@@ -8,7 +8,15 @@ export function BackupView(outlet: HTMLElement): () => void {
   const statsEl = h('div', { class: 'bk-stats' }, '…');
   const setMsg = (t: string, cls = '') => { msg.textContent = t; msg.className = 'bk-msg' + (cls ? ' ' + cls : ''); };
 
-  const exportA = h('a', { class: 'btn bk-btn', href: '/api/backup', download: 'arsenal-backup.json' }, '⤓ Скачать бэкап (JSON)');
+  const exportA = h('button', { class: 'btn bk-btn', type: 'button', onclick: async () => {
+    try {
+      const data = await api.exportBackup();
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
+      const a = h('a', { href: url, download: 'arsenal-backup.json' }) as HTMLAnchorElement;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { setMsg('Не удалось собрать бэкап: ' + (e instanceof Error ? e.message : String(e)), 'err'); }
+  } }, '⤓ Скачать бэкап (JSON)');
   const fileInp = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' } }) as HTMLInputElement;
   const importBtn = h('button', { class: 'btn bk-btn', type: 'button', onclick: () => fileInp.click() }, '⤒ Восстановить из файла…');
 

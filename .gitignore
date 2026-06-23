@@ -1,5 +1,6 @@
 node_modules/
 web/dist/
+web/dist-static/
 web/public/data/
 data/*.db
 data/*.db-*

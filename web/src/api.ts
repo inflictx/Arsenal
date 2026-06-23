@@ -1,3 +1,5 @@
+import { localApi } from './lib/local-api';
+
 export interface Entry {
   id: number;
   type: string;
@@ -47,7 +49,7 @@ const json = (body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
-export const api = {
+const httpApi = {
   stats: (): Promise<Stats> => req('/stats'),
   categories: (type: string): Promise<Category[]> => req('/categories' + qs({ type })),
   entries: (params: Record<string, unknown>): Promise<Entry[]> => req('/entries' + qs(params)),
@@ -60,6 +62,7 @@ export const api = {
   setNotes: (id: number, notes: string): Promise<Entry> => req('/entries/' + id + '/notes', { method: 'PATCH', ...json({ notes }) }),
   config: (name: string): Promise<any> => req('/config/' + name),
   restore: (data: unknown): Promise<{ entries: number; checklist_state: number }> => req('/restore', { method: 'POST', ...json(data) }),
+  exportBackup: (): Promise<any> => req('/backup'),
 
   targets: (): Promise<any[]> => req('/targets'),
   createTarget: (b: unknown): Promise<any> => req('/targets', { method: 'POST', ...json(b) }),
@@ -82,3 +85,7 @@ export const api = {
   resetChecklist: (slug: string): Promise<{ slug: string; cleared: number }> =>
     req('/checklists/' + encodeURIComponent(slug) + '/reset', { method: 'POST' }),
 };
+
+// Static (GitHub Pages) build uses the client-only localApi (IndexedDB + bundled
+// JSON); the normal build keeps the server-backed httpApi. Selected at build time.
+export const api = (import.meta.env.VITE_STATIC ? localApi : httpApi) as unknown as typeof httpApi;
