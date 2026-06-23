@@ -14,7 +14,7 @@ interface WLMeta {
 const SRC_TAGS = ['seclists', 'assetnote', 'kali', 'onelistforall', 'dirsearch', 'arjun',
   'jhaddix', 'n0kovo', 'weakpass', 'online', 'blns', 'param-miner', 'x8', 'commix', 'dnsmap', 'six2dez'];
 
-export function WordlistsView(outlet: HTMLElement): () => void {
+export function WordlistsView(outlet: HTMLElement, params: Record<string, string>): () => void {
   clear(outlet);
 
   let all: Entry[] = [];
@@ -138,7 +138,7 @@ export function WordlistsView(outlet: HTMLElement): () => void {
       cardsEl.appendChild(h('p', { class: 'wl-intro' }, 'Справочник ещё не загружен — выполни npm run seed.'));
       return;
     }
-    activeCat = cats[0];
+    activeCat = (params.sub && cats.includes(params.sub)) ? params.sub : cats[0]!;
     render();
   })();
 

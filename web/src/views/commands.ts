@@ -73,7 +73,7 @@ interface SFlag { flag: string; value?: string; desc: string; mode?: string; pos
 interface SGroup { name: string; flags: SFlag[]; }
 interface SMode { name: string; desc?: string; target?: string; }
 
-export function CommandsView(outlet: HTMLElement): () => void {
+export function CommandsView(outlet: HTMLElement, params: Record<string, string>): () => void {
   clear(outlet);
 
   const targetInput = h('input', { class: 'cmd-field', placeholder: '10.10.11.50 · target.htb · http://…', spellcheck: 'false' }) as HTMLInputElement;
@@ -478,10 +478,11 @@ export function CommandsView(outlet: HTMLElement): () => void {
     try { saved = JSON.parse(localStorage.getItem(LS_COLLAPSED) ?? 'null'); } catch { /* ignore */ }
     if (Array.isArray(saved)) for (const n of saved) collapsed.add(String(n));
     else secs.forEach((s) => { if (s.name !== 'WEB') collapsed.add(s.name); });
+    const want = params.sub ? docs.find((d) => d.title === params.sub) : null;
+    if (want?.category) collapsed.delete(want.category);
     renderTree();
-    const firstOpen = secs.find((s) => !collapsed.has(s.name)) ?? secs[0];
-    const first = firstOpen?.pages[0];
-    if (first) select(first);
+    if (want) { select(want); rowById.get(want.id)?.scrollIntoView({ block: 'center' }); }
+    else { const first = (secs.find((s) => !collapsed.has(s.name)) ?? secs[0])?.pages[0]; if (first) select(first); }
   })();
 
   return () => { window.removeEventListener('ars:target', onExternalTarget); scrollTop.destroy(); };

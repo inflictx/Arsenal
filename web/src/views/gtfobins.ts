@@ -14,7 +14,7 @@ const CTX_CHIPS: [string, string][] = [
   ['sudo', 'Sudo'], ['suid', 'SUID'], ['capabilities', 'Capabilities'], ['limited-suid', 'Limited SUID'],
 ];
 
-export function GtfobinsView(outlet: HTMLElement): () => void {
+export function GtfobinsView(outlet: HTMLElement, params: Record<string, string>): () => void {
   clear(outlet);
 
   let bins: Entry[] = [];
@@ -104,7 +104,9 @@ export function GtfobinsView(outlet: HTMLElement): () => void {
       titleEl.textContent = 'GTFOBins';
       return;
     }
-    select(bins[0]);
+    const want = params.sub ? bins.find((b) => b.title === params.sub) : null;
+    select(want ?? bins[0]!);
+    if (want) rowById.get(want.id)?.scrollIntoView({ block: 'center' });
   })();
 
   return () => scrollTop.destroy();

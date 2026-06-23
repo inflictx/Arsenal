@@ -5,7 +5,7 @@ import { ScrollTop } from '../components/scrolltop';
 import { copyButton } from '../lib/copy';
 import { renderMarkdown } from '../lib/markdown';
 
-export function BurpView(outlet: HTMLElement): () => void {
+export function BurpView(outlet: HTMLElement, params: Record<string, string>): () => void {
   clear(outlet);
 
   const filter = SearchField({ placeholder: 'Поиск по докам…', onInput: () => renderTree() });
@@ -154,9 +154,11 @@ export function BurpView(outlet: HTMLElement): () => void {
     try { saved = JSON.parse(localStorage.getItem('burp.collapsed') ?? 'null'); } catch { /* ignore */ }
     if (Array.isArray(saved)) for (const n of saved) collapsed.add(String(n));
     else secs.forEach((s) => collapsed.add(s.name)); // default: all groups collapsed (clean overview)
+    const want = params.sub ? docs.find((d) => d.title === params.sub) : null;
+    if (want) { const sec = secs.find((s) => s.pages.some((p) => p.id === want.id)); if (sec) collapsed.delete(sec.name); }
     renderTree();
-    const first = (secs.find((s) => !collapsed.has(s.name)) ?? secs[0])?.pages[0];
-    if (first) select(first);
+    if (want) { select(want); rowById.get(want.id)?.scrollIntoView({ block: 'center' }); }
+    else { const first = (secs.find((s) => !collapsed.has(s.name)) ?? secs[0])?.pages[0]; if (first) select(first); }
   })();
 
   return () => scrollTop.destroy();
