@@ -1,31 +1,105 @@
-# ARS3NAL — personal offline pentest / bug-bounty toolkit
+<h1 align="center">ARS3NAL</h1>
 
-A local, **offline-first** web app that replaces jumping between HackTricks,
-PayloadsAllTheThings and a pile of scattered `.md` files with one fast,
-searchable, editable arsenal. Runs entirely on your machine — no server-side
-component you don't control, no telemetry, your data never leaves the box.
+<p align="center">
+  <b>A local, offline-first arsenal for pentesting &amp; bug bounty.</b><br>
+  Payloads, a click-to-build command generator, GTFOBins, wordlists, an embedded CyberChef,
+  reverse shells, a Burp reference, operational checklists and an engagement tracker —
+  one fast, searchable, editable app that runs entirely on your machine.
+</p>
 
-> The UI is in **Russian** (payloads, commands and code stay technical/English).
+<p align="center">
+  <img alt="license" src="https://img.shields.io/badge/license-GPL--3.0-496dff">
+  <img alt="stack" src="https://img.shields.io/badge/stack-Fastify%20%2B%20SQLite%20%2B%20Vite%20TS-8250df">
+  <img alt="offline" src="https://img.shields.io/badge/offline-first-22c55e">
+  <img alt="ui" src="https://img.shields.io/badge/UI-Russian-496dff">
+</p>
 
-## Modules
+![Command builder](screenshots/commands.png)
 
-- **Payloads** — 63 curated PayloadsAllTheThings categories (~1500 entries), with a ⌘K quick-search palette over everything.
-- **Commands** — practical CTF/HTB/pentest tool reference; most tools have a click-to-build **command builder** (toggle flags → command assembles), and a Target/LHOST bar that substitutes example hosts live.
-- **GTFOBins** — all 458 binaries, fully translated, with function/context filter chips.
-- **Wordlists** — a curated guide to the top wordlists: canonical paths + GitHub links + "what each is for" (references only).
-- **CyberChef** — the official offline CyberChef build, embedded, re-themed to match and with its UI localized to Russian.
-- **Reverse Shell** — revshells.com-style generator (reverse / bind / msfvenom / listeners, encodings).
-- **Burp Docs** — a Russian reference covering the Burp Suite desktop documentation.
-- **Checklists** — per-vulnerability operational checklists you tick off (progress persists), plus infra/AD/cloud/priv-esc lists; inline payload cross-links.
-- **Engagements** — per-target workspace (host/LHOST/scope/notes + findings tracker + Markdown report export); the active target feeds `{TARGET}`/`{LHOST}` into Commands & Reverse Shell.
-- **Notes / Favorites / Backup** — your own Markdown notes, a ★ aggregator across all modules, and full JSON export/import.
+> No telemetry. No cloud. No account. Your data lives in a local SQLite file and never
+> leaves the box. Stop juggling 30 browser tabs and a folder of `.md` cheatsheets.
 
-## Run
+> ⚠️ **For authorized security testing and education only.** See [Disclaimer](#-disclaimer).
+
+> 🌐 The UI is in **Russian**; payloads, commands and code stay technical / English.
+
+---
+
+## ✨ Highlights
+
+### 🛠️ Command builder — assemble commands by clicking flags
+The headline feature. Pick a tool, toggle the flags you want, and the command assembles
+itself with **verified, documented flags** (each flag has a Russian explanation). Set your
+**Target / LHOST once** in the top bar and it's substituted into *every* tool's examples
+live — no more find-and-replace on `10.10.x.x`. Save assembled commands to your own
+**“Готовые команды”** library (persists in the DB, drag-to-reorder). 59 tools have the
+builder (nmap, ffuf, sqlmap, gobuster, hashcat, …); the rest are rich Markdown references.
+
+![Command builder with nmap](screenshots/commands.png)
+
+### ⌨️ One search across everything
+A ⌘K palette that searches **every** payload, command, GTFOBin, wordlist and doc at once
+(SQLite FTS5), so you find the thing without remembering which module it lives in.
+
+![Global search palette](screenshots/palette.png)
+
+### ⚡ Curated payloads — 63 categories
+Hand-curated from PayloadsAllTheThings (~1500 entries): detection-first ordering, real
+copy-ready payloads, diagrams and tables, with Russian tips. Not a noisy auto-dump.
+
+![Payloads](screenshots/payloads.png)
+
+### 🧪 CyberChef — embedded &amp; offline
+The full official CyberChef build, embedded right in the app, re-themed to match and with
+its UI localized to Russian. Encode/decode/crypto without leaving ARS3NAL or going online.
+
+![Embedded CyberChef](screenshots/cyberchef.png)
+
+### 🐧 GTFOBins — all 458, fully translated
+Every GTFOBins binary with function/context filter chips (shell, file-read, sudo, SUID…)
+and Russian-translated technique notes.
+
+![GTFOBins](screenshots/gtfobins.png)
+
+### 🐚 Reverse-shell generator
+revshells.com-grade: reverse / bind / msfvenom / listeners, with shell and encoding
+selectors (base64 / URL / PowerShell). Your LHOST is shared with the rest of the app.
+
+![Reverse shell generator](screenshots/revshell.png)
+
+### ☑️ Operational checklists
+70 per-vulnerability checklists (web + AD / cloud / priv-esc / pivoting) you tick off —
+progress persists — with a research panel and inline ⚡ payload cross-links per item.
+
+![Checklists](screenshots/checklists.png)
+
+### 🎯 Engagements &amp; findings
+A per-target workspace: host / LHOST / scope / notes + a findings tracker (severity,
+status, repro) + **Markdown report export**. The active target feeds `{TARGET}` / `{LHOST}`
+into the command builder and reverse-shell generator.
+
+![Engagements](screenshots/engagements.png)
+
+### 📚 Wordlists reference &amp; 🟠 Burp reference
+A curated guide to the top wordlists (canonical paths + GitHub links + “what each is for”),
+and a Russian reference for the Burp Suite desktop workflow.
+
+<p>
+  <img src="screenshots/wordlists.png" width="49%" alt="Wordlists">
+  <img src="screenshots/burp.png" width="49%" alt="Burp reference">
+</p>
+
+Plus **Notes** (personal Markdown), **Favorites** (★ across every module) and **Backup**
+(export/import the whole DB as one JSON).
+
+---
+
+## 🚀 Run
 
 Double-click **`start.bat`** (first run installs deps, seeds the DB and builds the UI),
 then open <http://localhost:7331>.
 
-Or manually:
+Or manually (Node.js 18+):
 
 ```bash
 npm install
@@ -34,45 +108,44 @@ npm run build
 npm run start    # http://localhost:7331
 ```
 
-Requires Node.js 18+.
+Dev mode: `npm run dev` (Vite + Fastify with live reload). Tests: `npm test`.
 
-## Develop
-
-```bash
-npm run dev      # Vite (5173) + Fastify (7331) with live reload
-npm test         # vitest
-```
-
-## Layout
+## 🗂️ Layout
 
 - `server/` — Fastify API + SQLite (better-sqlite3, FTS5)
-- `seed/` — one-time parsers that build the DB (curated payloads, checklists, commands, Burp docs, GTFOBins, wordlist references)
+- `seed/` — parsers that build the DB (curated payloads, checklists, commands, Burp docs, GTFOBins, wordlist refs)
 - `web/` — Vite + vanilla-TypeScript SPA (no framework)
 - `data/arsenal.db` — **your** data; custom entries, notes, engagements and checklist progress are never overwritten by re-seeding, and the DB is git-ignored so nothing personal is ever published.
 
-## Privacy
+## 🔒 Privacy
 
-Everything is local. Your notes, targets, findings and saved commands live only
-in `data/arsenal.db` (git-ignored). The seed pipeline rebuilds all *reference*
-content from source, so ignoring the DB loses nothing reproducible.
+Everything is local. Notes, targets, findings and saved commands live only in
+`data/arsenal.db` (git-ignored). The seed pipeline rebuilds all *reference* content from
+source, so ignoring the DB loses nothing.
 
-## Acknowledgements
+## ⚖️ Disclaimer
 
-ARS3NAL is mostly a fast, offline, searchable front-end over other people's
-excellent work. Huge thanks to these projects and their authors:
+ARS3NAL is a reference and productivity tool for **authorized** security testing,
+**CTF/learning**, and defensive research. Use it **only** against systems you own or have
+explicit written permission to test. You are solely responsible for your actions and for
+complying with all applicable laws. The authors accept no liability for misuse or damage.
+Full text: [`DISCLAIMER.md`](DISCLAIMER.md).
 
-- **[GTFOBins](https://github.com/GTFOBins/GTFOBins.github.io)** — Unix binaries abusable for shell / file ops / priv-esc *(GPL-3.0)*
-- **[PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings)** — by swisskyrepo & contributors — payloads, methodology, diagrams *(MIT)*
-- **[reverse-shell-generator](https://github.com/0dayCTF/reverse-shell-generator)** — by Ryan Montgomery / 0dayCTF — reverse / bind / msfvenom / listener data *(MIT)*
-- **[CyberChef](https://github.com/gchq/CyberChef)** — by GCHQ — the embedded offline "cyber swiss army knife" *(Apache-2.0)*
-- **[SecLists](https://github.com/danielmiessler/SecLists)** — by Daniel Miessler — wordlist references *(MIT)*
-- **[Burp Suite documentation](https://portswigger.net/burp/documentation)** — by PortSwigger — basis for the Burp reference module
+## 🙏 Acknowledgements
+
+ARS3NAL is mostly a fast, offline, searchable front-end over other people's excellent work.
+Huge thanks to:
+
+- **[GTFOBins](https://github.com/GTFOBins/GTFOBins.github.io)** — Unix binary abuse techniques *(GPL-3.0)*
+- **[PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings)** by swisskyrepo &amp; contributors — payloads, methodology, diagrams *(MIT)*
+- **[reverse-shell-generator](https://github.com/0dayCTF/reverse-shell-generator)** by Ryan Montgomery / 0dayCTF — reverse/bind/msfvenom/listener data *(MIT)*
+- **[CyberChef](https://github.com/gchq/CyberChef)** by GCHQ — embedded offline build *(Apache-2.0)*
+- **[SecLists](https://github.com/danielmiessler/SecLists)** by Daniel Miessler — wordlist references *(MIT)*
+- **[Burp Suite documentation](https://portswigger.net/burp/documentation)** by PortSwigger — basis for the Burp reference module
 - **[Open Sans](https://fonts.google.com/specimen/Open+Sans)** *(Apache-2.0)* and **[Source Code Pro](https://github.com/adobe-fonts/source-code-pro)** by Adobe *(SIL OFL-1.1)* — fonts
-- **[HackTricks](https://book.hacktricks.xyz)** — dark colour-palette inspiration
 
-Full per-source license details are in [`THIRD_PARTY.md`](THIRD_PARTY.md).
+Full per-source license details: [`THIRD_PARTY.md`](THIRD_PARTY.md).
 
-## License
+## 📄 License
 
-ARS3NAL's own code is licensed **GPL-3.0** (see [`LICENSE`](LICENSE)) — required
-because it bundles GPL-3.0 GTFOBins data.
+**GPL-3.0** (see [`LICENSE`](LICENSE)) — required because ARS3NAL bundles GPL-3.0 GTFOBins data.
