@@ -12,6 +12,7 @@
     "build": "vite build",
     "start": "tsx server/index.ts",
     "seed": "tsx seed/seed.ts",
+    "export-static": "tsx seed/export-static.ts",
     "test": "vitest run"
   },
   "dependencies": {
