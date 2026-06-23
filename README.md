@@ -56,9 +56,23 @@ Everything is local. Your notes, targets, findings and saved commands live only
 in `data/arsenal.db` (git-ignored). The seed pipeline rebuilds all *reference*
 content from source, so ignoring the DB loses nothing reproducible.
 
-## License & credits
+## Acknowledgements
 
-ARS3NAL's own code is **GPL-3.0** (see [`LICENSE`](LICENSE)) — chosen because it
-bundles GPL-3.0 GTFOBins data. It stands on a lot of other people's work; every
-bundled/derived/referenced source and its license is listed in
-[`THIRD_PARTY.md`](THIRD_PARTY.md). Huge thanks to all of them.
+ARS3NAL is mostly a fast, offline, searchable front-end over other people's
+excellent work. Huge thanks to these projects and their authors:
+
+- **[GTFOBins](https://github.com/GTFOBins/GTFOBins.github.io)** — Unix binaries abusable for shell / file ops / priv-esc *(GPL-3.0)*
+- **[PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings)** — by swisskyrepo & contributors — payloads, methodology, diagrams *(MIT)*
+- **[reverse-shell-generator](https://github.com/0dayCTF/reverse-shell-generator)** — by Ryan Montgomery / 0dayCTF — reverse / bind / msfvenom / listener data *(MIT)*
+- **[CyberChef](https://github.com/gchq/CyberChef)** — by GCHQ — the embedded offline "cyber swiss army knife" *(Apache-2.0)*
+- **[SecLists](https://github.com/danielmiessler/SecLists)** — by Daniel Miessler — wordlist references *(MIT)*
+- **[Burp Suite documentation](https://portswigger.net/burp/documentation)** — by PortSwigger — basis for the Burp reference module
+- **[Open Sans](https://fonts.google.com/specimen/Open+Sans)** *(Apache-2.0)* and **[Source Code Pro](https://github.com/adobe-fonts/source-code-pro)** by Adobe *(SIL OFL-1.1)* — fonts
+- **[HackTricks](https://book.hacktricks.xyz)** — dark colour-palette inspiration
+
+Full per-source license details are in [`THIRD_PARTY.md`](THIRD_PARTY.md).
+
+## License
+
+ARS3NAL's own code is licensed **GPL-3.0** (see [`LICENSE`](LICENSE)) — required
+because it bundles GPL-3.0 GTFOBins data.
