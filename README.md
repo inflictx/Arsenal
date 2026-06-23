@@ -14,7 +14,7 @@
   <img alt="ui" src="https://img.shields.io/badge/UI-Russian-496dff">
 </p>
 
-![Command builder](screenshots/commands.png)
+![ARS3NAL command builder — click flags, the command assembles itself](screenshots/commands.gif)
 
 > No telemetry. No cloud. No account. Your data lives in a local SQLite file and never
 > leaves the box. Stop juggling 30 browser tabs and a folder of `.md` cheatsheets.
@@ -41,13 +41,13 @@ builder (nmap, ffuf, sqlmap, gobuster, hashcat, …); the rest are rich Markdown
 A ⌘K palette that searches **every** payload, command, GTFOBin, wordlist and doc at once
 (SQLite FTS5), so you find the thing without remembering which module it lives in.
 
-![Global search palette](screenshots/palette.png)
+![Global search — type once, jump straight to the result](screenshots/search.gif)
 
 ### ⚡ Curated payloads — 63 categories
 Hand-curated from PayloadsAllTheThings (~1500 entries): detection-first ordering, real
 copy-ready payloads, diagrams and tables, with Russian tips. Not a noisy auto-dump.
 
-![Payloads](screenshots/payloads.png)
+![Payloads](screenshots/payloads.gif)
 
 ### 🧪 CyberChef — embedded &amp; offline
 The full official CyberChef build, embedded right in the app, re-themed to match and with
@@ -71,7 +71,7 @@ selectors (base64 / URL / PowerShell). Your LHOST is shared with the rest of the
 70 per-vulnerability checklists (web + AD / cloud / priv-esc / pivoting) you tick off —
 progress persists — with a research panel and inline ⚡ payload cross-links per item.
 
-![Checklists](screenshots/checklists.png)
+![Checklists](screenshots/checklists.gif)
 
 ### 🎯 Engagements &amp; findings
 A per-target workspace: host / LHOST / scope / notes + a findings tracker (severity,
