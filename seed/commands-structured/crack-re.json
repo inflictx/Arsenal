@@ -1,0 +1,283 @@
+{
+  "category": "Крекинг паролей",
+  "catOrder": 5,
+  "tools": [
+    {
+      "category": "Крекинг паролей",
+      "catOrder": 5,
+      "title": "hashcat",
+      "subcategory": "GPU-крекер хешей",
+      "purpose": "Самый быстрый крекер хешей с ускорением на GPU. Перебирает пароли по словарю, маске или гибридно для сотен типов хешей. Главный инструмент для оффлайн-восстановления паролей.",
+      "install": "sudo apt install hashcat",
+      "binary": "hashcat",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Словарь / маска (позиционный аргумент)",
+          "flags": [
+            { "flag": "словарь", "value": "/usr/share/wordlists/rockyou.txt", "desc": "Путь к словарю (для атаки -a 0/1) или маска (для -a 3). Подставляется последним, после хеш-файла. Правится свободно.", "positional": true, "on": true }
+          ]
+        },
+        {
+          "name": "Режим хеша (-m)",
+          "flags": [
+            { "flag": "-m", "value": "1000", "desc": "Тип хеша (--hash-type). Ключевые: 0 MD5, 100 SHA1, 1000 NTLM, 1400 SHA256, 1800 sha512crypt, 3200 bcrypt, 5600 NetNTLMv2, 13100 Kerberos TGS-REP (Kerberoasting), 18200 Kerberos AS-REP (AS-REP Roasting), 16800 WPA-PMKID, 22000 WPA-PBKDF2." },
+            { "flag": "--username", "desc": "Игнорировать имена пользователей в начале строк хеш-файла (формат user:hash)." },
+            { "flag": "--hash-info", "desc": "Показать справку по конкретному -m: пример хеша, тип соли и т.п." }
+          ]
+        },
+        {
+          "name": "Атака (-a)",
+          "flags": [
+            { "flag": "-a", "value": "0", "desc": "Режим атаки (--attack-mode): 0 прямая по словарю, 1 комбинаторная (2 словаря), 3 брутфорс по маске, 6 гибрид словарь+маска, 7 гибрид маска+словарь." },
+            { "flag": "?l?u?d?s", "desc": "Плейсхолдеры маски (для -a 3): ?l строчные a-z, ?u заглавные A-Z, ?d цифры 0-9, ?s спецсимволы, ?a всё сразу (?l?u?d?s), ?b байт 0x00-0xff. Пример маски: Password?d?d." },
+            { "flag": "-1", "value": "?l?d", "desc": "Свой набор символов 1 (--custom-charset1..4: -1/-2/-3/-4), затем используется в маске как ?1." },
+            { "flag": "--increment", "desc": "Перебирать длину маски по нарастающей (с короткой к длинной)." },
+            { "flag": "--increment-min", "value": "4", "desc": "Минимальная длина маски при --increment." },
+            { "flag": "--increment-max", "value": "8", "desc": "Максимальная длина маски при --increment." }
+          ]
+        },
+        {
+          "name": "Правила и скорость",
+          "flags": [
+            { "flag": "-r", "value": "/usr/share/hashcat/rules/best64.rule", "desc": "Файл правил мутации слов (--rules-file). Повторяемый. Классика: best64.rule, d3ad0ne.rule." },
+            { "flag": "-O", "desc": "Оптимизированные ядра (--optimized-kernel-enable): заметно быстрее, но ограничивает максимальную длину пароля (обычно 31)." },
+            { "flag": "-w", "value": "3", "desc": "Профиль нагрузки (--workload-profile): 1 низкий, 2 дефолт, 3 высокий, 4 кошмар (только headless)." },
+            { "flag": "-D", "value": "1,2", "desc": "Тип устройств (--opencl-device-types): 1 CPU, 2 GPU." },
+            { "flag": "--force", "desc": "Игнорировать предупреждения (запуск без поддерживаемого GPU и т.п.)." }
+          ]
+        },
+        {
+          "name": "Сервис и вывод",
+          "flags": [
+            { "flag": "--show", "desc": "Показать уже взломанные хеши из potfile (сравнивает hashlist с potfile), ничего не перебирая." },
+            { "flag": "-o", "value": "cracked.txt", "desc": "Файл для записи найденных паролей (--outfile)." },
+            { "flag": "--potfile-disable", "desc": "Не использовать и не писать potfile (заставить перебирать заново)." },
+            { "flag": "--stdout", "desc": "Только сгенерировать кандидаты и вывести их, не взламывая (проверка масок/правил)." },
+            { "flag": "--session", "value": "job1", "desc": "Имя сессии для возобновления (--session)." },
+            { "flag": "--restore", "desc": "Возобновить прерванную сессию (по имени из --session)." },
+            { "flag": "--runtime", "value": "3600", "desc": "Прервать работу через N секунд." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "hashcat -m 0 -a 0 {TARGET} /usr/share/wordlists/rockyou.txt", "note": "Словарная атака на MD5 по rockyou — базовый сценарий." },
+        { "cmd": "hashcat -m 1000 -a 0 {TARGET} /usr/share/wordlists/rockyou.txt -r /usr/share/hashcat/rules/best64.rule", "note": "NTLM-хеши со словарём и правилами мутации best64." },
+        { "cmd": "hashcat -m 22000 -a 3 {TARGET} '?d?d?d?d?d?d?d?d'", "note": "WPA-рукопожатие: брутфорс 8-значного цифрового пароля по маске." },
+        { "cmd": "hashcat -m 13100 {TARGET} /usr/share/wordlists/rockyou.txt", "note": "Kerberoasting: взлом TGS-REP билетов, добытых из AD." },
+        { "cmd": "hashcat -m 1000 {TARGET} --show", "note": "Показать уже взломанные NTLM из potfile без повторного перебора." },
+        { "cmd": "hashcat -m 1800 -a 6 {TARGET} /usr/share/wordlists/rockyou.txt '?d?d?d'", "note": "Гибрид: слово из словаря + три цифры в конце (sha512crypt)." }
+      ],
+      "notes": "Цель — хеш-файл (по одному хешу/строка), затем позиционно словарь или маска. Тип хеша (-m) критичен: неверный режим = ноль совпадений; определи его через hashid/--example-hashes. potfile (~/.hashcat/hashcat.potfile) копит взломанное между запусками. -O ускоряет, но режет длину пароля. На VM/без GPU нужен --force. 22000 заменил устаревшие 2500/16800 для WPA."
+    },
+    {
+      "category": "Крекинг паролей",
+      "catOrder": 5,
+      "title": "john (John the Ripper)",
+      "subcategory": "универсальный крекер хешей (CPU)",
+      "purpose": "Классический крекер паролей на CPU с автоопределением типа хеша и богатым набором *2john-конвертеров. Берёт ZIP/SSH/PDF/KeePass и сотни форматов хешей. Незаменим, когда нет GPU.",
+      "install": "sudo apt install john",
+      "binary": "john",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Режимы взлома",
+          "flags": [
+            { "flag": "--wordlist", "value": "/usr/share/wordlists/rockyou.txt", "desc": "Словарная атака (--wordlist=FILE). Читать кандидаты из файла." },
+            { "flag": "--rules", "value": "Jumbo", "desc": "Включить правила мутации слов (--rules[=SECTION]). Без секции — [List.Rules:Wordlist]." },
+            { "flag": "--single", "desc": "Режим single crack: правила на основе имён пользователей/GECOS (--single). Быстрый первый проход." },
+            { "flag": "--incremental", "value": "ASCII", "desc": "Инкрементальный брутфорс по марковской модели (--incremental[=MODE], дефолт ASCII)." },
+            { "flag": "--mask", "value": "?l?l?l?l?d?d", "desc": "Атака по маске (--mask=MASK). Плейсхолдеры как в hashcat: ?l ?u ?d ?s ?a." },
+            { "flag": "--loopback", "desc": "Брать кандидаты из john.pot (--loopback[=FILE]) — мутации уже взломанных." }
+          ]
+        },
+        {
+          "name": "Формат и результат",
+          "flags": [
+            { "flag": "--format", "value": "NT", "desc": "Явно задать тип хеша (--format=NAME): NT, raw-md5, sha512crypt, bcrypt, krb5tgs и др. Отключает автоопределение." },
+            { "flag": "--show", "desc": "Показать уже взломанные пароли для файла (--show[=left] — показать НЕвзломанные)." },
+            { "flag": "--list", "value": "formats", "desc": "Справочники (--list=WHAT): formats, subformats, build-info, rules." },
+            { "flag": "--test", "value": "5", "desc": "Бенчмарк форматов в течение N секунд (--test[=TIME])." }
+          ]
+        },
+        {
+          "name": "Производительность",
+          "flags": [
+            { "flag": "--fork", "value": "4", "desc": "Запустить N параллельных процессов на ядрах CPU (--fork=N)." },
+            { "flag": "--node", "value": "1-2/4", "desc": "Распределённый перебор: диапазон/всего (--node=MIN[-MAX]/TOTAL)." },
+            { "flag": "--max-run-time", "value": "3600", "desc": "Остановиться через N секунд." }
+          ]
+        },
+        {
+          "name": "Сессия и фильтры",
+          "flags": [
+            { "flag": "--session", "value": "job1", "desc": "Имя сессии для возобновления (--session=NAME, файл .rec)." },
+            { "flag": "--restore", "desc": "Возобновить прерванную сессию (--restore[=NAME], дефолт john.rec)." },
+            { "flag": "--status", "desc": "Показать статус активной/прерванной сессии (--status[=NAME])." },
+            { "flag": "--pot", "value": "custom.pot", "desc": "Свой potfile с результатами (--pot=NAME)." },
+            { "flag": "--users", "value": "admin", "desc": "Только указанные пользователи/UID (--users=[-]LOGIN|UID; минус = исключить)." },
+            { "flag": "--stdout", "desc": "Только вывести кандидаты, не проверяя (--stdout[=LENGTH]) — генератор слов." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "john --wordlist=/usr/share/wordlists/rockyou.txt {TARGET}", "note": "Стандартная словарная атака с автоопределением формата." },
+        { "cmd": "john --wordlist=/usr/share/wordlists/rockyou.txt --rules {TARGET}", "note": "Словарь + правила мутации (l33t, регистр, цифры в конце)." },
+        { "cmd": "john --format=NT --wordlist=/usr/share/wordlists/rockyou.txt {TARGET}", "note": "Явно указать NTLM-формат (автодетект на NT иногда промахивается)." },
+        { "cmd": "john --show {TARGET}", "note": "Показать уже взломанные пароли из john.pot." },
+        { "cmd": "zip2john secret.zip > {TARGET}; john {TARGET}", "note": "Извлечь хеш из ZIP конвертером и сразу взломать (так же ssh2john/pdf2john/keepass2john)." },
+        { "cmd": "john --incremental --fork=4 {TARGET}", "note": "Полный брутфорс на 4 ядрах, когда словари не помогли." }
+      ],
+      "notes": "Цель — файл с хешами (позиционно). Конвертеры *2john (zip2john, ssh2john, rar2john, pdf2john, keepass2john, gpg2john, office2john) превращают защищённый файл в хеш для john. Результаты копятся в ~/.john/john.pot — повторный запуск не перебирает уже взломанное (для чистоты используй --pot или сотри pot). Имена форматов из --list=formats. В Kali бинарь Jumbo-сборки (john-the-ripper-jumbo), отсюда сотни форматов."
+    },
+    {
+      "category": "Крекинг паролей",
+      "catOrder": 5,
+      "title": "hashid / hash-identifier",
+      "subcategory": "определение типа хеша",
+      "purpose": "Определяет тип хеша по его виду и сразу подсказывает режим hashcat (-m) и формат John (-j). Первый шаг перед любым взломом: без правильного типа крекер бесполезен.",
+      "install": "pipx install hashid",
+      "binary": "hashid",
+      "target": "'{TARGET}'",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Ввод",
+          "flags": [
+            { "flag": "'{TARGET}'", "desc": "Хеш в кавычках (позиционно). Можно передать путь к файлу с хешами или подать через STDIN." }
+          ]
+        },
+        {
+          "name": "Вывод режимов крекеров",
+          "flags": [
+            { "flag": "-m", "desc": "Показать соответствующий режим hashcat (--mode), число для флага -m hashcat." },
+            { "flag": "-j", "desc": "Показать соответствующий формат John the Ripper (--john), имя для --format." }
+          ]
+        },
+        {
+          "name": "Опции",
+          "flags": [
+            { "flag": "-e", "desc": "Расширенный режим (--extended): включить все алгоритмы, в т.ч. солёные хеши паролей." },
+            { "flag": "-o", "value": "result.txt", "desc": "Записать результат в файл вместо STDOUT (--outfile FILE)." },
+            { "flag": "--help", "desc": "Показать справку." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "hashid '{TARGET}'", "note": "Базовое определение: список вероятных типов хеша." },
+        { "cmd": "hashid -m -j '{TARGET}'", "note": "Показать сразу режим hashcat и формат John — готово копировать в крекер." },
+        { "cmd": "hashid -e '{TARGET}'", "note": "Расширенный список, включая солёные варианты." },
+        { "cmd": "hashid -m hashes.txt", "note": "Определить типы для всех хешей из файла." }
+      ],
+      "notes": "hashid распознаёт по структуре/префиксу больше типов, чем старый hash-identifier (особенно с префиксами вида $1$, $6$, $2y$). Это эвристика: для коротких хешей (MD5/NTLM выглядят одинаково — 32 hex) выдаётся несколько кандидатов, перебирай по очереди. hash-identifier — интерактивный аналог без флагов (вводишь хеш в приглашении). Альтернатива онлайн/CLI — name-that-hash (nth)."
+    },
+    {
+      "category": "Крекинг паролей",
+      "catOrder": 5,
+      "title": "cewl / crunch",
+      "subcategory": "генераторы словарей",
+      "purpose": "CeWL выкачивает слова с целевого сайта в кастомный словарь (имена, термины, продукты). Crunch генерирует словарь по маске/набору символов. Оба дают целевые списки под конкретную жертву.",
+      "install": "sudo apt install cewl crunch",
+      "binary": "cewl",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Глубина и слова (cewl)",
+          "flags": [
+            { "flag": "-d", "value": "2", "desc": "Глубина обхода сайта паука (--depth), дефолт 2." },
+            { "flag": "-m", "value": "3", "desc": "Минимальная длина слова (--min_word_length), дефолт 3." },
+            { "flag": "--with-numbers", "desc": "Принимать слова, содержащие цифры." },
+            { "flag": "--lowercase", "desc": "Приводить все собранные слова к нижнему регистру." },
+            { "flag": "-c", "desc": "Показывать частоту каждого слова (--count)." }
+          ]
+        },
+        {
+          "name": "Область и сбор (cewl)",
+          "flags": [
+            { "flag": "-o", "desc": "Разрешить пауку уходить на другие сайты (--offsite)." },
+            { "flag": "-a", "desc": "Собирать метаданные из файлов (--meta)." },
+            { "flag": "-e", "desc": "Собирать email-адреса (--email)." },
+            { "flag": "--meta_file", "value": "meta.txt", "desc": "Отдельный файл для метаданных." },
+            { "flag": "--email_file", "value": "emails.txt", "desc": "Отдельный файл для email-адресов." }
+          ]
+        },
+        {
+          "name": "Вывод и запрос (cewl)",
+          "flags": [
+            { "flag": "-w", "value": "wordlist.txt", "desc": "Записать словарь в файл (--write)." },
+            { "flag": "-u", "value": "Mozilla/5.0", "desc": "Свой User-Agent (--ua)." },
+            { "flag": "-v", "desc": "Подробный вывод (--verbose)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "cewl {TARGET} -d 2 -m 5 -w wordlist.txt", "note": "Собрать со страницы слова от 5 букв, глубина 2, в файл." },
+        { "cmd": "cewl {TARGET} --with-numbers -w wordlist.txt", "note": "Включить слова с цифрами (пароли вида Company2024)." },
+        { "cmd": "cewl {TARGET} -a --meta_file meta.txt -e --email_file mails.txt", "note": "Заодно вытащить метаданные документов и email-адреса." },
+        { "cmd": "crunch 8 8 -t @@@@%%%% -o wordlist.txt", "note": "Crunch: 4 строчные буквы + 4 цифры (например pass1234), сохранить в файл." },
+        { "cmd": "crunch 6 6 0123456789abcdef -o hex6.txt", "note": "Crunch: все 6-символьные hex-комбинации из заданного набора." }
+      ],
+      "notes": "CeWL: цель — URL (позиционно), требует доступа к сайту. Чем больше -d, тем шире охват и дольше работа. Полученный список скармливают в hashcat/john/hydra. CRUNCH (синтаксис: crunch MIN MAX [charset] [опции]): плейсхолдеры -t паттерна — @ строчные буквы, , (запятая) заглавные буквы, % цифры, ^ символы; порядок наборов всегда строчные-заглавные-цифры-символы, ненужный набор замени плюсом + (дефолтный charset). Опции crunch: -o файл вывода, -t паттерн, -b max размер файла (1MB/1GB), -f charset.lst имя (именованный набор), -p строки (перестановки), -s старт. Осторожно: crunch легко создаёт терабайты — оценивай объём (вывод первой строки показывает размер)."
+    },
+    {
+      "category": "Reverse Engineering",
+      "catOrder": 7,
+      "title": "ltrace / strace",
+      "subcategory": "трассировка вызовов",
+      "purpose": "strace перехватывает системные вызовы программы (open, read, connect), ltrace — вызовы библиотек (strcmp, malloc). Динамический разбор бинаря: видно файлы, сеть и сравнения паролей в открытую.",
+      "install": "sudo apt install strace ltrace",
+      "binary": "strace",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Что трассировать",
+          "flags": [
+            { "flag": "-f", "desc": "Следовать за дочерними процессами (--follow-forks): fork/vfork/clone." },
+            { "flag": "-e", "value": "trace=open,read", "desc": "Фильтр вызовов (--expression). Группы: trace=file, network, memory, signal, process; или список имён через запятую." },
+            { "flag": "-e", "value": "signal=!SIGIO", "desc": "Какие сигналы показывать (минус/! = исключить)." },
+            { "flag": "-v", "desc": "Полный вывод структур без сокращений (--no-abbrev)." }
+          ]
+        },
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "{TARGET}", "desc": "Трассируемый бинарь с аргументами (позиционно, после опций): strace [опции] ./prog args." },
+            { "flag": "-p", "value": "1234", "desc": "Подключиться к уже запущенному процессу по PID (--attach)." },
+            { "flag": "-E", "value": "VAR=val", "desc": "Задать переменную окружения для запускаемой программы." }
+          ]
+        },
+        {
+          "name": "Детали вывода",
+          "flags": [
+            { "flag": "-s", "value": "256", "desc": "Максимальная длина выводимых строк (--string-limit), дефолт 32 — увеличивай, чтобы видеть пароли целиком." },
+            { "flag": "-y", "desc": "Печатать пути для файловых дескрипторов (--decode-fds)." },
+            { "flag": "-T", "desc": "Показывать время, проведённое в каждом вызове (--syscall-times)." },
+            { "flag": "-t", "desc": "Метки времени (-t время, -tt с микросекундами, -ttt epoch)." },
+            { "flag": "-k", "desc": "Печатать стек вызовов после каждого syscall (--stack-trace)." }
+          ]
+        },
+        {
+          "name": "Сводка и файл",
+          "flags": [
+            { "flag": "-c", "desc": "Сводная таблица: счётчик и время по каждому вызову вместо полного трейса (--summary-only)." },
+            { "flag": "-o", "value": "trace.txt", "desc": "Писать трейс в файл вместо stderr (--output)." },
+            { "flag": "-ff", "desc": "С -o: отдельный файл на каждый PID (trace.txt.PID)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "strace ./{TARGET}", "note": "Полный трейс системных вызовов — увидеть открытия файлов, сеть, чтение конфигов." },
+        { "cmd": "strace -f -e trace=network ./{TARGET}", "note": "Только сетевые вызовы, включая дочерние процессы (куда стучится бинарь)." },
+        { "cmd": "strace -e trace=open,openat ./{TARGET}", "note": "Какие файлы пытается открыть программа (поиск конфигов/флагов)." },
+        { "cmd": "strace -c ./{TARGET}", "note": "Сводка по вызовам — быстро понять профиль поведения программы." },
+        { "cmd": "ltrace -s 256 ./{TARGET}", "note": "Трейс библиотечных вызовов с длинными строками — часто видно сравнение пароля через strcmp." },
+        { "cmd": "ltrace -e strcmp+strncmp ./{TARGET}", "note": "Только сравнения строк: подсмотреть введённый и ожидаемый пароль в открытом виде." }
+      ],
+      "notes": "Цель — путь к исполняемому файлу (позиционно после флагов), аргументы программы идут следом. LTRACE — та же логика, но перехватывает вызовы динамических БИБЛИОТЕК (strcmp, memcmp, strcpy, system, getenv), а не системные вызовы; флаги совпадают: -f дочерние, -e FILTER (формат malloc+free), -p PID, -s STRSIZE длина строк, -o FILE, -c сводка, плюс -S (показать и syscalls), -l LIBRARY (только вызовы в указанную библиотеку). Для CTF crackme ltrace -s полезнее всего: пароль часто сравнивается через strcmp и виден прямо в трейсе. Работают только с динамически слинкованными бинарями; статика (ldd говорит 'not a dynamic executable') ltrace не возьмёт. Иногда требуют sudo или отключения ptrace-защиты."
+    }
+  ]
+}

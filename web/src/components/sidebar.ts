@@ -1,0 +1,46 @@
+import { h } from '../lib/dom';
+import { navigate } from '../router';
+
+export interface NavItem { id: string; label: string; icon: string; }
+
+// Two groups: reference material you look things up in, and the per-engagement workspace.
+export const NAV_REFERENCE: NavItem[] = [
+  { id: 'payloads', label: 'Payloads', icon: '⚡' },
+  { id: 'commands', label: 'Commands', icon: '⌘' },
+  { id: 'gtfobins', label: 'GTFOBins', icon: '🐧' },
+  { id: 'wordlists', label: 'Wordlists', icon: '📚' },
+  { id: 'cyberchef', label: 'CyberChef', icon: '🧪' },
+  { id: 'revshell', label: 'Reverse Shell', icon: '🐚' },
+  { id: 'burp', label: 'Burp Docs', icon: '🟠' },
+];
+export const NAV_WORKSPACE: NavItem[] = [
+  { id: 'checklists', label: 'Checklists', icon: '☑' },
+  { id: 'engage', label: 'Engagements', icon: '🎯' },
+  { id: 'notes', label: 'Notes', icon: '🗒' },
+  { id: 'favorites', label: 'Favorites', icon: '★' },
+  { id: 'backup', label: 'Backup', icon: '💾' },
+];
+export const NAV: NavItem[] = [...NAV_REFERENCE, ...NAV_WORKSPACE];
+
+export function Sidebar(): { el: HTMLElement; setActive: (name: string) => void } {
+  const items: HTMLElement[] = [];
+  const mkItem = (n: NavItem) => {
+    const it = h('div', { class: 'nav-item', 'data-id': n.id, onclick: () => navigate(n.id) },
+      h('span', { class: 'ic' }, n.icon), n.label);
+    items.push(it);
+    return it;
+  };
+  const group = (label: string, list: NavItem[]) => [h('div', { class: 'nav-label' }, label), ...list.map(mkItem)];
+
+  const el = h('aside', { class: 'sidebar' },
+    h('div', { class: 'brand' }, h('span', { class: 'g' }, 'ARS3NAL')),
+    h('div', { class: 'brand-sub' }, '// personal payload toolkit'),
+    ...group('Reference', NAV_REFERENCE),
+    ...group('Workspace', NAV_WORKSPACE),
+    h('div', { class: 'sidebar-footer' }, h('span', { class: 'dot' }), 'offline · v0.1'),
+  );
+  function setActive(name: string) {
+    for (const it of items) it.classList.toggle('active', it.getAttribute('data-id') === name);
+  }
+  return { el, setActive };
+}

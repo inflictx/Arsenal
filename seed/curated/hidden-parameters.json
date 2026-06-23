@@ -1,0 +1,97 @@
+{
+  "category": "Hidden Parameters",
+  "source": "PayloadsAllTheThings/Hidden Parameters/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое скрытые параметры",
+      "language": "text",
+      "tags": ["methodology", "hidden-parameters"],
+      "body": "Скрытые (hidden / undocumented) параметры — это параметры запроса, которые приложение обрабатывает на бэкенде, но нигде не показывает в интерфейсе: их нет в формах, ссылках и видимом JS. Фаззинг помогает их обнаружить, а уже найденный скрытый параметр часто оказывается уязвимым к самым разным атакам (IDOR, SSRF, инъекции, обход авторизации, переключение режимов отладки).\n\nИдея простая: приложение «слушает» больше, чем показывает. Разработчики оставляют отладочные, легаси- и сервисные параметры, забывают их убрать или считают, что про них никто не знает. Их перебор по словарю и сравнение реакции сервера — отдельная техника разведки."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать скрытые параметры",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "• Любой эндпоинт, который что-то принимает: страницы, API, формы, экспорт/импорт, генерация PDF и писем.\n• Старые версии страниц и URL — через Wayback Machine и архивы (параметр давно убрали из UI, но обработчик на бэкенде остался).\n• JS-файлы: ищи имена параметров в коде фронтенда, в том числе закомментированные и неиспользуемые ветки.\n• Точки, где видна разница в поведении при изменении входа: разный ответ, длина, статус, время отклика, новые поля в JSON.\n\nКак тестировать: перебираешь имена параметров по словарю и сравниваешь ответ с базовым (без параметра). Отличие в коде ответа, длине тела, тексте ошибки или времени — сигнал, что параметр «живой»."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Тулзы",
+      "language": "text",
+      "tags": ["methodology", "tools"],
+      "body": "• PortSwigger/param-miner — расширение Burp для поиска скрытых, несвязанных параметров и заголовков.\n• s0md3v/Arjun — набор для обнаружения HTTP-параметров.\n• Sh1Yo/x8 — набор для обнаружения скрытых параметров.\n• tomnomnom/waybackurls — вытягивает все URL, известные Wayback Machine для домена.\n• devanshbatham/ParamSpider — добывает URL (и параметры) из веб-архивов для багхантинга и фаззинга."
+    },
+    {
+      "subcategory": "Брутфорс параметров",
+      "title": "Брутфорс параметров через x8",
+      "language": "bash",
+      "tags": ["bruteforce", "x8", "fuzzing"],
+      "body": "x8 -u \"https://example.com/\" -w <wordlist>\nx8 -u \"https://example.com/\" -X POST -w <wordlist>"
+    },
+    {
+      "subcategory": "Брутфорс параметров",
+      "title": "Как работает брутфорс параметров",
+      "language": "text",
+      "tags": ["bruteforce", "methodology"],
+      "body": "Берёшь словарь типичных имён параметров и отправляешь их на эндпоинт, наблюдая за неожиданным поведением бэкенда: изменение кода ответа, длины тела, появление новых данных или ошибок. Любое отличие от базового запроса — кандидат на скрытый параметр, который дальше проверяешь вручную."
+    },
+    {
+      "subcategory": "Брутфорс параметров",
+      "title": "Брутфорс через Arjun",
+      "language": "bash",
+      "tags": ["bruteforce", "arjun"],
+      "body": "arjun -u \"https://example.com/\"\narjun -u \"https://example.com/\" -m POST\narjun -u \"https://example.com/\" -m JSON\narjun -u \"https://example.com/\" -w params.txt"
+    },
+    {
+      "subcategory": "Брутфорс параметров",
+      "title": "Брутфорс через ffuf (через FUZZ в имени параметра)",
+      "language": "bash",
+      "tags": ["bruteforce", "ffuf"],
+      "body": "ffuf -u \"https://example.com/?FUZZ=test\" -w params.txt -fs <baseline-size>\nffuf -u \"https://example.com/\" -X POST -d \"FUZZ=test\" -H \"Content-Type: application/x-www-form-urlencoded\" -w params.txt -fs <baseline-size>"
+    },
+    {
+      "subcategory": "Брутфорс параметров",
+      "title": "Словари имён параметров",
+      "language": "text",
+      "tags": ["bruteforce", "wordlists"],
+      "body": "Arjun: db/large.txt, db/medium.txt, db/small.txt — https://github.com/s0md3v/Arjun (каталог arjun/db)\nsamlists: sam-cc-parameters-lowercase-all.txt, sam-cc-parameters-mixedcase-all.txt — https://github.com/the-xentropy/samlists\nSecLists: Discovery/Web-Content/burp-parameter-names.txt"
+    },
+    {
+      "subcategory": "Типичные скрытые параметры",
+      "title": "Частые имена скрытых параметров",
+      "language": "text",
+      "tags": ["wordlist", "common-params"],
+      "body": "debug\ntest\nadmin\nsource\nedit\ngrant\ntoken\nadmin_only\ndebug_mode\ninclude\nfile\nurl\ncallback\nredirect\npreview\nenable\ndisable\nmode\nrole\nuser\nuser_id\naccount\nis_admin\nshow\nverbose\ntrace\nformat"
+    },
+    {
+      "subcategory": "Типичные скрытые параметры",
+      "title": "Зачем пробовать debug / test / admin / source",
+      "language": "text",
+      "tags": ["common-params", "tips"],
+      "body": "Некоторые имена параметров чаще других включают «сервисное» поведение, и их стоит пробовать в первую очередь:\n• debug / debug_mode / verbose / trace — расширенный вывод, стектрейсы, дамп переменных, отключение части проверок.\n• test — тестовые ветки кода, моковые данные, ослабленные проверки.\n• admin / is_admin / role / grant — попытка повысить привилегии или включить админ-режим (часто связка с mass assignment).\n• source / view-source / raw — выдача исходника страницы/шаблона вместо отрисовки.\n\nПробуй разные значения: 1, true, on, yes, debug, а также пустое значение."
+    },
+    {
+      "subcategory": "Методы передачи",
+      "title": "Где пробовать параметр — GET / POST / JSON / заголовок",
+      "language": "text",
+      "tags": ["methodology", "methods"],
+      "body": "Один и тот же скрытый параметр сервер может принимать из разных мест — проверяй все каналы:\n• GET — в query string: ?param=value.\n• POST (form) — тело application/x-www-form-urlencoded: param=value.\n• JSON — ключ в теле application/json: {\"param\":\"value\"}.\n• Заголовок — кастомный HTTP-заголовок: X-Param: value (особенно X-Forwarded-For, X-Original-URL, X-Rewrite-URL, X-Debug).\n\nИногда параметр игнорируется в GET, но срабатывает в JSON-теле или в заголовке — поэтому перебор стоит повторять под каждый метод."
+    },
+    {
+      "subcategory": "Методы передачи",
+      "title": "Примеры передачи одного параметра разными способами",
+      "language": "http",
+      "tags": ["methods", "examples"],
+      "body": "GET /endpoint?debug=true HTTP/1.1\nHost: example.com\n\n---\n\nPOST /endpoint HTTP/1.1\nHost: example.com\nContent-Type: application/x-www-form-urlencoded\n\ndebug=true\n\n---\n\nPOST /endpoint HTTP/1.1\nHost: example.com\nContent-Type: application/json\n\n{\"debug\": true}\n\n---\n\nGET /endpoint HTTP/1.1\nHost: example.com\nX-Debug: true"
+    },
+    {
+      "subcategory": "Источники имён параметров",
+      "title": "Старые параметры из веб-архивов и JS",
+      "language": "text",
+      "tags": ["recon", "wayback", "sources"],
+      "body": "Скрытые параметры часто не нужно угадывать — их можно вытащить из истории и кода:\n• Wayback Machine (http://web.archive.org/) — старые версии страниц с уже убранными из UI параметрами.\n• JS-файлы — пройдись по фронтенд-коду и найди имена параметров, в том числе закомментированные и неиспользуемые.\n• waybackurls / ParamSpider — автоматически собирают URL (и параметры) из веб-архивов для дальнейшего фаззинга.\n\nСобранные таким способом имена добавляй в свой словарь для брутфорса — они точнее общих списков."
+    }
+  ]
+}

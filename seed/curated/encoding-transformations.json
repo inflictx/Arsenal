@@ -1,0 +1,115 @@
+{
+  "category": "Encoding Transformations",
+  "source": "PayloadsAllTheThings/Encoding Transformations/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что это и зачем",
+      "language": "text",
+      "tags": ["methodology", "bypass", "waf"],
+      "body": "Encoding & Transformations — техники, меняющие представление данных без изменения их сути.\nТипичные примеры: URL-кодирование, Base64, HTML-entity, Unicode-преобразования.\nИспользуются как гаджеты для обхода фильтров ввода, ухода от WAF и поломки процедур санитизации.\nИдея: payload в «обходной» форме проходит фильтр, а на следующем этапе обработки приводится к опасному виду."
+    },
+    {
+      "subcategory": "Unicode",
+      "title": "Что такое Unicode и нормализация",
+      "language": "text",
+      "tags": ["unicode", "normalization"],
+      "body": "Unicode — универсальный стандарт кодирования символов почти всех систем письма. Каждому символу присвоена уникальная кодовая точка (например, U+0041 для «A»). Форматы UTF-8 и UTF-16 определяют, как точки хранятся в байтах.\n\nНормализация Unicode — приведение текста к стандартизированной, согласованной форме, чтобы эквивалентные символы были представлены в памяти одинаково.\n\nNFC  — Canonical Composition: собирает декомпозированные последовательности в предкомпонованные символы.\nNFD  — Canonical Decomposition: разбивает символы на декомпозированные формы (база + комбинирующие знаки).\nNFKC — Compatibility Composition: как NFC, но дополнительно заменяет символы на совместимые эквиваленты (может менять вид/формат).\nNFKD — Compatibility Decomposition: как NFD, но дополнительно декомпозирует символы совместимости.\n\nИдея атаки: подаём «безопасный» Unicode-символ, который после нормализации (часто NFKC/NFKD) превращается в опасный ASCII и пробивает фильтр.\n\nТаблица соответствий: https://appcheck-ng.com/wp-content/uploads/unicode_normalization.html"
+    },
+    {
+      "subcategory": "Unicode",
+      "title": "Unicode-нормализация: символ → payload → результат",
+      "language": "table",
+      "tags": ["unicode", "normalization", "bypass"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Символ", "Payload", "После нормализации"],
+          "rows": [
+            ["‥ (U+2025)", "‥/‥/‥/etc/passwd", "../../../etc/passwd"],
+            ["︰ (U+FE30)", "︰/︰/︰/etc/passwd", "../../../etc/passwd"],
+            ["＇ (U+FF07)", "＇ or ＇1＇=＇1", "' or '1'='1"],
+            ["＂ (U+FF02)", "＂ or ＂1＂=＂1", "\" or \"1\"=\"1"],
+            ["﹣ (U+FE63)", "admin'﹣﹣", "admin'--"],
+            ["。 (U+3002)", "domain。com", "domain.com"],
+            ["／ (U+FF0F)", "／／domain.com", "//domain.com"],
+            ["＜ (U+FF1C)", "＜img src=a＞", "<img src=a/>"],
+            ["﹛ (U+FE5B)", "﹛﹛3+3﹜﹜", "{{3+3}}"],
+            ["［ (U+FF3B)", "［［5+5］］", "[[5+5]]"],
+            ["＆ (U+FF06)", "＆＆whoami", "&&whoami"],
+            ["ｐ (U+FF50)", "shell.ｐʰｐ", "shell.php"],
+            ["ʰ (U+02B0)", "shell.ｐʰｐ", "shell.php"],
+            ["ª (U+00AA)", "ªdmin", "admin"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Unicode",
+      "title": "Проверка нормализации во всех формах (Python)",
+      "language": "python",
+      "tags": ["unicode", "normalization", "python"],
+      "body": "import unicodedata\nstring = \"ᴾᵃʸˡᵒᵃᵈˢ𝓐𝓵𝓵𝕋𝕙𝕖𝒯𝒽𝒾𝓃ℊ𝓈\"\nprint ('NFC: ' + unicodedata.normalize('NFC', string))\nprint ('NFD: ' + unicodedata.normalize('NFD', string))\nprint ('NFKC: ' + unicodedata.normalize('NFKC', string))\nprint ('NFKD: ' + unicodedata.normalize('NFKD', string))"
+    },
+    {
+      "subcategory": "Punycode",
+      "title": "Что такое Punycode",
+      "language": "text",
+      "tags": ["punycode", "idn", "homograph"],
+      "body": "Punycode — способ представить Unicode-символы (не-ASCII буквы, символы, письменности) только ограниченным набором ASCII (буквы, цифры, дефисы).\n\nИспользуется в основном в DNS, который традиционно поддерживает только ASCII. Punycode позволяет интернационализированные доменные имена (IDN): домен может содержать символы многих языков, переведённые в безопасную ASCII-форму.\n\nИспользуется для homograph-атак: домен визуально неотличим от настоящего, но фактически указывает на другой."
+    },
+    {
+      "subcategory": "Punycode",
+      "title": "IDN-домен в браузере → реальный ASCII (Punycode)",
+      "language": "table",
+      "tags": ["punycode", "idn", "homograph"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Видно в браузере (поддержка IDN)", "Фактический ASCII (Punycode)"],
+          "rows": [
+            ["раypal.com", "xn--ypal-43d9g.com"],
+            ["paypal.com", "paypal.com"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Punycode",
+      "title": "MySQL считает похожие символы равными",
+      "language": "sql",
+      "tags": ["punycode", "mysql", "account-takeover"],
+      "body": "-- В MySQL похожие символы трактуются как равные.\n-- Можно злоупотребить в Password Reset, Forgot Password и OAuth-провайдерах.\nSELECT 'a' = 'ᵃ';\n+-------------+\n| 'a' = 'ᵃ'   |\n+-------------+\n|           1 |\n+-------------+"
+    },
+    {
+      "subcategory": "Punycode",
+      "title": "Отключение трюка через COLLATE utf8mb4_0900_as_cs",
+      "language": "sql",
+      "tags": ["punycode", "mysql", "collation"],
+      "body": "-- Трюк работает, если запрос использует COLLATE utf8mb4_0900_as_cs.\n-- С этой коллацией символы уже НЕ равны (результат 0):\nSELECT 'a' = 'ᵃ' COLLATE utf8mb4_0900_as_cs;\n+----------------------------------------+\n| 'a' = 'ᵃ' COLLATE utf8mb4_0900_as_cs   |\n+----------------------------------------+\n|                                      0 |\n+----------------------------------------+"
+    },
+    {
+      "subcategory": "Base64",
+      "title": "Что такое Base64",
+      "language": "text",
+      "tags": ["base64", "encoding"],
+      "body": "Base64 — метод преобразования бинарных данных (изображения, файлы) или текста со спецсимволами в читаемую строку из ASCII-символов (A-Z, a-z, 0-9, + и /).\nКаждые 3 байта входа делятся на 4 группы по 6 бит и отображаются в 4 Base64-символа.\nЕсли вход не кратен 3 байтам, выход дополняется символами «=» (padding)."
+    },
+    {
+      "subcategory": "Base64",
+      "title": "Кодирование и декодирование (CLI)",
+      "language": "bash",
+      "tags": ["base64", "cli", "encoding"],
+      "body": "echo -n admin | base64\nYWRtaW4=\n\necho -n YWRtaW4= | base64 -d\nadmin"
+    },
+    {
+      "subcategory": "Лабы",
+      "title": "Практика",
+      "language": "text",
+      "tags": ["labs", "practice"],
+      "body": "NahamCon — Puny-Code: 0-Click Account Takeover:\nhttps://github.com/VoorivexTeam/white-box-challenges/tree/main/punycode\n\nPentesterLab — Unicode and NFKC:\nhttps://pentesterlab.com/exercises/unicode-transform"
+    }
+  ]
+}

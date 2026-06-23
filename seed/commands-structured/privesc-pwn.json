@@ -1,0 +1,369 @@
+{
+  "category": "Privilege Escalation",
+  "catOrder": 4,
+  "tools": [
+    {
+      "category": "Privilege Escalation",
+      "catOrder": 4,
+      "title": "linpeas / winpeas",
+      "subcategory": "авто-энумерация для повышения привилегий",
+      "purpose": "Скрипт-разведчик: автоматически собирает с машины всё, что может привести к повышению привилегий (SUID, cron, права, креды, ядро, конфиги) и подсвечивает находки по цвету. Первый запуск после получения шелла.",
+      "install": "curl -L https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh -o linpeas.sh; chmod +x linpeas.sh",
+      "binary": "./linpeas.sh",
+      "target": "",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Объём проверок",
+          "flags": [
+            { "flag": "-a", "desc": "Все проверки (кроме regex): глубже копает — мониторинг процессов, поиск паролей, брут пользователей. Рекомендуется для CTF, но дольше (5-10 мин)." },
+            { "flag": "-s", "desc": "Стелс и быстрый режим: пропускает долгие проверки, ничего не пишет на диск (меньше следов)." },
+            { "flag": "-e", "desc": "Доп. (extra) энумерация — дополнительные проверки сверх дефолтных." },
+            { "flag": "-r", "desc": "Включить regex-поиск (API-ключи, креды). Медленно и шумно, отдельно от -a." },
+            { "flag": "-o", "value": "SysI,Devs", "desc": "Запустить только выбранные группы проверок (через запятую)." },
+            { "flag": "-L", "desc": "Принудительно запустить linpeas (force execution), если автоопределение мешает." }
+          ]
+        },
+        {
+          "name": "Доступ и пароли",
+          "flags": [
+            { "flag": "-P", "value": "password", "desc": "Передать пароль текущего пользователя — будет использован для sudo -l и брута других юзеров." },
+            { "flag": "-D", "desc": "Debug-режим: показывать неуспешные проверки и тайминги (диагностика)." },
+            { "flag": "-w", "desc": "Пауза между крупными блоками проверок (читать вывод по частям)." }
+          ]
+        },
+        {
+          "name": "Сетевая разведка",
+          "flags": [
+            { "flag": "-t", "desc": "Автоматический сетевой скан и проверка доступа в интернет." },
+            { "flag": "-d", "value": "10.0.0.0/24", "desc": "Обнаружение живых хостов в подсети через ping/fping." },
+            { "flag": "-p", "value": "22,80,443", "desc": "Сканировать указанные TCP-порты (вместе с -d)." },
+            { "flag": "-i", "value": "{TARGET}", "desc": "Сканировать конкретный IP на открытые порты." }
+          ]
+        },
+        {
+          "name": "Вывод и прочее",
+          "flags": [
+            { "flag": "-N", "desc": "Без цвета (no colours) — удобно при сохранении в файл." },
+            { "flag": "-q", "desc": "Не показывать баннер." },
+            { "flag": "-h", "desc": "Показать справку по флагам." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "./linpeas.sh -a | tee linpeas.txt", "note": "Полная энумерация со всеми проверками, сохранить вывод (цвет смотри через less -r)." },
+        { "cmd": "./linpeas.sh -s -N", "note": "Быстрый стелс-проход без записи на диск и без цвета." },
+        { "cmd": "curl -L https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh | sh", "note": "Запуск целиком в памяти, не оставляя файл на диске (fileless)." },
+        { "cmd": "./linpeas.sh -P 'MyPass123' -a", "note": "Полный прогон с паролем для sudo -l и брута пользователей." }
+      ],
+      "notes": "Активный форк — peass-ng/PEASS-ng (не старый carlospolop репо). Цель не нужна: скрипт сканирует локальную машину, на которой запущен. WINPEAS (Windows-аналог) из того же релиза: winPEASx64.exe / winPEASany.exe (.NET) и winPEAS.bat (без зависимостей). Аргументы winpeas позиционные, не флаги: winpeas.exe quiet (без баннера), systeminfo / userinfo (только эти группы), searchall (расширенный поиск файлов с кредами), cmd (для запуска), log (запись в файл). Запускай в памяти где можно — AV ловит winpeas по сигнатуре."
+    },
+    {
+      "category": "Privilege Escalation",
+      "catOrder": 4,
+      "title": "pspy",
+      "subcategory": "мониторинг процессов без root",
+      "purpose": "Снифферит запуск процессов и события файловой системы БЕЗ прав root. Ловит cron-задачи, чужие команды и скрипты в момент исполнения — главный инструмент для поиска привилегированных cron/таймеров.",
+      "install": "curl -L https://github.com/DominicBreuker/pspy/releases/latest/download/pspy64 -o pspy64; chmod +x pspy64",
+      "binary": "./pspy64",
+      "target": "",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Что выводить",
+          "flags": [
+            { "flag": "-p", "desc": "Печатать команды (процессы) в stdout. Включено по умолчанию; отключить: -p=false." },
+            { "flag": "-f", "desc": "Печатать события файловой системы (inotify) в stdout. По умолчанию выключено." },
+            { "flag": "-c", "desc": "Раскрашивать команды по UID процесса (события ФС при этом не красятся)." }
+          ]
+        },
+        {
+          "name": "Сканирование процессов",
+          "flags": [
+            { "flag": "-i", "value": "100", "desc": "Интервал в миллисекундах между сканами procfs. Меньше — больше шанс поймать короткоживущие процессы (по умолчанию 100мс, не считая событий inotify)." }
+          ]
+        },
+        {
+          "name": "Слежение за директориями",
+          "flags": [
+            { "flag": "-r", "value": "/etc", "desc": "Следить за директорией рекурсивно (включая подкаталоги) через inotify. Повторяемый. Дефолт: /usr /tmp /etc /home /var /opt." },
+            { "flag": "-d", "value": "/tmp", "desc": "Следить ТОЛЬКО за самой директорией, без подкаталогов (нерекурсивно). Повторяемый." }
+          ]
+        },
+        {
+          "name": "Отладка",
+          "flags": [
+            { "flag": "--debug", "desc": "Подробные сообщения об ошибках, которые иначе скрыты." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "./pspy64", "note": "Базовый запуск с дефолтами — смотреть появляющиеся процессы и cron." },
+        { "cmd": "./pspy64 -pf -i 1000", "note": "Команды + события ФС, скан procfs раз в секунду (как в офиц. примере)." },
+        { "cmd": "./pspy64 -f -p=false", "note": "Только события файловой системы, без вывода команд." },
+        { "cmd": "./pspy64 -r /usr -r /home -d /var/spool/cron", "note": "Рекурсивно за /usr и /home, нерекурсивно за каталогом cron." }
+      ],
+      "notes": "Цель не нужна — мониторит локальную систему. pspy64 / pspy32 — статические бинари без зависимостей, есть «короткие» сборки pspy64s. Главная фишка: видит cron-задачи и чужие команды без root, что мгновенно раскрывает привилегированные скрипты для эксплуатации. Запускай и жди 1-2 минуты, пока сработает cron-таймер."
+    },
+    {
+      "category": "Privilege Escalation",
+      "catOrder": 4,
+      "title": "linux-exploit-suggester / windows-exploit-suggester",
+      "subcategory": "подбор kernel-эксплойтов",
+      "purpose": "Сопоставляет версию ядра/ОС со списком публично известных эксплойтов и выдаёт ранжированный список подходящих CVE с ссылками. Быстрая проверка на kernel-exploit privesc.",
+      "install": "curl -L https://github.com/The-Z-Labs/linux-exploit-suggester/raw/master/linux-exploit-suggester.sh -o les.sh; chmod +x les.sh",
+      "binary": "./linux-exploit-suggester.sh",
+      "target": "",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Источник данных о системе",
+          "flags": [
+            { "flag": "--kernel", "value": "3.2.0", "desc": "Оценить эксплойты для указанной версии ядра (без запуска на самой машине)." },
+            { "flag": "--uname", "value": "uname-string", "desc": "Оценить по предоставленной строке uname -a (анализ с другой машины)." },
+            { "flag": "--pkglist-file", "value": "pkgs.txt", "desc": "Файл со списком установленных пакетов (для проверки userspace-эксплойтов офлайн)." },
+            { "flag": "--cvelist-file", "value": "cves.txt", "desc": "Свой файл со списком CVE для сопоставления." }
+          ]
+        },
+        {
+          "name": "Область поиска",
+          "flags": [
+            { "flag": "--kernelspace-only", "desc": "Показывать только эксплойты уровня ядра (kernelspace)." },
+            { "flag": "--userspace-only", "desc": "Показывать только userspace-эксплойты (sudo, pkexec и т.п.)." },
+            { "flag": "-d", "desc": "Также показывать DoS-эксплойты (--show-dos), по умолчанию скрыты." },
+            { "flag": "--skip-more-checks", "desc": "Пропустить доп. проверки применимости (быстрее, но больше ложных)." },
+            { "flag": "--skip-pkg-versions", "desc": "Не сверять версии пакетов при оценке." }
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            { "flag": "-f", "desc": "Полный вывод (--full): вся доступная информация по каждому эксплойту." },
+            { "flag": "-g", "desc": "Короткий/компактный вывод (--short)." },
+            { "flag": "--checksec", "desc": "Показать состояние механизмов защиты системы (аналог checksec для ОС)." }
+          ]
+        },
+        {
+          "name": "Загрузка эксплойтов",
+          "flags": [
+            { "flag": "-b", "desc": "Скачать готовые бинарники эксплойтов (--fetch-binaries)." },
+            { "flag": "-s", "desc": "Скачать исходники эксплойтов (--fetch-sources)." },
+            { "flag": "-V", "desc": "Показать версию инструмента (--version)." },
+            { "flag": "-h", "desc": "Справка (--help)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "./linux-exploit-suggester.sh", "note": "Запуск на целевой машине — автоопределение ядра и оценка эксплойтов." },
+        { "cmd": "./linux-exploit-suggester.sh --uname \"$(uname -a)\"", "note": "Передать строку uname (если анализируешь дамп/чужую систему)." },
+        { "cmd": "./linux-exploit-suggester.sh --kernel 4.4.0", "note": "Оценить эксплойты для конкретной версии ядра офлайн." },
+        { "cmd": "./linux-exploit-suggester.sh --checksec", "note": "Показать включённые защиты ОС (NX, ASLR, RELRO и пр.)." }
+      ],
+      "notes": "Активный репозиторий — The-Z-Labs/linux-exploit-suggester (есть устаревший форк mzet-). Без флагов запускается на машине и сам читает /proc/version. Ранжирует находки по вероятности (Highly probable / Probable). ВАЖНО: kernel-эксплойты могут уронить машину — на проде осторожно. Windows-аналог: WES-NG (bitsadmin/wesng), скрипт wes.py — работает офлайн по выводу systeminfo: сначала wes.py --update (скачать БД CVE), затем wes.py systeminfo.txt; полезные флаги -e/--exploits-only (только с эксплойтами), -i/--impact (фильтр по типу: 'Elevation of Privilege'), -s/--severity, --hide (скрыть шум вроде Edge/Flash). Старый Windows-Exploit-Suggester.py (GDSSecurity) заброшен и требует Excel-БД — используй WES-NG."
+    },
+    {
+      "category": "Pwn",
+      "catOrder": 6,
+      "title": "checksec",
+      "subcategory": "проверка защит бинаря",
+      "purpose": "Показывает, какие механизмы защиты включены в ELF/PE: RELRO, Stack Canary, NX, PIE, FORTIFY, RPATH. Первый шаг анализа pwn-задачи — определяет, какие техники эксплуатации применимы.",
+      "install": "pip install pwntools  # даёт 'checksec' и 'pwn checksec'; либо apt install checksec",
+      "binary": "checksec",
+      "target": "--file={TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Что проверять",
+          "flags": [
+            { "flag": "--file", "value": "{TARGET}", "desc": "Проверить защиты указанного бинаря (классический синтаксис: --file=./bin)." },
+            { "flag": "--dir", "value": "/usr/bin", "desc": "Проверить все исполняемые файлы в директории." },
+            { "flag": "--proc", "value": "nginx", "desc": "Проверить защиты запущенного процесса по имени." },
+            { "flag": "--proc-all", "desc": "Проверить все запущенные процессы." },
+            { "flag": "--kernel", "desc": "Показать состояние защит ядра Linux и hardening-опций конфигурации." }
+          ]
+        },
+        {
+          "name": "FORTIFY_SOURCE",
+          "flags": [
+            { "flag": "--fortify-file", "value": "{TARGET}", "desc": "Проверить FORTIFY_SOURCE для файла (какие функции защищены)." },
+            { "flag": "--fortify-proc", "value": "1234", "desc": "Проверить FORTIFY для процесса по PID." }
+          ]
+        },
+        {
+          "name": "Формат вывода",
+          "flags": [
+            { "flag": "--format", "value": "json", "desc": "Формат вывода: cli (по умолчанию), csv, xml, json (в Go-версии флаг --output)." },
+            { "flag": "--output", "value": "json", "desc": "То же, что --format, в новой Go-версии: cli/json/xml/yaml." },
+            { "flag": "--extended", "desc": "Расширенный вывод (доп. свойства бинаря)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "checksec --file={TARGET}", "note": "Классический Bash-синтаксис checksec.sh — проверить защиты бинаря." },
+        { "cmd": "pwn checksec {TARGET}", "note": "Версия из pwntools — самая ходовая в CTF, цель позиционна." },
+        { "cmd": "checksec --file={TARGET} --format=json", "note": "Машиночитаемый вывод для парсинга в скриптах." },
+        { "cmd": "checksec file {TARGET} --output json", "note": "Новый Go-синтаксис (slimm609/checksec): подкоманда file вместо --file=." }
+      ],
+      "notes": "Есть несколько реализаций. Классический checksec.sh (slimm609, Bash) и checksec из pwntools используют --file=BIN. Свежая Go-версия slimm609/checksec перешла на синтаксис подкоманд: 'checksec file BIN --output json' (опции в виде --output, без =). В CTF чаще всего применяют pwntools: 'pwn checksec ./bin' или ELF('./bin').checksec в Python. Цель обязательна — без неё проверять нечего."
+    },
+    {
+      "category": "Pwn",
+      "catOrder": 6,
+      "title": "ROPgadget / ropper",
+      "subcategory": "поиск ROP-гаджетов",
+      "purpose": "Ищет в бинаре ROP/JOP-гаджеты (короткие цепочки инструкций до ret/jmp) для построения цепочек эксплуатации в обход NX. Умеет автоматически собирать ropchain для execve(/bin/sh).",
+      "install": "pip install ROPgadget",
+      "binary": "ROPgadget",
+      "target": "--binary {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель и автоцепочка",
+          "flags": [
+            { "flag": "--binary", "value": "{TARGET}", "desc": "Бинарь для анализа (ELF/PE/Mach-O)." },
+            { "flag": "--ropchain", "desc": "Автоматически собрать ROP-цепочку (execve /bin/sh) и вывести готовый Python-скрипт." },
+            { "flag": "--depth", "value": "10", "desc": "Глубина поиска гаджетов в байтах (по умолчанию 10)." },
+            { "flag": "--all", "desc": "Не убирать дубликаты гаджетов из вывода." },
+            { "flag": "--dump", "desc": "Показать байты (опкоды) гаджетов." }
+          ]
+        },
+        {
+          "name": "Фильтрация гаджетов",
+          "flags": [
+            { "flag": "--only", "value": "pop|ret", "desc": "Показывать только гаджеты с этими инструкциями (через |). Напр. 'pop|ret'." },
+            { "flag": "--filter", "value": "jmp|call", "desc": "Исключить гаджеты с этими мнемониками." },
+            { "flag": "--range", "value": "0x400000-0x401000", "desc": "Искать гаджеты только в этом диапазоне адресов." },
+            { "flag": "--badbytes", "value": "00|0a", "desc": "Отбросить гаджеты, в адресе которых есть эти байты (через |)." },
+            { "flag": "--re", "value": "regexp", "desc": "Фильтр гаджетов по регулярному выражению." },
+            { "flag": "--align", "value": "4", "desc": "Только гаджеты с адресами, выровненными по N байт." }
+          ]
+        },
+        {
+          "name": "Поиск строк и опкодов",
+          "flags": [
+            { "flag": "--string", "value": "/bin/sh", "desc": "Искать строку в читаемых сегментах (адреса для аргументов)." },
+            { "flag": "--memstr", "value": "/bin/sh", "desc": "Найти адрес каждого байта строки по отдельности (когда строки целиком нет)." },
+            { "flag": "--opcode", "value": "c3", "desc": "Искать опкод (hex) в исполняемом сегменте." }
+          ]
+        },
+        {
+          "name": "Типы и raw",
+          "flags": [
+            { "flag": "--nojop", "desc": "Не искать JOP-гаджеты (jmp/call)." },
+            { "flag": "--nosys", "desc": "Не искать syscall-гаджеты." },
+            { "flag": "--norop", "desc": "Не искать ROP-гаджеты (когда нужны только JOP/sys)." },
+            { "flag": "--multibr", "desc": "Разрешить гаджеты с несколькими ветвлениями (длиннее, но больше вариантов)." },
+            { "flag": "--callPreceded", "desc": "Только гаджеты, перед которыми стоит call (для обхода CFG)." },
+            { "flag": "--rawArch", "value": "x86", "desc": "Архитектура для raw-файла без заголовка (x86/x64/arm/arm64...)." },
+            { "flag": "--rawMode", "value": "64", "desc": "Разрядность для raw-файла (32/64)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "ROPgadget --binary {TARGET}", "note": "Вывести все найденные гаджеты бинаря." },
+        { "cmd": "ROPgadget --binary {TARGET} --ropchain", "note": "Автоматически собрать рабочую ROP-цепочку на /bin/sh." },
+        { "cmd": "ROPgadget --binary {TARGET} --only 'pop|ret'", "note": "Только pop-гаджеты — основа ручной сборки цепочки." },
+        { "cmd": "ROPgadget --binary {TARGET} --string '/bin/sh'", "note": "Найти адрес строки /bin/sh для аргумента execve." }
+      ],
+      "notes": "Цель обязательна. Альтернатива — ropper (sashs/Ropper, pip install ropper), часто удобнее и с семантическим поиском: ropper -f BIN (все гаджеты), ropper -f BIN --search 'pop rdi; ret' (поиск с подстановкой ?/%), ropper -f BIN --string '/bin/sh', ropper -f BIN --chain execve (автоцепочка), ropper -f BIN --type jop, -b 00 (badbytes), -j esp (jmp reg). У ropper --inst-count по умолчанию 6. В pwntools для ROP обычно берут модуль pwnlib.rop.ROP, но ROPgadget/ropper нужны для ручного исследования и --ropchain."
+    },
+    {
+      "category": "Pwn",
+      "catOrder": 6,
+      "title": "one_gadget",
+      "subcategory": "поиск one-shot RCE в libc",
+      "purpose": "Находит в libc «магические» адреса (one-gadget), прыжок на которые сразу даёт execve(\"/bin/sh\") без аргументов. Незаменим, когда есть утечка адреса libc и одна запись (GOT/return).",
+      "install": "gem install one_gadget",
+      "binary": "one_gadget",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Источник libc",
+          "flags": [
+            { "flag": "-b", "value": "BuildID", "desc": "Искать по BuildID[sha1] libc (когда самого файла нет, но известен build-id). Альтернатива позиционному файлу." },
+            { "flag": "-f", "desc": "Принудительно искать гаджеты в файле, а не по build-id (--force-file)." }
+          ]
+        },
+        {
+          "name": "Вывод и количество",
+          "flags": [
+            { "flag": "-l", "value": "1", "desc": "Уровень вывода (--level): сколько гаджетов показывать. По умолчанию 0 (только самые надёжные); больше — больше кандидатов." },
+            { "flag": "-o", "value": "raw", "desc": "Формат вывода (--output-format): pretty (дефолт), raw, json." },
+            { "flag": "-r", "desc": "Алиас -o raw: вывести только смещения гаджетов через пробел (удобно для скриптов)." }
+          ]
+        },
+        {
+          "name": "Адреса и сортировка",
+          "flags": [
+            { "flag": "--base", "value": "0x7f0000000000", "desc": "Базовый адрес libc — выводить абсолютные адреса вместо смещений." },
+            { "flag": "-n", "value": "system", "desc": "Сортировать гаджеты по близости к указанным функциям или к GOT-функциям файла (--near)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "one_gadget {TARGET}", "note": "Найти one-gadget'ы в libc (укажи путь к libc.so.6 как цель)." },
+        { "cmd": "one_gadget {TARGET} -l 1", "note": "Показать больше кандидатов, если дефолтные не сработали по constraints." },
+        { "cmd": "one_gadget {TARGET} --base 0x7ffff7a0d000", "note": "Вывести абсолютные адреса при известной базе libc." },
+        { "cmd": "one_gadget -b 3a9b... ", "note": "Поиск по BuildID, когда файла libc нет на руках." }
+      ],
+      "notes": "Цель — это файл libc (обычно libc.so.6), а НЕ исследуемый бинарь. Каждый гаджет идёт со списком constraints (например 'rsp & 0xf == 0' или '[rsp+0x30] == NULL') — на момент прыжка они ДОЛЖНЫ выполняться, иначе будет краш; перебирай разные гаджеты. В pwntools есть автоподбор, но one_gadget точнее показывает constraints. Требует Ruby."
+    },
+    {
+      "category": "Pwn",
+      "catOrder": 6,
+      "title": "patchelf",
+      "subcategory": "правка динамических секций ELF",
+      "purpose": "Меняет в готовом ELF интерпретатор (ld-linux), RPATH и зависимости (DT_NEEDED). В pwn-задачах позволяет запустить бинарь с нужной версией libc/loader без пересборки.",
+      "install": "sudo apt install patchelf",
+      "binary": "patchelf",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Интерпретатор (loader)",
+          "flags": [
+            { "flag": "--set-interpreter", "value": "./ld-2.31.so", "desc": "Заменить динамический загрузчик (ELF interpreter) на указанный — запуск с нужным ld." },
+            { "flag": "--print-interpreter", "desc": "Показать текущий интерпретатор бинаря." }
+          ]
+        },
+        {
+          "name": "Зависимости (DT_NEEDED)",
+          "flags": [
+            { "flag": "--replace-needed", "value": "libc.so.6 ./libc.so.6", "desc": "Заменить заявленную зависимость на другую (два аргумента: старая новая)." },
+            { "flag": "--add-needed", "value": "./libc.so.6", "desc": "Добавить новую нужную библиотеку." },
+            { "flag": "--remove-needed", "value": "libfoo.so", "desc": "Убрать зависимость (DT_NEEDED). Можно несколько раз." },
+            { "flag": "--print-needed", "desc": "Показать список нужных библиотек." }
+          ]
+        },
+        {
+          "name": "RPATH / RUNPATH",
+          "flags": [
+            { "flag": "--set-rpath", "value": ".", "desc": "Задать RPATH/RUNPATH (где искать libc) — напр. '.' чтобы брать libc из текущей папки." },
+            { "flag": "--add-rpath", "value": ".", "desc": "Добавить путь к существующему RPATH." },
+            { "flag": "--print-rpath", "desc": "Показать текущий RPATH." },
+            { "flag": "--remove-rpath", "desc": "Удалить RPATH полностью." },
+            { "flag": "--force-rpath", "desc": "Использовать DT_RPATH вместо DT_RUNPATH (старое поведение поиска)." }
+          ]
+        },
+        {
+          "name": "Прочее и вывод",
+          "flags": [
+            { "flag": "--set-soname", "value": "libc.so.6", "desc": "Изменить SONAME у разделяемой библиотеки." },
+            { "flag": "--print-soname", "desc": "Показать SONAME библиотеки." },
+            { "flag": "--output", "value": "patched", "desc": "Записать результат в новый файл, не трогая оригинал." },
+            { "flag": "--page-size", "value": "4096", "desc": "Указать размер страницы целевой архитектуры (для кросс-патчинга)." },
+            { "flag": "--version", "desc": "Показать версию patchelf." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "patchelf --set-interpreter ./ld-2.31.so {TARGET}", "note": "Подменить loader на нужную версию ld из задачи." },
+        { "cmd": "patchelf --replace-needed libc.so.6 ./libc.so.6 {TARGET}", "note": "Заставить бинарь линковаться с приложенной libc." },
+        { "cmd": "patchelf --set-rpath . {TARGET}", "note": "Искать библиотеки в текущей папке (рядом положенная libc)." },
+        { "cmd": "patchelf --set-interpreter ./ld.so --set-rpath . --output patched {TARGET}", "note": "Связка loader+rpath в новый файл, оригинал не портим." }
+      ],
+      "notes": "Цель обязательна — это патчимый ELF. Типичный pwn-воркфлоу: организаторы дают libc.so.6 и ld-X.so от удалённого хоста; чтобы локально воспроизвести среду, патчишь интерпретатор и RPATH под эти файлы (либо используешь pwninit, который делает это автоматически). Любой строковый аргумент можно подать из файла с префиксом @. Делай бэкап бинаря или используй --output — патч необратим."
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+/* ARS3NAL theme override for embedded CyberChef.
+   Loaded AFTER assets/main.css so our values win by source order.
+   We override the CSS custom properties for EVERY CyberChef theme class
+   (classic/dark/geocities/solarized*) so the palette stays ours even if
+   CyberChef's theme logic flips the <html> class. The HackTricks-dark
+   palette mirrors web/src/styles/tokens.css. Fonts reuse the app's bundled
+   woff2 at /fonts/ (same origin → resolve fine from inside the iframe). */
+
+/* ---- Fonts (subset of web/src/styles/fonts.css: latin + ext + cyrillic) ---- */
+@font-face { font-family:'Open Sans'; font-style:normal; font-weight:400; font-display:swap; src:url(/fonts/htf_0.woff2) format('woff2'); unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family:'Open Sans'; font-style:normal; font-weight:400; font-display:swap; src:url(/fonts/htf_3.woff2) format('woff2'); unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family:'Open Sans'; font-style:normal; font-weight:400; font-display:swap; src:url(/fonts/htf_6.woff2) format('woff2'); unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+@font-face { font-family:'Open Sans'; font-style:normal; font-weight:400; font-display:swap; src:url(/fonts/htf_4.woff2) format('woff2'); unicode-range:U+0460-052F,U+1C80-1C8A,U+20B4,U+2DE0-2DFF,U+A640-A69F,U+FE2E-FE2F; }
+@font-face { font-family:'Open Sans'; font-style:normal; font-weight:600; font-display:swap; src:url(/fonts/htf_0.woff2) format('woff2'); unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family:'Open Sans'; font-style:normal; font-weight:600; font-display:swap; src:url(/fonts/htf_3.woff2) format('woff2'); unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family:'Open Sans'; font-style:normal; font-weight:600; font-display:swap; src:url(/fonts/htf_6.woff2) format('woff2'); unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+@font-face { font-family:'Open Sans'; font-style:normal; font-weight:600; font-display:swap; src:url(/fonts/htf_4.woff2) format('woff2'); unicode-range:U+0460-052F,U+1C80-1C8A,U+20B4,U+2DE0-2DFF,U+A640-A69F,U+FE2E-FE2F; }
+@font-face { font-family:'Open Sans'; font-style:normal; font-weight:700; font-display:swap; src:url(/fonts/htf_0.woff2) format('woff2'); unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family:'Open Sans'; font-style:normal; font-weight:700; font-display:swap; src:url(/fonts/htf_6.woff2) format('woff2'); unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+
+@font-face { font-family:'Source Code Pro'; font-style:normal; font-weight:400; font-display:swap; src:url(/fonts/htf_15.woff2) format('woff2'); unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family:'Source Code Pro'; font-style:normal; font-weight:400; font-display:swap; src:url(/fonts/htf_10.woff2) format('woff2'); unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family:'Source Code Pro'; font-style:normal; font-weight:400; font-display:swap; src:url(/fonts/htf_14.woff2) format('woff2'); unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+@font-face { font-family:'Source Code Pro'; font-style:normal; font-weight:600; font-display:swap; src:url(/fonts/htf_15.woff2) format('woff2'); unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family:'Source Code Pro'; font-style:normal; font-weight:600; font-display:swap; src:url(/fonts/htf_14.woff2) format('woff2'); unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+
+/* ---- Palette override (HackTricks-dark, matches tokens.css) ---- */
+:root.classic, :root.dark, :root.geocities, :root.solarizedDark, :root.solarizedLight {
+  --primary-font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --primary-font-colour: #d6dbe4;
+  --fixed-width-font-family: "Source Code Pro", "Monaco", "Consolas", monospace;
+  --fixed-width-font-colour: inherit;
+  --subtext-font-colour: #8b93a7;
+
+  --primary-background-colour: #1c1c1c;
+  --secondary-background-colour: #202024;
+
+  --primary-border-colour: #2f2f36;
+  --secondary-border-colour: #2a2a30;
+
+  --title-colour: #ffffff;
+  --title-weight: 600;
+  --title-background-colour: #232328;
+
+  --banner-font-colour: #c9ced9;
+  --banner-bg-colour: #202024;
+  --banner-url-colour: #6f8cff;
+
+  --category-list-font-colour: #6f8cff;
+
+  --loader-background-colour: #2a2a30;
+  --loader-outer-colour: #496dff;
+  --loader-middle-colour: #8250df;
+  --loader-inner-colour: #6f8cff;
+
+  --op-list-operation-font-colour: #d6dbe4;
+  --op-list-operation-bg-colour: #232328;
+  --op-list-operation-border-colour: #2f2f36;
+
+  --rec-list-operation-font-colour: #d6dbe4;
+  --rec-list-operation-bg-colour: #202024;
+  --rec-list-operation-border-colour: #2f2f36;
+
+  --selected-operation-font-color: #ffffff;
+  --selected-operation-bg-colour: #2b2b33;
+  --selected-operation-border-colour: #496dff;
+
+  --breakpoint-font-colour: #ddd;
+  --breakpoint-bg-colour: #2a1f3a;
+  --breakpoint-border-colour: #2f2f36;
+
+  --disabled-font-colour: #666;
+  --disabled-bg-colour: #2a2a30;
+  --disabled-border-colour: #2f2f36;
+
+  --fc-operation-font-colour: #d6dbe4;
+  --fc-operation-bg-colour: #26262c;
+  --fc-operation-border-colour: #2f2f36;
+  --fc-breakpoint-operation-bg-colour: #2a1f3a;
+  --fc-breakpoint-operation-border-colour: #2f2f36;
+
+  --arg-font-colour: #c9ced9;
+  --arg-background: #232328;
+  --arg-border-colour: #2f2f36;
+  --arg-disabled-background: #2a2a30;
+  --arg-label-colour: #6f8cff;
+
+  --btn-default-font-colour: #d6dbe4;
+  --btn-default-bg-colour: #232328;
+  --btn-default-border-colour: #2f2f36;
+  --btn-default-hover-font-colour: #ffffff;
+  --btn-default-hover-bg-colour: #2b2b33;
+  --btn-default-hover-border-colour: #496dff;
+
+  --btn-success-font-colour: #ffffff;
+  --btn-success-bg-colour: #496dff;
+  --btn-success-border-colour: #496dff;
+  --btn-success-hover-font-colour: #ffffff;
+  --btn-success-hover-bg-colour: #6a86ff;
+  --btn-success-hover-border-colour: #6a86ff;
+
+  --scrollbar-track: #1c1c1c;
+  --scrollbar-thumb: #3a3a42;
+  --scrollbar-hover: #4a4a54;
+
+  --drop-file-border-colour: #496dff;
+  --table-border-colour: #2f2f36;
+  --popover-background: #232328;
+  --popover-border-colour: #2f2f36;
+  --code-background: #1d1f21;
+  --code-font-colour: #c9d1d9;
+  --input-highlight-colour: #496dff;
+  --input-border-colour: #2f2f36;
+}
+
+/* Hide controls that don't make sense in an embedded offline copy:
+   "About / Support" (#support) and "Download CyberChef" (opens #download-modal). */
+#support,
+a[data-target="#download-modal"] { display: none !important; }

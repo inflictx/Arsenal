@@ -1,0 +1,91 @@
+{
+  "category": "Client Side Path Traversal",
+  "source": "PayloadsAllTheThings/Client Side Path Traversal/",
+  "entries": [
+    {
+      "subcategory": "Что такое CSPT",
+      "title": "Client-Side Path Traversal — суть уязвимости",
+      "language": "text",
+      "tags": ["detection", "cspt", "methodology"],
+      "body": "CSPT (Client-Side Path Traversal), иногда «On-site Request Forgery», — баг, который используется как инструмент для CSRF- или XSS-атак.\n\nСуть: клиентский код делает запрос через fetch на URL, в путь которого попадает контролируемый ввод. Если ввод не кодируется, в путь можно подставить «../» — после нормализации браузером запрос уйдёт на другой URL.\n\nТак как запрос инициируется из фронтенда самого приложения, браузер автоматически прикладывает cookies и прочую аутентификацию — и они становятся доступны для эксплуатации."
+    },
+    {
+      "subcategory": "Что такое CSPT",
+      "title": "Где искать CSPT",
+      "language": "text",
+      "tags": ["detection", "recon"],
+      "body": "• Любой клиентский fetch / XHR, где путь URL собирается из пользовательского ввода (query-параметр, фрагмент, поле формы).\n• Параметр-«идентификатор», который фронтенд подставляет в путь API-запроса (newsitemid, email, inviteCode, channelname и т.п.).\n• Места, где ввод НЕ проходит URL-кодирование перед вставкой в путь — там пролезет «../».\n• Цель — заставить запрос уйти на произвольный эндпоинт того же origin, к которому браузер сам приложит куки/CSRF-токен."
+    },
+    {
+      "subcategory": "CSPT → XSS",
+      "title": "CSPT to XSS — техника манипуляции путём в fetch",
+      "language": "text",
+      "tags": ["cspt", "xss", "fetch"],
+      "body": "Страница после загрузки вызывает fetch и шлёт запрос на URL с контролируемым вводом, который не кодируется в пути. Это позволяет подставить последовательности «../» и увести запрос на произвольный эндпоинт — это и есть CSPT.\n\nЕсли увести fetch на эндпоинт, который возвращает контролируемое содержимое (например, JS с text-injection), и это содержимое попадёт в DOM/исполнение — получаем XSS из CSPT."
+    },
+    {
+      "subcategory": "CSPT → XSS",
+      "title": "CSPT to XSS — пример эксплуатации",
+      "language": "text",
+      "tags": ["cspt", "xss", "exploitation"],
+      "body": "• Страница https://example.com/static/cms/news.html принимает параметр newsitemid\n• Затем она делает fetch содержимого https://example.com/newitems/<newsitemid>\n• Отдельно найдена text-injection в https://example.com/pricing/default.js через параметр cb\n• Итоговый payload (newsitemid с «../» уводит fetch на уязвимый default.js):\n\nhttps://example.com/static/cms/news.html?newsitemid=../pricing/default.js?cb=alert(document.domain)//"
+    },
+    {
+      "subcategory": "CSPT → CSRF (CSPT2CSRF)",
+      "title": "CSPT to CSRF — суть техники",
+      "language": "text",
+      "tags": ["cspt", "csrf", "cspt2csrf"],
+      "body": "CSPT перенаправляет легитимные HTTP-запросы. Фронтенд сам добавляет к таким запросам нужные токены (аутентификацию, CSRF-токен). Если увести через «../» запрос на эндпоинт-«синк», выполняющий действие, — можно обойти существующую защиту от CSRF.\n\nИменно поэтому CSPT2CSRF работает там, где обычный CSRF бессилен: токены подставляет сам клиент, а SameSite=Lax не мешает (запрос идёт изнутри самого сайта)."
+    },
+    {
+      "subcategory": "CSPT → CSRF (CSPT2CSRF)",
+      "title": "CSRF против CSPT2CSRF — сравнение",
+      "language": "table",
+      "tags": ["cspt2csrf", "csrf", "comparison"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Возможность", "CSRF", "CSPT2CSRF"],
+          "rows": [
+            ["POST CSRF?", "да", "да"],
+            ["Контроль тела запроса?", "да", "нет"],
+            ["Работает при anti-CSRF токене?", "нет", "да"],
+            ["Работает при SameSite=Lax?", "нет", "да"],
+            ["GET / PATCH / PUT / DELETE CSRF?", "нет", "да"],
+            ["1-click CSRF?", "нет", "да"],
+            ["Импакт зависит от source и sink?", "нет", "да"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "CSPT → CSRF (CSPT2CSRF)",
+      "title": "CSPT2CSRF с POST-синком — Mattermost (CVE-2023-45316)",
+      "language": "http",
+      "tags": ["cspt2csrf", "cve", "post"],
+      "body": "/<team>/channels/channelname?telem_action=under_control&forceRHSOpen&telem_run_id=../../../../../../api/v4/caches/invalidate"
+    },
+    {
+      "subcategory": "CSPT → CSRF (CSPT2CSRF)",
+      "title": "CSPT2CSRF — обход через «../» в email/inviteCode (erasec.be)",
+      "language": "http",
+      "tags": ["cspt2csrf", "bypass", "exploitation"],
+      "body": "https://example.com/signup/invite?email=foo%40bar.com&inviteCode=123456789/../../../cards/123e4567-e89b-42d3-a456-556642440000/cancel?a="
+    },
+    {
+      "subcategory": "CSPT → CSRF (CSPT2CSRF)",
+      "title": "Реальные кейсы CSPT2CSRF",
+      "language": "text",
+      "tags": ["cspt2csrf", "cve", "recon"],
+      "body": "• 1-click CSPT2CSRF в Rocket.Chat.\n• CVE-2023-45316 — CSPT2CSRF с POST-синком в Mattermost.\n• CVE-2023-6458 — CSPT2CSRF с GET-синком в Mattermost.\n• CVE-2023-5123 — CSPT2CSRF в Grafana JSON API Plugin.\n• Client Side Path Manipulation (erasec.be) — CSPT2CSRF через invite-флоу.\n\nЗакономерность: импакт CSPT2CSRF зависит от пары source (где инъекция пути) → sink (на какой эндпоинт-действие удаётся увести запрос)."
+    },
+    {
+      "subcategory": "Тулзы и лабы",
+      "title": "Инструменты и площадки для CSPT",
+      "language": "text",
+      "tags": ["tools", "labs"],
+      "body": "• doyensec/CSPTBurpExtension — расширение Burp Suite для поиска и эксплуатации Client-Side Path Traversal.\n• doyensec/CSPTPlayground — открытый полигон для поиска и эксплуатации CSPT.\n• Root Me — CSPT - The Ruler — лаба-челлендж по CSPT."
+    }
+  ]
+}

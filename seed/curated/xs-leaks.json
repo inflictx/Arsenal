@@ -1,0 +1,137 @@
+{
+  "category": "XS-Leaks",
+  "source": "PayloadsAllTheThings/XS-Leak/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое XS-Leak",
+      "language": "text",
+      "tags": ["methodology", "side-channel", "xs-leak"],
+      "body": "Cross-Site Leaks (XS-Leaks) — это уязвимости класса side-channel: атакующий выводит чувствительную информацию о целевом origin, НЕ читая тело ответа.\nЭксплуатируется не данными (как в XSS), а наблюдаемым поведением браузера: разница во времени отклика, побочные эффекты, события ошибок.\nОбходят классические защиты CORS / SOP, потому что атакующему не нужно читать ответ — достаточно отличить два состояния (есть результат / нет результата, авторизован / нет)."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Атакующие примитивы (что и через что утекает)",
+      "language": "table",
+      "tags": ["methodology", "oracle", "primitives"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Примитив", "Что утекает"],
+          "rows": [
+            ["Timing (тайминг)", "Размер / сложность ресурса"],
+            ["Frame count (счётчик фреймов)", "Различия в контенте"],
+            ["Errors (ошибки)", "Решения контроля доступа"],
+            ["Cache (кэш)", "Прошлые визиты"],
+            ["Navigation (навигация)", "Состояние авторизации"],
+            ["Rendering (рендеринг)", "Длина текста"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Методология",
+      "title": "XS-Search — boolean-оракул из поисковых систем",
+      "language": "text",
+      "tags": ["methodology", "xs-search", "oracle"],
+      "body": "XS-Search-атаки злоупотребляют системами поиска по запросу (Query-Based Search), чтобы вытащить данные пользователя.\nИзмеряя побочный эффект поискового запроса (время отклика, число фреймов, событие ошибки), атакующий определяет, вернул поиск результаты или нет.\nЭтот boolean-оракул (да/нет) позволяет брутфорсить секрет посимвольно.\n\nПример: открыть 50 вкладок и использовать разницу таймингов от нарушения CSP в iframe на странице результатов поиска, чтобы перебрать флаг символ за символом."
+    },
+    {
+      "subcategory": "Тайминговые атаки",
+      "title": "Принцип тайминговой атаки",
+      "language": "text",
+      "tags": ["timing", "side-channel", "oracle"],
+      "body": "В тайминговой атаке информацию вытаскивают, измеряя, СКОЛЬКО система отвечает на конкретные запросы.\nНа целевое приложение доставляют скрипты, которые дёргают API, шлют AJAX или инициируют CORS-взаимодействия.\nИзмеряя и сравнивая время отклика этих операций, атакующий делает выводы о внутреннем поведении, процессах валидации данных или защитных механизмах.\nКлючевое: задача — отличить два состояния по времени, а не прочитать ответ."
+    },
+    {
+      "subcategory": "Подсчёт фреймов",
+      "title": "Frame Counting — принцип",
+      "language": "text",
+      "tags": ["frame-counting", "iframe", "oracle"],
+      "body": "Если страница грузит РАЗНОЕ число iframe в зависимости от состояния пользователя (например, по результатам поиска), атакующий считает их и выводит данные.\nwindow.length у ссылки на окно (window.open / iframe.contentWindow) возвращает число вложенных фреймов — это и есть boolean/числовой оракул, доступный кросс-доменно (SOP его не блокирует)."
+    },
+    {
+      "subcategory": "Подсчёт фреймов",
+      "title": "Frame Counting — PoC (window.length)",
+      "language": "javascript",
+      "tags": ["frame-counting", "poc", "window-open"],
+      "body": "// Get a reference to the window\nvar win = window.open('https://example.org');\n\n// Wait for the page to load\nsetTimeout(() => {\n  // Read the number of iframes loaded\n  console.log(\"%d iframes detected\", win.length);\n}, 2000);"
+    },
+    {
+      "subcategory": "Кэш-пробинг",
+      "title": "Cache Probing — принцип",
+      "language": "text",
+      "tags": ["cache-probing", "cache", "oracle"],
+      "body": "В атаке кэш-пробинга вредоносный сайт пытается определить, лежит ли конкретный ресурс целевого сайта уже в кэше браузера жертвы.\nАтакующий заставляет браузер запросить ресурс (картинку, скрипт, эндпоинт), который мог попасть в кэш только если пользователь авторизован или ранее посещал определённую страницу.\nИзмеряя, насколько быстро ресурс загрузился, или наблюдая разницу в поведении между кэшированным и некэшированным ответом, атакующий выводит чувствительную информацию.\nТипичный приём: сбросить кэш (CORS-ошибкой или POST-запросом), затем замерить повторную загрузку."
+    },
+    {
+      "subcategory": "Известные оракулы",
+      "title": "Каталог известных XS-Leak оракулов (xsinator)",
+      "language": "table",
+      "tags": ["oracle", "catalog", "xsinator"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Оракул", "Что детектит / лик"],
+          "rows": [
+            ["Cache Leak (CORS)", "Детект ресурсов, загруженных страницей. Кэш сбрасывается CORS-ошибкой."],
+            ["Cache Leak (POST)", "Детект ресурсов, загруженных страницей. Кэш сбрасывается POST-запросом."],
+            ["ContentDocument X-Frame Leak", "Детект X-Frame-Options через ContentDocument."],
+            ["COOP Leak", "Детект заголовка Cross-Origin-Opener-Policy через popup."],
+            ["CORB Leak", "Детект X-Content-Type-Options в связке с определённым content type через CORB."],
+            ["CORP Leak", "Детект заголовка Cross-Origin-Resource-Policy через fetch."],
+            ["CORS Error Leak", "Лик целевого URL редиректа через CORS-ошибку."],
+            ["CSP Directive Leak", "Детект директив CSP через атрибут csp у iframe."],
+            ["CSP Redirect Detection", "Детект кросс-доменных редиректов через событие нарушения CSP."],
+            ["CSP Violation Leak", "Лик цели кросс-доменного редиректа через событие нарушения CSP."],
+            ["CSS Property Leak", "Лик CSS-правил через getComputedStyle."],
+            ["Download Detection", "Детект скачиваний (заголовок Content-Disposition)."],
+            ["Duration Redirect Leak", "Детект кросс-доменных редиректов по длительности."],
+            ["ETag header length", "Детект размера тела ответа по длине заголовка ETag."],
+            ["Event Handler Leak (Object)", "Детект ошибок через onload/onerror у object."],
+            ["Event Handler Leak (Script)", "Детект ошибок через onload/onerror у script."],
+            ["Event Handler Leak (Stylesheet)", "Детект ошибок через onload/onerror у stylesheet."],
+            ["Fetch Redirect Leak", "Детект HTTP-редиректов через Fetch API."],
+            ["Frame Count Leak", "Детект числа iframe на странице."],
+            ["History Length Leak", "Детект javascript-редиректов через History API."],
+            ["Id Attribute Leak", "Лик атрибута id у фокусируемых HTML-элементов через onblur."],
+            ["Max Redirect Leak", "Детект серверного редиректа через злоупотребление лимитом max redirect."],
+            ["Media Dimensions Leak", "Лик размеров картинок или видео."],
+            ["Media Duration Leak", "Лик длительности аудио или видео."],
+            ["MediaError Leak", "Детект статус-кодов через сообщение MediaError."],
+            ["Payment API Leak", "Детект того, что другая вкладка использует Payment API."],
+            ["Performance API CORP Leak", "Детект заголовка Cross-Origin-Resource-Policy через Performance API."],
+            ["Performance API Download Detection", "Детект скачиваний (Content-Disposition) через Performance API."],
+            ["Performance API Empty Page Leak", "Детект пустых ответов через Performance API."],
+            ["Performance API Error Leak", "Детект ошибок через Performance API."],
+            ["Performance API X-Frame Leak", "Детект X-Frame-Options через Performance API."],
+            ["Performance API XSS Auditor Leak", "Детект скриптов/обработчиков событий на странице через Performance API."],
+            ["Redirect Start Leak", "Детект кросс-доменных HTTP-редиректов по времени redirectStart."],
+            ["Request Merging Error Leak", "Детект ошибок через слияние запросов (request merging)."],
+            ["SRI Error Leak", "Лик content length через ошибку SRI."],
+            ["Style Reload Error Leak", "Детект ошибок через баг перезагрузки стиля."],
+            ["URL Max Length Leak", "Детект серверного редиректа через злоупотребление макс. длиной URL."],
+            ["WebSocket Leak (FF)", "Детект числа websocket на странице через исчерпание лимита сокетов (Firefox)."],
+            ["WebSocket Leak (GC)", "Детект числа websocket на странице через исчерпание лимита сокетов (Chrome)."]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Известные оракулы",
+      "title": "Disk cache grooming",
+      "language": "text",
+      "tags": ["cache-probing", "oracle", "disk-cache"],
+      "body": "Disk cache grooming — техника манипуляции дисковым кэшем браузера для построения оракула.\nИсточник (PoC): https://gist.github.com/parrot409/e3b546d3b76e9f9044d22456e4cc8622"
+    },
+    {
+      "subcategory": "Инструменты",
+      "title": "Инструменты для XS-Leaks",
+      "language": "text",
+      "tags": ["tools", "xsinator", "autoleak"],
+      "body": "RUB-NDS/xsinator.com — XS-Leak Browser Test Suite (готовый набор тестов оракулов в браузере).\nRUB-NDS/AutoLeak — поиск XS-Leaks в браузере через diffing DOM-графов в двух состояниях."
+    }
+  ]
+}

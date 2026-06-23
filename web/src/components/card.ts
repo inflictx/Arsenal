@@ -1,0 +1,70 @@
+import { h } from '../lib/dom';
+import { codeBlock } from '../lib/highlight';
+import { copyButton } from '../lib/copy';
+import { toast } from '../lib/toast';
+import { api, type Entry } from '../api';
+
+interface TableData { headers: string[]; rows: string[][]; }
+
+function renderTable(t: TableData): HTMLElement {
+  return h('div', { class: 'table-wrap' },
+    h('table', { class: 'card-table' },
+      h('thead', {}, h('tr', {}, ...t.headers.map((hd) => h('th', {}, hd)))),
+      h('tbody', {}, ...t.rows.map((r) => h('tr', {}, ...r.map((c) => h('td', {}, c))))),
+    ),
+  );
+}
+function tableToText(t: TableData): string {
+  return [t.headers.join('\t'), ...t.rows.map((r) => r.join('\t'))].join('\n');
+}
+
+export function PayloadCard(e: Entry): HTMLElement {
+  const meta = (e.meta ?? {}) as Record<string, any>;
+  const kind: string | undefined = meta.kind;
+  const body = e.body ?? '';
+
+  const star = h('button', {
+    class: 'star' + (e.is_favorite ? ' on' : ''),
+    title: 'Favorite',
+  }, e.is_favorite ? '★' : '☆') as HTMLButtonElement;
+  star.addEventListener('click', async (ev) => {
+    ev.stopPropagation();
+    try {
+      const u = await api.favorite(e.id);
+      star.classList.toggle('on', u.is_favorite);
+      star.textContent = u.is_favorite ? '★' : '☆';
+    } catch { toast('Не сохранилось'); }
+  });
+
+  let content: HTMLElement;
+  let actions: (HTMLElement | null)[];
+  let chip: string | null = e.language;
+
+  if (kind === 'image') {
+    content = h('figure', { class: 'card-figure' },
+      h('img', { class: 'card-img', src: meta.src, alt: e.title, loading: 'lazy' }),
+      meta.caption ? h('figcaption', {}, meta.caption) : null,
+    );
+    actions = [star];
+    chip = 'схема';
+  } else if (kind === 'table' && meta.table) {
+    content = renderTable(meta.table as TableData);
+    actions = [star, copyButton(() => tableToText(meta.table as TableData))];
+    chip = 'таблица';
+  } else {
+    content = codeBlock(body, { wrap: body.length > 110 });
+    actions = [star, copyButton(() => body)];
+  }
+
+  const sub = e.subcategory ? h('div', { class: 'card-sub' }, e.subcategory) : null;
+  const top = h('div', { class: 'card-top' },
+    h('span', { class: 'card-title', title: e.title }, e.title),
+    chip ? h('span', { class: 'lang' }, chip) : null,
+    h('div', { class: 'card-actions' }, ...actions),
+  );
+  const tags = e.tags?.length
+    ? h('div', { class: 'tags' }, ...e.tags.map((t) => h('span', { class: 'tag' }, t)))
+    : null;
+
+  return h('div', { class: 'card' }, sub, top, content, tags);
+}

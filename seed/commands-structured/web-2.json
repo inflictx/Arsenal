@@ -1,0 +1,538 @@
+{
+  "category": "WEB",
+  "catOrder": 2,
+  "tools": [
+    {
+      "title": "httpx",
+      "subcategory": "HTTP-пробинг и анализ хостов",
+      "purpose": "Быстрый многоцелевой HTTP-тулкит от ProjectDiscovery: проверяет живость хостов, снимает статус-коды, заголовки, технологии, фавиконы, делает скриншоты.",
+      "install": "go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest",
+      "binary": "httpx",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Ввод",
+          "flags": [
+            {"flag": "-u", "value": "https://example.com", "desc": "Цель(и) для пробинга (хост, URL; через запятую)"},
+            {"flag": "-l", "value": "hosts.txt", "desc": "Файл со списком хостов (по строке на цель)"},
+            {"flag": "-rr", "value": "req.txt", "desc": "Файл с сырым HTTP-запросом для отправки"},
+            {"flag": "-p", "value": "80,443,8080", "desc": "Порты для пробинга (синтаксис как у nmap)"},
+            {"flag": "-path", "value": "/admin", "desc": "Путь(и) для пробинга (через запятую или файл)"}
+          ]
+        },
+        {
+          "name": "Пробы (что показывать)",
+          "flags": [
+            {"flag": "-sc", "desc": "Показать код ответа (status-code)"},
+            {"flag": "-title", "desc": "Показать <title> страницы"},
+            {"flag": "-td", "desc": "Определить и показать технологии (tech-detect)"},
+            {"flag": "-server", "desc": "Показать заголовок Server"},
+            {"flag": "-cl", "desc": "Показать Content-Length ответа"},
+            {"flag": "-ct", "desc": "Показать Content-Type ответа"},
+            {"flag": "-ip", "desc": "Показать IP-адрес хоста"},
+            {"flag": "-cdn", "desc": "Показать используемый CDN/WAF"},
+            {"flag": "-favicon", "desc": "Показать mmh3-хэш фавикона"},
+            {"flag": "-location", "desc": "Показать заголовок Location при редиректе"},
+            {"flag": "-method", "desc": "Показать HTTP-метод запроса"}
+          ]
+        },
+        {
+          "name": "Фильтры и матчеры",
+          "flags": [
+            {"flag": "-mc", "value": "200,302", "desc": "Оставить только указанные статус-коды"},
+            {"flag": "-fc", "value": "404,403", "desc": "Отфильтровать указанные статус-коды"},
+            {"flag": "-ms", "value": "admin", "desc": "Оставить ответы, содержащие строку"},
+            {"flag": "-fs", "value": "Not Found", "desc": "Отфильтровать ответы со строкой"},
+            {"flag": "-mr", "value": "[a-z]+", "desc": "Оставить ответы по regex"},
+            {"flag": "-ml", "value": "1024", "desc": "Оставить по Content-Length"},
+            {"flag": "-fl", "value": "0", "desc": "Отфильтровать по Content-Length"},
+            {"flag": "-fd", "desc": "Убрать почти одинаковые (дубль) ответы"}
+          ]
+        },
+        {
+          "name": "HTTP-конфиг",
+          "flags": [
+            {"flag": "-H", "value": "Cookie: a=b", "desc": "Свой HTTP-заголовок (повторяемый)"},
+            {"flag": "-proxy", "value": "http://127.0.0.1:8080", "desc": "Прокси (http/socks) для запросов"},
+            {"flag": "-random-agent", "desc": "Случайный User-Agent на каждый запрос"},
+            {"flag": "-x", "value": "GET,POST", "desc": "Методы для пробинга"},
+            {"flag": "-body", "value": "a=1", "desc": "Тело POST-запроса"},
+            {"flag": "-fr", "desc": "Следовать за HTTP-редиректами"},
+            {"flag": "-maxr", "value": "10", "desc": "Максимум редиректов для перехода"},
+            {"flag": "-r", "value": "8.8.8.8", "desc": "Свои DNS-резолверы (файл или через запятую)"}
+          ]
+        },
+        {
+          "name": "Скорость и оптимизация",
+          "flags": [
+            {"flag": "-t", "value": "50", "desc": "Количество потоков"},
+            {"flag": "-rl", "value": "150", "desc": "Лимит запросов в секунду"},
+            {"flag": "-timeout", "value": "5", "desc": "Таймаут запроса в секундах"},
+            {"flag": "-retries", "value": "2", "desc": "Число повторов при ошибке"},
+            {"flag": "-delay", "value": "1s", "desc": "Пауза между запросами"}
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            {"flag": "-o", "value": "out.txt", "desc": "Файл для записи результатов"},
+            {"flag": "-j", "desc": "Вывод в формате JSONL"},
+            {"flag": "-csv", "desc": "Вывод в формате CSV"},
+            {"flag": "-ss", "desc": "Скриншоты страниц через headless-браузер"},
+            {"flag": "-sr", "desc": "Сохранять HTTP-ответы на диск"},
+            {"flag": "-silent", "desc": "Тихий режим: только результаты"},
+            {"flag": "-nc", "desc": "Отключить цвет в выводе"},
+            {"flag": "-stats", "desc": "Показывать статистику сканирования"}
+          ]
+        }
+      ],
+      "recipes": [
+        {"cmd": "httpx -l hosts.txt -sc -title -td -silent", "note": "Базовый прогон: живость + код + заголовок + технологии"},
+        {"cmd": "subfinder -d {TARGET} -silent | httpx -sc -title -td -ip -silent", "note": "Связка: сабдомены сразу в httpx"},
+        {"cmd": "httpx -l urls.txt -mc 200 -fr -silent -o live.txt", "note": "Только живые 200 с переходом по редиректам"},
+        {"cmd": "httpx -l hosts.txt -ss -srd shots -silent", "note": "Скриншоты всех хостов в папку"}
+      ],
+      "notes": "Глобальные опции ставь до позиционных. Хорошо принимает цели по stdin (echo url | httpx)."
+    },
+    {
+      "title": "katana",
+      "subcategory": "Краулер URL и эндпоинтов",
+      "purpose": "Быстрый веб-краулер от ProjectDiscovery: собирает ссылки, формы и эндпоинты, в т.ч. из JavaScript, в обычном и headless-режиме.",
+      "install": "CGO_ENABLED=1 go install github.com/projectdiscovery/katana/cmd/katana@latest",
+      "binary": "katana",
+      "target": "-u {TARGET}",
+      "modes": ["standard", "headless"],
+      "groups": [
+        {
+          "name": "Ввод",
+          "flags": [
+            {"flag": "-u", "value": "https://example.com", "desc": "URL(ы) для краулинга (через запятую) или файл"},
+            {"flag": "-list", "value": "urls.txt", "desc": "Файл со списком URL для краулинга"},
+            {"flag": "-e", "value": "cdn,private-ips", "desc": "Исключить хосты (cdn, private-ips, cidr, ip, regex)"},
+            {"flag": "-resume", "value": "resume.cfg", "desc": "Возобновить прошлое сканирование"}
+          ]
+        },
+        {
+          "name": "Конфигурация краулинга",
+          "flags": [
+            {"flag": "-d", "value": "3", "desc": "Максимальная глубина краулинга"},
+            {"flag": "-jc", "desc": "Парсить эндпоинты из JavaScript (js-crawl)"},
+            {"flag": "-kf", "value": "all", "desc": "Краулить известные файлы (all, robotstxt, sitemapxml)"},
+            {"flag": "-ct", "value": "10m", "desc": "Лимит времени краулинга (s, m, h, d)"},
+            {"flag": "-aff", "desc": "Автозаполнение форм (экспериментально)"},
+            {"flag": "-fx", "desc": "Извлекать формы в JSONL-вывод"},
+            {"flag": "-s", "value": "breadth-first", "desc": "Стратегия обхода (depth-first, breadth-first)"},
+            {"flag": "-H", "value": "Cookie: a=b", "desc": "Свои заголовки/куки (header:value)"},
+            {"flag": "-proxy", "value": "http://127.0.0.1:8080", "desc": "HTTP/SOCKS5 прокси"},
+            {"flag": "-timeout", "value": "10", "desc": "Таймаут запроса в секундах"}
+          ]
+        },
+        {
+          "name": "Headless",
+          "flags": [
+            {"flag": "-hl", "desc": "Гибридный headless-краулинг (рендер JS в браузере)"},
+            {"flag": "-sc", "desc": "Использовать локальный Chrome вместо встроенного"},
+            {"flag": "-sb", "desc": "Показывать окно браузера"},
+            {"flag": "-nos", "desc": "Запуск Chrome в режиме --no-sandbox"},
+            {"flag": "-xhr", "desc": "Извлекать XHR-запросы в JSONL"}
+          ]
+        },
+        {
+          "name": "Область (scope)",
+          "flags": [
+            {"flag": "-cs", "value": "login", "desc": "regex для URL в области (in-scope)"},
+            {"flag": "-cos", "value": "logout", "desc": "regex для URL вне области (out-of-scope)"},
+            {"flag": "-fs", "value": "fqdn", "desc": "Поле области (dn, rdn, fqdn) или свой regex"},
+            {"flag": "-do", "desc": "Показывать и внешние эндпоинты"}
+          ]
+        },
+        {
+          "name": "Фильтры",
+          "flags": [
+            {"flag": "-mr", "value": "admin", "desc": "Оставить URL по regex"},
+            {"flag": "-fr", "value": "logout", "desc": "Отфильтровать URL по regex"},
+            {"flag": "-em", "value": "php,js", "desc": "Оставить только указанные расширения"},
+            {"flag": "-ef", "value": "png,css", "desc": "Отфильтровать указанные расширения"},
+            {"flag": "-mdc", "value": "status_code==200", "desc": "Условие на совпадение (DSL)"}
+          ]
+        },
+        {
+          "name": "Скорость и вывод",
+          "flags": [
+            {"flag": "-c", "value": "10", "desc": "Число параллельных воркеров (fetchers)"},
+            {"flag": "-p", "value": "10", "desc": "Параллельная обработка входных целей"},
+            {"flag": "-rl", "value": "150", "desc": "Лимит запросов в секунду (глобально)"},
+            {"flag": "-rd", "value": "1", "desc": "Задержка между запросами (сек)"},
+            {"flag": "-o", "value": "urls.txt", "desc": "Файл для вывода"},
+            {"flag": "-j", "desc": "Вывод в формате JSONL"},
+            {"flag": "-sr", "desc": "Сохранять запросы/ответы на диск"},
+            {"flag": "-silent", "desc": "Тихий режим: только результат"}
+          ]
+        }
+      ],
+      "recipes": [
+        {"cmd": "katana -u {TARGET} -silent", "note": "Быстрый краулинг одного сайта"},
+        {"cmd": "katana -u {TARGET} -jc -d 5 -silent", "note": "Глубокий обход с парсингом JS"},
+        {"cmd": "katana -u {TARGET} -hl -jc -silent", "note": "Headless-краулинг JS-приложений (SPA)"},
+        {"cmd": "katana -list urls.txt -em php,asp -silent -o endpoints.txt", "note": "Собрать только динамические эндпоинты"}
+      ],
+      "notes": "Глобальные опции до позиционных. Принимает цели по stdin. Для headless нужен Chrome; сборка требует CGO."
+    },
+    {
+      "title": "gau / waybackurls",
+      "subcategory": "Сбор URL из веб-архивов",
+      "purpose": "getallurls (gau) вытягивает известные URL домена из Wayback Machine, Common Crawl, OTX и URLScan. Пассивный сбор без обращения к самому сайту.",
+      "install": "go install github.com/lc/gau/v2/cmd/gau@latest",
+      "binary": "gau",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Источники",
+          "flags": [
+            {"flag": "--providers", "value": "wayback,otx", "desc": "Источники данных (wayback, commoncrawl, otx, urlscan)"},
+            {"flag": "--subs", "desc": "Включать сабдомены в результаты"},
+            {"flag": "--from", "value": "202301", "desc": "Начальная дата выборки URL (ГГГГММ)"},
+            {"flag": "--to", "value": "202412", "desc": "Конечная дата выборки URL (ГГГГММ)"}
+          ]
+        },
+        {
+          "name": "Фильтры",
+          "flags": [
+            {"flag": "--blacklist", "value": "png,jpg,css,woff", "desc": "Пропускать указанные расширения файлов"},
+            {"flag": "--mc", "value": "200,500", "desc": "Оставить URL только с этими статус-кодами"},
+            {"flag": "--fc", "value": "404,302", "desc": "Отфильтровать URL с этими статус-кодами"},
+            {"flag": "--mt", "value": "text/html", "desc": "Оставить только эти MIME-типы"},
+            {"flag": "--ft", "value": "image/png", "desc": "Отфильтровать эти MIME-типы"},
+            {"flag": "--fp", "desc": "Убрать дубли эндпоинтов с разными параметрами"}
+          ]
+        },
+        {
+          "name": "Сеть",
+          "flags": [
+            {"flag": "--threads", "value": "5", "desc": "Число рабочих потоков"},
+            {"flag": "--timeout", "value": "60", "desc": "Таймаут HTTP в секундах"},
+            {"flag": "--retries", "value": "5", "desc": "Число повторов HTTP-клиента"},
+            {"flag": "--proxy", "value": "http://127.0.0.1:8080", "desc": "HTTP/SOCKS5 прокси"}
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            {"flag": "--o", "value": "urls.txt", "desc": "Записать результаты в файл"},
+            {"flag": "--json", "desc": "Вывод в формате JSON"},
+            {"flag": "--verbose", "desc": "Подробный вывод"},
+            {"flag": "--config", "value": "$HOME/.gau.toml", "desc": "Путь к файлу конфигурации"}
+          ]
+        }
+      ],
+      "recipes": [
+        {"cmd": "gau {TARGET}", "note": "Все известные URL домена из архивов"},
+        {"cmd": "gau --subs {TARGET}", "note": "С учётом сабдоменов"},
+        {"cmd": "gau --blacklist png,jpg,css,js {TARGET} | sort -u", "note": "Без статики, уникальные"},
+        {"cmd": "gau {TARGET} | httpx -mc 200 -silent", "note": "Архивные URL прогнать на живость"}
+      ],
+      "notes": "Альтернатива: waybackurls (tomnomnom) - проще, только Wayback Machine: 'waybackurls {TARGET}' или 'cat domains | waybackurls'. Домен в gau передаётся позиционно или по stdin."
+    },
+    {
+      "title": "subfinder",
+      "subcategory": "Пассивный поиск сабдоменов",
+      "purpose": "Пассивный перебор сабдоменов от ProjectDiscovery через множество онлайн-источников (crt.sh, VirusTotal, и др.). Быстрый и не шумит по цели.",
+      "install": "go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest",
+      "binary": "subfinder",
+      "target": "-d {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Ввод",
+          "flags": [
+            {"flag": "-d", "value": "example.com", "desc": "Домен(ы) для поиска сабдоменов (через запятую)"},
+            {"flag": "-dL", "value": "domains.txt", "desc": "Файл со списком доменов"}
+          ]
+        },
+        {
+          "name": "Источники",
+          "flags": [
+            {"flag": "-s", "value": "crtsh,github", "desc": "Использовать только указанные источники"},
+            {"flag": "-es", "value": "shodan", "desc": "Исключить указанные источники"},
+            {"flag": "-all", "desc": "Использовать все источники (медленнее)"},
+            {"flag": "-recursive", "desc": "Только источники с рекурсивным поиском"},
+            {"flag": "-ls", "desc": "Показать список доступных источников"}
+          ]
+        },
+        {
+          "name": "Фильтры и резолв",
+          "flags": [
+            {"flag": "-m", "value": "dev", "desc": "Оставить только совпадающие сабдомены"},
+            {"flag": "-f", "value": "test", "desc": "Отфильтровать указанные сабдомены"},
+            {"flag": "-nW", "desc": "Показывать только активные (резолвящиеся) сабдомены"},
+            {"flag": "-r", "value": "8.8.8.8", "desc": "Свои DNS-резолверы (через запятую)"},
+            {"flag": "-rL", "value": "resolvers.txt", "desc": "Файл со списком резолверов"}
+          ]
+        },
+        {
+          "name": "Скорость и оптимизация",
+          "flags": [
+            {"flag": "-rl", "value": "10", "desc": "Лимит HTTP-запросов в секунду"},
+            {"flag": "-t", "value": "10", "desc": "Число потоков для резолва"},
+            {"flag": "-timeout", "value": "30", "desc": "Таймаут HTTP в секундах"},
+            {"flag": "-max-time", "value": "10", "desc": "Максимум времени перебора (минуты)"},
+            {"flag": "-proxy", "value": "http://127.0.0.1:8080", "desc": "HTTP-прокси"}
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            {"flag": "-o", "value": "subs.txt", "desc": "Файл для записи результатов"},
+            {"flag": "-oJ", "desc": "Вывод в формате JSONL"},
+            {"flag": "-oD", "value": "out/", "desc": "Папка вывода при нескольких доменах"},
+            {"flag": "-cs", "desc": "Добавить источник в JSON-вывод"},
+            {"flag": "-oI", "desc": "Показать резолвнутые IP (только active)"},
+            {"flag": "-silent", "desc": "Тихий режим: только сабдомены"},
+            {"flag": "-nc", "desc": "Отключить цвет вывода"},
+            {"flag": "-v", "desc": "Подробный вывод"}
+          ]
+        }
+      ],
+      "recipes": [
+        {"cmd": "subfinder -d {TARGET} -silent", "note": "Базовый пассивный список сабдоменов"},
+        {"cmd": "subfinder -d {TARGET} -all -silent", "note": "Максимальный охват всеми источниками"},
+        {"cmd": "subfinder -d {TARGET} -silent | httpx -sc -title -silent", "note": "Сабдомены сразу на живость"},
+        {"cmd": "subfinder -dL domains.txt -all -oJ -o subs.json", "note": "Массовый перебор по списку доменов в JSON"}
+      ],
+      "notes": "Глобальные опции до позиционных. Для платных источников нужны API-ключи в provider-config.yaml."
+    },
+    {
+      "title": "amass",
+      "subcategory": "Глубокая разведка DNS/сабдоменов",
+      "purpose": "Мощный фреймворк OWASP для DNS-разведки и картирования атак: пассивные источники, брутфорс и активная проверка сабдоменов с графовой БД.",
+      "install": "go install -v github.com/owasp-amass/amass/v4/...@master",
+      "binary": "amass",
+      "target": "enum -d {TARGET}",
+      "modes": ["passive", "normal", "active"],
+      "groups": [
+        {
+          "name": "Ввод и режим",
+          "flags": [
+            {"flag": "-d", "value": "example.com", "desc": "Домен(ы) цели (через запятую, повторяемый)"},
+            {"flag": "-df", "value": "domains.txt", "desc": "Файл с корневыми доменами"},
+            {"flag": "-passive", "desc": "Только пассивный сбор из источников (без DNS)"},
+            {"flag": "-active", "desc": "Активная разведка (обращение к найденным узлам)"},
+            {"flag": "-brute", "desc": "Брутфорс сабдоменов по словарю"},
+            {"flag": "-w", "value": "wordlist.txt", "desc": "Свой словарь для брутфорса"}
+          ]
+        },
+        {
+          "name": "Источники",
+          "flags": [
+            {"flag": "-include", "value": "crtsh", "desc": "Использовать только указанные источники"},
+            {"flag": "-exclude", "value": "shodan", "desc": "Исключить указанные источники"},
+            {"flag": "-list", "desc": "Показать список доступных источников"},
+            {"flag": "-config", "value": "config.yaml", "desc": "YAML-конфиг (API-ключи, scope, словари)"}
+          ]
+        },
+        {
+          "name": "DNS и резолверы",
+          "flags": [
+            {"flag": "-r", "value": "8.8.8.8,1.1.1.1", "desc": "Недоверенные DNS-резолверы (повторяемый)"},
+            {"flag": "-rf", "value": "resolvers.txt", "desc": "Файл с недоверенными резолверами"},
+            {"flag": "-tr", "value": "1.1.1.1", "desc": "Доверенные DNS-резолверы"},
+            {"flag": "-dns-qps", "value": "200", "desc": "Лимит DNS-запросов в секунду (на все резолверы)"},
+            {"flag": "-norecursive", "desc": "Отключить рекурсивный брутфорс"},
+            {"flag": "-max-depth", "value": "3", "desc": "Максимум меток сабдомена для брутфорса"}
+          ]
+        },
+        {
+          "name": "Область и фильтры",
+          "flags": [
+            {"flag": "-bl", "value": "old.example.com", "desc": "Чёрный список сабдоменов (исключить)"},
+            {"flag": "-blf", "value": "blacklist.txt", "desc": "Файл с чёрным списком сабдоменов"},
+            {"flag": "-nf", "value": "names.txt", "desc": "Файл с уже известными именами (подмешать)"},
+            {"flag": "-p", "value": "443,8443", "desc": "Порты для проверки (по умолчанию 443)"},
+            {"flag": "-timeout", "value": "30", "desc": "Время работы перебора (минуты)"}
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            {"flag": "-o", "value": "out.txt", "desc": "Текстовый файл вывода"},
+            {"flag": "-oA", "value": "amass_scan", "desc": "Префикс для всех форматов вывода"},
+            {"flag": "-dir", "value": "amass_db", "desc": "Папка графовой БД результатов"},
+            {"flag": "-ip", "desc": "Показывать IP найденных имён"},
+            {"flag": "-ipv4", "desc": "Показывать только IPv4-адреса"},
+            {"flag": "-v", "desc": "Подробный вывод (статус/отладка)"},
+            {"flag": "-silent", "desc": "Отключить весь вывод во время работы"},
+            {"flag": "-nocolor", "desc": "Отключить цвет вывода"}
+          ]
+        }
+      ],
+      "recipes": [
+        {"cmd": "amass enum -passive -d {TARGET}", "note": "Быстрый пассивный сбор сабдоменов"},
+        {"cmd": "amass enum -d {TARGET} -brute -w wordlist.txt", "note": "Перебор с брутфорсом по словарю"},
+        {"cmd": "amass enum -active -d {TARGET} -ip -o subs.txt", "note": "Активная разведка с резолвом IP"},
+        {"cmd": "amass intel -d {TARGET} -whois", "note": "Разведка организации (intel) через reverse WHOIS"}
+      ],
+      "notes": "Работа через подкоманды: enum (перебор сабдоменов), intel (OSINT по организации), db (управление графовой БД). Без -passive/-active используется обычный режим: источники + DNS-валидация. Доступна и v5 (репозиторий owasp-amass)."
+    },
+    {
+      "title": "naabu",
+      "subcategory": "Быстрый сканер портов",
+      "purpose": "Быстрый сканер портов от ProjectDiscovery на Go: SYN/CONNECT-сканы, обнаружение хостов, удобная связка с httpx и nmap для верификации.",
+      "install": "go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest",
+      "binary": "naabu",
+      "target": "-host {TARGET}",
+      "modes": ["SYN", "CONNECT"],
+      "groups": [
+        {
+          "name": "Ввод",
+          "flags": [
+            {"flag": "-host", "value": "example.com", "desc": "Хост(ы) для сканирования (через запятую)"},
+            {"flag": "-list", "value": "hosts.txt", "desc": "Файл со списком хостов"},
+            {"flag": "-eh", "value": "10.0.0.1", "desc": "Исключить хосты (через запятую)"},
+            {"flag": "-ef", "value": "exclude.txt", "desc": "Файл с исключаемыми хостами"}
+          ]
+        },
+        {
+          "name": "Порты",
+          "flags": [
+            {"flag": "-p", "value": "80,443,8000-9000", "desc": "Порты для скана (через запятую/диапазон)"},
+            {"flag": "-tp", "value": "1000", "desc": "Топ-порты (full, 100, 1000)"},
+            {"flag": "-ep", "value": "22", "desc": "Исключить порты"},
+            {"flag": "-pf", "value": "ports.txt", "desc": "Файл со списком портов"},
+            {"flag": "-ec", "desc": "Не сканировать CDN/WAF целиком (только 80,443)"}
+          ]
+        },
+        {
+          "name": "Режим скана",
+          "flags": [
+            {"flag": "-s", "value": "SYN", "desc": "Тип скана: SYN или CONNECT (по умолч. CONNECT)"},
+            {"flag": "-sa", "desc": "Сканировать все IP, связанные с доменом"},
+            {"flag": "-iv", "value": "4", "desc": "Версии IP (4, 6)"},
+            {"flag": "-nmap-cli", "value": "nmap -sV", "desc": "Прогнать найденные порты через nmap"},
+            {"flag": "-passive", "desc": "Пассивный режим через Shodan InternetDB"},
+            {"flag": "-proxy", "value": "socks5://127.0.0.1:9050", "desc": "SOCKS5-прокси"}
+          ]
+        },
+        {
+          "name": "Обнаружение хостов",
+          "flags": [
+            {"flag": "-sn", "desc": "Только обнаружение хостов (без скана портов)"},
+            {"flag": "-Pn", "desc": "Пропустить обнаружение хостов (скан всех)"},
+            {"flag": "-pe", "desc": "ICMP echo пинг для обнаружения"},
+            {"flag": "-ps", "value": "80", "desc": "TCP SYN пинг по портам"}
+          ]
+        },
+        {
+          "name": "Скорость и оптимизация",
+          "flags": [
+            {"flag": "-c", "value": "25", "desc": "Число воркеров (потоков)"},
+            {"flag": "-rate", "value": "1000", "desc": "Пакетов в секунду"},
+            {"flag": "-retries", "value": "3", "desc": "Число повторов"},
+            {"flag": "-timeout", "value": "1000", "desc": "Таймаут в миллисекундах"},
+            {"flag": "-verify", "desc": "TCP-верификация найденных портов (без ложных)"}
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            {"flag": "-o", "value": "ports.txt", "desc": "Файл для вывода"},
+            {"flag": "-j", "desc": "Вывод в формате JSONL"},
+            {"flag": "-csv", "desc": "Вывод в формате CSV"},
+            {"flag": "-silent", "desc": "Тихий режим: только результаты"},
+            {"flag": "-v", "desc": "Подробный вывод"},
+            {"flag": "-cdn", "desc": "Показать используемый CDN"}
+          ]
+        }
+      ],
+      "recipes": [
+        {"cmd": "naabu -host {TARGET} -silent", "note": "Скан топ-100 портов одного хоста"},
+        {"cmd": "naabu -host {TARGET} -p - -silent", "note": "Скан всех 65535 портов"},
+        {"cmd": "naabu -list hosts.txt -tp 1000 -silent | httpx -sc -title -silent", "note": "Порты по списку, живые в httpx"},
+        {"cmd": "naabu -host {TARGET} -p 80,443 -nmap-cli 'nmap -sV' -silent", "note": "Найти порты и снять версии сервисов nmap"}
+      ],
+      "notes": "Глобальные опции до позиционных. SYN-скан (-s SYN) требует root/привилегий и libpcap; CONNECT работает без них."
+    },
+    {
+      "title": "dnsx",
+      "subcategory": "Быстрый DNS-резолвер и тулкит",
+      "purpose": "Быстрый многоцелевой DNS-инструмент от ProjectDiscovery: массовый резолв, запрос любых типов записей, DNS-брутфорс и фильтрация wildcard.",
+      "install": "go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest",
+      "binary": "dnsx",
+      "target": "-l {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Ввод",
+          "flags": [
+            {"flag": "-l", "value": "hosts.txt", "desc": "Список доменов/хостов для резолва (или stdin)"},
+            {"flag": "-d", "value": "example.com", "desc": "Домен(ы) для брутфорса (с -w)"},
+            {"flag": "-w", "value": "words.txt", "desc": "Словарь для DNS-брутфорса"}
+          ]
+        },
+        {
+          "name": "Типы записей",
+          "flags": [
+            {"flag": "-a", "desc": "Запросить A-запись (по умолчанию)"},
+            {"flag": "-aaaa", "desc": "Запросить AAAA-запись (IPv6)"},
+            {"flag": "-cname", "desc": "Запросить CNAME-запись"},
+            {"flag": "-ns", "desc": "Запросить NS-запись"},
+            {"flag": "-txt", "desc": "Запросить TXT-запись"},
+            {"flag": "-mx", "desc": "Запросить MX-запись"},
+            {"flag": "-ptr", "desc": "Запросить PTR-запись (reverse DNS)"},
+            {"flag": "-soa", "desc": "Запросить SOA-запись"},
+            {"flag": "-axfr", "desc": "Попытка зонального трансфера (AXFR)"},
+            {"flag": "-recon", "desc": "Запросить все типы DNS-записей"}
+          ]
+        },
+        {
+          "name": "Фильтры и пробы",
+          "flags": [
+            {"flag": "-re", "desc": "Показать DNS-ответ (resp)"},
+            {"flag": "-ro", "desc": "Показать только ответ (resp-only)"},
+            {"flag": "-rc", "value": "noerror", "desc": "Фильтр по DNS-статусу (noerror, servfail, nxdomain)"},
+            {"flag": "-cdn", "desc": "Показать имя CDN"},
+            {"flag": "-asn", "desc": "Показать ASN хоста"}
+          ]
+        },
+        {
+          "name": "Резолверы и wildcard",
+          "flags": [
+            {"flag": "-r", "value": "8.8.8.8,1.1.1.1", "desc": "Свои резолверы (UDP/TCP/DOH/DOT)"},
+            {"flag": "-wt", "value": "5", "desc": "Порог фильтра wildcard"},
+            {"flag": "-wd", "value": "example.com", "desc": "Домен для фильтрации wildcard"},
+            {"flag": "-hf", "desc": "Использовать системный hosts-файл"},
+            {"flag": "-trace", "desc": "Трассировка DNS (DNS tracing)"}
+          ]
+        },
+        {
+          "name": "Скорость и оптимизация",
+          "flags": [
+            {"flag": "-t", "value": "100", "desc": "Число параллельных потоков"},
+            {"flag": "-rl", "value": "-1", "desc": "Лимит DNS-запросов в секунду (-1 = выкл)"},
+            {"flag": "-retry", "value": "2", "desc": "Число попыток DNS"},
+            {"flag": "-timeout", "value": "3s", "desc": "Таймаут запроса"}
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            {"flag": "-o", "value": "resolved.txt", "desc": "Файл для записи результатов"},
+            {"flag": "-j", "desc": "Вывод в формате JSONL"},
+            {"flag": "-silent", "desc": "Тихий режим: только результаты"},
+            {"flag": "-v", "desc": "Подробный вывод"},
+            {"flag": "-nc", "desc": "Отключить цвет вывода"},
+            {"flag": "-stats", "desc": "Показывать статистику"}
+          ]
+        }
+      ],
+      "recipes": [
+        {"cmd": "subfinder -d {TARGET} -silent | dnsx -silent", "note": "Отфильтровать живые (резолвящиеся) сабдомены"},
+        {"cmd": "dnsx -l hosts.txt -a -re -silent", "note": "Резолв A-записей с показом ответа"},
+        {"cmd": "dnsx -d {TARGET} -w words.txt -silent", "note": "DNS-брутфорс сабдоменов по словарю"},
+        {"cmd": "dnsx -l hosts.txt -cname -ro -silent", "note": "Только CNAME (поиск висячих записей/takeover)"}
+      ],
+      "notes": "Глобальные опции до позиционных. Отлично работает в связке через stdin (subfinder | dnsx | httpx)."
+    }
+  ]
+}

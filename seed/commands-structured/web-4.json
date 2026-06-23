@@ -1,0 +1,590 @@
+{
+  "category": "WEB",
+  "catOrder": 2,
+  "tools": [
+    {
+      "title": "nikto",
+      "subcategory": "Сканер веб-сервера на уязвимости",
+      "purpose": "Классический сканер веб-серверов: шлёт тысячи запросов и ищет опасные файлы, дефолтные конфиги, устаревшее ПО и известные дыры. Быстрый первичный аудит HTTP/HTTPS-сервиса.",
+      "install": "sudo apt install nikto",
+      "binary": "nikto",
+      "target": "-h {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель и соединение",
+          "flags": [
+            { "flag": "-h", "value": "{TARGET}", "desc": "Цель: URL, хост или IP (можно файл со списком хостов)" },
+            { "flag": "-port", "value": "443", "desc": "Порт(ы) сканирования (по умолчанию 80); можно список через запятую" },
+            { "flag": "-ssl", "desc": "Принудительно использовать HTTPS/SSL для всех запросов" },
+            { "flag": "-nossl", "desc": "Запретить SSL, работать только по обычному HTTP" },
+            { "flag": "-vhost", "value": "{TARGET}", "desc": "Значение заголовка Host (виртуальный хост на одном IP)" },
+            { "flag": "-root", "value": "/app/", "desc": "Префикс-путь, который добавляется ко всем запросам" },
+            { "flag": "-nolookup", "desc": "Не делать DNS-резолв имени хоста" },
+            { "flag": "-useproxy", "value": "http://127.0.0.1:8080", "desc": "Пускать запросы через прокси (удобно ловить трафик в Burp)" }
+          ]
+        },
+        {
+          "name": "Что искать (Tuning)",
+          "flags": [
+            { "flag": "-Tuning", "value": "123bde", "desc": "Какие классы проверок включить: 1 интересные файлы, 2 дефолт/мисконфиг, 3 раскрытие инфо, 4 инъекции (XSS), 5 LFI в web-root, 6 DoS, 7 удалённое чтение файлов, 8 выполнение команд, 9 SQLi, 0 загрузка файлов, a обход авторизации, b определение ПО, c удалённое подключение исходников, x инверсия (исключить указанное)" },
+            { "flag": "-Plugins", "value": "@@DEFAULT", "desc": "Какие плагины запускать (по умолчанию @@DEFAULT); список через ;" },
+            { "flag": "-list-plugins", "desc": "Показать все доступные плагины и базы, ничего не сканируя" },
+            { "flag": "-mutate", "value": "2", "desc": "Угадывать имена: 1 файлы во всех каталогах, 2 имена файлов паролей, 3 юзеры через Apache UserDir, 4 юзеры через cgiwrap, 5 поддомены, 6 каталоги по словарю" },
+            { "flag": "-mutate-options", "value": "words.txt", "desc": "Доп. данные для -mutate (например словарь для угадывания каталогов)" }
+          ]
+        },
+        {
+          "name": "Аутентификация",
+          "flags": [
+            { "flag": "-id", "value": "user:pass", "desc": "Учётные данные HTTP Basic-аутентификации (login:password)" }
+          ]
+        },
+        {
+          "name": "Скрытность и обход IDS",
+          "flags": [
+            { "flag": "-evasion", "value": "1", "desc": "Техники обхода IDS (libwhisker): 1 случайное URI-кодирование, 2 self-reference каталога, 3 преждевременное завершение URL, 4 длинная случайная строка, 5 фейк-параметр, 6 TAB как разделитель, 7 смена регистра URL, 8 windows-слеш, A возврат каретки как разделитель, B байт 0x0b как разделитель" },
+            { "flag": "-useragent", "value": "Mozilla/5.0", "desc": "Подменить строку User-Agent" },
+            { "flag": "-Pause", "value": "2", "desc": "Пауза в секундах между каждым запросом (снизить нагрузку/шум)" },
+            { "flag": "-timeout", "value": "10", "desc": "Таймаут запроса в секундах (по умолчанию 10)" },
+            { "flag": "-maxtime", "value": "1h", "desc": "Максимальное время сканирования одного хоста" }
+          ]
+        },
+        {
+          "name": "Вывод и отчёт",
+          "flags": [
+            { "flag": "-output", "value": "report.html", "desc": "Сохранить результат в файл" },
+            { "flag": "-Format", "value": "htm", "desc": "Формат отчёта для -output: csv, htm, txt, xml, msf, json" },
+            { "flag": "-Display", "value": "V", "desc": "Что показывать на экране: 1 редиректы, 2 cookies, 3 все ответы 200/OK, 4 требующие авторизации, D отладка, E HTTP-ошибки, P прогресс, V подробный вывод" },
+            { "flag": "-Save", "value": "out_dir", "desc": "Сохранять положительные ответы сервера в указанный каталог" },
+            { "flag": "-no404", "desc": "Отключить проверку страницы 404 (ускоряет, но больше ложных срабатываний)" },
+            { "flag": "-nointeractive", "desc": "Неинтерактивный режим — не задавать вопросов во время скана" }
+          ]
+        },
+        {
+          "name": "Служебное",
+          "flags": [
+            { "flag": "-update", "desc": "Обновить базы плагинов и сигнатур" },
+            { "flag": "-dbcheck", "desc": "Проверить базы данных на синтаксические ошибки" },
+            { "flag": "-Version", "desc": "Показать версию nikto и баз" },
+            { "flag": "-Help", "desc": "Показать справку по опциям" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "nikto -h {TARGET}", "note": "Базовый скан хоста со всеми проверками по умолчанию" },
+        { "cmd": "nikto -h {TARGET} -ssl -port 443", "note": "Скан HTTPS-сайта на 443 порту" },
+        { "cmd": "nikto -h {TARGET} -Tuning 123b -output report.html -Format htm", "note": "Только интересные файлы/мисконфиг/инфо/ПО, отчёт в HTML" },
+        { "cmd": "nikto -h {TARGET} -useproxy http://127.0.0.1:8080", "note": "Пропустить трафик через Burp для разбора" }
+      ],
+      "notes": "Шумный инструмент: для bug bounty согласуй с правилами программы. -Tuning x инвертирует выбор (исключает указанные классы)."
+    },
+    {
+      "title": "whatweb",
+      "subcategory": "Определение технологий сайта",
+      "purpose": "Фингерпринтит веб-сайт: определяет CMS, фреймворки, серверы, библиотеки, аналитику, версии и более 1800 технологий по сигнатурам. Быстрый способ понять, на чём построен сайт.",
+      "install": "sudo apt install whatweb",
+      "binary": "whatweb",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "-i", "value": "urls.txt", "desc": "Читать список целей из файла (--input-file)" },
+            { "flag": "-a", "value": "3", "desc": "Уровень агрессии: 1 скрытно (1 запрос), 3 агрессивно (доп. запросы при совпадении), 4 тяжело (много запросов, все агрессивные плагины)" }
+          ]
+        },
+        {
+          "name": "HTTP и аутентификация",
+          "flags": [
+            { "flag": "-U", "value": "Mozilla/5.0", "desc": "Подменить User-Agent (--user-agent)" },
+            { "flag": "-H", "value": "X-Forwarded-For: 127.0.0.1", "desc": "Добавить произвольный HTTP-заголовок (--header)" },
+            { "flag": "-c", "value": "session=abc", "desc": "Передать cookies (--cookie), формат name=value; name2=value2" },
+            { "flag": "-u", "value": "user:pass", "desc": "HTTP Basic-аутентификация (--user), формат login:password" },
+            { "flag": "--follow-redirect", "value": "always", "desc": "Поведение при редиректах: never, http-only, meta-only, same-site, always" }
+          ]
+        },
+        {
+          "name": "Прокси",
+          "flags": [
+            { "flag": "--proxy", "value": "127.0.0.1:8080", "desc": "Использовать HTTP-прокси (порт по умолчанию 8080)" },
+            { "flag": "--proxy-user", "value": "user:pass", "desc": "Логин и пароль для прокси" }
+          ]
+        },
+        {
+          "name": "Плагины",
+          "flags": [
+            { "flag": "-p", "value": "WordPress,Apache", "desc": "Запускать только выбранные плагины (--plugins), поддержка +/-" },
+            { "flag": "-l", "desc": "Показать список всех доступных плагинов (--list-plugins)" },
+            { "flag": "-I", "value": "wordpress", "desc": "Подробная инфо о плагинах с поиском по ключевому слову (--info-plugins)" },
+            { "flag": "--search-plugins", "value": "cms", "desc": "Поиск плагинов по ключевому слову" }
+          ]
+        },
+        {
+          "name": "Производительность",
+          "flags": [
+            { "flag": "-t", "value": "25", "desc": "Число потоков (--max-threads, по умолчанию 25)" },
+            { "flag": "--open-timeout", "value": "15", "desc": "Таймаут установки соединения в секундах" },
+            { "flag": "--read-timeout", "value": "30", "desc": "Таймаут чтения ответа в секундах" },
+            { "flag": "--wait", "value": "1", "desc": "Пауза между соединениями в секундах (полезно с 1 потоком)" }
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            { "flag": "-v", "desc": "Подробный вывод с описаниями плагинов (--verbose); дважды — отладка" },
+            { "flag": "-q", "desc": "Тихий режим — не печатать краткий лог в stdout (--quiet)" },
+            { "flag": "--colour", "value": "always", "desc": "Управление цветом вывода: never, always, auto" },
+            { "flag": "--no-errors", "desc": "Скрыть сообщения об ошибках" },
+            { "flag": "--log-brief", "value": "out.txt", "desc": "Лог в краткий однострочный grep-формат" },
+            { "flag": "--log-verbose", "value": "out.txt", "desc": "Лог в человекочитаемый формат" },
+            { "flag": "--log-json", "value": "out.json", "desc": "Лог в формате JSON" },
+            { "flag": "--log-xml", "value": "out.xml", "desc": "Лог в формате XML" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "whatweb {TARGET}", "note": "Быстрый фингерпринт одного сайта" },
+        { "cmd": "whatweb -a 3 -v {TARGET}", "note": "Агрессивный режим с подробным выводом версий" },
+        { "cmd": "whatweb -i urls.txt --log-json out.json", "note": "Массовое сканирование списка с JSON-логом" }
+      ],
+      "notes": "Уровень агрессии 3 и 4 шлёт больше запросов — на bug bounty учитывай rate limit."
+    },
+    {
+      "title": "wafw00f",
+      "subcategory": "Определение WAF перед целью",
+      "purpose": "Определяет, стоит ли перед сайтом веб-файрвол (WAF) и какой именно — Cloudflare, Akamai, AWS WAF, Imperva и ещё ~150 продуктов. Помогает понять, почему блокируются payload-ы и какой обход искать.",
+      "install": "pip install wafw00f",
+      "binary": "wafw00f",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "-i", "value": "urls.txt", "desc": "Читать цели из файла (--input), формат csv/json/text" }
+          ]
+        },
+        {
+          "name": "Режим обнаружения",
+          "flags": [
+            { "flag": "-a", "desc": "Найти ВСЕ совпавшие WAF, не останавливаться на первом (--findall)" },
+            { "flag": "-r", "desc": "Не следовать редиректам 3xx (--noredirect)" },
+            { "flag": "-t", "value": "Cloudflare", "desc": "Проверять только один конкретный WAF (--test); имена смотри в -l" },
+            { "flag": "-l", "desc": "Показать список всех WAF, которые умеет определять (--list)" }
+          ]
+        },
+        {
+          "name": "HTTP и прокси",
+          "flags": [
+            { "flag": "-p", "value": "http://127.0.0.1:8080", "desc": "Использовать HTTP-прокси для запросов (--proxy)" },
+            { "flag": "-H", "value": "headers.txt", "desc": "Файл с кастомными заголовками поверх стандартных (--headers)" },
+            { "flag": "-T", "value": "7", "desc": "Таймаут запросов в секундах (--timeout)" }
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            { "flag": "-v", "desc": "Подробный вывод; повтор -v увеличивает детализацию (--verbose)" },
+            { "flag": "-o", "value": "result.json", "desc": "Сохранить вывод в файл; формат по расширению csv/json/text (--output)" },
+            { "flag": "-f", "value": "json", "desc": "Принудительный формат вывода: csv, json, text (--format)" },
+            { "flag": "--no-colors", "desc": "Отключить ANSI-цвета в выводе" },
+            { "flag": "-V", "desc": "Показать версию wafw00f (--version)" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "wafw00f {TARGET}", "note": "Проверить, какой WAF защищает сайт" },
+        { "cmd": "wafw00f -a {TARGET}", "note": "Найти все WAF (бывает несколько слоёв)" },
+        { "cmd": "wafw00f -i urls.txt -o result.json -f json", "note": "Массовая проверка списка с сохранением в JSON" }
+      ],
+      "notes": "Запускай первым делом: знание WAF определяет стратегию обхода фильтров."
+    },
+    {
+      "title": "gospider",
+      "subcategory": "Быстрый веб-краулер на Go",
+      "purpose": "Быстрый паук на Go: рекурсивно обходит сайт, вытаскивает ссылки, формы, эндпоинты и URL из JS-файлов, robots.txt и sitemap. Может добирать URL из внешних источников (archive.org, CommonCrawl). Основа для сбора attack surface.",
+      "install": "go install github.com/jaeles-project/gospider@latest",
+      "binary": "gospider",
+      "target": "-s {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "-s", "value": "{TARGET}", "desc": "Один сайт для обхода (--site)" },
+            { "flag": "-S", "value": "sites.txt", "desc": "Файл со списком сайтов (--sites)" },
+            { "flag": "-o", "value": "out_dir", "desc": "Папка для сохранения результатов (--output)" }
+          ]
+        },
+        {
+          "name": "Источники ссылок",
+          "flags": [
+            { "flag": "--js", "desc": "Искать ссылки внутри JS-файлов через LinkFinder (по умолчанию вкл.)" },
+            { "flag": "--sitemap", "desc": "Попытаться обойти sitemap.xml" },
+            { "flag": "--robots", "desc": "Попытаться обойти robots.txt (по умолчанию вкл.)" },
+            { "flag": "-a", "desc": "Добирать URL из сторонних источников: Archive.org, CommonCrawl, VirusTotal, AlienVault (--other-source)" },
+            { "flag": "-w", "desc": "Включать поддомены из сторонних источников (--include-subs, вместе с -a)" },
+            { "flag": "-r", "desc": "Также обходить/запрашивать URL из сторонних источников (--include-other-source)" },
+            { "flag": "--subs", "desc": "Включать поддомены при обходе" }
+          ]
+        },
+        {
+          "name": "Область и фильтры",
+          "flags": [
+            { "flag": "-d", "value": "3", "desc": "Глубина рекурсии обхода; 0 = бесконечно (--depth, по умолчанию 1)" },
+            { "flag": "--whitelist", "value": "/api/", "desc": "Regex: обходить только совпадающие URL" },
+            { "flag": "--blacklist", "value": "logout", "desc": "Regex: исключить совпадающие URL" },
+            { "flag": "--whitelist-domain", "value": "example.com", "desc": "Разрешённый домен для обхода" },
+            { "flag": "-L", "value": "100", "desc": "Фильтр по длине ответа (--filter-length)" },
+            { "flag": "-l", "desc": "Показывать длину ответа (--length)" }
+          ]
+        },
+        {
+          "name": "HTTP и аутентификация",
+          "flags": [
+            { "flag": "-u", "value": "web", "desc": "User-Agent: web (случайный десктопный), mobi или своя строка (--user-agent)" },
+            { "flag": "-H", "value": "X-Test: 1", "desc": "Добавить заголовок; флаг можно повторять (--header)" },
+            { "flag": "--cookie", "value": "session=abc", "desc": "Передать cookies" },
+            { "flag": "--burp", "value": "req.txt", "desc": "Загрузить заголовки и cookie из сырого HTTP-запроса Burp" },
+            { "flag": "-p", "value": "http://127.0.0.1:8080", "desc": "Прокси (--proxy)" },
+            { "flag": "--no-redirect", "desc": "Не следовать редиректам" }
+          ]
+        },
+        {
+          "name": "Производительность",
+          "flags": [
+            { "flag": "-t", "value": "5", "desc": "Число потоков — сайтов параллельно (--threads, по умолчанию 1)" },
+            { "flag": "-c", "value": "5", "desc": "Макс. одновременных запросов к одному домену (--concurrent, по умолчанию 5)" },
+            { "flag": "-k", "value": "1", "desc": "Пауза в секундах перед новым запросом (--delay)" },
+            { "flag": "-K", "value": "2", "desc": "Доп. случайные секунды к --delay (--random-delay)" },
+            { "flag": "-m", "value": "10", "desc": "Таймаут запроса в секундах (--timeout, по умолчанию 10)" }
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            { "flag": "--json", "desc": "Вывод в формате JSON" },
+            { "flag": "-q", "desc": "Тихий режим — показывать только найденные URL (--quiet)" },
+            { "flag": "-v", "desc": "Подробный вывод (--verbose)" },
+            { "flag": "--debug", "desc": "Режим отладки" },
+            { "flag": "-B", "desc": "Только HTML-контент, всё остальное отключено (--base)" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "gospider -s {TARGET}", "note": "Базовый обход одного сайта" },
+        { "cmd": "gospider -s {TARGET} -d 3 -c 10 -t 5 --subs", "note": "Глубокий обход с поддоменами и параллелизмом" },
+        { "cmd": "gospider -s {TARGET} -a -w -r --json -o out", "note": "Со сторонними источниками (archive/CC) и JSON-выводом" },
+        { "cmd": "gospider -s {TARGET} --burp req.txt", "note": "Обход с заголовками/cookie из перехваченного запроса Burp" }
+      ],
+      "notes": ""
+    },
+    {
+      "title": "hakrawler",
+      "subcategory": "Минималистичный краулер для пайплайнов",
+      "purpose": "Простой быстрый паук на Go для сбора URL и эндпоинтов. Читает цели из STDIN и хорошо встраивается в пайплайны (subfinder | httpx | hakrawler). Минимум настроек — максимум скорости.",
+      "install": "go install github.com/hakluke/hakrawler@latest",
+      "binary": "hakrawler",
+      "target": "",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "(stdin)", "desc": "Цели читаются из STDIN построчно: echo {TARGET} | hakrawler или cat urls.txt | hakrawler" }
+          ]
+        },
+        {
+          "name": "Область обхода",
+          "flags": [
+            { "flag": "-d", "value": "2", "desc": "Глубина обхода (по умолчанию 2)" },
+            { "flag": "-subs", "desc": "Включать поддомены при обходе" },
+            { "flag": "-i", "desc": "Обходить только внутри пути (ограничение области)" },
+            { "flag": "-dr", "desc": "Не следовать HTTP-редиректам" }
+          ]
+        },
+        {
+          "name": "HTTP",
+          "flags": [
+            { "flag": "-h", "value": "Cookie: a=b;;X-Test: 1", "desc": "Кастомные заголовки; несколько разделяются двойной ;;" },
+            { "flag": "-insecure", "desc": "Отключить проверку TLS-сертификата" },
+            { "flag": "-proxy", "value": "http://127.0.0.1:8080", "desc": "URL прокси" },
+            { "flag": "-timeout", "value": "10", "desc": "Макс. время обхода одного URL в секундах (-1 = без лимита)" },
+            { "flag": "-size", "value": "1000", "desc": "Лимит размера страницы в КБ (-1 = без лимита)" }
+          ]
+        },
+        {
+          "name": "Производительность",
+          "flags": [
+            { "flag": "-t", "value": "8", "desc": "Число потоков (по умолчанию 8)" }
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            { "flag": "-u", "desc": "Показывать только уникальные URL" },
+            { "flag": "-json", "desc": "Вывод в формате JSON" },
+            { "flag": "-s", "desc": "Показывать источник каждого URL (href, form, script)" },
+            { "flag": "-w", "desc": "Показывать, на какой странице найден URL" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "echo {TARGET} | hakrawler", "note": "Базовый обход одной цели через stdin" },
+        { "cmd": "echo {TARGET} | hakrawler -d 3 -subs -u", "note": "Глубже, с поддоменами, только уникальные URL" },
+        { "cmd": "echo {TARGET} | hakrawler -insecure -proxy http://127.0.0.1:8080", "note": "Через Burp и без проверки TLS" }
+      ],
+      "notes": "Цель ВСЕГДА подаётся через stdin (echo/cat), отдельного флага URL нет."
+    },
+    {
+      "title": "paramspider",
+      "subcategory": "Сбор URL с параметрами из архива",
+      "purpose": "Вытаскивает из Wayback Machine (web.archive.org) все исторические URL домена, у которых есть GET-параметры, и заменяет значения параметров на плейсхолдер FUZZ. Готовый список целей для фаззинга XSS/SQLi/LFI и т.п.",
+      "install": "git clone https://github.com/devanshbatham/ParamSpider && cd ParamSpider && pip install .",
+      "binary": "paramspider",
+      "target": "-d {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "-d", "value": "{TARGET}", "desc": "Целевой домен для сбора URL из Wayback Machine (--domain)" },
+            { "flag": "-l", "value": "domains.txt", "desc": "Файл со списком доменов — пакетный режим (--list)" }
+          ]
+        },
+        {
+          "name": "Вывод и формат",
+          "flags": [
+            { "flag": "-p", "value": "FUZZ", "desc": "Плейсхолдер вместо значений параметров (--placeholder, по умолчанию FUZZ)" },
+            { "flag": "-s", "desc": "Стримить найденные URL прямо в терминал по мере обработки (--stream)" }
+          ]
+        },
+        {
+          "name": "Сеть",
+          "flags": [
+            { "flag": "--proxy", "value": "127.0.0.1:8080", "desc": "Адрес прокси для запросов" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "paramspider -d {TARGET}", "note": "Собрать параметризованные URL домена (результат в папке results/)" },
+        { "cmd": "paramspider -d {TARGET} -s", "note": "Сразу видеть URL в терминале" },
+        { "cmd": "paramspider -d {TARGET} -p '\"><h1>x</h1>'", "note": "Свой плейсхолдер вместо FUZZ" }
+      ],
+      "notes": "В текущей версии вывод автоматически пишется в папку results/<домен>.txt — отдельного флага -o нет. Флаги --subs и --exclude из старых версий убраны."
+    },
+    {
+      "title": "interactsh-client",
+      "subcategory": "Ловушка OOB-взаимодействий (аналог Collaborator)",
+      "purpose": "Open-source аналог Burp Collaborator для слепых уязвимостей. Запускаешь клиент — он выдаёт уникальный домен вида xxxx.oast.pro. Этот домен вставляешь в payload (SSRF, слепой XXE, слепой RCE, слепой SQLi). Когда сервер цели сам резолвит/запрашивает домен, клиент печатает входящий DNS/HTTP/SMTP-пинг с IP, временем и протоколом — это доказывает, что уязвимость сработала.",
+      "install": "go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest",
+      "binary": "interactsh-client",
+      "target": "",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Запуск",
+          "flags": [
+            { "flag": "(без цели)", "desc": "Цель не задаётся: запусти клиент, получи домен *.oast.pro (oast.live, oast.site, oast.online, oast.fun, oast.me) и вставь его в payload" },
+            { "flag": "-n", "value": "1", "desc": "Сколько payload-доменов сгенерировать (--number, по умолчанию 1)" }
+          ]
+        },
+        {
+          "name": "Сервер",
+          "flags": [
+            { "flag": "-s", "value": "oast.pro", "desc": "Какой interactsh-сервер использовать; можно свой self-hosted (--server)" },
+            { "flag": "-t", "value": "TOKEN", "desc": "Токен аутентификации для защищённого/своего сервера (--token)" },
+            { "flag": "-config", "value": "config.yaml", "desc": "Файл конфигурации клиента" }
+          ]
+        },
+        {
+          "name": "Опрос и сессия",
+          "flags": [
+            { "flag": "-pi", "value": "5", "desc": "Интервал опроса сервера в секундах (--poll-interval, по умолчанию 5)" },
+            { "flag": "-sf", "value": "session.txt", "desc": "Файл сессии: сохранить/прочитать, чтобы вернуть тот же поддомен (--session-file)" },
+            { "flag": "-nf", "desc": "Отключить HTTP-fallback при регистрации (--no-http-fallback)" },
+            { "flag": "-kai", "value": "1m", "desc": "Интервал keep-alive (--keep-alive-interval)" }
+          ]
+        },
+        {
+          "name": "Фильтрация взаимодействий",
+          "flags": [
+            { "flag": "-dns-only", "desc": "Показывать только DNS-взаимодействия" },
+            { "flag": "-http-only", "desc": "Показывать только HTTP-взаимодействия" },
+            { "flag": "-smtp-only", "desc": "Показывать только SMTP-взаимодействия" },
+            { "flag": "-m", "value": "admin", "desc": "Показывать только взаимодействия, совпавшие с шаблоном (--match)" },
+            { "flag": "-f", "value": "favicon", "desc": "Скрыть взаимодействия, совпавшие с шаблоном (--filter)" },
+            { "flag": "-asn", "desc": "Показывать ASN-информацию по IP источника" }
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            { "flag": "-o", "value": "interactions.txt", "desc": "Сохранять взаимодействия в файл" },
+            { "flag": "-json", "desc": "Вывод в формате JSONL" },
+            { "flag": "-v", "desc": "Подробный режим — показывать полный запрос/ответ" },
+            { "flag": "-ps", "desc": "Сохранять сгенерированные payload-домены (--payload-store)" },
+            { "flag": "-psf", "value": "payloads.txt", "desc": "Файл для хранения payload-ов (--payload-store-file)" }
+          ]
+        },
+        {
+          "name": "Служебное",
+          "flags": [
+            { "flag": "-up", "desc": "Обновить interactsh-client до последней версии (--update)" },
+            { "flag": "-version", "desc": "Показать версию инструмента" },
+            { "flag": "-hc", "desc": "Диагностическая проверка работоспособности (--health-check)" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "interactsh-client", "note": "Запустить и получить домен *.oast.pro для вставки в payload" },
+        { "cmd": "interactsh-client -v", "note": "Видеть полные детали входящих запросов (полезно при отладке SSRF)" },
+        { "cmd": "interactsh-client -n 5 -ps -o oob.txt", "note": "Сгенерировать 5 доменов, сохранить payload-ы и взаимодействия" },
+        { "cmd": "interactsh-client -s {TARGET} -t TOKEN", "note": "Подключиться к своему self-hosted серверу" }
+      ],
+      "notes": "Рабочий цикл: запуск -> получаешь *.oast.pro -> пихаешь домен в payload слепой уязвимости -> ловишь DNS/HTTP-пинги в терминале. Это и есть факт срабатывания."
+    },
+    {
+      "title": "graphw00f",
+      "subcategory": "Фингерпринт GraphQL-движка",
+      "purpose": "GraphQL-аналог wafw00f: находит GraphQL-эндпоинт на цели и определяет, какая именно реализация за ним стоит (Apollo, Graphene, graphql-ruby, HyperGraphQL и др.). По движку понятно, какие атаки и обходы применимы.",
+      "install": "git clone https://github.com/dolevf/graphw00f && cd graphw00f && pip install -r requirements.txt",
+      "binary": "graphw00f",
+      "target": "-t {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "-t", "value": "{TARGET}", "desc": "Целевой URL вместе с путём для проверки (--target)" }
+          ]
+        },
+        {
+          "name": "Режим работы",
+          "flags": [
+            { "flag": "-d", "desc": "Режим detect: найти путь GraphQL-эндпоинта перебором известных путей (--detect)" },
+            { "flag": "-f", "desc": "Режим fingerprint: определить, какой GraphQL-движок запущен (--fingerprint)" },
+            { "flag": "-w", "value": "paths.txt", "desc": "Свой словарь путей GraphQL-эндпоинтов для режима detect (--wordlist)" },
+            { "flag": "-l", "desc": "Показать список всех движков, которые умеет определять, и выйти (--list)" }
+          ]
+        },
+        {
+          "name": "HTTP",
+          "flags": [
+            { "flag": "-u", "value": "Mozilla/5.0", "desc": "Свой User-Agent (--user-agent)" },
+            { "flag": "-H", "value": "Authorization: Bearer x", "desc": "Кастомный заголовок; можно указывать несколько раз (--header); cookies сюда же" },
+            { "flag": "-p", "value": "http://127.0.0.1:8080", "desc": "HTTP(S)-прокси, формат http://user:pass@host:port (--proxy)" },
+            { "flag": "-T", "value": "10", "desc": "Таймаут запроса в секундах (--timeout, по умолчанию 10)" },
+            { "flag": "-r", "desc": "Не следовать редиректам 3xx (--noredirect)" }
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            { "flag": "-o", "value": "result.csv", "desc": "Записать результаты в файл CSV (--output-file)" },
+            { "flag": "-v", "desc": "Показать версию и выйти (--version)" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "python3 main.py -f -d -t {TARGET}", "note": "Найти эндпоинт и сразу определить движок" },
+        { "cmd": "python3 main.py -f -t {TARGET}", "note": "Фингерпринт уже известного /graphql эндпоинта" },
+        { "cmd": "python3 main.py -d -t {TARGET} -w paths.txt", "note": "Только поиск эндпоинта по своему словарю путей" },
+        { "cmd": "python3 main.py -l", "note": "Список всех определяемых движков" }
+      ],
+      "notes": "Запускается как python3 main.py из папки репозитория. detect (-d) ищет ГДЕ эндпоинт, fingerprint (-f) определяет ЧТО за движок; обычно используют вместе."
+    },
+    {
+      "title": "smuggler",
+      "subcategory": "Поиск HTTP Request Smuggling",
+      "purpose": "Проверяет эндпоинт на уязвимости HTTP Request Smuggling (десинхронизация CL.TE / TE.CL). Шлёт серию мутированных запросов и определяет, рассинхронизируются ли фронтенд и бэкенд по разбору длины тела.",
+      "install": "git clone https://github.com/defparam/smuggler && cd smuggler",
+      "binary": "python3 smuggler.py",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Целевой URL с эндпоинтом (--url); либо подать URL через stdin" },
+            { "flag": "-v", "value": "vhost", "desc": "Указать виртуальный хост — заголовок Host (--vhost)" }
+          ]
+        },
+        {
+          "name": "Запрос",
+          "flags": [
+            { "flag": "-m", "value": "POST", "desc": "HTTP-метод запроса (--method, по умолчанию POST)" },
+            { "flag": "-t", "value": "5", "desc": "Таймаут сокета в секундах (--timeout, по умолчанию 5)" },
+            { "flag": "-c", "value": "default.py", "desc": "Файл конфигурации мутаций/payload-ов (--configfile, по умолчанию default.py)" }
+          ]
+        },
+        {
+          "name": "Вывод и поведение",
+          "flags": [
+            { "flag": "-x", "desc": "Выйти при первой найденной уязвимости на эндпоинте (--exit_early)" },
+            { "flag": "-q", "desc": "Тихий режим — выводить только найденные проблемы (--quiet)" },
+            { "flag": "-l", "value": "scan.log", "desc": "Файл лога (--log)" },
+            { "flag": "--no-color", "desc": "Отключить ANSI-цвета" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "python3 smuggler.py -u {TARGET}", "note": "Базовая проверка эндпоинта на smuggling" },
+        { "cmd": "echo {TARGET} | python3 smuggler.py", "note": "Подать URL через stdin" },
+        { "cmd": "python3 smuggler.py -u {TARGET} -m POST -x -q", "note": "POST-метод, остановка на первой находке, тихо" }
+      ],
+      "notes": "Цель подаётся либо через -u, либо через stdin (echo {TARGET} | python3 smuggler.py). Конфиги мутаций лежат в папке config/."
+    },
+    {
+      "title": "crlfuzz",
+      "subcategory": "Сканер CRLF-инъекций",
+      "purpose": "Быстрый сканер CRLF-инъекций на Go. Подставляет управляющие символы перевода строки в URL и заголовки и проверяет, удаётся ли расщепить HTTP-ответ (HTTP response splitting / header injection). Работает по одному URL, списку или из stdin.",
+      "install": "go install github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest",
+      "binary": "crlfuzz",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Один URL для фаззинга (--url)" },
+            { "flag": "-l", "value": "urls.txt", "desc": "Файл со списком URL (--list)" },
+            { "flag": "(stdin)", "desc": "URL можно подать через stdin: cat urls.txt | crlfuzz" }
+          ]
+        },
+        {
+          "name": "Запрос",
+          "flags": [
+            { "flag": "-X", "value": "GET", "desc": "HTTP-метод запроса (--method, по умолчанию GET)" },
+            { "flag": "-d", "value": "a=1", "desc": "Тело запроса / POST-данные (--data)" },
+            { "flag": "-H", "value": "Cookie: a=b", "desc": "Кастомный заголовок; можно указывать несколько раз (--header)" },
+            { "flag": "-x", "value": "http://127.0.0.1:8080", "desc": "Использовать прокси (--proxy)" }
+          ]
+        },
+        {
+          "name": "Производительность",
+          "flags": [
+            { "flag": "-c", "value": "25", "desc": "Уровень параллелизма (--concurrent, по умолчанию 25)" }
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            { "flag": "-s", "desc": "Тихий режим — показывать только уязвимые цели (--silent)" },
+            { "flag": "-o", "value": "out.txt", "desc": "Сохранить результаты в файл (--output)" },
+            { "flag": "-v", "desc": "Подробный режим — показывать ошибки/детали (--verbose)" },
+            { "flag": "-V", "desc": "Показать версию (--version)" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "crlfuzz -u {TARGET}", "note": "Проверить один URL на CRLF-инъекцию" },
+        { "cmd": "crlfuzz -l urls.txt -s -o vuln.txt", "note": "Скан списка, только уязвимые, в файл" },
+        { "cmd": "cat urls.txt | crlfuzz -c 50", "note": "Из stdin с повышенным параллелизмом (для пайплайнов)" }
+      ],
+      "notes": ""
+    }
+  ]
+}

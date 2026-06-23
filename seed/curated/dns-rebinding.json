@@ -1,0 +1,83 @@
+{
+  "category": "DNS Rebinding",
+  "source": "PayloadsAllTheThings/DNS Rebinding/",
+  "entries": [
+    {
+      "subcategory": "Что это",
+      "title": "Суть DNS rebinding",
+      "language": "text",
+      "tags": ["methodology", "concept"],
+      "body": "DNS rebinding меняет IP-адрес домена, который контролирует атакующий, на IP-адрес целевого приложения. Это обходит same-origin policy: браузер жертвы начинает слать произвольные запросы к целевому (внутреннему) приложению и читать ответы.\n\nКлючевая идея: одно и то же доменное имя (malicious.com) сначала резолвится в публичный IP атакующего, а потом — во внутренний IP цели (192.168.1.1, 127.0.0.1). Для браузера это всё ещё «тот же origin», поэтому SOP не мешает читать ответы."
+    },
+    {
+      "subcategory": "Что это",
+      "title": "Где применимо",
+      "language": "text",
+      "tags": ["methodology", "ssrf", "recon"],
+      "body": "• Доступ из браузера жертвы к внутренней сети и localhost-сервисам (роутеры, админки, API без аутентификации, dev-серверы на 127.0.0.1).\n• Обход SSRF-фильтров, которые проверяют IP/хост на этапе валидации, но резолвят DNS повторно при самом запросе (TOCTOU): первый резолв проходит проверку, второй уже указывает на внутренний адрес.\n• Атаки на сервисы, доверяющие запросам с loopback/локальной сети без дополнительной авторизации."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Низкий TTL и смена IP — как это работает",
+      "language": "text",
+      "tags": ["methodology", "technique"],
+      "body": "Setup:\n• Регистрируем вредоносный домен (например malicious.com).\n• Поднимаем свой DNS-сервер, способный резолвить malicious.com в разные IP.\n\nПервичное взаимодействие:\n• Размещаем на malicious.com страницу с вредоносным JavaScript.\n• Заманиваем жертву открыть её (фишинг, реклама, соц. инженерия).\n\nПервый DNS-резолв:\n• Браузер запрашивает IP у нашего DNS-сервера.\n• Отдаём легитимно выглядящий публичный IP (например 203.0.113.1) с ОЧЕНЬ НИЗКИМ TTL.\n\nRebinding на внутренний IP:\n• Из-за низкого TTL браузер быстро перерезолвит домен.\n• На повторный запрос наш DNS-сервер отдаёт уже внутренний IP (например 192.168.1.1 — роутер жертвы или 127.0.0.1).\n\nЭксплуатация в рамках same-origin:\n• Браузер считает ответы пришедшими с того же origin (malicious.com).\n• JS в браузере жертвы шлёт запросы к внутренним адресам и читает ответы, обходя SOP."
+    },
+    {
+      "subcategory": "Тулзы",
+      "title": "Инструменты для DNS rebinding",
+      "language": "text",
+      "tags": ["tools", "singularity", "rbndr"],
+      "body": "• nccgroup/singularity (Singularity of Origin) — фреймворк для DNS rebinding атак. https://github.com/nccgroup/singularity\n• rebind.it — веб-клиент Singularity of Origin. http://rebind.it/\n• taviso/rbndr — простой сервис DNS rebinding. https://github.com/taviso/rbndr\n• taviso/rebinder — хелпер для rbndr. https://lock.cmpxchg8b.com/rebinder.html\n\nПримечание: whonow (brannondorsey/whonow) — ещё один публичный «malicious DNS server» для on-the-fly rebinding (резолв через имя хоста), полезен как альтернатива rbndr."
+    },
+    {
+      "subcategory": "Эксплуатация",
+      "title": "Пример атаки через Singularity of Origin",
+      "language": "text",
+      "tags": ["exploitation", "singularity"],
+      "body": "1. Зарегистрировать домен.\n2. Развернуть Singularity of Origin (https://github.com/nccgroup/singularity/wiki/Setup-and-Installation).\n3. Подогнать под себя страницу autoattack.html (https://github.com/nccgroup/singularity/blob/master/html/autoattack.html).\n4. Открыть http://rebinder.your.domain:8080/autoattack.html\n5. Дождаться завершения атаки (может занять секунды/минуты)."
+    },
+    {
+      "subcategory": "Защита",
+      "title": "Как защищаются от DNS rebinding",
+      "language": "text",
+      "tags": ["protection", "defense"],
+      "body": "Большинство защит блокируют DNS-ответы с нежелательными IP на периметре, когда ответ входит во внутреннюю сеть. Чаще всего блокируют приватные диапазоны RFC 1918: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16. Некоторые тулзы дополнительно блокируют localhost (127.0.0.0/8), локальные (внутренние) сети или диапазон 0.0.0.0/0.\n\nДополнительно для защиты приложений: проверять заголовок Host (allow-list), требовать аутентификацию даже для loopback/локальных запросов, не доверять только IP/SOP. Защиты на уровне DNS обычно выключены по умолчанию."
+    },
+    {
+      "subcategory": "Обход защит",
+      "title": "Обход через 0.0.0.0",
+      "language": "text",
+      "tags": ["protection-bypass", "localhost"],
+      "body": "Можно использовать IP-адрес 0.0.0.0, чтобы достучаться до localhost (127.0.0.1) и обойти фильтры, блокирующие 127.0.0.1 или 127.0.0.0/8."
+    },
+    {
+      "subcategory": "Обход защит",
+      "title": "Обход через CNAME (внутренний сервер)",
+      "language": "text",
+      "tags": ["protection-bypass", "cname"],
+      "body": "Можно использовать DNS-записи CNAME, чтобы обойти защиту, блокирующую все внутренние IP. Наш ответ вернёт лишь CNAME на внутренний сервер — правило фильтрации внутренних IP не сработает, а локальный внутренний DNS-сервер сам отрезолвит этот CNAME."
+    },
+    {
+      "subcategory": "Обход защит",
+      "title": "CNAME bypass — пример dig",
+      "language": "bash",
+      "tags": ["protection-bypass", "cname"],
+      "body": "$ dig cname.example.com +noall +answer\n; <<>> DiG 9.11.3-1ubuntu1.15-Ubuntu <<>> example.com +noall +answer\n;; global options: +cmd\ncname.example.com.            381     IN      CNAME   target.local."
+    },
+    {
+      "subcategory": "Обход защит",
+      "title": "Обход через localhost (CNAME)",
+      "language": "text",
+      "tags": ["protection-bypass", "localhost", "cname"],
+      "body": "Можно использовать \"localhost\" как значение DNS-записи CNAME, чтобы обойти фильтры, блокирующие DNS-ответы с 127.0.0.1."
+    },
+    {
+      "subcategory": "Обход защит",
+      "title": "localhost CNAME — пример dig",
+      "language": "bash",
+      "tags": ["protection-bypass", "localhost", "cname"],
+      "body": "$ dig www.example.com +noall +answer\n; <<>> DiG 9.11.3-1ubuntu1.15-Ubuntu <<>> example.com +noall +answer\n;; global options: +cmd\nlocalhost.example.com.            381     IN      CNAME   localhost."
+    }
+  ]
+}

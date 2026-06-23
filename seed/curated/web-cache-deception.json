@@ -1,0 +1,140 @@
+{
+  "category": "Web Cache Deception",
+  "source": "PayloadsAllTheThings/Web Cache Deception/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Как кэш «обманывают» (схема атаки)",
+      "language": "image",
+      "tags": ["methodology", "wcd", "concept"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/web-cache-deception/wcd.jpg",
+        "caption": "Жертва открывает http://www.example.com/home.php/non-existent.css. Кэш-сервер не находит ресурс и пробрасывает запрос на origin. Origin возвращает контент home.php (с приватными данными жертвы), часто с заголовками «не кэшировать». Кэш видит расширение .css, считает ответ статикой и сохраняет его. Атакующий запрашивает тот же URL и получает закэшированный приватный ответ жертвы. Источник: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Что такое Web Cache Deception (WCD)",
+      "language": "text",
+      "tags": ["methodology", "concept", "wcd"],
+      "body": "Web Cache Deception (WCD) — уязвимость, когда веб-сервер или кэширующий прокси по-разному трактуют запрошенный путь, и в результате кэш сохраняет приватный/чувствительный ответ как будто это публичная статика.\n\nКлассический пример: атакующий заманивает залогиненную жертву открыть http://www.example.com/home.php/non-existent.css\n\n1. Браузер жертвы запрашивает /home.php/non-existent.css.\n2. Кэш-сервер ищет ресурс у себя — не находит (промах кэша).\n3. Запрос пробрасывается на origin (главный сервер).\n4. Origin отдаёт контент /home.php — обычно с приватными данными жертвы и заголовками, запрещающими кэширование.\n5. Ответ проходит обратно через кэш.\n6. Кэш видит, что путь оканчивается на .css.\n7. Под директорией кэша создаётся папка home.php, и внутри кэшируется поддельный «CSS»-файл (non-existent.css).\n8. Атакующий запрашивает тот же /home.php/non-existent.css → кэш отдаёт сохранённый ответ с чувствительными данными home.php жертвы."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "WCD vs Web Cache Poisoning — в чём разница",
+      "language": "text",
+      "tags": ["methodology", "concept", "cache-poisoning"],
+      "body": "Это две разные атаки на один и тот же кэш.\n\n• Web Cache Deception (WCD): жертва сама запрашивает «хитрый» путь (например /account/home/x.css). Цель — заставить кэш сохранить ПРИВАТНЫЙ ответ жертвы, чтобы потом украсть его через тот же URL. Полезная нагрузка — расхождение в трактовке пути/расширения между кэшем и origin. Жертва — конкретный залогиненный пользователь.\n\n• Web Cache Poisoning: атакующий через un-keyed вход (заголовок, не входящий в ключ кэша) «отравляет» закэшированный ответ для ОБЩЕГО URL, и потом этот вредоносный ответ (например с XSS) отдаётся всем посетителям. Жертва — все пользователи страницы.\n\nКоротко: при WCD кэш отдаёт чужие приватные данные не тому человеку; при poisoning кэш раздаёт всем подсунутый атакующим вредоносный контент."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать: стартовые URL для проверки кэша",
+      "language": "text",
+      "tags": ["methodology", "recon", "tricks"],
+      "body": "Сначала найди эндпоинт с приватными данными (профиль, /home, /account, /api/.../session, токены). Затем подставь к нему «статический хвост» и проверь, не закэшировался ли приватный ответ.\n\nХорошие стартовые форматы URL для проверки «кэш»-фичи:\nhttps://example.com/app/conversation/.js?test\nhttps://example.com/app/conversation/;.js\nhttps://example.com/home.php/non-existent.css\n\nПризнак уязвимости: повторный запрос того же URL из чистой сессии (приватная вкладка/без cookie) возвращает данные жертвы; смотри также заголовки кэша (X-Cache: HIT, Age, CF-Cache-Status: HIT)."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Тулзы",
+      "language": "text",
+      "tags": ["tools", "cache-poisoning"],
+      "body": "• PortSwigger/param-miner — Burp-расширение для поиска un-keyed входов и Web Cache Poisoning (github.com/PortSwigger/param-miner).\n• В каталоге PayloadsAllTheThings лежит Intruders/param_miner_lowercase_headers.txt — словарь HTTP-заголовков в нижнем регистре для перебора потенциально un-keyed заголовков."
+    },
+
+    {
+      "subcategory": "Path confusion",
+      "title": "Path confusion — подставить фейковое статическое расширение",
+      "language": "text",
+      "tags": ["path-confusion", "static-extension", "exploitation"],
+      "body": "https://example.com/home.php/non-existent.css\nhttps://example.com/myaccount/home/malicious.css\nhttps://example.com/app/conversation/.js?test"
+    },
+    {
+      "subcategory": "Path confusion",
+      "title": "Кэширование чувствительных данных — пример атаки (PayPal Home)",
+      "language": "text",
+      "tags": ["path-confusion", "exploitation", "sensitive-data"],
+      "body": "Web Cache Deception на главной странице (пример Omer Gil, PayPal):\n\n1. Обычный заход на свою домашнюю: https://www.example.com/myaccount/home/\n2. Открыть вредоносную ссылку: https://www.example.com/myaccount/home/malicious.css\n3. Страница отображается как /home, а кэш сохраняет ответ.\n4. Открыть приватную вкладку с тем же URL: https://www.example.com/myaccount/home/malicious.css\n5. Отображается содержимое из кэша (приватные данные жертвы)."
+    },
+    {
+      "subcategory": "Path confusion",
+      "title": "Кэширование чувствительных данных — кража JWT (OpenAI)",
+      "language": "text",
+      "tags": ["path-confusion", "exploitation", "jwt", "account-takeover"],
+      "body": "Web Cache Deception на OpenAI (кража JWT → захват аккаунта):\n\n1. Атакующий формирует специальный .css-путь к эндпоинту /api/auth/session.\n2. Атакующий распространяет ссылку.\n3. Жертвы переходят по легитимной ссылке.\n4. Ответ (с сессионными данными/JWT) кэшируется.\n5. Атакующий собирает JWT-учётки из кэша."
+    },
+
+    {
+      "subcategory": "Delimiter-трюки",
+      "title": "Детект расхождения по разделителю (;)",
+      "language": "text",
+      "tags": ["delimiter", "detection", "path-confusion"],
+      "body": "Расхождение по разделителю: /path/<dynamic-resource>;<static-resource>\n\nПример: /settings/profile;script.js\n\n• Если origin использует ; как разделитель, а кэш — нет:\n  – Кэш трактует путь как: /settings/profile;script.js (видит .js → статика → кэширует).\n  – Origin трактует путь как: /settings/profile (отдаёт приватный профиль).\n→ Приватный ответ /settings/profile кэшируется под «статическим» URL.\n\nДругие варианты разделителя: https://example.com/app/conversation/;.js\n\nПолный список символов-разделителей: PortSwigger «Web cache deception lab delimiter list» (portswigger.net/web-security/web-cache-deception/wcd-lab-delimiter-list)."
+    },
+
+    {
+      "subcategory": "Обход нормализации",
+      "title": "Детект расхождения нормализации пути (..%2f)",
+      "language": "text",
+      "tags": ["normalization", "detection", "path-traversal"],
+      "body": "Расхождение нормализации: /wcd/..%2fprofile\n\n• Если origin раскручивает (нормализует) последовательность обхода пути, а кэш — нет:\n  – Кэш трактует путь как: /wcd/..%2fprofile (видит как отдельный «статический» путь, например /wcd/... ).\n  – Origin трактует путь как: /profile (после нормализации ..%2f).\n→ Приватный ответ /profile кэшируется под URL, который кэш считает безопасным для кэширования."
+    },
+
+    {
+      "subcategory": "Caching Custom JavaScript",
+      "title": "Un-keyed входы для Cache Poisoning",
+      "language": "text",
+      "tags": ["cache-poisoning", "unkeyed-input", "headers"],
+      "body": "Найди un-keyed вход (значение, влияющее на ответ, но не входящее в ключ кэша) для отравления кэша:\n\nValues: User-Agent\nValues: Cookie\nHeader: X-Forwarded-Host\nHeader: X-Host\nHeader: X-Forwarded-Server\nHeader: X-Forwarded-Scheme (header; also in combination with X-Forwarded-Host)\nHeader: X-Original-URL (Symfony)\nHeader: X-Rewrite-URL (Symfony)"
+    },
+    {
+      "subcategory": "Caching Custom JavaScript",
+      "title": "Cache Poisoning через X-Forwarded-Host (XSS)",
+      "language": "http",
+      "tags": ["cache-poisoning", "x-forwarded-host", "xss"],
+      "body": "GET /test?buster=123 HTTP/1.1\nHost: target.com\nX-Forwarded-Host: test\"><script>alert(1)</script>\n\nHTTP/1.1 200 OK\nCache-Control: public, no-cache\n[..]\n<meta property=\"og:image\" content=\"https://test\"><script>alert(1)</script>\">",
+      "meta": {
+        "tip": "Используй cache buster (?buster=123), чтобы отравить именно эту страницу, а не главную страницу сайта. X-Forwarded-Host попадает в атрибут og:image без экранирования → отражённый payload закрепляется в кэше и отдаётся всем."
+      }
+    },
+
+    {
+      "subcategory": "CloudFlare",
+      "title": "Когда CloudFlare кэширует ответ",
+      "language": "text",
+      "tags": ["cloudflare", "cdn", "caching-rules"],
+      "body": "CloudFlare кэширует ресурс, когда заголовок Cache-Control = public, а max-age больше 0.\n\n• Cloudflare CDN по умолчанию НЕ кэширует HTML.\n• Cloudflare кэширует по расширению файла, а не по MIME-типу (developers.cloudflare.com/cache/about/default-cache-behavior/).\n\nВ Cloudflare CDN есть «Cache Deception Armor» — по умолчанию он ВЫКЛЮЧЕН. Когда Armor включён, правило проверяет, что расширение URL соответствует возвращаемому Content-Type (иначе ответ не кэшируется как статика)."
+    },
+    {
+      "subcategory": "CloudFlare",
+      "title": "Расширения, кэшируемые CloudFlare по умолчанию",
+      "language": "table",
+      "tags": ["cloudflare", "static-extension", "caching-rules"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["", "", "", "", "", "", ""],
+          "rows": [
+            ["7Z", "CSV", "GIF", "MIDI", "PNG", "TIF", "ZIP"],
+            ["AVI", "DOC", "GZ", "MKV", "PPT", "TIFF", "ZST"],
+            ["AVIF", "DOCX", "ICO", "MP3", "PPTX", "TTF", "CSS"],
+            ["APK", "DMG", "ISO", "MP4", "PS", "WEBM", "FLAC"],
+            ["BIN", "EJS", "JAR", "OGG", "RAR", "WEBP", "MID"],
+            ["BMP", "EOT", "JPG", "OTF", "SVG", "WOFF", "PLS"],
+            ["BZ2", "EPS", "JPEG", "PDF", "SVGZ", "WOFF2", "TAR"],
+            ["CLASS", "EXE", "JS", "PICT", "SWF", "XLS", "XLSX"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "CloudFlare",
+      "title": "Исключения и обходы Cache Deception Armor",
+      "language": "text",
+      "tags": ["cloudflare", "bypass", "armor"],
+      "body": "• Если возвращаемый Content-Type = application/octet-stream, расширение не важно — это обычно сигнал браузеру сохранить файл, а не отобразить, поэтому Cloudflare кэширует.\n• Cloudflare разрешает отдавать .jpg как image/webp или .gif как video/webm и другие пары, которые он считает маловероятными атаками — такие несоответствия проходят мимо Armor.\n• Bypass Cache Deception Armor через расширение .avif (исправлено): hackerone.com/reports/1391635."
+    }
+  ]
+}

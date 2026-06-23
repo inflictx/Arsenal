@@ -1,0 +1,521 @@
+{
+  "category": "WEB",
+  "catOrder": 2,
+  "tools": [
+    {
+      "title": "nmap",
+      "subcategory": "сканер портов и сервисов",
+      "purpose": "Сканер сети: находит живые хосты, открытые порты, версии сервисов и ОС, запускает NSE-скрипты. Первый шаг разведки почти на любой машине.",
+      "install": "sudo apt install nmap",
+      "binary": "nmap",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Обнаружение хостов",
+          "flags": [
+            { "flag": "-sn", "desc": "Только пинг-скан (host discovery) без сканирования портов — найти живые хосты в подсети." },
+            { "flag": "-Pn", "desc": "Пропустить обнаружение хостов, считать цель живой. Нужен, когда хост блокирует ICMP (типично для HTB)." },
+            { "flag": "-sL", "desc": "List Scan: только перечислить и резолвить цели, не отправляя пакеты." },
+            { "flag": "-n", "desc": "Не делать обратный DNS-резолв (ускоряет скан)." },
+            { "flag": "-R", "desc": "Всегда делать DNS-резолв, даже для недоступных хостов." },
+            { "flag": "-PS", "value": "22,80,443", "desc": "TCP SYN ping по указанным портам для обнаружения хоста." },
+            { "flag": "-PA", "value": "80", "desc": "TCP ACK ping по указанным портам." },
+            { "flag": "--dns-servers", "value": "1.1.1.1", "desc": "Использовать свои DNS-серверы для резолва." }
+          ]
+        },
+        {
+          "name": "Техника скана",
+          "flags": [
+            { "flag": "-sS", "desc": "TCP SYN (half-open / stealth) скан. Дефолт при наличии root, быстрый и менее заметный." },
+            { "flag": "-sT", "desc": "TCP Connect-скан (полное соединение). Дефолт без root-прав." },
+            { "flag": "-sU", "desc": "UDP-скан. Медленный — обычно сочетают с --top-ports." },
+            { "flag": "-sA", "desc": "TCP ACK-скан — маппинг правил фаервола (фильтруется/не фильтруется)." },
+            { "flag": "-sN", "desc": "TCP Null-скан (без флагов) — обход простых фильтров." },
+            { "flag": "-sF", "desc": "TCP FIN-скан — обход простых фильтров." },
+            { "flag": "-sX", "desc": "TCP Xmas-скан (FIN+PSH+URG)." },
+            { "flag": "-sO", "desc": "Скан IP-протоколов (какие протоколы поддерживает хост)." }
+          ]
+        },
+        {
+          "name": "Порты",
+          "flags": [
+            { "flag": "-p", "value": "80,443", "desc": "Сканировать только указанные порты. Диапазоны (1-1000) и префиксы T:/U: поддерживаются." },
+            { "flag": "-p-", "desc": "Сканировать все 65535 портов." },
+            { "flag": "--top-ports", "value": "1000", "desc": "Сканировать N самых распространённых портов." },
+            { "flag": "-F", "desc": "Быстрый режим — только топ-100 портов." },
+            { "flag": "--exclude-ports", "value": "9100", "desc": "Исключить указанные порты из скана." },
+            { "flag": "-r", "desc": "Сканировать порты по порядку, не рандомизировать." }
+          ]
+        },
+        {
+          "name": "Версии, ОС, скрипты",
+          "flags": [
+            { "flag": "-sV", "desc": "Определение версий сервисов на открытых портах." },
+            { "flag": "--version-intensity", "value": "9", "desc": "Интенсивность version-скана: 0 (лёгкий) … 9 (все пробы)." },
+            { "flag": "--version-all", "desc": "Пробовать все пробы определения версии (= intensity 9)." },
+            { "flag": "-O", "desc": "Определение операционной системы по сетевым отпечаткам." },
+            { "flag": "--osscan-guess", "desc": "Агрессивнее угадывать ОС, когда точного совпадения нет." },
+            { "flag": "-sC", "desc": "Запустить набор default NSE-скриптов (эквивалент --script=default)." },
+            { "flag": "--script", "value": "vuln", "desc": "Запустить NSE-скрипты по имени/категории/папке (default, safe, vuln, auth, brute, discovery)." },
+            { "flag": "--script-args", "value": "user=admin", "desc": "Передать аргументы NSE-скриптам (n1=v1,n2=v2)." },
+            { "flag": "-A", "desc": "Агрессивный режим: включает -O, -sV, -sC и --traceroute разом." }
+          ]
+        },
+        {
+          "name": "Тайминг и производительность",
+          "flags": [
+            { "flag": "-T4", "desc": "Шаблон тайминга 0..5 (paranoid..insane). T3 — дефолт, T4 — быстро для лаб/CTF." },
+            { "flag": "--min-rate", "value": "1000", "desc": "Не медленнее N пакетов в секунду — ускоряет полный скан портов." },
+            { "flag": "--max-rate", "value": "5000", "desc": "Не быстрее N пакетов в секунду — щадящий режим под WAF/IDS." },
+            { "flag": "--max-retries", "value": "2", "desc": "Лимит ретрансмиссий проб на порт." },
+            { "flag": "--host-timeout", "value": "30m", "desc": "Бросить хост, если он не доскан за это время (суффиксы ms/s/m/h)." },
+            { "flag": "--scan-delay", "value": "1s", "desc": "Минимальная задержка между пробами к хосту (обход rate-limit)." }
+          ]
+        },
+        {
+          "name": "Обход фаервола / IDS",
+          "flags": [
+            { "flag": "-f", "desc": "Фрагментировать пакеты на мелкие IP-фрагменты (-ff — сильнее)." },
+            { "flag": "--mtu", "value": "16", "desc": "Фрагментировать с заданным MTU (кратно 8)." },
+            { "flag": "-D", "value": "RND:10", "desc": "Маскировать скан декоями (decoy1,decoy2,ME,...)." },
+            { "flag": "-S", "value": "{LHOST}", "desc": "Подделать IP источника." },
+            { "flag": "-g", "value": "53", "desc": "Использовать заданный исходящий порт (обход фильтров по source-port)." },
+            { "flag": "--spoof-mac", "value": "0", "desc": "Подделать MAC (0 = случайный, либо префикс/вендор)." },
+            { "flag": "-e", "value": "tun0", "desc": "Использовать указанный сетевой интерфейс." }
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            { "flag": "-oA", "value": "scan", "desc": "Сохранить все три формата сразу: scan.nmap, scan.xml, scan.gnmap." },
+            { "flag": "-oN", "value": "scan.txt", "desc": "Сохранить обычный (человекочитаемый) вывод в файл." },
+            { "flag": "-oX", "value": "scan.xml", "desc": "Сохранить вывод в XML." },
+            { "flag": "-oG", "value": "scan.gnmap", "desc": "Сохранить grepable-вывод (удобно для grep/awk)." },
+            { "flag": "-v", "desc": "Подробный вывод (-vv ещё подробнее)." },
+            { "flag": "--reason", "desc": "Показать причину, почему порт в данном состоянии." },
+            { "flag": "--open", "desc": "Показывать только открытые (и open|filtered) порты." },
+            { "flag": "--packet-trace", "desc": "Показать все отправленные/принятые пакеты (отладка)." }
+          ]
+        },
+        {
+          "name": "Цели и прочее",
+          "flags": [
+            { "flag": "-iL", "value": "targets.txt", "desc": "Брать цели из файла (по одной на строку)." },
+            { "flag": "-iR", "value": "100", "desc": "Выбрать N случайных целей (0 = бесконечно)." },
+            { "flag": "--exclude", "value": "{TARGET}", "desc": "Исключить указанные хосты/сети из скана." },
+            { "flag": "-6", "desc": "Включить сканирование IPv6." },
+            { "flag": "--resume", "value": "scan.txt", "desc": "Возобновить прерванный скан из normal/grepable-вывода." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "nmap -sC -sV -oA scan {TARGET}", "note": "Стандартный первый скан: default-скрипты + версии, сохранить все форматы." },
+        { "cmd": "nmap -p- --min-rate 10000 -oA allports {TARGET}", "note": "Быстрый полный свип всех TCP-портов; затем точечно доскан найденных." },
+        { "cmd": "nmap -p 22,80,443 -sC -sV -oA deep {TARGET}", "note": "Глубокий скан только по открытым портам, найденным на этапе свипа." },
+        { "cmd": "nmap -sU --top-ports 100 {TARGET}", "note": "UDP-скан топ-100 портов (UDP медленный — ограничиваем объём)." },
+        { "cmd": "nmap --script vuln {TARGET}", "note": "Прогон NSE-скриптов категории vuln по известным уязвимостям." },
+        { "cmd": "sudo nmap -sS -Pn -T4 {TARGET}", "note": "Стелс-SYN со скипом host-discovery, когда ICMP блокируется (HTB)." }
+      ],
+      "notes": "Цель позиционна (без флага), принимает hostname/IP/CIDR (10.0.0.0/24) и диапазоны (10.0.0.1-50). -sS и -O требуют root. По умолчанию сканируются топ-1000 портов. -sn — современное имя старого -sP."
+    },
+    {
+      "title": "ffuf",
+      "subcategory": "веб-фаззер по ключу FUZZ",
+      "purpose": "Быстрый веб-фаззер на Go: подставляет слова из словаря на место ключа FUZZ в URL, заголовке, теле или куках. Брут директорий/файлов, параметров, vhost'ов, перебор значений.",
+      "install": "go install github.com/ffuf/ffuf/v2@latest",
+      "binary": "ffuf",
+      "target": "-u {TARGET}/FUZZ",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Ввод и словари",
+          "flags": [
+            { "flag": "-w", "value": "wordlist.txt", "desc": "Словарь; можно привязать ключ: wordlist.txt:KEY. Повторяемый для нескольких словарей." },
+            { "flag": "-mode", "value": "clusterbomb", "desc": "Режим мультисловаря: clusterbomb (все комбинации), pitchfork (по индексам), sniper (по одной позиции)." },
+            { "flag": "-e", "value": ".php,.bak,.html", "desc": "Список расширений, дописываемых к ключу FUZZ (через запятую)." },
+            { "flag": "-request", "value": "req.txt", "desc": "Сырой HTTP-запрос из файла (например, сохранённый из Burp) с FUZZ внутри." },
+            { "flag": "-request-proto", "value": "https", "desc": "Протокол для сырого запроса (http/https)." },
+            { "flag": "-ic", "desc": "Игнорировать комментарии в словаре (строки с #)." },
+            { "flag": "-D", "desc": "Режим совместимости со словарями dirsearch (используется с -e)." }
+          ]
+        },
+        {
+          "name": "HTTP-запрос",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}/FUZZ", "desc": "Целевой URL. Ключ FUZZ ставится туда, где нужно перебирать." },
+            { "flag": "-X", "value": "POST", "desc": "HTTP-метод запроса." },
+            { "flag": "-H", "value": "Header: value", "desc": "Заголовок. Повторяемый. Для vhost-фаззинга: -H 'Host: FUZZ.target'." },
+            { "flag": "-d", "value": "user=FUZZ", "desc": "Тело POST-запроса (можно с FUZZ)." },
+            { "flag": "-b", "value": "name=value", "desc": "Куки в формате 'n1=v1; n2=v2'." },
+            { "flag": "-r", "desc": "Следовать редиректам." },
+            { "flag": "-x", "value": "http://127.0.0.1:8080", "desc": "Прокси для всех запросов (HTTP/SOCKS5)." },
+            { "flag": "-replay-proxy", "value": "http://127.0.0.1:8080", "desc": "Переотправлять только совпавшие запросы через прокси (в Burp)." },
+            { "flag": "-recursion", "desc": "Рекурсивный скан (URL должен заканчиваться на FUZZ)." },
+            { "flag": "-recursion-depth", "value": "2", "desc": "Максимальная глубина рекурсии." },
+            { "flag": "-timeout", "value": "10", "desc": "Таймаут HTTP-запроса в секундах." },
+            { "flag": "-http2", "desc": "Использовать HTTP/2." }
+          ]
+        },
+        {
+          "name": "Матчеры (что показывать)",
+          "flags": [
+            { "flag": "-mc", "value": "200,301,302", "desc": "Показывать только эти коды ответа (или all). Дефолт: 200-299,301,302,307,401,403,405,500." },
+            { "flag": "-ms", "value": "1024", "desc": "Показывать по размеру ответа (байты)." },
+            { "flag": "-ml", "value": "10", "desc": "Показывать по числу строк в ответе." },
+            { "flag": "-mw", "value": "50", "desc": "Показывать по числу слов в ответе." },
+            { "flag": "-mr", "value": "regexp", "desc": "Показывать по совпадению регекспа в ответе." },
+            { "flag": "-mt", "value": ">100", "desc": "Показывать по времени до первого байта (мс)." },
+            { "flag": "-mmode", "value": "or", "desc": "Логика матчеров: and / or (дефолт or)." }
+          ]
+        },
+        {
+          "name": "Фильтры (что скрывать)",
+          "flags": [
+            { "flag": "-fc", "value": "404", "desc": "Скрыть эти коды ответа (через запятую, поддержка диапазонов)." },
+            { "flag": "-fs", "value": "1024", "desc": "Скрыть по размеру ответа (байты) — классика против шумных 404." },
+            { "flag": "-fl", "value": "10", "desc": "Скрыть по числу строк." },
+            { "flag": "-fw", "value": "50", "desc": "Скрыть по числу слов." },
+            { "flag": "-fr", "value": "regexp", "desc": "Скрыть по совпадению регекспа." },
+            { "flag": "-ft", "value": "<100", "desc": "Скрыть по времени до первого байта." },
+            { "flag": "-fmode", "value": "or", "desc": "Логика фильтров: and / or (дефолт or)." },
+            { "flag": "-ac", "desc": "Автокалибровка фильтров (сама определяет шумный baseline)." }
+          ]
+        },
+        {
+          "name": "Общие",
+          "flags": [
+            { "flag": "-t", "value": "40", "desc": "Число потоков (дефолт 40)." },
+            { "flag": "-rate", "value": "100", "desc": "Лимит запросов в секунду (0 = без лимита)." },
+            { "flag": "-p", "value": "0.1", "desc": "Задержка между запросами: фикс '0.1' или диапазон '0.1-2.0'." },
+            { "flag": "-maxtime", "value": "300", "desc": "Максимальное время работы всего процесса (сек)." },
+            { "flag": "-s", "desc": "Тихий режим — только результаты, без баннера и прогресса." },
+            { "flag": "-c", "desc": "Цветной вывод." },
+            { "flag": "-v", "desc": "Подробный вывод — полный URL и redirect-локация." },
+            { "flag": "-sf", "desc": "Остановиться, если >95% ответов — 403 Forbidden." }
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            { "flag": "-o", "value": "out.json", "desc": "Записать результаты в файл." },
+            { "flag": "-of", "value": "json", "desc": "Формат файла: json, ejson, html, md, csv, ecsv, all." },
+            { "flag": "-od", "value": "responses/", "desc": "Папка для сохранения тел совпавших ответов." },
+            { "flag": "-or", "desc": "Не создавать файл вывода, если результатов нет." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "ffuf -u {TARGET}/FUZZ -w wordlist.txt -mc all -fs 0", "note": "Брут директорий/файлов: показать всё и отфильтровать шум по размеру." },
+        { "cmd": "ffuf -u {TARGET}/FUZZ -w wordlist.txt -e .php,.txt,.bak -ac", "note": "Брут файлов с расширениями и автокалибровкой фильтров." },
+        { "cmd": "ffuf -u {TARGET} -H 'Host: FUZZ.target.htb' -w subs.txt -fs 0", "note": "Перебор виртуальных хостов; отфильтровать размер дефолтного ответа." },
+        { "cmd": "ffuf -u {TARGET}/FUZZ -w wordlist.txt -recursion -recursion-depth 2 -e .php", "note": "Рекурсивный брут с дописыванием расширения (URL кончается на FUZZ)." },
+        { "cmd": "ffuf -request req.txt -request-proto https -w params.txt -fc 404", "note": "Фаззинг по сырому запросу из Burp с FUZZ внутри файла." }
+      ],
+      "notes": "Ключ FUZZ подставляется в любую часть запроса. Для нескольких словарей используй -w файл:KEY и -mode. Дефолтный матчер кодов — 200-299,301,302,307,401,403,405,500. Типичный воркфлоу: -mc all + фильтр по размеру/словам/строкам."
+    },
+    {
+      "title": "feroxbuster",
+      "subcategory": "рекурсивный контент-брутфорс",
+      "purpose": "Быстрый рекурсивный сканер контента на Rust. Брутит директории и файлы, по умолчанию извлекает ссылки из ответов и автоматически уходит в рекурсию. Удобные авто-режимы (--smart/--thorough).",
+      "install": "curl -sL https://raw.githubusercontent.com/epi052/feroxbuster/main/install-nix.sh | bash",
+      "binary": "feroxbuster",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель и словарь",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Целевой URL (короткий/длинный: -u/--url). Повторяемый." },
+            { "flag": "-w", "value": "wordlist.txt", "desc": "Путь или URL словаря (-w/--wordlist)." },
+            { "flag": "--stdin", "desc": "Читать список URL из STDIN." },
+            { "flag": "--resume-from", "value": "ferox.state", "desc": "Возобновить незавершённый скан из state-файла." },
+            { "flag": "--request-file", "value": "req.txt", "desc": "Сырой HTTP-запрос как шаблон для всех запросов." }
+          ]
+        },
+        {
+          "name": "Авто-режимы",
+          "flags": [
+            { "flag": "--burp", "desc": "Прокси на http://127.0.0.1:8080 + отключить проверку TLS (одной командой в Burp)." },
+            { "flag": "--burp-replay", "desc": "Слать в Burp только нефильтрованные (найденные) запросы." },
+            { "flag": "--smart", "desc": "Включает --auto-tune, --collect-words и --collect-backups." },
+            { "flag": "--thorough", "desc": "Как --smart, плюс --collect-extensions и --scan-dir-listings (режим «по максимуму»)." },
+            { "flag": "--data-urlencoded", "value": "user=admin", "desc": "POST с Content-Type form-urlencoded и этим телом (поддержка @file)." }
+          ]
+        },
+        {
+          "name": "Запрос",
+          "flags": [
+            { "flag": "-x", "value": "php,html,txt", "desc": "Расширения для поиска (-x/--extensions), через запятую или пробел, без точки. @file тоже." },
+            { "flag": "-H", "value": "Header: value", "desc": "HTTP-заголовки (-H/--headers). Повторяемый." },
+            { "flag": "-b", "value": "name=value", "desc": "Куки (-b/--cookies)." },
+            { "flag": "-Q", "value": "token=stuff", "desc": "Query-параметры URL (-Q/--query)." },
+            { "flag": "-m", "value": "GET", "desc": "HTTP-метод(ы) (-m/--methods), дефолт GET." },
+            { "flag": "--data", "value": "body", "desc": "Тело запроса (поддержка @file для чтения из файла)." },
+            { "flag": "-a", "value": "Mozilla/5.0", "desc": "User-Agent (-a/--user-agent)." },
+            { "flag": "-A", "desc": "Случайный User-Agent (-A/--random-agent)." },
+            { "flag": "-f", "desc": "Дописывать / к каждому URL (-f/--add-slash)." }
+          ]
+        },
+        {
+          "name": "Фильтры ответов",
+          "flags": [
+            { "flag": "-s", "value": "200,301,302", "desc": "Белый список кодов (-s/--status-codes): показывать только эти. Дефолт — все." },
+            { "flag": "-C", "value": "404,403", "desc": "Чёрный список кодов (-C/--filter-status): скрыть эти." },
+            { "flag": "-S", "value": "5120", "desc": "Скрыть по размеру ответа (-S/--filter-size)." },
+            { "flag": "-W", "value": "312", "desc": "Скрыть по числу слов (-W/--filter-words)." },
+            { "flag": "-N", "value": "20", "desc": "Скрыть по числу строк (-N/--filter-lines)." },
+            { "flag": "-X", "value": "regexp", "desc": "Скрыть по регекспу в теле/заголовках (-X/--filter-regex)." },
+            { "flag": "--filter-similar-to", "value": "{TARGET}/soft404", "desc": "Скрыть страницы, похожие на указанную (борьба с soft-404)." },
+            { "flag": "-D", "desc": "Не автофильтровать wildcard-ответы (-D/--dont-filter)." }
+          ]
+        },
+        {
+          "name": "Рекурсия и скан",
+          "flags": [
+            { "flag": "-d", "value": "4", "desc": "Максимальная глубина рекурсии (-d/--depth); 0 = бесконечно, дефолт 4." },
+            { "flag": "-n", "desc": "Не сканировать рекурсивно (-n/--no-recursion)." },
+            { "flag": "--force-recursion", "desc": "Принудительная рекурсия по всем найденным эндпоинтам." },
+            { "flag": "-e", "desc": "Извлекать ссылки из тела ответа (-e/--extract-links); ВКЛ по умолчанию." },
+            { "flag": "--dont-extract-links", "desc": "Не извлекать ссылки из ответов." },
+            { "flag": "-t", "value": "50", "desc": "Число потоков (-t/--threads), дефолт 50." },
+            { "flag": "-L", "value": "4", "desc": "Лимит одновременных сканов (-L/--scan-limit), 0 = без лимита." },
+            { "flag": "--rate-limit", "value": "100", "desc": "Лимит запросов в секунду на директорию." },
+            { "flag": "--dont-scan", "value": "logout", "desc": "URL/регекспы, исключаемые из рекурсии и сканов." },
+            { "flag": "--auto-tune", "desc": "Автоматически снижать темп при всплеске ошибок." },
+            { "flag": "--auto-bail", "desc": "Автоматически останавливать скан при всплеске ошибок." },
+            { "flag": "--scan-dir-listings", "desc": "Принудительно рекурсировать внутрь листингов директорий." }
+          ]
+        },
+        {
+          "name": "Авто-сбор",
+          "flags": [
+            { "flag": "-E", "desc": "Автоматически находить расширения и добавлять в --extensions (-E/--collect-extensions)." },
+            { "flag": "-B", "desc": "Автоматически запрашивать бэкап-расширения для найденных URL (-B/--collect-backups): ~ .bak .old .1 …" },
+            { "flag": "-g", "desc": "Извлекать значимые слова из ответов и добавлять в словарь (-g/--collect-words)." },
+            { "flag": "-I", "value": "html,php", "desc": "Расширения, игнорируемые при авто-сборе (-I/--dont-collect)." }
+          ]
+        },
+        {
+          "name": "Клиент и вывод",
+          "flags": [
+            { "flag": "-k", "desc": "Отключить проверку TLS-сертификата (-k/--insecure). Нужен для self-signed на HTB." },
+            { "flag": "-r", "desc": "Следовать редиректам (-r/--redirects)." },
+            { "flag": "-T", "value": "7", "desc": "Таймаут запроса в секундах (-T/--timeout), дефолт 7." },
+            { "flag": "-p", "value": "http://127.0.0.1:8080", "desc": "Прокси (-p/--proxy): http(s):// или socks5://." },
+            { "flag": "-P", "value": "http://127.0.0.1:8080", "desc": "Replay-прокси (-P/--replay-proxy): слать туда только найденное." },
+            { "flag": "-o", "value": "out.txt", "desc": "Файл вывода (-o/--output); с --json — JSON-записи." },
+            { "flag": "--json", "desc": "Писать логи/вывод в JSON." },
+            { "flag": "--silent", "desc": "Только URL и без логов (для пайпов в другие тулзы)." },
+            { "flag": "-q", "desc": "Скрыть прогресс-бары и баннер (-q/--quiet)." },
+            { "flag": "-v", "desc": "Повысить детализацию (-v/--verbosity, повторяемый)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "feroxbuster -u {TARGET} -w wordlist.txt -x php,html,txt", "note": "Базовый рекурсивный брут с расширениями." },
+        { "cmd": "feroxbuster -u {TARGET} -w wordlist.txt -k -r -C 404,403", "note": "HTB: игнор self-signed TLS, следовать редиректам, скрыть 404/403." },
+        { "cmd": "feroxbuster -u {TARGET} -w wordlist.txt --thorough", "note": "Режим «по максимуму»: авто-сбор расширений/слов/бэкапов + листинги." },
+        { "cmd": "feroxbuster -u {TARGET} -w wordlist.txt --burp", "note": "Весь трафик через Burp на 127.0.0.1:8080 + игнор TLS." },
+        { "cmd": "feroxbuster -u {TARGET} -w wordlist.txt --filter-similar-to {TARGET}/doesnotexist", "note": "Отсев soft-404 по похожести на заведомо несуществующую страницу." }
+      ],
+      "notes": "Извлечение ссылок (-e) включено по умолчанию. -d — это глубина рекурсии, у --data короткой формы НЕТ (частая путаница). Дефолтный словарь — raft-medium-directories из SecLists. -s — белый список кодов, -C — чёрный. Состояние скана сохраняется в .state для --resume-from."
+    },
+    {
+      "title": "gobuster",
+      "subcategory": "брутфорс через подкоманды",
+      "purpose": "Многорежимный брутфорсер на Go: директории/файлы (dir), поддомены DNS (dns), виртуальные хосты (vhost) и произвольный фаззинг по ключу FUZZ (fuzz). Быстрый и простой.",
+      "install": "go install github.com/OJ/gobuster/v3@latest",
+      "binary": "gobuster",
+      "target": "-u {TARGET}",
+      "modes": [
+        { "name": "dir", "desc": "Брутфорс директорий и файлов по URL.", "target": "-u {TARGET}" },
+        { "name": "dns", "desc": "Брутфорс поддоменов домена через DNS.", "target": "-d {TARGET}" },
+        { "name": "vhost", "desc": "Брутфорс виртуальных хостов (заголовок Host).", "target": "-u {TARGET}" },
+        { "name": "fuzz", "desc": "Фаззинг по ключу FUZZ в URL/заголовке/теле.", "target": "-u {TARGET}/FUZZ" }
+      ],
+      "groups": [
+        {
+          "name": "Глобальные (все режимы)",
+          "flags": [
+            { "flag": "-w", "value": "wordlist.txt", "desc": "Путь к словарю (- = STDIN). Обязателен." },
+            { "flag": "-t", "value": "10", "desc": "Число потоков (дефолт 10)." },
+            { "flag": "-o", "value": "out.txt", "desc": "Файл для записи результатов (по умолчанию stdout)." },
+            { "flag": "-d", "value": "1500ms", "desc": "Задержка между запросами на поток." },
+            { "flag": "-q", "desc": "Не печатать баннер и лишний шум (-q/--quiet)." },
+            { "flag": "-np", "desc": "Не показывать прогресс (-np/--no-progress)." },
+            { "flag": "-ne", "desc": "Не показывать ошибки (-ne/--no-error)." },
+            { "flag": "-p", "value": "patterns.txt", "desc": "Файл с шаблонами замены (-p/--pattern)." },
+            { "flag": "--debug", "desc": "Включить отладочный вывод." }
+          ]
+        },
+        {
+          "name": "HTTP (dir/vhost/fuzz)",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Целевой URL (-u/--url). Режимы dir/vhost/fuzz." },
+            { "flag": "-c", "value": "name=value", "desc": "Куки для запросов (-c/--cookies)." },
+            { "flag": "-H", "value": "Header: value", "desc": "HTTP-заголовки (-H/--headers). Повторяемый." },
+            { "flag": "-r", "desc": "Следовать редиректам (-r/--follow-redirect)." },
+            { "flag": "-k", "desc": "Пропустить проверку TLS-сертификата (-k/--no-tls-validation). Нужен для self-signed." },
+            { "flag": "-a", "value": "Mozilla/5.0", "desc": "User-Agent (-a/--useragent)." },
+            { "flag": "-rua", "desc": "Случайный User-Agent (-rua/--random-agent)." },
+            { "flag": "--proxy", "value": "http://127.0.0.1:8080", "desc": "Прокси: http(s):// или socks5://." },
+            { "flag": "-to", "value": "10s", "desc": "Таймаут HTTP (-to/--timeout), дефолт 10s." },
+            { "flag": "-m", "value": "GET", "desc": "HTTP-метод (-m/--method), дефолт GET." },
+            { "flag": "-U", "value": "user", "desc": "Имя для Basic Auth (-U/--username)." },
+            { "flag": "-P", "value": "pass", "desc": "Пароль для Basic Auth (-P/--password)." }
+          ]
+        },
+        {
+          "name": "Режим dir",
+          "flags": [
+            { "flag": "-x", "value": "php,html,txt", "desc": "Расширения файлов через запятую, без точки.", "mode": "dir" },
+            { "flag": "-b", "value": "404", "desc": "Чёрный список кодов (--status-codes-blacklist), дефолт 404. Перебивает -s.", "mode": "dir" },
+            { "flag": "-s", "value": "200,204,301,302,307,401", "desc": "Белый список кодов. Чтобы включить, сначала очисти blacklist: -b ''.", "mode": "dir" },
+            { "flag": "-X", "value": "ext.txt", "desc": "Читать список расширений из файла (-X/--extensions-file).", "mode": "dir" },
+            { "flag": "-e", "desc": "Расширенный режим — печатать полные URL (-e/--expanded).", "mode": "dir" },
+            { "flag": "-n", "desc": "Не печатать коды статусов (-n/--no-status).", "mode": "dir" },
+            { "flag": "-f", "desc": "Дописывать / к каждому запросу (-f/--add-slash).", "mode": "dir" },
+            { "flag": "-db", "desc": "При находке файла искать бэкап-копии (-db/--discover-backup).", "mode": "dir" },
+            { "flag": "-xl", "value": "203-206", "desc": "Исключить ответы по длине тела (-xl/--exclude-length), диапазоны можно.", "mode": "dir" },
+            { "flag": "-hl", "desc": "Скрыть длину тела в выводе (-hl/--hide-length).", "mode": "dir" }
+          ]
+        },
+        {
+          "name": "Режим dns",
+          "flags": [
+            { "flag": "-d", "value": "{TARGET}", "desc": "Целевой домен (-do/--domain). В режиме dns цель задаётся доменом.", "mode": "dns" },
+            { "flag": "-c", "desc": "Также проверять CNAME-записи (-c/--check-cname).", "mode": "dns" },
+            { "flag": "-wc", "desc": "Продолжать работу при обнаружении wildcard (-wc/--wildcard).", "mode": "dns" },
+            { "flag": "--resolver", "value": "{TARGET}", "desc": "Свой DNS-сервер (server или server:port); на HTB это обычно сам целевой хост. Не работает в Windows.", "mode": "dns" },
+            { "flag": "-to", "value": "1s", "desc": "Таймаут DNS-резолвера (дефолт 1s).", "mode": "dns" }
+          ]
+        },
+        {
+          "name": "Режим vhost",
+          "flags": [
+            { "flag": "-ad", "desc": "Дописывать основной домен к каждому слову словаря (-ad/--append-domain). Без него слова берутся как есть.", "mode": "vhost" },
+            { "flag": "-xs", "value": "404", "desc": "Исключить эти коды статусов (-xs/--exclude-status).", "mode": "vhost" },
+            { "flag": "-xl", "value": "1234", "desc": "Исключить ответы по длине тела (-xl/--exclude-length).", "mode": "vhost" },
+            { "flag": "-xh", "desc": "Автоподстройка exclude-length под длину hostname в ответах (-xh/--exclude-hostname-length).", "mode": "vhost" }
+          ]
+        },
+        {
+          "name": "Режим fuzz",
+          "flags": [
+            { "flag": "-b", "value": "404", "desc": "Исключаемые коды статусов (-b/--exclude-statuscodes). Ключ FUZZ обязателен в URL/-H/-B.", "mode": "fuzz" },
+            { "flag": "-xl", "value": "1234", "desc": "Исключить ответы по длине тела (-xl/--exclude-length).", "mode": "fuzz" },
+            { "flag": "-B", "value": "user=FUZZ", "desc": "Тело запроса (может содержать ключ FUZZ) (-B/--body).", "mode": "fuzz" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "gobuster dir -u {TARGET} -w wordlist.txt -x php,html,txt -t 50", "note": "Брут директорий и файлов с расширениями." },
+        { "cmd": "gobuster dir -u {TARGET} -w wordlist.txt -b '' -s 200,204,301,302,307,401,403", "note": "Переключение на белый список кодов (сначала чистим blacklist)." },
+        { "cmd": "gobuster dns -d {TARGET} -w subdomains.txt", "note": "Брут поддоменов через DNS; на HTB добавь --resolver на целевой хост для *.htb." },
+        { "cmd": "gobuster vhost -u {TARGET} -w vhosts.txt --append-domain", "note": "Брут виртуальных хостов; без --append-domain ничего не найдётся." },
+        { "cmd": "gobuster fuzz -u {TARGET}/FUZZ -w wordlist.txt -b 404", "note": "Произвольный фаззинг, где dir не подходит (заголовок/тело/путь)." }
+      ],
+      "notes": "v3.8.x использует urfave/cli: короткие алиасы бывают многобуквенными (-to, -np, -ad, -xl), вызываются с одним дефисом. В dir дефолт — blacklist 404; -s и -b одновременно нельзя. В vhost с v3.2+ домен НЕ дописывается без --append-domain — частая причина «пустого» результата. В dns режиме нет -u и HTTP-флагов."
+    },
+    {
+      "title": "dirsearch",
+      "subcategory": "брутфорс путей (Python)",
+      "purpose": "Гибкий сканер веб-путей на Python. Брутит директории и файлы, поддерживает плейсхолдер %EXT% для расширений, рекурсию, богатую фильтрацию по кодам/размеру/тексту и вывод в разные форматы.",
+      "install": "pipx install dirsearch",
+      "binary": "dirsearch",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Целевой URL (-u/--url). Повторяемый." },
+            { "flag": "-l", "value": "urls.txt", "desc": "Файл со списком URL (-l/--urls-file)." },
+            { "flag": "--stdin", "desc": "Читать URL из STDIN." },
+            { "flag": "--cidr", "value": "{TARGET}", "desc": "Цель — подсеть в формате CIDR (например 10.0.0.0/24)." },
+            { "flag": "--raw", "value": "req.txt", "desc": "Загрузить сырой HTTP-запрос из файла (нужен --scheme)." },
+            { "flag": "-s", "value": "session", "desc": "Файл сессии для возобновления (-s/--session)." }
+          ]
+        },
+        {
+          "name": "Словарь и расширения",
+          "flags": [
+            { "flag": "-w", "value": "wordlist.txt", "desc": "Словари или папки через запятую (-w/--wordlists). Дефолт — db/dicc.txt." },
+            { "flag": "-e", "value": "php,html,js", "desc": "Список расширений через запятую (-e/--extensions). Заполняет %EXT% в словаре." },
+            { "flag": "-f", "desc": "Дописывать расширения и / к каждому слову (-f/--force-extensions)." },
+            { "flag": "--overwrite-extensions", "desc": "Заменять имеющееся расширение слов на ваши." },
+            { "flag": "--exclude-extensions", "value": "html", "desc": "Исключить эти расширения." },
+            { "flag": "--prefixes", "value": "admin_", "desc": "Дописывать префиксы ко всем словам." },
+            { "flag": "--suffixes", "value": "~", "desc": "Дописывать суффиксы ко всем словам." },
+            { "flag": "-U", "desc": "Привести словарь к верхнему регистру (-U/--uppercase)." },
+            { "flag": "-L", "desc": "Привести словарь к нижнему регистру (-L/--lowercase)." }
+          ]
+        },
+        {
+          "name": "Фильтрация и рекурсия",
+          "flags": [
+            { "flag": "-i", "value": "200,301,302", "desc": "Показывать только эти коды (-i/--include-status). Диапазоны можно." },
+            { "flag": "-x", "value": "404,403", "desc": "Скрыть эти коды (-x/--exclude-status)." },
+            { "flag": "--exclude-sizes", "value": "0B,123GB", "desc": "Скрыть ответы по размеру (через запятую)." },
+            { "flag": "--exclude-text", "value": "Not Found", "desc": "Скрыть ответы, содержащие этот текст. Повторяемый." },
+            { "flag": "--exclude-regex", "value": "regexp", "desc": "Скрыть ответы по регекспу." },
+            { "flag": "-r", "desc": "Рекурсивный брутфорс (-r/--recursive)." },
+            { "flag": "-R", "value": "3", "desc": "Максимальная глубина рекурсии (-R/--max-recursion-depth)." },
+            { "flag": "--recursion-status", "value": "200-399,401,403", "desc": "Коды, при которых уходить в рекурсию (дефолт 200-399,401,403)." },
+            { "flag": "--subdirs", "value": "admin/", "desc": "Сканировать указанные подкаталоги цели." },
+            { "flag": "--min-response-size", "value": "100", "desc": "Минимальная длина ответа для показа." },
+            { "flag": "--max-response-size", "value": "100000", "desc": "Максимальная длина ответа для показа." }
+          ]
+        },
+        {
+          "name": "Запрос",
+          "flags": [
+            { "flag": "-m", "value": "GET", "desc": "HTTP-метод (-m/--http-method), дефолт GET." },
+            { "flag": "-d", "value": "user=admin", "desc": "Тело запроса (-d/--data)." },
+            { "flag": "-H", "value": "Header: value", "desc": "HTTP-заголовок (-H/--header). Повторяемый." },
+            { "flag": "-F", "desc": "Следовать редиректам (-F/--follow-redirects)." },
+            { "flag": "--random-agent", "desc": "Случайный User-Agent на каждый запрос." },
+            { "flag": "--auth", "value": "user:pass", "desc": "Учётные данные (например user:pass или bearer-токен)." },
+            { "flag": "--auth-type", "value": "basic", "desc": "Тип аутентификации: basic, digest, bearer, ntlm." },
+            { "flag": "--cookie", "value": "name=value", "desc": "Заголовок Cookie." },
+            { "flag": "--user-agent", "value": "Mozilla/5.0", "desc": "Фиксированный User-Agent." }
+          ]
+        },
+        {
+          "name": "Соединение",
+          "flags": [
+            { "flag": "-t", "value": "25", "desc": "Число потоков (-t/--threads), дефолт 25." },
+            { "flag": "--timeout", "value": "7.5", "desc": "Таймаут соединения (дефолт 7.5)." },
+            { "flag": "--delay", "value": "0.5", "desc": "Задержка между запросами." },
+            { "flag": "-p", "value": "http://127.0.0.1:8080", "desc": "Прокси (HTTP/SOCKS), повторяемый (-p/--proxy)." },
+            { "flag": "--proxy-auth", "value": "user:pass", "desc": "Учётные данные прокси." },
+            { "flag": "--max-rate", "value": "100", "desc": "Максимум запросов в секунду." },
+            { "flag": "--retries", "value": "1", "desc": "Число повторов неудачных запросов." },
+            { "flag": "--scheme", "value": "https", "desc": "Схема для сырого запроса или URL без схемы." }
+          ]
+        },
+        {
+          "name": "Прочее и вывод",
+          "flags": [
+            { "flag": "--crawl", "desc": "Краулить найденные ответы в поисках новых путей." },
+            { "flag": "--full-url", "desc": "Показывать полные URL в выводе." },
+            { "flag": "-o", "value": "out.txt", "desc": "Файл вывода (-o/--output-file)." },
+            { "flag": "-O", "value": "json", "desc": "Форматы отчёта через запятую (-O/--output-formats): simple, plain, json, xml, md, csv, html, sqlite." },
+            { "flag": "-q", "desc": "Тихий режим (-q/--quiet-mode)." },
+            { "flag": "-v", "desc": "Подробный вывод (-v/--verbose): время ответа и content-type." },
+            { "flag": "--no-color", "desc": "Без цветного вывода." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "dirsearch -u {TARGET} -e php,html,js,txt", "note": "Базовый скан с расширениями (подставляются в %EXT% словаря)." },
+        { "cmd": "dirsearch -u {TARGET} -e php,html,js -r -R 3 -x 404,403", "note": "Рекурсия до глубины 3, скрыть 404/403." },
+        { "cmd": "dirsearch -u {TARGET} -w wordlist.txt --exclude-sizes 0B --random-agent -F", "note": "Отсев пустых ответов, случайный UA, следовать редиректам." },
+        { "cmd": "dirsearch -u {TARGET} -e php -p http://127.0.0.1:8080", "note": "Прогон через Burp для анализа запросов." },
+        { "cmd": "dirsearch -u {TARGET} -e php,html -o scan.json -O json", "note": "Скан с сохранением отчёта в JSON для дальнейшей обработки." }
+      ],
+      "notes": "Механика %EXT%: dirsearch заменяет ключ %EXT% в словах словаря на расширения из -e (index.%EXT% + -e asp,aspx → index, index.asp, index.aspx). Дефолтный словарь db/dicc.txt уже использует %EXT%. TLS-сертификаты не проверяются по умолчанию — отдельного -k/--insecure нет. В свежих версиях переименованы флаги: вывод теперь -o/--output-file, форматы -O/--output-formats."
+    }
+  ]
+}

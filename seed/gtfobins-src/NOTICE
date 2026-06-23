@@ -1,0 +1,15 @@
+This directory contains data from the GTFOBins project:
+
+    https://github.com/GTFOBins/GTFOBins.github.io
+    Copyright (c) GTFOBins contributors
+
+GTFOBins is licensed under the GNU General Public License v3.0 (GPL-3.0).
+A copy of the GPL-3.0 license text is in the repository root: ../../LICENSE
+
+ARS3NAL parses this data into its database (seed/parsers/gtfobins.ts) and shows
+it in the GTFOBins module with attribution. The Russian translations of the
+technique comments (comments-ru-*.json) are derivative works of this GPL-3.0
+data and are likewise GPL-3.0.
+
+Because this GPL-3.0 data is bundled, the ARS3NAL project as a whole is
+distributed under GPL-3.0.

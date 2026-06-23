@@ -1,0 +1,34 @@
+{
+  "category": "Insecure Management Interface",
+  "source": "PayloadsAllTheThings/Insecure Management Interface/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что это и где искать",
+      "language": "text",
+      "tags": ["admin", "methodology", "recon"],
+      "body": "Админ/management-интерфейсы (роутеры, БД, облака, веб-админки) часто слабо защищены: нет/слабая аутентификация, дефолтные креды (admin/admin), открыты в интернет, plain HTTP.\nГде искать: предсказуемые URL (/admin), панели управления, API без auth, сетевые устройства с дефолтами."
+    },
+    {
+      "subcategory": "Поиск",
+      "title": "nuclei — дефолтные логины и открытые панели",
+      "language": "bash",
+      "tags": ["nuclei", "default-creds", "exposed-panels"],
+      "body": "nuclei -t http/default-logins -u https://example.com\nnuclei -t http/exposed-panels -u https://example.com\nnuclei -t http/exposures -u https://example.com"
+    },
+    {
+      "subcategory": "Примеры",
+      "title": "Типичные цели",
+      "language": "text",
+      "tags": ["admin", "examples"],
+      "body": "• Сетевые устройства — роутеры/свитчи/файрволы с дефолтными кредами или непропатченными багами.\n• Веб-приложения — админки без аутентификации или по предсказуемым URL (/admin).\n• Облака — API-эндпоинты без auth или со слишком широкими ролями."
+    },
+    {
+      "subcategory": "Spring Boot Actuator",
+      "title": "Spring Boot Actuator — чувствительные эндпоинты",
+      "language": "text",
+      "tags": ["spring-boot", "actuator", "rce"],
+      "body": "Открытые Actuator-эндпоинты часто ведут к утечкам и RCE:\n/actuator/env, /actuator/heapdump (дамп памяти → секреты), /actuator/mappings, /actuator/jolokia (→ RCE через MBean), /env (старые версии).\nДля фаззинга путей есть вордлист Intruder/springboot_actuator.txt. См. Veracode «Exploiting Spring Boot Actuators»."
+    }
+  ]
+}

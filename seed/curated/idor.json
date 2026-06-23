@@ -1,0 +1,88 @@
+{
+  "category": "Insecure Direct Object References",
+  "source": "PayloadsAllTheThings/Insecure Direct Object References/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое IDOR",
+      "language": "text",
+      "tags": ["methodology", "idor"],
+      "body": "IDOR (Insecure Direct Object Reference) — приложение даёт прямой доступ к объекту (файл, запись в БД, URL) по пользовательскому вводу без проверки прав. Меняешь идентификатор в URL или API-запросе → читаешь/меняешь/удаляешь чужие данные.\n\nПример: профиль доступен по https://example.com/profile?user_id=123. Если сервер не проверяет, что текущий юзер вправе видеть профиль 123, достаточно подставить чужой id:\nhttps://example.com/profile?user_id=124"
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Схема IDOR — запрос чужого документа",
+      "language": "image",
+      "tags": ["methodology", "idor"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/idor/idor.png",
+        "caption": "Пользователь запрашивает свой документ №1000 — сервер отдаёт. Затем просит документ №1002 (чужой) — и сервер всё равно отдаёт, без проверки владельца. Это и есть IDOR. Источник: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать и как тестировать IDOR",
+      "language": "text",
+      "tags": ["methodology", "recon", "authz"],
+      "body": "• Любой параметр-идентификатор: user_id, account, order, doc, file, invoice, message, id в URL, в query, в теле, в JSON, в заголовках, в cookie.\n• Заведи два аккаунта (A и B). Действие делаешь от A, подставляешь идентификатор объекта B → если доступ есть, это IDOR.\n• Проверяй не только чтение (GET), но и изменение/удаление (POST/PUT/DELETE).\n• Часто помогают Burp-расширения Authz / AuthMatrix / Autorize — автоматически переигрывают запросы от другой сессии и подсвечивают разницу."
+    },
+    {
+      "subcategory": "Числовые идентификаторы",
+      "title": "Перебор числовых ID (инкремент/декремент)",
+      "language": "text",
+      "tags": ["enumeration", "numeric"],
+      "body": "Увеличивай/уменьшай значение, чтобы достучаться до чужих данных.\n\n• Decimal:    287789, 287790, 287791, ...\n• Hexadecimal: 0x4642d, 0x4642e, 0x4642f, ...\n• Unix epoch timestamp: 1695574808, 1695575098, ..."
+    },
+    {
+      "subcategory": "Угадываемые идентификаторы",
+      "title": "Имена, email, base64",
+      "language": "text",
+      "tags": ["enumeration", "identifiers"],
+      "body": "Часть идентификаторов угадывается (имена и почты) и может открыть доступ к данным клиентов.\n\n• Name:  john, doe, john.doe, ...\n• Email: john.doe@mail.com\n• Base64 encoded value: am9obi5kb2VAbWFpbC5jb20="
+    },
+    {
+      "subcategory": "Слабый генератор (PRNG)",
+      "title": "Предсказуемые UUID/GUID v1 и MongoDB ObjectId",
+      "language": "text",
+      "tags": ["prng", "uuid", "mongodb"],
+      "body": "• UUID/GUID v1 предсказуем, если знаешь время создания: 95f6e264-bb00-11ec-8833-00155d01ef00\n• MongoDB ObjectId генерируется предсказуемо: 5ae9b90a2c144b9def01ec37\n    - 4 байта — секунды с Unix epoch\n    - 3 байта — идентификатор машины\n    - 2 байта — process id\n    - 3 байта — счётчик, начинается со случайного значения"
+    },
+    {
+      "subcategory": "Хешированные идентификаторы",
+      "title": "ID/токен как хеш от username/email",
+      "language": "text",
+      "tags": ["hash", "enumeration"],
+      "body": "Иногда id или токен — это хеш от известного значения, например sha1(username), md5(email). Вычисли хеш сам и подставь.\n\n• MD5:  098f6bcd4621d373cade4e832627b4f6\n• SHA1: a94a8fe5ccb19ba61c4c0873d391e987982fbbd3\n• SHA2: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    },
+    {
+      "subcategory": "Wildcard-параметр",
+      "title": "Подстановка wildcard вместо ID",
+      "language": "http",
+      "tags": ["wildcard", "enumeration"],
+      "body": "GET /api/users/* HTTP/1.1\nGET /api/users/% HTTP/1.1\nGET /api/users/_ HTTP/1.1\nGET /api/users/. HTTP/1.1"
+    },
+    {
+      "subcategory": "Wildcard-параметр",
+      "title": "Идея wildcard",
+      "language": "text",
+      "tags": ["wildcard", "enumeration"],
+      "body": "Отправь wildcard (*, %, ., _) вместо конкретного ID — некоторые бэкенды в ответ отдадут данные всех пользователей."
+    },
+    {
+      "subcategory": "Трюки обхода",
+      "title": "IDOR Tips — смена метода, типа, массив, parameter pollution",
+      "language": "text",
+      "tags": ["bypass", "parameter-pollution", "tricks"],
+      "body": "• Смени HTTP-метод:        POST → PUT\n• Смени content type:      XML → JSON\n• Заверни число в массив:   {\"id\":19} → {\"id\":[19]}\n• Parameter Pollution:      user_id=hacker_id&user_id=victim_id"
+    },
+    {
+      "subcategory": "Инструменты",
+      "title": "Burp-расширения для проверки доступа",
+      "language": "text",
+      "tags": ["tools", "burp"],
+      "body": "• Authz — переигрывает запросы от другой сессии и сравнивает ответы.\n• AuthMatrix — матрица ролей/эндпоинтов для проверки авторизации.\n• Autorize — автоматически шлёт каждый запрос от low-priv сессии и помечает обойдённую авторизацию.\nВсе три — из PortSwigger BApp Store."
+    }
+  ]
+}

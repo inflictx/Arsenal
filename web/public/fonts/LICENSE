@@ -1,0 +1,12 @@
+Fonts bundled in this directory (subset .woff2 files, named htf_*.woff2):
+
+- Open Sans — Apache License 2.0
+  https://fonts.google.com/specimen/Open+Sans
+  (full Apache-2.0 text: ../cyberchef/LICENSE, or https://www.apache.org/licenses/LICENSE-2.0)
+
+- Source Code Pro — SIL Open Font License 1.1
+  https://github.com/adobe-fonts/source-code-pro
+  Full license text: ./OFL.txt
+
+Both licenses permit redistribution and embedding. The files are static subsets
+re-served locally so the app works fully offline.

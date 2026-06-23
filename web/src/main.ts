@@ -1,0 +1,53 @@
+import './styles/fonts.css';
+import './styles/tokens.css';
+import './styles/base.css';
+import './styles/components.css';
+
+import { h } from './lib/dom';
+import { Sidebar } from './components/sidebar';
+import { Topbar } from './components/topbar';
+import { startRouter, type RenderFn } from './router';
+import { PayloadsView } from './views/payloads';
+import { ChecklistsView } from './views/checklists';
+import { RevShellView } from './views/revshell';
+import { BurpView } from './views/burp';
+import { CommandsView } from './views/commands';
+import { GtfobinsView } from './views/gtfobins';
+import { WordlistsView } from './views/wordlists';
+import { NotesView } from './views/notes';
+import { FavoritesView } from './views/favorites';
+import { BackupView } from './views/backup';
+import { EngageView } from './views/engage';
+import { CyberChefView } from './views/cyberchef';
+import { initPaletteHotkey } from './lib/palette';
+import { initBackgroundFx } from './lib/particles';
+import { api } from './api';
+
+const appRoot = document.getElementById('app')!;
+
+const sidebar = Sidebar();
+const topbar = Topbar();
+const outlet = h('div', { class: 'outlet' });
+const main = h('main', { class: 'main' }, topbar.el, outlet);
+appRoot.append(sidebar.el, main);
+
+const routes: Record<string, RenderFn> = {
+  payloads: PayloadsView,
+  checklists: ChecklistsView,
+  revshell: RevShellView,
+  burp: BurpView,
+  commands: CommandsView,
+  gtfobins: GtfobinsView,
+  wordlists: WordlistsView,
+  cyberchef: CyberChefView,
+  notes: NotesView,
+  engage: EngageView,
+  favorites: FavoritesView,
+  backup: BackupView,
+};
+
+startRouter(outlet, routes, (name) => sidebar.setActive(name));
+initPaletteHotkey();
+initBackgroundFx();
+
+api.stats().then((s) => topbar.setStat(s.total)).catch(() => { /* offline / server down */ });

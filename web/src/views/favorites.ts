@@ -1,0 +1,84 @@
+import { h, clear } from '../lib/dom';
+import { api, type Entry } from '../api';
+import { SearchField } from '../components/searchfield';
+import { ScrollTop } from '../components/scrolltop';
+import { copyButton } from '../lib/copy';
+import { renderMarkdown } from '../lib/markdown';
+
+const TYPE_LABEL: Record<string, string> = {
+  note: 'Заметка', cmd_recipe: 'Готовая команда', command: 'Command', payload: 'Payload',
+  gtfobin: 'GTFOBins', wordlist_ref: 'Wordlist', wordlist: 'Wordlist', doc: 'Burp Docs',
+};
+const TYPE_ORDER = ['note', 'cmd_recipe', 'command', 'payload', 'gtfobin', 'wordlist_ref', 'wordlist', 'doc'];
+
+export function FavoritesView(outlet: HTMLElement): () => void {
+  clear(outlet);
+
+  let favs: Entry[] = [];
+  const search = SearchField({ placeholder: 'Поиск в избранном…', onInput: () => render() });
+  const countEl = h('div', { class: 'burp-hits' });
+  const wrap = h('div', { class: 'fav-wrap' });
+  outlet.appendChild(h('div', { class: 'content' },
+    h('div', { class: 'fav-head' }, h('h1', { class: 'cat-h' }, '★ Избранное'), search.el), countEl, wrap));
+  const scrollTop = ScrollTop();
+  outlet.appendChild(scrollTop.el);
+
+  function matches(e: Entry, q: string): boolean {
+    return [e.title, e.body, e.category, (e.tags || []).join(' ')].filter(Boolean).join(' ').toLowerCase().includes(q);
+  }
+
+  async function unfav(e: Entry) {
+    await api.favorite(e.id);
+    favs = favs.filter((x) => x.id !== e.id);
+    render();
+  }
+
+  function card(e: Entry): HTMLElement {
+    const head = h('div', { class: 'fav-card-head' },
+      h('span', { class: 'fav-title' }, e.title || '(без названия)'),
+      h('span', { class: 'fav-type' }, TYPE_LABEL[e.type] ?? e.type));
+    const copyBtn = copyButton(() => e.body ?? '', 'Copy');
+    copyBtn.classList.add('fav-copy');
+    const star = h('button', { class: 'btn fav-x', type: 'button', title: 'Убрать из избранного', onclick: () => unfav(e) }, '★');
+    head.append(copyBtn, star);
+
+    const md = h('article', { class: 'md cmd-md' });
+    md.innerHTML = renderMarkdown(e.body ?? '');
+    md.querySelectorAll('pre').forEach((pre) => {
+      const code = pre.querySelector('code');
+      const b = copyButton(() => code?.textContent ?? pre.textContent ?? '', 'Copy');
+      b.classList.add('doc-copy');
+      pre.appendChild(b);
+    });
+
+    const kids: HTMLElement[] = [head];
+    if (e.category) kids.push(h('div', { class: 'fav-cat' }, e.category));
+    kids.push(md);
+    return h('div', { class: 'card fav-card' }, ...kids);
+  }
+
+  function render() {
+    clear(wrap);
+    const q = search.input.value.trim().toLowerCase();
+    const hits = favs.filter((e) => !q || matches(e, q));
+    countEl.textContent = favs.length ? `${hits.length} в избранном` : '';
+    if (!favs.length) {
+      wrap.appendChild(h('div', { class: 'note-empty' },
+        h('p', {}, 'В избранном пусто. Жми ★ на заметках, готовых командах, пейлоадах, GTFOBins и т.д. — всё собранное появится здесь.')));
+      return;
+    }
+    const groups = [...new Set(hits.map((e) => e.type))].sort((a, b) => TYPE_ORDER.indexOf(a) - TYPE_ORDER.indexOf(b));
+    for (const t of groups) {
+      const items = hits.filter((e) => e.type === t);
+      wrap.appendChild(h('div', { class: 'wl-group-h' }, TYPE_LABEL[t] ?? t, h('span', { class: 'n' }, String(items.length))));
+      for (const e of items) wrap.appendChild(card(e));
+    }
+  }
+
+  (async () => {
+    try { favs = await api.entries({ favorite: 1, limit: 1000 }); } catch { favs = []; }
+    render();
+  })();
+
+  return () => scrollTop.destroy();
+}

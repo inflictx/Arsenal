@@ -1,0 +1,100 @@
+{
+  "category": "HTTP Parameter Pollution",
+  "source": "PayloadsAllTheThings/HTTP Parameter Pollution/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое HTTP Parameter Pollution",
+      "language": "text",
+      "tags": ["methodology", "hpp"],
+      "body": "HTTP Parameter Pollution (HPP, загрязнение HTTP-параметров) — техника обхода, при которой атакующий передаёт несколько экземпляров одного и того же параметра с одинаковым именем (?param1=value&param1=value), чтобы повлиять на логику приложения или вытащить скрытую информацию.\n\nФормального стандарта разбора повторяющихся параметров нет: каждая технология парсит их по-своему. Одни берут первое вхождение, другие — последнее, третьи собирают всё в массив. Именно это расхождение и эксплуатируется — например, чтобы обойти фильтры/WAF, работающие по сигнатурам, или разрезать атакующий вектор между несколькими копиями параметра."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Где искать и два уровня HPP",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "HPP бьёт на двух уровнях:\n• Client-Side HPP — эксплуатирует JavaScript-код на стороне клиента (в браузере): пользовательский ввод попадает в ссылки/формы, и лишний параметр перезаписывает поведение фронтенда.\n• Server-Side HPP — эксплуатирует то, как сервер обрабатывает несколько параметров с одинаковым именем.\n\nГде пробовать:\n• Любой эндпоинт, где один параметр участвует в логике (флаги, суммы, идентификаторы, фильтры доступа).\n• Точки, проходящие через несколько слоёв (WAF → прокси → бэкенд) — если слои парсят дубли по-разному, фильтр видит одно значение, бэкенд использует другое.\n• Формы, редиректы, ссылки, которые собираются из ввода на клиенте.\n\nКак тестировать: дублируй целевой параметр и наблюдай, какое из значений реально применилось; меняй порядок значений; пробуй разные формы записи (param[], %26, вложенные ключи)."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Тулзы",
+      "language": "text",
+      "tags": ["methodology", "tools"],
+      "body": "• Burp Suite — вручную правишь запрос и добавляешь дублирующиеся параметры.\n• OWASP ZAP — перехват и модификация HTTP-параметров."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Примеры манипуляции логикой",
+      "language": "text",
+      "tags": ["hpp", "logic", "examples"],
+      "body": "/app?debug=false&debug=true\n/transfer?amount=1&amount=5000"
+    },
+    {
+      "subcategory": "Поведение парсеров",
+      "title": "Как разные технологии парсят дубли (?par1=a&par1=b)",
+      "language": "table",
+      "tags": ["hpp", "parsing", "reference"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Технология", "Результат разбора", "Итог (par1=)"],
+          "rows": [
+            ["ASP.NET/IIS", "Все вхождения", "a,b"],
+            ["ASP/IIS", "Все вхождения", "a,b"],
+            ["Golang net/http — r.URL.Query().Get(\"param\")", "Первое вхождение", "a"],
+            ["Golang net/http — r.URL.Query()[\"param\"]", "Все вхождения в массиве", "['a','b']"],
+            ["IBM HTTP Server", "Первое вхождение", "a"],
+            ["IBM Lotus Domino", "Первое вхождение", "a"],
+            ["JSP, Servlet/Tomcat", "Первое вхождение", "a"],
+            ["mod_wsgi (Python)/Apache", "Первое вхождение", "a"],
+            ["Nodejs", "Все вхождения", "a,b"],
+            ["Perl CGI/Apache", "Первое вхождение", "a"],
+            ["PHP/Apache", "Последнее вхождение", "b"],
+            ["PHP/Zues", "Последнее вхождение", "b"],
+            ["Python Django", "Последнее вхождение", "b"],
+            ["Python Flask", "Первое вхождение", "a"],
+            ["Python/Zope", "Все вхождения в массиве", "['a','b']"],
+            ["Ruby on Rails", "Последнее вхождение", "b"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Эксплуатация",
+      "title": "Дублирование параметра",
+      "language": "text",
+      "tags": ["hpp", "duplicate"],
+      "body": "param=value1&param=value2"
+    },
+    {
+      "subcategory": "Эксплуатация",
+      "title": "Инъекция массива (array injection)",
+      "language": "text",
+      "tags": ["hpp", "array"],
+      "body": "param[]=value1\nparam[]=value1&param[]=value2\nparam[]=value1&param=value2\nparam=value1&param[]=value2"
+    },
+    {
+      "subcategory": "Эксплуатация",
+      "title": "Закодированная инъекция (склейка лишнего параметра)",
+      "language": "text",
+      "tags": ["hpp", "encoded", "waf-bypass"],
+      "body": "param=value1%26other=value2"
+    },
+    {
+      "subcategory": "Эксплуатация",
+      "title": "Вложенная инъекция (nested keys)",
+      "language": "text",
+      "tags": ["hpp", "nested"],
+      "body": "param[key1]=value1&param[key2]=value2"
+    },
+    {
+      "subcategory": "Эксплуатация",
+      "title": "JSON-инъекция (дубль ключа в теле)",
+      "language": "json",
+      "tags": ["hpp", "json"],
+      "body": "{\n    \"test\": \"user\",\n    \"test\": \"admin\"\n}"
+    }
+  ]
+}

