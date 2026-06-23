@@ -478,7 +478,7 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
     try { saved = JSON.parse(localStorage.getItem(LS_COLLAPSED) ?? 'null'); } catch { /* ignore */ }
     if (Array.isArray(saved)) for (const n of saved) collapsed.add(String(n));
     else secs.forEach((s) => { if (s.name !== 'WEB') collapsed.add(s.name); });
-    const want = params.sub ? docs.find((d) => d.title === params.sub) : null;
+    const want = params.id ? docs.find((d) => String(d.id) === params.id) : (params.sub ? docs.find((d) => d.title === params.sub) : null);
     if (want?.category) collapsed.delete(want.category);
     renderTree();
     if (want) { select(want); rowById.get(want.id)?.scrollIntoView({ block: 'center' }); }

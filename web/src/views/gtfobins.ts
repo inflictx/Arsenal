@@ -104,7 +104,7 @@ export function GtfobinsView(outlet: HTMLElement, params: Record<string, string>
       titleEl.textContent = 'GTFOBins';
       return;
     }
-    const want = params.sub ? bins.find((b) => b.title === params.sub) : null;
+    const want = params.id ? bins.find((b) => String(b.id) === params.id) : (params.sub ? bins.find((b) => b.title === params.sub) : null);
     select(want ?? bins[0]!);
     if (want) rowById.get(want.id)?.scrollIntoView({ block: 'center' });
   })();

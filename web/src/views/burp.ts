@@ -154,7 +154,7 @@ export function BurpView(outlet: HTMLElement, params: Record<string, string>): (
     try { saved = JSON.parse(localStorage.getItem('burp.collapsed') ?? 'null'); } catch { /* ignore */ }
     if (Array.isArray(saved)) for (const n of saved) collapsed.add(String(n));
     else secs.forEach((s) => collapsed.add(s.name)); // default: all groups collapsed (clean overview)
-    const want = params.sub ? docs.find((d) => d.title === params.sub) : null;
+    const want = params.id ? docs.find((d) => String(d.id) === params.id) : (params.sub ? docs.find((d) => d.title === params.sub) : null);
     if (want) { const sec = secs.find((s) => s.pages.some((p) => p.id === want.id)); if (sec) collapsed.delete(sec.name); }
     renderTree();
     if (want) { select(want); rowById.get(want.id)?.scrollIntoView({ block: 'center' }); }

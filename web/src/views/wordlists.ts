@@ -75,7 +75,7 @@ export function WordlistsView(outlet: HTMLElement, params: Record<string, string
     if (m.raw && m.raw !== m.github) links.appendChild(h('a', { class: 'wl-link', href: m.raw, target: '_blank', rel: 'noreferrer' }, 'Прямая ссылка ↗'));
     if (links.childElementCount) kids.push(links);
 
-    return h('div', { class: 'card wl-card' }, ...(kids.filter(Boolean) as HTMLElement[]));
+    return h('div', { class: 'card wl-card', 'data-id': String(e.id) }, ...(kids.filter(Boolean) as HTMLElement[]));
   }
 
   function renderCatList() {
@@ -140,6 +140,10 @@ export function WordlistsView(outlet: HTMLElement, params: Record<string, string
     }
     activeCat = (params.sub && cats.includes(params.sub)) ? params.sub : cats[0]!;
     render();
+    if (params.id) {
+      const card = cardsEl.querySelector('[data-id="' + params.id + '"]') as HTMLElement | null;
+      if (card) { card.scrollIntoView({ block: 'center' }); card.classList.add('flash'); setTimeout(() => card.classList.remove('flash'), 1600); }
+    }
   })();
 
   return () => scrollTop.destroy();

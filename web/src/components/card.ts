@@ -66,5 +66,5 @@ export function PayloadCard(e: Entry): HTMLElement {
     ? h('div', { class: 'tags' }, ...e.tags.map((t) => h('span', { class: 'tag' }, t)))
     : null;
 
-  return h('div', { class: 'card' }, sub, top, content, tags);
+  return h('div', { class: 'card', 'data-id': String(e.id) }, sub, top, content, tags);
 }

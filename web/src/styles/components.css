@@ -79,6 +79,9 @@
 .pal-copy { flex: none; border: 1px solid var(--border-2); background: var(--panel-2); color: var(--muted); border-radius: 6px; padding: 1px 7px; font-size: 12px; line-height: 1.4; cursor: pointer; opacity: 0; transition: 0.12s; }
 .presult:hover .pal-copy, .presult.sel .pal-copy { opacity: 1; }
 .pal-copy:hover { color: var(--cyan); border-color: rgba(73, 109, 255, 0.5); }
+/* brief highlight when ⌘K jumps to a specific card */
+.card.flash, .wl-card.flash { animation: ars-flash 1.6s ease; }
+@keyframes ars-flash { 0%, 100% { box-shadow: none; } 12% { box-shadow: 0 0 0 2px var(--cyan), 0 0 22px -2px rgba(73, 109, 255, 0.55); } }
 .palette-foot { padding: 8px 14px; border-top: 1px solid var(--border); font-size: 11px; color: var(--faint); display: flex; gap: 14px; }
 .palette-foot b { color: var(--muted); font-weight: 500; font-family: var(--mono); }
 

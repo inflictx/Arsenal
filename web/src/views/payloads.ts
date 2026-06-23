@@ -27,6 +27,7 @@ export function PayloadsView(outlet: HTMLElement, params: Record<string, string>
 
   let categories: Category[] = [];
   let active = params.sub || '';
+  let wantId = params.id || ''; // deep-link from ⌘K: scroll to + flash this exact card once
   let loaded: Entry[] = [];
 
   function renderCats() {
@@ -75,6 +76,15 @@ export function PayloadsView(outlet: HTMLElement, params: Record<string, string>
     loaded = await api.entries({ type: 'payload', category: cat, limit: 1000 });
     countEl.textContent = loaded.length + ' payloads';
     showCards(loaded);
+    flashWanted();
+  }
+
+  // When opened from ⌘K, jump to the exact payload card (not the top of the category).
+  function flashWanted() {
+    if (!wantId) return;
+    const card = cardsWrap.querySelector('[data-id="' + wantId + '"]') as HTMLElement | null;
+    wantId = '';
+    if (card) { card.scrollIntoView({ block: 'center' }); card.classList.add('flash'); setTimeout(() => card.classList.remove('flash'), 1600); }
   }
 
   (async () => {

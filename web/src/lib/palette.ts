@@ -12,12 +12,14 @@ function firstCodeBlock(body: string): string | null {
   const m = body.match(/```[^\n]*\n([\s\S]*?)```/);
   return m ? m[1].trim() : null;
 }
-// What ↵ copies for a result — the USEFUL bit per type, not the whole doc/blob.
-function copyValueFor(e: Entry): string {
+// The clean value the ⧉ button copies — or null when there's nothing useful to copy
+// (e.g. Burp docs are prose). When null the copy button is hidden, so you never copy junk.
+function copyValueFor(e: Entry): string | null {
   const meta = (e.meta ?? {}) as Record<string, any>;
-  if (e.type === 'wordlist_ref') return (meta.paths && meta.paths[0]) || meta.raw || meta.github || e.body || '';
-  if (e.type === 'gtfobin' || e.type === 'doc' || e.type === 'command') return firstCodeBlock(e.body ?? '') ?? (e.body ?? '');
-  return e.body ?? '';
+  if (e.type === 'wordlist_ref') return (meta.paths && meta.paths[0]) || meta.raw || meta.github || null;
+  if (e.type === 'command' || e.type === 'gtfobin') return firstCodeBlock(e.body ?? ''); // first command block, else null
+  if (e.type === 'doc') return null; // Burp docs are prose — nothing clean to copy; just open it
+  return (e.body ?? '').trim() || null; // payload / cmd_recipe / note → the payload/command itself
 }
 function preview(e: Entry): string {
   const meta = (e.meta ?? {}) as Record<string, any>;
@@ -59,6 +61,7 @@ export function openPalette() {
     if (!input.value.trim()) { results.appendChild(h('div', { class: 'empty' }, 'Search across every payload, wordlist & technique…')); return; }
     if (!items.length) { results.appendChild(h('div', { class: 'empty' }, 'No results')); return; }
     items.forEach((e, i) => {
+      const cv = copyValueFor(e);
       results.appendChild(
         h('div', { class: 'presult' + (i === sel ? ' sel' : ''), onclick: () => choose(e), onmouseenter: () => { sel = i; mark(); } },
           h('div', { class: 'r-top' },
@@ -66,7 +69,7 @@ export function openPalette() {
             h('span', { class: 'r-type ' + e.type }, e.type),
             e.category ? h('span', { class: 'r-cat' }, e.category) : null,
             h('span', { class: 'r-spacer' }),
-            h('button', { class: 'pal-copy', title: 'Копировать значение', onclick: (ev: MouseEvent) => { ev.stopPropagation(); copyEntry(e); } }, '⧉'),
+            cv ? h('button', { class: 'pal-copy', title: 'Скопировать значение', onclick: (ev: MouseEvent) => { ev.stopPropagation(); copyText(cv); toast('Скопировано · ' + e.title); } }, '⧉') : null,
           ),
           h('div', { class: 'r-body' }, preview(e)),
         ),
@@ -96,9 +99,10 @@ export function openPalette() {
   function choose(e: Entry) {
     const { route, sub } = routeFor(e);
     close();
-    navigate(route, sub ? { sub } : undefined);
+    const p: Record<string, string> = { id: String(e.id) };
+    if (sub) p.sub = sub;
+    navigate(route, p);
   }
-  function copyEntry(e: Entry) { copyText(copyValueFor(e)); toast('Copied · ' + e.title); }
   function resetInput() { input.value = ''; syncClear(); items = []; render(); }
 
   input.addEventListener('input', () => { syncClear(); clearTimeout(timer); timer = setTimeout(() => run(input.value), 110); });
