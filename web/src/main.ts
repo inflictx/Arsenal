@@ -1,7 +1,9 @@
-import './styles/fonts.css';
 import './styles/tokens.css';
 import './styles/base.css';
 import './styles/components.css';
+import { injectFonts } from './lib/fonts';
+
+injectFonts(); // @font-face at runtime so URLs honor the Vite base path (works on GitHub Pages)
 
 import { h } from './lib/dom';
 import { Sidebar } from './components/sidebar';

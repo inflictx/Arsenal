@@ -259,8 +259,12 @@ export const localApi = {
     await dbPut('kv', { k: 'seq:entry', v: maxUser });
     const cs: any[] = Array.isArray(data?.checklist_state) ? data.checklist_state : [];
     for (const r of cs) await dbPut('checklistState', { key: r.key, checked: !!r.checked, note: r.note ?? null });
-    for (const t of (Array.isArray(data?.targets) ? data.targets : [])) await dbPut('targets', { ...t, is_active: !!t.is_active });
-    for (const f of (Array.isArray(data?.findings) ? data.findings : [])) await dbPut('findings', f);
+    const tg = Array.isArray(data?.targets) ? data.targets : [];
+    let maxT = 0; for (const t of tg) { await dbPut('targets', { ...t, is_active: !!t.is_active }); maxT = Math.max(maxT, t.id ?? 0); }
+    if (tg.length) await dbPut('kv', { k: 'seq:target', v: maxT }); // else new targets would reuse restored ids
+    const fd = Array.isArray(data?.findings) ? data.findings : [];
+    let maxF = 0; for (const f of fd) { await dbPut('findings', f); maxF = Math.max(maxF, f.id ?? 0); }
+    if (fd.length) await dbPut('kv', { k: 'seq:finding', v: maxF });
     return { entries: entries.length, checklist_state: cs.length };
   },
 

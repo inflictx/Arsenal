@@ -14,6 +14,8 @@
   <img alt="ui" src="https://img.shields.io/badge/UI-Russian-496dff">
 </p>
 
+<p align="center"><b>▶ <a href="https://inflictx.github.io/Arsenal/">Live demo</a></b> — runs entirely in your browser, nothing to install (your data stays in your browser).</p>
+
 ![ARS3NAL command builder — click flags, the command assembles itself](screenshots/commands.gif)
 
 > No telemetry. No cloud. No account. Your data lives in a local SQLite file and never
@@ -95,6 +97,11 @@ Plus **Notes** (personal Markdown), **Favorites** (★ across every module) and 
 ---
 
 ## 🚀 Run
+
+**Two ways:** the [**live demo**](https://inflictx.github.io/Arsenal/) runs client-only in your
+browser (reference content is bundled; your notes/targets/progress live in the browser's
+IndexedDB). For the full local app with your own SQLite database and editable content, run it
+yourself:
 
 Double-click **`start.bat`** (first run installs deps, seeds the DB and builds the UI),
 then open <http://localhost:7331>.

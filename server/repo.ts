@@ -188,8 +188,11 @@ const restoreTx = db.transaction((data: any) => {
   for (const e of entries) {
     ins.run({
       id: e.id ?? null, type: e.type, category: e.category ?? null, subcategory: e.subcategory ?? null,
-      title: e.title, body: e.body ?? null, language: e.language ?? null, tags: e.tags ?? null,
-      source: e.source ?? null, meta: e.meta ?? null,
+      title: e.title, body: e.body ?? null, language: e.language ?? null,
+      // accept both string (server backup) and array/object (static/IndexedDB backup) shapes
+      tags: typeof e.tags === 'string' ? e.tags : (e.tags != null ? JSON.stringify(e.tags) : null),
+      source: e.source ?? null,
+      meta: typeof e.meta === 'string' ? e.meta : (e.meta != null ? JSON.stringify(e.meta) : null),
       is_custom: e.is_custom ? 1 : 0, is_favorite: e.is_favorite ? 1 : 0, notes: e.notes ?? null,
       created_at: e.created_at ?? now, updated_at: e.updated_at ?? now,
     });
