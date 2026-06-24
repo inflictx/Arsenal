@@ -13,7 +13,7 @@
   <img alt="license" src="https://img.shields.io/badge/license-GPL--3.0-496dff">
   <img alt="stack" src="https://img.shields.io/badge/stack-Fastify%20%2B%20SQLite%20%2B%20Vite%20TS-8250df">
   <img alt="offline" src="https://img.shields.io/badge/offline-first-22c55e">
-  <img alt="ui" src="https://img.shields.io/badge/UI-Russian-496dff">
+  <img alt="ui" src="https://img.shields.io/badge/UI-RU%20%2B%20EN-496dff">
 </p>
 
 <p align="center"><b>▶ <a href="https://inflictx.github.io/Arsenal/">Live demo</a></b> — runs entirely in your browser, nothing to install (your data stays in your browser).</p>
@@ -25,7 +25,9 @@
 
 > ⚠️ **For authorized security testing and education only.** See [Disclaimer](#-disclaimer).
 
-> 🌐 The UI is in **Russian**; payloads, commands and code stay technical / English.
+> 🌐 **Bilingual (Russian / English)** — a one-click toggle switches the interface and most
+> reference content (payloads, GTFOBins, commands, Burp docs, wordlists) between RU and EN.
+> Payloads, commands and code themselves stay technical.
 
 ---
 
@@ -33,7 +35,7 @@
 
 ### 🛠️ Command builder — assemble commands by clicking flags
 The headline feature. Pick a tool, toggle the flags you want, and the command assembles
-itself with **verified, documented flags** (each flag has a Russian explanation). Set your
+itself with **verified, documented flags** (each flag is explained, RU/EN). Set your
 **Target / LHOST once** in the top bar and it's substituted into *every* tool's examples
 live — no more find-and-replace on `10.10.x.x`. Save assembled commands to your own
 **“Готовые команды”** library (persists in the DB, drag-to-reorder). 59 tools have the
@@ -49,7 +51,7 @@ A ⌘K palette that searches **every** payload, command, GTFOBin, wordlist and d
 
 ### ⚡ Curated payloads — 63 categories
 Hand-curated from PayloadsAllTheThings (~1500 entries): detection-first ordering, real
-copy-ready payloads, diagrams and tables, with Russian tips. Not a noisy auto-dump.
+copy-ready payloads, diagrams and tables, with tips (RU/EN). Not a noisy auto-dump.
 
 ![Payloads](screenshots/payloads.gif)
 
@@ -59,9 +61,9 @@ its UI localized to Russian. Encode/decode/crypto without leaving ARS3NAL or goi
 
 ![Embedded CyberChef](screenshots/cyberchef.png)
 
-### 🐧 GTFOBins — all 458, fully translated
+### 🐧 GTFOBins — all 458, RU / EN
 Every GTFOBins binary with function/context filter chips (shell, file-read, sudo, SUID…)
-and Russian-translated technique notes.
+and technique notes in Russian and English.
 
 ![GTFOBins](screenshots/gtfobins.png)
 
@@ -86,7 +88,7 @@ into the command builder and reverse-shell generator.
 
 ### 📚 Wordlists reference &amp; 🟠 Burp reference
 A curated guide to the top wordlists (canonical paths + GitHub links + “what each is for”),
-and a Russian reference for the Burp Suite desktop workflow.
+and a reference for the Burp Suite desktop workflow (RU/EN).
 
 <p>
   <img src="screenshots/wordlists.png" width="49%" alt="Wordlists">

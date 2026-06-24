@@ -1,0 +1,62 @@
+[
+  {
+    "category": "Setup & locations",
+    "name": "SecLists - installation (apt)",
+    "purpose": "SecLists is the main collection of wordlists (discovery, passwords, fuzzing, payload lists). On Kali it installs as a single package, after which all the /usr/share/seclists/... paths from this section will work.",
+    "whenToUse": "The first thing to install on a fresh system before any enumeration.",
+    "tool": "apt",
+    "paths": ["sudo apt install seclists", "/usr/share/seclists/"],
+    "github": "https://github.com/danielmiessler/SecLists",
+    "tags": ["seclists", "kali", "setup"]
+  },
+  {
+    "category": "Setup & locations",
+    "name": "SecLists - git clone (always fresh)",
+    "purpose": "Cloning the repository gives the freshest version of the wordlists (newer than the package in the distro repos) and works on any system, not only Kali.",
+    "whenToUse": "When you need an up-to-date SecLists on a non-Kali system or newer than the packaged one.",
+    "tool": "git",
+    "paths": ["git clone --depth 1 https://github.com/danielmiessler/SecLists.git"],
+    "github": "https://github.com/danielmiessler/SecLists",
+    "tags": ["seclists", "setup"]
+  },
+  {
+    "category": "Setup & locations",
+    "name": "rockyou - unpack",
+    "purpose": "On modern Kali, rockyou.txt ships compressed (.gz) from the wordlists package. Until you unpack it, tools will not see it.",
+    "whenToUse": "Right after installation: unpack it to get a ready /usr/share/wordlists/rockyou.txt.",
+    "tool": "gunzip",
+    "paths": ["sudo gunzip /usr/share/wordlists/rockyou.txt.gz", "/usr/share/wordlists/rockyou.txt"],
+    "github": "https://www.kali.org/tools/wordlists/",
+    "tags": ["kali", "rockyou", "setup", "passwords"]
+  },
+  {
+    "category": "Setup & locations",
+    "name": "Assetnote wordlists - where to get them",
+    "purpose": "Assetnote keeps auto-generated \"fresh\" wordlists (directories, API routes, subdomains) on its CDN - they reflect the real modern web and are often stronger than the classic SecLists.",
+    "whenToUse": "When classic DirBuster/SecLists are outdated and you need a wordlist based on current statistics; downloaded as individual files via wget.",
+    "tool": "wget / browser",
+    "paths": ["wget https://wordlists-cdn.assetnote.io/data/automated/httparchive_directories_1m_2026_05_27.txt"],
+    "github": "https://wordlists.assetnote.io/",
+    "raw": "https://wordlists.assetnote.io/",
+    "tags": ["assetnote", "setup"]
+  },
+  {
+    "category": "Setup & locations",
+    "name": "Where the wordlists live on Kali",
+    "purpose": "A cheat sheet of the standard paths: /usr/share/wordlists/ - the shared folder (rockyou + symlinks to dirb/dirbuster/seclists/fasttrack/wfuzz); /usr/share/seclists/ - all of SecLists; /usr/share/wordlists/dirb/ and /usr/share/wordlists/dirbuster/ - the classic dirb/DirBuster lists.",
+    "whenToUse": "When you do not remember where a needed list lives and which path to pass to -w.",
+    "tool": "ls",
+    "paths": ["/usr/share/wordlists/", "/usr/share/seclists/", "/usr/share/wordlists/dirb/", "/usr/share/wordlists/seclists"],
+    "tags": ["kali", "setup", "paths"]
+  },
+  {
+    "category": "Setup & locations",
+    "name": "Generating your own wordlists (cewl / crunch / rules)",
+    "purpose": "When ready-made lists are not enough: cewl scrapes words straight from the target's site; crunch generates a brute-force set by mask/charset; hashcat/john rules mutate an existing wordlist (Password -> P@ssw0rd!).",
+    "whenToUse": "For a specific target: collect words from its site (cewl) or expand a wordlist with rules during cracking.",
+    "tool": "cewl / crunch / hashcat -r / john --rules",
+    "paths": ["cewl -d 2 -m 5 -w custom.txt https://target", "crunch 8 8 -t @@@@%%%% -o wl.txt", "hashcat -m 0 hash.txt rockyou.txt -r /usr/share/hashcat/rules/best64.rule"],
+    "github": "https://github.com/hashcat/hashcat/tree/master/rules",
+    "tags": ["setup", "generation", "cewl", "crunch", "rules"]
+  }
+]

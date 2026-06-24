@@ -9,7 +9,7 @@ import { parseStructuredCommands, cmdKey } from './parsers/commands-structured';
 import { parseGtfobins } from './parsers/gtfobins';
 import { parseWordlistsRef } from './parsers/wordlists-ref';
 import { replaceChecklists } from '../server/checklists';
-import { CURATED } from './curated/index';
+import { CURATED, CURATED_EN } from './curated/index';
 import type { CuratedCategory } from './curated/types';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -43,8 +43,8 @@ function seedContent(locale: 'ru' | 'en'): number {
   const en = locale === 'en';
   let total = 0;
 
-  // Curated categories authored in TypeScript (no EN variant yet → RU copy as fallback).
-  for (const cat of CURATED) total += insertMany(rowsFromCategory(cat, locale));
+  // Curated categories authored in TypeScript (CURATED_EN holds the English versions).
+  for (const cat of (en ? CURATED_EN : CURATED)) total += insertMany(rowsFromCategory(cat, locale));
 
   // Curated categories authored as JSON (prefer curated-en/<file> for 'en').
   const curatedDir = join(here, 'curated');
@@ -85,16 +85,18 @@ function seedContent(locale: 'ru' | 'en'): number {
   // coveredKeys is always taken from the RU set (titles are verbatim) so the md filter
   // stays consistent across locales. Markdown long-tail refs stay RU until translated.
   const cmdEnDir = join(here, 'commands-structured-en');
-  const ruStructured = parseStructuredCommands();
-  const structuredEntries = en && existsSync(cmdEnDir) ? parseStructuredCommands(cmdEnDir).entries : ruStructured.entries;
-  const md = parseCommands().filter((e) => !ruStructured.coveredKeys.has(cmdKey(e.category, e.title)));
-  total += insertMany(withLocale(structuredEntries, locale));
+  const structured = en && existsSync(cmdEnDir) ? parseStructuredCommands(cmdEnDir) : parseStructuredCommands();
+  const mdEnDir = join(here, 'commands-en');
+  const mdEntries = en && existsSync(mdEnDir) ? parseCommands(mdEnDir, 'en') : parseCommands();
+  // coveredKeys + md taken from the SAME locale set so the "structured overrides md" filter matches.
+  const md = mdEntries.filter((e) => !structured.coveredKeys.has(cmdKey(e.category, e.title)));
+  total += insertMany(withLocale(structured.entries, locale));
   total += insertMany(withLocale(md, locale));
 
   // GTFOBins: en uses the original English function descriptions + technique comments
   // (no RU overlay). Wordlist refs are mostly English data (RU copy fallback for now).
   total += insertMany(withLocale(parseGtfobins(locale), locale));
-  total += insertMany(withLocale(parseWordlistsRef(), locale));
+  total += insertMany(withLocale(parseWordlistsRef(locale), locale));
 
   return total;
 }

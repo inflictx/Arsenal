@@ -5,6 +5,13 @@ import type { EntryInput } from '../../server/repo';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DIR = join(here, '..', 'commands');
+const DIR_EN = join(here, '..', 'commands-en');
+
+// RU category names that need an English label for the en locale (others are already English).
+const CAT_EN: Record<string, string> = {
+  'Обзор': 'Overview',
+  'Крекинг паролей': 'Password Cracking',
+};
 
 interface Cat { category: string; order: number; }
 const OVERVIEW: Cat = { category: 'Обзор', order: 1 };
@@ -28,10 +35,10 @@ function classifyH1(text: string): Cat | null {
   return null; // unknown heading → keep current domain
 }
 
-function overviewTitle(text: string): string {
-  if (/справочник/i.test(text)) return 'О справочнике';
-  if (/recommendations/i.test(text)) return 'Рекомендации — стадии работы';
-  if (/caveats/i.test(text)) return 'Caveats — нюансы версий';
+function overviewTitle(text: string, en: boolean): string {
+  if (/справочник|reference/i.test(text)) return en ? 'About this reference' : 'О справочнике';
+  if (/recommendations|рекоменд/i.test(text)) return en ? 'Recommendations: workflow stages' : 'Рекомендации — стадии работы';
+  if (/caveats/i.test(text)) return en ? 'Caveats: version notes' : 'Caveats — нюансы версий';
   return text.trim();
 }
 
@@ -47,15 +54,16 @@ function splitHeading(s: string): { title: string; subcategory: string | null } 
 
 interface Draft { category: string; catOrder: number; title: string; subcategory: string | null; lines: string[]; }
 
-export function parseCommands(): EntryInput[] {
-  if (!existsSync(DIR)) return [];
-  const files = readdirSync(DIR)
+export function parseCommands(dir: string = DIR, locale: 'ru' | 'en' = 'ru'): EntryInput[] {
+  if (!existsSync(dir)) return [];
+  const en = locale === 'en';
+  const files = readdirSync(dir)
     .filter((f) => f.endsWith('.md'))
     .sort((a, b) => (a === 'reference.md' ? -1 : b === 'reference.md' ? 1 : a.localeCompare(b)));
 
   const drafts: Draft[] = [];
   for (const file of files) {
-    const text = readFileSync(join(DIR, file), 'utf8');
+    const text = readFileSync(join(dir, file), 'utf8');
     let cur: Cat = OVERVIEW;
     let entry: Draft | null = null;
     const flush = () => {
@@ -70,7 +78,7 @@ export function parseCommands(): EntryInput[] {
         flush();
         if (cls === OVERVIEW) {
           cur = OVERVIEW;
-          entry = { category: cur.category, catOrder: cur.order, title: overviewTitle(h1[1]), subcategory: null, lines: [] };
+          entry = { category: cur.category, catOrder: cur.order, title: overviewTitle(h1[1], en), subcategory: null, lines: [] };
         } else if (cls) {
           cur = cls;
         }
@@ -87,7 +95,7 @@ export function parseCommands(): EntryInput[] {
 
   return drafts.map((d, i) => ({
     type: 'command',
-    category: d.category,
+    category: en ? (CAT_EN[d.category] ?? d.category) : d.category,
     subcategory: d.subcategory,
     title: d.title,
     body: d.lines
