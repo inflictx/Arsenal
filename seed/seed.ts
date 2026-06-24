@@ -1,7 +1,7 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { db } from '../server/db';
+import { db, setSetting } from '../server/db';
 import { insertMany, type EntryInput } from '../server/repo';
 import { parseChecklists } from './parsers/checklists';
 import { parseCommands } from './parsers/commands';
@@ -130,6 +130,32 @@ function main() {
   replaceChecklists(lists);
   const itemTotal = lists.reduce((n, l) => n + l.sections.reduce((m, s) => m + s.items.length, 0), 0);
   console.log(`  = ${lists.length} checklists · ${itemTotal} items`);
+
+  // English checklist overlay: parse the en markdown, align to the RU structure by
+  // slug + position so EN items reuse the RU keys (progress is shared across languages),
+  // and stash the EN definitions in settings for the en locale. Falls back to RU per
+  // field where a translation is missing or the structure does not line up.
+  const enChkDir = join(here, 'checklists-en');
+  let enLists = lists;
+  if (existsSync(enChkDir)) {
+    const parsedEn = parseChecklists(enChkDir, 'en');
+    const enBySlug = new Map(parsedEn.map((l) => [l.slug, l]));
+    enLists = lists.map((ru) => {
+      const en = enBySlug.get(ru.slug);
+      if (!en) return ru;
+      const sections = ru.sections.map((rs, si) => {
+        const es = en.sections[si];
+        return {
+          name: es?.name ?? rs.name,
+          items: rs.items.map((ri, ii) => ({ key: ri.key, text: es?.items[ii]?.text ?? ri.text })),
+        };
+      });
+      return { ...ru, title: en.title, research: en.research || ru.research, sections };
+    });
+    const enCount = enLists.filter((l, i) => l !== lists[i]).length;
+    console.log(`  = en overlay: ${enCount}/${lists.length} translated (rest fall back to ru)`);
+  }
+  setSetting('checklists:en', JSON.stringify(enLists));
 
   // Re-apply the preserved ★/notes onto the freshly-seeded rows.
   if (preserved.length) {

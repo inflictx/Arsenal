@@ -10,7 +10,7 @@
 //   manifest.json         { types: {type: count}, checklists: n }
 //
 // Run:  npm run export-static
-import { db } from '../server/db';
+import { db, getSetting } from '../server/db';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,6 +35,8 @@ const cls = (db.prepare('SELECT * FROM checklists ORDER BY sort, slug').all() as
   research: r.research ?? '', sections: r.sections ? JSON.parse(r.sections) : [],
 }));
 writeFileSync(join(OUT, 'checklists.json'), JSON.stringify(cls));
+// English checklists (RU item keys + EN text, built at seed time). Falls back to RU defs.
+writeFileSync(join(OUT, 'checklists-en.json'), getSetting('checklists:en') || JSON.stringify(cls));
 
 // Reference entries (is_custom=0), exported per locale into data/<locale>/.
 const LOCALES = ['ru', 'en'] as const;

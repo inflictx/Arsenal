@@ -75,8 +75,8 @@ const httpApi = {
   updateFinding: (id: number, b: unknown): Promise<any> => req('/findings/' + id, { method: 'PUT', ...json(b) }),
   removeFinding: (id: number): Promise<{ ok: boolean }> => req('/findings/' + id, { method: 'DELETE' }),
 
-  checklists: (): Promise<ChecklistSummary[]> => req('/checklists'),
-  checklist: (slug: string): Promise<Checklist> => req('/checklists/' + encodeURIComponent(slug)),
+  checklists: (): Promise<ChecklistSummary[]> => req('/checklists' + qs({ locale: getLang() })),
+  checklist: (slug: string): Promise<Checklist> => req('/checklists/' + encodeURIComponent(slug) + qs({ locale: getLang() })),
   setChecklistItem: (key: string, checked: boolean): Promise<{ key: string; checked: boolean }> =>
     req('/checklists/item', { method: 'PATCH', ...json({ key, checked }) }),
   setChecklistItemNote: (key: string, note: string): Promise<{ key: string; note: string }> =>

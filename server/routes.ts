@@ -75,11 +75,15 @@ export async function registerRoutes(app: FastifyInstance) {
   });
 
   // ── Checklists ──────────────────────────────────────────────────────────
-  app.get('/checklists', async () => checklists.listChecklists());
+  app.get('/checklists', async (req) => {
+    const locale = (req.query as { locale?: string }).locale === 'en' ? 'en' : 'ru';
+    return checklists.listChecklists(locale);
+  });
 
   app.get('/checklists/:slug', async (req, reply) => {
     const { slug } = req.params as { slug: string };
-    const c = checklists.getChecklist(slug);
+    const locale = (req.query as { locale?: string }).locale === 'en' ? 'en' : 'ru';
+    const c = checklists.getChecklist(slug, locale);
     if (!c) return reply.code(404).send({ error: 'not found' });
     return c;
   });

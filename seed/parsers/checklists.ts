@@ -109,7 +109,7 @@ const SLUG_RULES: [string[], string][] = [
   [['cloud'], 'cloud'],
   [['pivoting', 'туннел'], 'pivoting'],
   [['api testing', 'owasp api'], 'api-testing'],
-  [['recon-пайплайн', 'пайплайн', 'recon automation'], 'recon-automation'],
+  [['recon-пайплайн', 'пайплайн', 'recon automation', 'recon pipeline'], 'recon-automation'],
   // meta (после всех — самые широкие ключи)
   [['methodology', 'recon'], 'recon'],
 ];
@@ -207,7 +207,7 @@ function splitH2(md: string): RawSection[] {
 }
 
 /** Тело одной operational-категории → секции/пункты + info-строки (Инструменты/Защита/заметки). */
-function parseOperationalBody(slug: string, body: string): { sections: ChecklistSection[]; info: string[] } {
+function parseOperationalBody(slug: string, body: string, locale: 'ru' | 'en'): { sections: ChecklistSection[]; info: string[] } {
   const sections: ChecklistSection[] = [];
   const info: string[] = [];
   let cur: ChecklistSection | null = null;
@@ -218,7 +218,7 @@ function parseOperationalBody(slug: string, body: string): { sections: Checklist
 
     const itemM = line.match(/^-\s*\[\s*\]\s*(.+)$/);
     if (itemM) {
-      if (!cur) { cur = { name: 'Шаги', items: [] }; sections.push(cur); }
+      if (!cur) { cur = { name: locale === 'en' ? 'Steps' : 'Шаги', items: [] }; sections.push(cur); }
       const text = itemM[1].trim();
       cur.items.push({ key: itemKey(slug, text), text });
       continue;
@@ -245,12 +245,12 @@ function parseOperationalBody(slug: string, body: string): { sections: Checklist
 }
 
 /** Полный разбор всех батчей в массив чек-листов (по порядку sort). */
-export function parseChecklists(): ParsedChecklist[] {
+export function parseChecklists(dir: string = CHECKLIST_DIR, locale: 'ru' | 'en' = 'ru'): ParsedChecklist[] {
   // pass 1: research → researchBySlug + общий блок (TL;DR/Caveats/Источники → отдаём recon).
   const researchBySlug: Record<string, string> = {};
   const generalParts: string[] = [];
   for (const b of BATCHES) {
-    const p = join(CHECKLIST_DIR, b.re);
+    const p = join(dir, b.re);
     if (!existsSync(p)) continue;
     for (const sec of splitH2(readFileSync(p, 'utf8'))) {
       if (sec.num != null) {
@@ -267,7 +267,7 @@ export function parseChecklists(): ParsedChecklist[] {
   const out: ParsedChecklist[] = [];
   const seen = new Set<string>();
   for (const b of BATCHES) {
-    const p = join(CHECKLIST_DIR, b.op);
+    const p = join(dir, b.op);
     if (!existsSync(p)) continue;
     for (const sec of splitH2(readFileSync(p, 'utf8'))) {
       if (sec.num == null) continue;
@@ -276,7 +276,7 @@ export function parseChecklists(): ParsedChecklist[] {
       if (seen.has(slug)) { console.warn(`  ! дубликат slug "${slug}" ("${sec.title}") — пропуск`); continue; }
       seen.add(slug);
 
-      const { sections, info } = parseOperationalBody(slug, sec.body);
+      const { sections, info } = parseOperationalBody(slug, sec.body, locale);
 
       const parts: string[] = [];
       if (slug === 'recon') {
@@ -285,7 +285,7 @@ export function parseChecklists(): ParsedChecklist[] {
       } else if (researchBySlug[slug]) {
         parts.push(researchBySlug[slug]!);
       }
-      if (info.length) parts.push('## 🛠 Инструменты и защита\n\n' + info.join('\n\n'));
+      if (info.length) parts.push((locale === 'en' ? '## 🛠 Tools & defense\n\n' : '## 🛠 Инструменты и защита\n\n') + info.join('\n\n'));
 
       out.push({
         slug,

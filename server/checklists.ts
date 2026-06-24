@@ -1,4 +1,4 @@
-import { db } from './db';
+import { db, getSetting } from './db';
 
 export interface ChecklistItemDef { key: string; text: string; }
 export interface ChecklistSectionDef { name: string; items: ChecklistItemDef[]; }
@@ -66,7 +66,22 @@ function itemCount(sectionsJson: string): number {
   } catch { return 0; }
 }
 
-export function listChecklists(): ChecklistSummary[] {
+type Locale = 'ru' | 'en';
+
+/** EN checklist definitions, built at seed time and stashed in settings (RU item keys + EN text). */
+function enChecklistDefs(): ChecklistDef[] {
+  try { return JSON.parse(getSetting('checklists:en') || '[]') as ChecklistDef[]; } catch { return []; }
+}
+
+export function listChecklists(locale: Locale = 'ru'): ChecklistSummary[] {
+  if (locale === 'en') {
+    return enChecklistDefs()
+      .map((d) => ({
+        slug: d.slug, title: d.title, category: d.category, sort: d.sort,
+        total: d.sections.reduce((n, s) => n + s.items.length, 0), checked: checkedCount(d.slug),
+      }))
+      .sort((a, b) => a.sort - b.sort || a.title.localeCompare(b.title));
+  }
   const rows = db.prepare('SELECT slug, title, category, sort, sections FROM checklists ORDER BY sort, title').all() as
     { slug: string; title: string; category: string | null; sort: number; sections: string }[];
   return rows.map((r) => ({
@@ -79,21 +94,17 @@ export function listChecklists(): ChecklistSummary[] {
   }));
 }
 
-export function getChecklist(slug: string): ChecklistView | null {
-  const row = db.prepare('SELECT slug, title, category, sort, research, sections FROM checklists WHERE slug=?').get(slug) as
-    { slug: string; title: string; category: string | null; sort: number; research: string; sections: string } | undefined;
-  if (!row) return null;
-
+/** Overlay user progress/notes (keyed by the shared item key) onto a definition. */
+function buildView(def: ChecklistDef): ChecklistView {
   const state = new Map<string, { checked: number; note: string | null }>();
-  for (const s of db.prepare('SELECT key, checked, note FROM checklist_state WHERE key LIKE ?').all(slug + '#%') as
+  for (const s of db.prepare('SELECT key, checked, note FROM checklist_state WHERE key LIKE ?').all(def.slug + '#%') as
     { key: string; checked: number; note: string | null }[]) {
     state.set(s.key, { checked: s.checked, note: s.note });
   }
 
   let total = 0;
   let checked = 0;
-  const defs = JSON.parse(row.sections) as ChecklistSectionDef[];
-  const sections: ChecklistSectionView[] = defs.map((sec) => ({
+  const sections: ChecklistSectionView[] = def.sections.map((sec) => ({
     name: sec.name,
     items: sec.items.map((it) => {
       const st = state.get(it.key);
@@ -104,9 +115,21 @@ export function getChecklist(slug: string): ChecklistView | null {
     }),
   }));
 
-  const noteRow = db.prepare('SELECT note FROM checklist_state WHERE key=?').get('note#' + slug) as { note: string | null } | undefined;
+  const noteRow = db.prepare('SELECT note FROM checklist_state WHERE key=?').get('note#' + def.slug) as { note: string | null } | undefined;
+  return { slug: def.slug, title: def.title, category: def.category, sort: def.sort, research: def.research ?? '', note: noteRow?.note ?? '', sections, total, checked };
+}
 
-  return { slug: row.slug, title: row.title, category: row.category, sort: row.sort, research: row.research ?? '', note: noteRow?.note ?? '', sections, total, checked };
+export function getChecklist(slug: string, locale: Locale = 'ru'): ChecklistView | null {
+  let def: ChecklistDef | null = null;
+  if (locale === 'en') {
+    def = enChecklistDefs().find((d) => d.slug === slug) ?? null;
+  } else {
+    const row = db.prepare('SELECT slug, title, category, sort, research, sections FROM checklists WHERE slug=?').get(slug) as
+      { slug: string; title: string; category: string | null; sort: number; research: string; sections: string } | undefined;
+    if (row) def = { slug: row.slug, title: row.title, category: row.category, sort: row.sort, research: row.research ?? '', sections: JSON.parse(row.sections) as ChecklistSectionDef[] };
+  }
+  if (!def) return null;
+  return buildView(def);
 }
 
 // ── Writes (user progress) ────────────────────────────────────────────────────

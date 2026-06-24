@@ -107,7 +107,10 @@ async function stateMap(): Promise<Map<string, CS>> {
 }
 let _cls: any[] | null = null;
 async function checklistDefs(): Promise<any[]> {
-  if (!_cls) { try { _cls = await (await fetch(DATA_ROOT + 'checklists.json')).json(); } catch { _cls = []; } }
+  if (!_cls) {
+    const file = getLang() === 'en' ? 'checklists-en.json' : 'checklists.json';
+    try { _cls = await (await fetch(DATA_ROOT + file)).json(); } catch { _cls = []; }
+  }
   return _cls!;
 }
 
