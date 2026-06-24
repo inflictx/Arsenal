@@ -3,17 +3,18 @@ import { api, type Entry, type Category } from '../api';
 import { PayloadCard } from '../components/card';
 import { SearchField } from '../components/searchfield';
 import { ScrollTop } from '../components/scrolltop';
+import { t } from '../lib/i18n';
 
 export function PayloadsView(outlet: HTMLElement, params: Record<string, string>): () => void {
   clear(outlet);
 
-  const catFilter = SearchField({ placeholder: 'Filter categories…', onInput: () => renderCats() });
+  const catFilter = SearchField({ placeholder: t('payloads.filterCats'), onInput: () => renderCats() });
   const catScroll = h('div', { class: 'scroll' });
   const catPanel = h('aside', { class: 'catlist' }, catFilter.el, catScroll);
 
   const titleEl = h('h1', { class: 'cat-h' }, 'Payloads');
   const countEl = h('span', { class: 'badge' }, '');
-  const search = SearchField({ placeholder: 'Filter in this category…', mono: true, onInput: (v) => applyFilter(v) });
+  const search = SearchField({ placeholder: t('payloads.filterInCat'), mono: true, onInput: (v) => applyFilter(v) });
   const cardsWrap = h('div', { class: 'cards' });
   const right = h('div', { style: { minWidth: '0' } },
     h('div', { class: 'cards-head' }, titleEl, countEl),
@@ -47,7 +48,7 @@ export function PayloadsView(outlet: HTMLElement, params: Record<string, string>
   function showCards(entries: Entry[]) {
     clear(cardsWrap);
     if (!entries.length) {
-      cardsWrap.appendChild(h('div', { class: 'empty' }, h('div', { class: 'big' }, '∅'), 'Nothing here'));
+      cardsWrap.appendChild(h('div', { class: 'empty' }, h('div', { class: 'big' }, '∅'), t('payloads.empty')));
       return;
     }
     for (const e of entries) cardsWrap.appendChild(PayloadCard(e));
@@ -56,7 +57,7 @@ export function PayloadsView(outlet: HTMLElement, params: Record<string, string>
   // In-category search is a fast client-side filter over the loaded category.
   function applyFilter(q: string) {
     const s = q.trim().toLowerCase();
-    if (!s) { countEl.textContent = loaded.length + ' payloads'; showCards(loaded); return; }
+    if (!s) { countEl.textContent = loaded.length + ' ' + t('payloads.countPayloads'); showCards(loaded); return; }
     const filtered = loaded.filter((e) =>
       e.title.toLowerCase().includes(s) ||
       (e.body ?? '').toLowerCase().includes(s) ||
@@ -74,7 +75,7 @@ export function PayloadsView(outlet: HTMLElement, params: Record<string, string>
     renderCats();
     window.scrollTo({ top: 0 });
     loaded = await api.entries({ type: 'payload', category: cat, limit: 1000 });
-    countEl.textContent = loaded.length + ' payloads';
+    countEl.textContent = loaded.length + ' ' + t('payloads.countPayloads');
     showCards(loaded);
     flashWanted();
   }

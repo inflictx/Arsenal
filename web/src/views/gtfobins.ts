@@ -4,6 +4,7 @@ import { SearchField } from '../components/searchfield';
 import { ScrollTop } from '../components/scrolltop';
 import { copyButton } from '../lib/copy';
 import { renderMarkdown } from '../lib/markdown';
+import { t } from '../lib/i18n';
 
 // chip key → label (key matches the tags stored on each entry)
 const FUNC_CHIPS: [string, string][] = [
@@ -22,11 +23,11 @@ export function GtfobinsView(outlet: HTMLElement, params: Record<string, string>
   const rowById = new Map<number, HTMLElement>();
   const filters = new Set<string>();
 
-  const filter = SearchField({ placeholder: 'Поиск бинаря…', onInput: () => renderList() });
+  const filter = SearchField({ placeholder: t('gtfobins.searchPlaceholder'), onInput: () => renderList() });
   const countEl = h('div', { class: 'burp-hits' });
   const listScroll = h('div', { class: 'scroll burp-tree' });
   const credit = h('div', { class: 'gtfo-credit' },
-    'Данные — ', h('a', { href: 'https://gtfobins.github.io', target: '_blank', rel: 'noreferrer' }, 'GTFOBins'), ' · GPL-3.0');
+    t('gtfobins.creditPrefix'), h('a', { href: 'https://gtfobins.github.io', target: '_blank', rel: 'noreferrer' }, 'GTFOBins'), ' · GPL-3.0');
   const left = h('aside', { class: 'catlist' }, filter.el, countEl, listScroll, credit);
 
   const titleEl = h('h1', { class: 'cat-h' }, 'GTFOBins');
@@ -46,8 +47,8 @@ export function GtfobinsView(outlet: HTMLElement, params: Record<string, string>
         } }, lbl));
     }
   };
-  addChips('Функции', FUNC_CHIPS, 'func');
-  addChips('Контексты', CTX_CHIPS, 'ctx');
+  addChips(t('gtfobins.funcLabel'), FUNC_CHIPS, 'func');
+  addChips(t('gtfobins.ctxLabel'), CTX_CHIPS, 'ctx');
 
   outlet.appendChild(h('div', { class: 'content' }, chipBar, h('div', { class: 'browser' }, left, right)));
   const scrollTop = ScrollTop();
@@ -55,9 +56,9 @@ export function GtfobinsView(outlet: HTMLElement, params: Record<string, string>
 
   function plural(n: number): string {
     const m10 = n % 10, m100 = n % 100;
-    if (m10 === 1 && m100 !== 11) return 'бинарь';
-    if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return 'бинаря';
-    return 'бинарей';
+    if (m10 === 1 && m100 !== 11) return t('gtfobins.pluralOne');
+    if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return t('gtfobins.pluralFew');
+    return t('gtfobins.pluralMany');
   }
 
   function matches(b: Entry): boolean {
@@ -89,7 +90,7 @@ export function GtfobinsView(outlet: HTMLElement, params: Record<string, string>
     bodyEl.innerHTML = renderMarkdown(b.body ?? '');
     bodyEl.querySelectorAll('pre').forEach((pre) => {
       const code = pre.querySelector('code');
-      const btn = copyButton(() => (code?.textContent ?? pre.textContent ?? ''), 'Copy');
+      const btn = copyButton(() => (code?.textContent ?? pre.textContent ?? ''), t('gtfobins.copy'));
       btn.classList.add('doc-copy');
       pre.appendChild(btn);
     });
@@ -100,7 +101,7 @@ export function GtfobinsView(outlet: HTMLElement, params: Record<string, string>
     bins.sort((a, b) => a.title.localeCompare(b.title));
     renderList();
     if (!bins.length) {
-      bodyEl.innerHTML = '<p>GTFOBins ещё не загружены — выполни <code>npm run seed</code>.</p>';
+      bodyEl.innerHTML = t('gtfobins.notLoaded');
       titleEl.textContent = 'GTFOBins';
       return;
     }

@@ -7,6 +7,7 @@ import { renderMarkdown, renderInline } from '../lib/markdown';
 import { navigate } from '../router';
 import { toast } from '../lib/toast';
 import { copyText } from '../lib/copy';
+import { t } from '../lib/i18n';
 
 // Слова-шум, не используемые для подбора пейлоадов под пункт.
 const STOP = new Set([
@@ -18,7 +19,7 @@ const STOP = new Set([
 export function ChecklistsView(outlet: HTMLElement, params: Record<string, string>): () => void {
   clear(outlet);
 
-  const filter = SearchField({ placeholder: 'Фильтр чек-листов…', onInput: () => renderList() });
+  const filter = SearchField({ placeholder: t('checklists.filterPlaceholder'), onInput: () => renderList() });
   const listScroll = h('div', { class: 'scroll' });
   const leftPanel = h('aside', { class: 'catlist' }, filter.el, listScroll);
   const detail = h('div', { class: 'chk-detail', style: { minWidth: '0' } });
@@ -50,10 +51,10 @@ export function ChecklistsView(outlet: HTMLElement, params: Record<string, strin
     }
     const fU = uncovered.filter((n) => !f || n.toLowerCase().includes(f));
     if (fU.length) {
-      listScroll.appendChild(h('div', { class: 'nav-label chk-uncovered-label' }, 'Без чек-листа'));
+      listScroll.appendChild(h('div', { class: 'nav-label chk-uncovered-label' }, t('checklists.noChecklist')));
       for (const name of fU) {
         listScroll.appendChild(
-          h('div', { class: 'cat chk-row muted', title: 'Открыть пейлоады', onclick: () => navigate('payloads', { sub: name }) },
+          h('div', { class: 'cat chk-row muted', title: t('checklists.openPayloads'), onclick: () => navigate('payloads', { sub: name }) },
             h('span', { class: 'chk-row-title' }, name),
             h('span', { class: 'n' }, '→'),
           ),
@@ -95,16 +96,16 @@ export function ChecklistsView(outlet: HTMLElement, params: Record<string, strin
   function renderDetail() {
     clear(detail);
     if (!current) {
-      detail.appendChild(h('div', { class: 'empty' }, h('div', { class: 'big' }, '✓'), 'Выбери чек-лист слева'));
+      detail.appendChild(h('div', { class: 'empty' }, h('div', { class: 'big' }, '✓'), t('checklists.pickLeft')));
       return;
     }
     const c = current;
 
     const progBadge = h('span', { class: 'badge chk-badge' }, `${c.checked} / ${c.total}`);
-    const researchBtn = h('button', { class: 'btn', onclick: toggleResearch }, '📖 Ресёрч');
-    const resetBtn = h('button', { class: 'btn', onclick: doReset }, '↺ Сбросить');
+    const researchBtn = h('button', { class: 'btn', onclick: toggleResearch }, '📖 ' + t('checklists.research'));
+    const resetBtn = h('button', { class: 'btn', onclick: doReset }, '↺ ' + t('checklists.reset'));
     const openPayloads = c.category
-      ? h('button', { class: 'btn', onclick: () => navigate('payloads', { sub: c.category! }) }, '⚡ Все пейлоады')
+      ? h('button', { class: 'btn', onclick: () => navigate('payloads', { sub: c.category! }) }, '⚡ ' + t('checklists.allPayloads'))
       : null;
     const head = h('div', { class: 'cards-head chk-head' },
       h('h1', { class: 'cat-h' }, c.title),
@@ -133,14 +134,14 @@ export function ChecklistsView(outlet: HTMLElement, params: Record<string, strin
       );
     }
 
-    const noteArea = h('textarea', { class: 'chk-note-input', placeholder: 'Твои заметки, payload’ы, находки по этой цели…' }) as HTMLTextAreaElement;
+    const noteArea = h('textarea', { class: 'chk-note-input', placeholder: t('checklists.notePlaceholder') }) as HTMLTextAreaElement;
     noteArea.value = c.note || '';
     let noteTimer: ReturnType<typeof setTimeout> | undefined;
     noteArea.addEventListener('input', () => {
       clearTimeout(noteTimer);
       noteTimer = setTimeout(() => { api.setChecklistNote(c.slug, noteArea.value).catch(() => {}); }, 500);
     });
-    const noteCard = h('div', { class: 'chk-note' }, h('div', { class: 'chk-note-h' }, '🗒 Заметки'), noteArea);
+    const noteCard = h('div', { class: 'chk-note' }, h('div', { class: 'chk-note-h' }, '🗒 ' + t('checklists.notesHeading')), noteArea);
 
     detail.append(head, bar, research, sectionsWrap, noteCard);
     refreshCounters();
@@ -167,8 +168,8 @@ export function ChecklistsView(outlet: HTMLElement, params: Record<string, strin
         c.checked = 0;
         renderDetail();
         syncSummary();
-        toast('Чек-лист сброшен');
-      }).catch(() => toast('Не удалось сбросить'));
+        toast(t('checklists.toastReset'));
+      }).catch(() => toast(t('checklists.toastResetFailed')));
     }
     function itemRow(it: ChecklistItem) {
       const box = h('span', { class: 'chk-box' + (it.checked ? ' on' : '') }, it.checked ? '✓' : '');
@@ -176,17 +177,17 @@ export function ChecklistsView(outlet: HTMLElement, params: Record<string, strin
       // Любой inline `code` в тексте пункта → клик копирует (полиглот, {{7*7}}, дорк — что угодно).
       txt.querySelectorAll('code').forEach((cd) => {
         cd.classList.add('chk-copyable');
-        (cd as HTMLElement).title = 'Скопировать';
+        (cd as HTMLElement).title = t('checklists.copy');
         cd.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          copyText(cd.textContent || '').then((ok) => { if (ok) toast('Скопировано'); });
+          copyText(cd.textContent || '').then((ok) => { if (ok) toast(t('checklists.copied')); });
         });
       });
 
       const matches = matchPayloads(it.text);
       const chip = matches.length
-        ? (h('button', { class: 'chk-pl-chip', title: 'Подходящие пейлоады из базы', type: 'button' }, `⚡ ${matches.length}`) as HTMLButtonElement)
+        ? (h('button', { class: 'chk-pl-chip', title: t('checklists.matchedPayloads'), type: 'button' }, `⚡ ${matches.length}`) as HTMLButtonElement)
         : null;
 
       const row = h('label', { class: 'chk-item' + (it.checked ? ' checked' : '') }, box, txt, chip);
@@ -208,7 +209,7 @@ export function ChecklistsView(outlet: HTMLElement, params: Record<string, strin
             if (c.category) {
               panel.appendChild(
                 h('a', { class: 'chk-pl-all', href: '#', onclick: (e: Event) => { e.preventDefault(); navigate('payloads', { sub: c.category! }); } },
-                  `Открыть все пейлоады: ${c.category} →`),
+                  `${t('checklists.openAllPayloads')} ${c.category} →`),
               );
             }
           }
@@ -228,7 +229,7 @@ export function ChecklistsView(outlet: HTMLElement, params: Record<string, strin
         api.setChecklistItem(it.key, next).catch(() => {
           it.checked = !next; c.checked += next ? -1 : 1;
           paint(!next); refreshCounters(); syncSummary();
-          toast('Не сохранилось');
+          toast(t('checklists.toastSaveFailed'));
         });
       }
       return h('div', { class: 'chk-item-wrap' }, row, panel);

@@ -3,6 +3,7 @@ import { api, type Entry } from '../api';
 import { SearchField } from '../components/searchfield';
 import { ScrollTop } from '../components/scrolltop';
 import { copyButton } from '../lib/copy';
+import { t } from '../lib/i18n';
 
 interface WLMeta {
   category: string; name: string; purpose?: string; whenToUse?: string;
@@ -23,14 +24,13 @@ export function WordlistsView(outlet: HTMLElement, params: Record<string, string
 
   const meta = (e: Entry): WLMeta => e.meta as WLMeta;
 
-  const search = SearchField({ placeholder: 'Поиск словаря…', onInput: () => render() });
+  const search = SearchField({ placeholder: t('wordlists.searchPlaceholder'), onInput: () => render() });
   const countEl = h('div', { class: 'burp-hits' });
   const catScroll = h('div', { class: 'scroll burp-tree' });
   const left = h('aside', { class: 'catlist' }, search.el, countEl, catScroll);
 
   const titleEl = h('h1', { class: 'cat-h' }, 'Wordlists');
-  const subEl = h('p', { class: 'wl-intro' },
-    'Топовые словари: путь на Kali, ссылка на GitHub и для чего каждый нужен. Пути сверены на боевой системе (SecLists 2025.3).');
+  const subEl = h('p', { class: 'wl-intro' }, t('wordlists.intro'));
   const cardsEl = h('div', { class: 'wl-cards' });
   const right = h('div', { style: { minWidth: '0' } }, h('div', { class: 'cards-head' }, titleEl), subEl, cardsEl);
 
@@ -55,7 +55,7 @@ export function WordlistsView(outlet: HTMLElement, params: Record<string, string
       h('div', { class: 'wl-card-head' }, h('span', { class: 'wl-name' }, m.name), srcBadge(m)),
     ];
     if (m.purpose) kids.push(h('p', { class: 'wl-purpose' }, m.purpose));
-    if (m.whenToUse) kids.push(h('p', { class: 'wl-when' }, h('span', { class: 'wl-when-l' }, 'Когда: '), m.whenToUse));
+    if (m.whenToUse) kids.push(h('p', { class: 'wl-when' }, h('span', { class: 'wl-when-l' }, t('wordlists.whenLabel')), m.whenToUse));
 
     const chips = h('div', { class: 'wl-chips' });
     if (m.size) chips.appendChild(h('span', { class: 'wl-chip wl-size' }, m.size));
@@ -64,7 +64,7 @@ export function WordlistsView(outlet: HTMLElement, params: Record<string, string
 
     for (const p of m.paths ?? []) {
       const row = h('div', { class: 'wl-path' }, h('code', {}, p));
-      const btn = copyButton(() => p, 'Copy');
+      const btn = copyButton(() => p, t('wordlists.copy'));
       btn.classList.add('wl-copy');
       row.appendChild(btn);
       kids.push(row);
@@ -72,7 +72,7 @@ export function WordlistsView(outlet: HTMLElement, params: Record<string, string
 
     const links = h('div', { class: 'wl-links' });
     if (m.github) links.appendChild(h('a', { class: 'wl-link', href: m.github, target: '_blank', rel: 'noreferrer' }, 'GitHub ↗'));
-    if (m.raw && m.raw !== m.github) links.appendChild(h('a', { class: 'wl-link', href: m.raw, target: '_blank', rel: 'noreferrer' }, 'Прямая ссылка ↗'));
+    if (m.raw && m.raw !== m.github) links.appendChild(h('a', { class: 'wl-link', href: m.raw, target: '_blank', rel: 'noreferrer' }, t('wordlists.rawLink')));
     if (links.childElementCount) kids.push(links);
 
     return h('div', { class: 'card wl-card', 'data-id': String(e.id) }, ...(kids.filter(Boolean) as HTMLElement[]));
@@ -100,7 +100,7 @@ export function WordlistsView(outlet: HTMLElement, params: Record<string, string
 
     if (q) {
       const hits = all.filter((e) => matchesSearch(e, q));
-      titleEl.textContent = 'Поиск';
+      titleEl.textContent = t('wordlists.searchTitle');
       countEl.textContent = `${hits.length} ${plural(hits.length)}`;
       let curCat: string | null = null;
       for (const e of hits) {
@@ -112,7 +112,7 @@ export function WordlistsView(outlet: HTMLElement, params: Record<string, string
         }
         cardsEl.appendChild(card(e));
       }
-      if (!hits.length) cardsEl.appendChild(h('p', { class: 'wl-intro' }, 'Ничего не найдено.'));
+      if (!hits.length) cardsEl.appendChild(h('p', { class: 'wl-intro' }, t('wordlists.notFound')));
       return;
     }
 
@@ -124,9 +124,9 @@ export function WordlistsView(outlet: HTMLElement, params: Record<string, string
 
   function plural(n: number): string {
     const m10 = n % 10, m100 = n % 100;
-    if (m10 === 1 && m100 !== 11) return 'словарь';
-    if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return 'словаря';
-    return 'словарей';
+    if (m10 === 1 && m100 !== 11) return t('wordlists.pluralOne');
+    if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return t('wordlists.pluralFew');
+    return t('wordlists.pluralMany');
   }
 
   (async () => {
@@ -135,7 +135,7 @@ export function WordlistsView(outlet: HTMLElement, params: Record<string, string
     cats = [...new Set(all.map((e) => meta(e).category))];
     if (!all.length) {
       subEl.remove();
-      cardsEl.appendChild(h('p', { class: 'wl-intro' }, 'Справочник ещё не загружен — выполни npm run seed.'));
+      cardsEl.appendChild(h('p', { class: 'wl-intro' }, t('wordlists.notLoaded')));
       return;
     }
     activeCat = (params.sub && cats.includes(params.sub)) ? params.sub : cats[0]!;

@@ -1,4 +1,5 @@
 import { h } from '../lib/dom';
+import { t } from '../lib/i18n';
 
 export interface SearchField {
   el: HTMLElement;
@@ -13,7 +14,7 @@ export function SearchField(opts: { placeholder: string; mono?: boolean; onInput
     placeholder: opts.placeholder,
     spellcheck: 'false',
   }) as HTMLInputElement;
-  const clearBtn = h('button', { class: 'sf-clear', title: 'Clear (Esc)', type: 'button' }, '✕') as HTMLButtonElement;
+  const clearBtn = h('button', { class: 'sf-clear', title: t('searchfield.clear'), type: 'button' }, '✕') as HTMLButtonElement;
   const el = h('div', { class: 'sf' }, input, clearBtn);
 
   function sync() { el.classList.toggle('has', input.value.length > 0); }

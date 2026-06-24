@@ -4,6 +4,7 @@ import { SearchField } from '../components/searchfield';
 import { ScrollTop } from '../components/scrolltop';
 import { copyButton } from '../lib/copy';
 import { renderMarkdown } from '../lib/markdown';
+import { t } from '../lib/i18n';
 
 const NEW: Entry = { id: 0, type: 'note', category: null, subcategory: null, title: '', body: '', language: 'md', tags: [], source: null, meta: null, is_custom: true, is_favorite: false, notes: null, created_at: '', updated_at: '' };
 
@@ -15,13 +16,13 @@ export function NotesView(outlet: HTMLElement): () => void {
   let mode: 'read' | 'edit' = 'read';
   const rowById = new Map<number, HTMLElement>();
 
-  const search = SearchField({ placeholder: 'Поиск заметок…', onInput: () => renderList() });
-  const newBtn = h('button', { class: 'btn note-new', type: 'button', onclick: () => startNew() }, '＋ Новая');
+  const search = SearchField({ placeholder: t('notes.searchPlaceholder'), onInput: () => renderList() });
+  const newBtn = h('button', { class: 'btn note-new', type: 'button', onclick: () => startNew() }, '＋ ' + t('notes.new'));
   const countEl = h('div', { class: 'burp-hits' });
   const listScroll = h('div', { class: 'scroll burp-tree' });
   const left = h('aside', { class: 'catlist' }, h('div', { class: 'note-left-head' }, search.el, newBtn), countEl, listScroll);
 
-  const titleEl = h('h1', { class: 'cat-h' }, 'Notes');
+  const titleEl = h('h1', { class: 'cat-h' }, t('notes.title'));
   const actionsEl = h('div', { class: 'note-actions' });
   const bodyEl = h('div', { class: 'note-body' });
   const right = h('div', { style: { minWidth: '0' } }, h('div', { class: 'cards-head note-head' }, titleEl, actionsEl), bodyEl);
@@ -33,9 +34,9 @@ export function NotesView(outlet: HTMLElement): () => void {
   const fmtDate = (s?: string | null) => (s ? s.slice(0, 10) : '');
   function plural(n: number): string {
     const m10 = n % 10, m100 = n % 100;
-    if (m10 === 1 && m100 !== 11) return 'заметка';
-    if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return 'заметки';
-    return 'заметок';
+    if (m10 === 1 && m100 !== 11) return t('notes.pluralOne');
+    if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return t('notes.pluralFew');
+    return t('notes.pluralMany');
   }
   function matches(n: Entry, q: string): boolean {
     return [n.title, n.body, (n.tags || []).join(' '), n.category].filter(Boolean).join(' ').toLowerCase().includes(q);
@@ -58,7 +59,7 @@ export function NotesView(outlet: HTMLElement): () => void {
     for (const n of hits) {
       const row = h('div', { class: 'cat note-row' + (active && active.id === n.id ? ' active' : ''), onclick: () => openNote(n) },
         n.is_favorite ? h('span', { class: 'note-star' }, '★') : null,
-        h('span', { class: 'chk-row-title' }, n.title || '(без названия)'),
+        h('span', { class: 'chk-row-title' }, n.title || t('notes.untitled')),
         h('span', { class: 'note-date' }, fmtDate(n.updated_at)),
       );
       rowById.set(n.id, row);
@@ -81,7 +82,7 @@ export function NotesView(outlet: HTMLElement): () => void {
 
   async function removeActive() {
     if (!active || !active.id) return;
-    if (!window.confirm(`Удалить заметку «${active.title || 'без названия'}»?`)) return;
+    if (!window.confirm(t('notes.confirmDelete1') + `«${active.title || t('notes.untitledBare')}»` + t('notes.confirmDelete2'))) return;
     await api.remove(active.id);
     await reload();
     active = notes[0] ?? null;
@@ -92,7 +93,7 @@ export function NotesView(outlet: HTMLElement): () => void {
     title = title.trim();
     if (!title && !body.trim()) { mode = 'read'; renderRight(); return; }
     const tags = tagsStr.split(',').map((s) => s.trim()).filter(Boolean);
-    const payload = { title: title || '(без названия)', body, tags, category: catStr.trim() || null, language: 'md' };
+    const payload = { title: title || t('notes.untitled'), body, tags, category: catStr.trim() || null, language: 'md' };
     const saved = active && active.id
       ? await api.update(active.id, payload)
       : await api.create({ type: 'note', ...payload });
@@ -103,24 +104,24 @@ export function NotesView(outlet: HTMLElement): () => void {
 
   function renderRight() {
     if (!active) {
-      titleEl.textContent = 'Notes';
+      titleEl.textContent = t('notes.title');
       clear(actionsEl); clear(bodyEl);
       bodyEl.appendChild(h('div', { class: 'note-empty' },
-        h('p', {}, 'Заметок пока нет. Здесь — твои личные шпаргалки и заметки (markdown, таблицы, код).'),
-        h('button', { class: 'btn', type: 'button', onclick: () => startNew() }, '＋ Создать первую заметку')));
+        h('p', {}, t('notes.emptyText')),
+        h('button', { class: 'btn', type: 'button', onclick: () => startNew() }, '＋ ' + t('notes.createFirst'))));
       return;
     }
     if (mode === 'edit') return renderEditor();
 
-    titleEl.textContent = active.title || '(без названия)';
+    titleEl.textContent = active.title || t('notes.untitled');
     clear(actionsEl);
     actionsEl.append(
-      h('button', { class: 'btn note-fav' + (active.is_favorite ? ' on' : ''), type: 'button', title: 'В избранное', onclick: () => toggleFav() }, active.is_favorite ? '★' : '☆'),
-      h('button', { class: 'btn', type: 'button', onclick: () => { mode = 'edit'; renderRight(); } }, '✎ Править'),
-      h('button', { class: 'btn note-del', type: 'button', title: 'Удалить', onclick: () => removeActive() }, '🗑'),
+      h('button', { class: 'btn note-fav' + (active.is_favorite ? ' on' : ''), type: 'button', title: t('notes.toFav'), onclick: () => toggleFav() }, active.is_favorite ? '★' : '☆'),
+      h('button', { class: 'btn', type: 'button', onclick: () => { mode = 'edit'; renderRight(); } }, '✎ ' + t('notes.edit')),
+      h('button', { class: 'btn note-del', type: 'button', title: t('notes.delete'), onclick: () => removeActive() }, '🗑'),
     );
     clear(bodyEl);
-    const meta = h('div', { class: 'note-meta' }, (active.category ? active.category + ' · ' : '') + 'обновлено ' + fmtDate(active.updated_at));
+    const meta = h('div', { class: 'note-meta' }, (active.category ? active.category + ' · ' : '') + t('notes.updated') + ' ' + fmtDate(active.updated_at));
     const md = h('article', { class: 'md cmd-md' });
     md.innerHTML = renderMarkdown(active.body ?? '');
     md.querySelectorAll('pre').forEach((pre) => {
@@ -134,14 +135,14 @@ export function NotesView(outlet: HTMLElement): () => void {
 
   function renderEditor() {
     if (!active) return;
-    titleEl.textContent = active.id ? 'Править заметку' : 'Новая заметка';
-    const titleInp = h('input', { class: 'input note-title-inp', placeholder: 'Заголовок', spellcheck: 'false' }) as HTMLInputElement;
+    titleEl.textContent = active.id ? t('notes.editTitle') : t('notes.newTitle');
+    const titleInp = h('input', { class: 'input note-title-inp', placeholder: t('notes.phTitle'), spellcheck: 'false' }) as HTMLInputElement;
     titleInp.value = active.title ?? '';
-    const catInp = h('input', { class: 'input note-cat-inp', placeholder: 'категория (необязательно)', spellcheck: 'false' }) as HTMLInputElement;
+    const catInp = h('input', { class: 'input note-cat-inp', placeholder: t('notes.phCategory'), spellcheck: 'false' }) as HTMLInputElement;
     catInp.value = active.category ?? '';
-    const tagsInp = h('input', { class: 'input note-tags-inp', placeholder: 'теги через запятую (необязательно)', spellcheck: 'false' }) as HTMLInputElement;
+    const tagsInp = h('input', { class: 'input note-tags-inp', placeholder: t('notes.phTags'), spellcheck: 'false' }) as HTMLInputElement;
     tagsInp.value = (active.tags || []).join(', ');
-    const area = h('textarea', { class: 'note-area', placeholder: 'Markdown… **жирный**, таблицы, ```bash\\n код \\n```', spellcheck: 'false' }) as HTMLTextAreaElement;
+    const area = h('textarea', { class: 'note-area', placeholder: t('notes.phBody'), spellcheck: 'false' }) as HTMLTextAreaElement;
     area.value = active.body ?? '';
     const preview = h('article', { class: 'md cmd-md note-preview' });
     const renderPrev = () => { preview.innerHTML = renderMarkdown(area.value); };
@@ -150,15 +151,15 @@ export function NotesView(outlet: HTMLElement): () => void {
 
     clear(actionsEl);
     actionsEl.append(
-      h('button', { class: 'btn note-save', type: 'button', onclick: () => saveNote(titleInp.value, tagsInp.value, catInp.value, area.value) }, '💾 Сохранить'),
-      h('button', { class: 'btn', type: 'button', onclick: () => { if (active && !active.id) active = notes[0] ?? null; mode = 'read'; renderList(); renderRight(); } }, 'Отмена'),
+      h('button', { class: 'btn note-save', type: 'button', onclick: () => saveNote(titleInp.value, tagsInp.value, catInp.value, area.value) }, '💾 ' + t('notes.save')),
+      h('button', { class: 'btn', type: 'button', onclick: () => { if (active && !active.id) active = notes[0] ?? null; mode = 'read'; renderList(); renderRight(); } }, t('notes.cancel')),
     );
     clear(bodyEl);
     bodyEl.appendChild(h('div', { class: 'note-form' },
       titleInp,
       h('div', { class: 'note-form-row' }, catInp, tagsInp),
       area,
-      h('div', { class: 'note-prev-label' }, 'Предпросмотр'),
+      h('div', { class: 'note-prev-label' }, t('notes.preview')),
       preview,
     ));
     titleInp.focus();

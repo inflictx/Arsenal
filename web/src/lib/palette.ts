@@ -2,6 +2,7 @@ import { h, clear } from './dom';
 import { api, type Entry } from '../api';
 import { copyText } from './copy';
 import { toast } from './toast';
+import { t } from './i18n';
 import { navigate } from '../router';
 
 const SEARCH_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>`;
@@ -34,16 +35,16 @@ function preview(e: Entry): string {
 export function openPalette() {
   if (backdrop) return;
 
-  const input = h('input', { placeholder: 'Поиск по всему — payloads, commands, GTFOBins, docs · ↵ открыть', spellcheck: 'false' }) as HTMLInputElement;
-  const clearBtn = h('button', { class: 'palette-clear', title: 'Clear' }, '✕') as HTMLButtonElement;
+  const input = h('input', { placeholder: t('palette.placeholder'), spellcheck: 'false' }) as HTMLInputElement;
+  const clearBtn = h('button', { class: 'palette-clear', title: t('palette.clear') }, '✕') as HTMLButtonElement;
   const inputRow = h('div', { class: 'palette-input' }, h('span', { html: SEARCH_ICON }), input, clearBtn);
   const results = h('div', { class: 'palette-results' });
   const panel = h('div', { class: 'palette' }, inputRow, results,
     h('div', { class: 'palette-foot' },
-      h('span', {}, h('b', {}, '↑↓'), ' navigate'),
-      h('span', {}, h('b', {}, '↵'), ' open'),
-      h('span', {}, h('b', {}, '⧉'), ' copy'),
-      h('span', {}, h('b', {}, 'esc'), ' close'),
+      h('span', {}, h('b', {}, '↑↓'), ' ' + t('palette.navigate')),
+      h('span', {}, h('b', {}, '↵'), ' ' + t('palette.open')),
+      h('span', {}, h('b', {}, '⧉'), ' ' + t('palette.copy')),
+      h('span', {}, h('b', {}, 'esc'), ' ' + t('palette.close')),
     ),
   );
   backdrop = h('div', { class: 'palette-backdrop', onclick: (e: MouseEvent) => { if (e.target === backdrop) close(); } }, panel);
@@ -58,8 +59,8 @@ export function openPalette() {
 
   function render() {
     clear(results);
-    if (!input.value.trim()) { results.appendChild(h('div', { class: 'empty' }, 'Search across every payload, wordlist & technique…')); return; }
-    if (!items.length) { results.appendChild(h('div', { class: 'empty' }, 'No results')); return; }
+    if (!input.value.trim()) { results.appendChild(h('div', { class: 'empty' }, t('palette.hint'))); return; }
+    if (!items.length) { results.appendChild(h('div', { class: 'empty' }, t('palette.noResults'))); return; }
     items.forEach((e, i) => {
       const cv = copyValueFor(e);
       results.appendChild(
@@ -69,7 +70,7 @@ export function openPalette() {
             h('span', { class: 'r-type ' + e.type }, e.type),
             e.category ? h('span', { class: 'r-cat' }, e.category) : null,
             h('span', { class: 'r-spacer' }),
-            cv ? h('button', { class: 'pal-copy', title: 'Скопировать значение', onclick: (ev: MouseEvent) => { ev.stopPropagation(); copyText(cv); toast('Скопировано · ' + e.title); } }, '⧉') : null,
+            cv ? h('button', { class: 'pal-copy', title: t('palette.copyValue'), onclick: (ev: MouseEvent) => { ev.stopPropagation(); copyText(cv); toast(t('palette.copied') + e.title); } }, '⧉') : null,
           ),
           h('div', { class: 'r-body' }, preview(e)),
         ),

@@ -4,14 +4,15 @@ import { SearchField } from '../components/searchfield';
 import { ScrollTop } from '../components/scrolltop';
 import { copyButton } from '../lib/copy';
 import { renderMarkdown } from '../lib/markdown';
+import { t } from '../lib/i18n';
 
 export function BurpView(outlet: HTMLElement, params: Record<string, string>): () => void {
   clear(outlet);
 
-  const filter = SearchField({ placeholder: 'Поиск по докам…', onInput: () => renderTree() });
+  const filter = SearchField({ placeholder: t('burp.searchPlaceholder'), onInput: () => renderTree() });
   const treeScroll = h('div', { class: 'scroll burp-tree' });
   const credit = h('div', { class: 'gtfo-credit' },
-    'На основе документации ', h('a', { href: 'https://portswigger.net/burp/documentation', target: '_blank', rel: 'noreferrer' }, 'PortSwigger Burp Suite'));
+    t('burp.creditPrefix'), h('a', { href: 'https://portswigger.net/burp/documentation', target: '_blank', rel: 'noreferrer' }, 'PortSwigger Burp Suite'));
   const left = h('aside', { class: 'catlist' }, filter.el, treeScroll, credit);
 
   const titleEl = h('h1', { class: 'cat-h' }, 'Burp Suite');
@@ -94,9 +95,9 @@ export function BurpView(outlet: HTMLElement, params: Record<string, string>): (
 
   function plural(n: number): string {
     const m10 = n % 10, m100 = n % 100;
-    if (m10 === 1 && m100 !== 11) return 'результат';
-    if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return 'результата';
-    return 'результатов';
+    if (m10 === 1 && m100 !== 11) return t('burp.pluralOne');
+    if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return t('burp.pluralFew');
+    return t('burp.pluralMany');
   }
 
   function renderTree() {
@@ -107,7 +108,7 @@ export function BurpView(outlet: HTMLElement, params: Record<string, string>): (
       wasSearching = true;
       const hits = searchDocs(q);
       treeScroll.appendChild(h('div', { class: 'burp-hits' },
-        hits.length ? `${hits.length} ${plural(hits.length)}` : 'Ничего не найдено'));
+        hits.length ? `${hits.length} ${plural(hits.length)}` : t('burp.notFound')));
       for (const p of hits) treeScroll.appendChild(makeRow(p, p.category));
       return;
     }
@@ -135,7 +136,7 @@ export function BurpView(outlet: HTMLElement, params: Record<string, string>): (
     bodyEl.innerHTML = renderMarkdown(p.body ?? '');
     bodyEl.querySelectorAll('pre').forEach((pre) => {
       const code = pre.querySelector('code');
-      const btn = copyButton(() => (code?.textContent ?? pre.textContent ?? ''), 'Copy');
+      const btn = copyButton(() => (code?.textContent ?? pre.textContent ?? ''), t('burp.copy'));
       btn.classList.add('doc-copy');
       pre.appendChild(btn);
     });
@@ -145,8 +146,8 @@ export function BurpView(outlet: HTMLElement, params: Record<string, string>): (
     try { docs = await api.entries({ type: 'doc', limit: 1000 }); } catch { docs = []; }
     if (!docs.length) {
       renderTree();
-      bodyEl.innerHTML = '<p>Документация ещё не загружена.</p>';
-      titleEl.textContent = 'Burp Suite — документация';
+      bodyEl.innerHTML = t('burp.notLoaded');
+      titleEl.textContent = t('burp.notLoadedTitle');
       return;
     }
     const secs = sections();

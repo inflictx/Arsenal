@@ -2,6 +2,7 @@ import { h } from '../lib/dom';
 import { codeBlock } from '../lib/highlight';
 import { copyButton } from '../lib/copy';
 import { toast } from '../lib/toast';
+import { t } from '../lib/i18n';
 import { api, type Entry } from '../api';
 
 interface TableData { headers: string[]; rows: string[][]; }
@@ -25,7 +26,7 @@ export function PayloadCard(e: Entry): HTMLElement {
 
   const star = h('button', {
     class: 'star' + (e.is_favorite ? ' on' : ''),
-    title: 'Favorite',
+    title: t('card.favorite'),
   }, e.is_favorite ? '★' : '☆') as HTMLButtonElement;
   star.addEventListener('click', async (ev) => {
     ev.stopPropagation();
@@ -33,7 +34,7 @@ export function PayloadCard(e: Entry): HTMLElement {
       const u = await api.favorite(e.id);
       star.classList.toggle('on', u.is_favorite);
       star.textContent = u.is_favorite ? '★' : '☆';
-    } catch { toast('Не сохранилось'); }
+    } catch { toast(t('card.saveFailed')); }
   });
 
   let content: HTMLElement;
@@ -46,11 +47,11 @@ export function PayloadCard(e: Entry): HTMLElement {
       meta.caption ? h('figcaption', {}, meta.caption) : null,
     );
     actions = [star];
-    chip = 'схема';
+    chip = t('card.chipScheme');
   } else if (kind === 'table' && meta.table) {
     content = renderTable(meta.table as TableData);
     actions = [star, copyButton(() => tableToText(meta.table as TableData))];
-    chip = 'таблица';
+    chip = t('card.chipTable');
   } else {
     content = codeBlock(body, { wrap: body.length > 110 });
     actions = [star, copyButton(() => body)];

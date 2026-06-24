@@ -1,5 +1,6 @@
 import { h, clear } from '../lib/dom';
 import { api } from '../api';
+import { t } from '../lib/i18n';
 
 export function BackupView(outlet: HTMLElement): () => void {
   clear(outlet);
@@ -15,26 +16,26 @@ export function BackupView(outlet: HTMLElement): () => void {
       const a = h('a', { href: url, download: 'arsenal-backup.json' }) as HTMLAnchorElement;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (e) { setMsg('Не удалось собрать бэкап: ' + (e instanceof Error ? e.message : String(e)), 'err'); }
-  } }, '⤓ Скачать бэкап (JSON)');
+    } catch (e) { setMsg(t('backup.exportFailed') + (e instanceof Error ? e.message : String(e)), 'err'); }
+  } }, '⤓ ' + t('backup.exportBtn'));
   const fileInp = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' } }) as HTMLInputElement;
-  const importBtn = h('button', { class: 'btn bk-btn', type: 'button', onclick: () => fileInp.click() }, '⤒ Восстановить из файла…');
+  const importBtn = h('button', { class: 'btn bk-btn', type: 'button', onclick: () => fileInp.click() }, '⤒ ' + t('backup.importBtn'));
 
   fileInp.addEventListener('change', async () => {
     const f = fileInp.files?.[0];
     if (!f) return;
     let data: { entries?: unknown[] };
-    try { data = JSON.parse(await f.text()); } catch { setMsg('Не удалось прочитать файл — это не валидный JSON.', 'err'); fileInp.value = ''; return; }
+    try { data = JSON.parse(await f.text()); } catch { setMsg(t('backup.readFailed'), 'err'); fileInp.value = ''; return; }
     const n = Array.isArray(data?.entries) ? data.entries!.length : -1;
-    if (n < 0) { setMsg('В файле нет поля «entries» — похоже, это не бэкап ARS3NAL.', 'err'); fileInp.value = ''; return; }
-    if (!window.confirm(`Восстановить из бэкапа?\n\nЭто ЗАМЕНИТ все текущие данные содержимым файла (${n} записей). Текущее будет стёрто без возможности отмены.`)) { fileInp.value = ''; return; }
-    setMsg('Восстановление…');
+    if (n < 0) { setMsg(t('backup.noEntries'), 'err'); fileInp.value = ''; return; }
+    if (!window.confirm(t('backup.confirmHead') + `\n\n` + t('backup.confirmBody1') + ` (${n} ` + t('backup.records') + `). ` + t('backup.confirmBody2'))) { fileInp.value = ''; return; }
+    setMsg(t('backup.restoring'));
     try {
       const r = await api.restore(data);
-      setMsg(`Готово: восстановлено ${r.entries} записей и ${r.checklist_state} отметок чек-листов. Обнови страницу (Ctrl+Shift+R).`, 'ok');
+      setMsg(t('backup.doneRestored') + ` ${r.entries} ` + t('backup.records') + ` ` + t('backup.and') + ` ${r.checklist_state} ` + t('backup.checklistMarks') + `. ` + t('backup.reloadHint'), 'ok');
       loadStats();
     } catch (e) {
-      setMsg('Ошибка восстановления: ' + (e instanceof Error ? e.message : String(e)), 'err');
+      setMsg(t('backup.restoreError') + (e instanceof Error ? e.message : String(e)), 'err');
     }
     fileInp.value = '';
   });
@@ -43,18 +44,18 @@ export function BackupView(outlet: HTMLElement): () => void {
     try {
       const s = await api.stats();
       clear(statsEl);
-      statsEl.appendChild(h('div', { class: 'bk-stat' }, h('b', {}, String(s.total)), ' всего'));
-      for (const t of s.byType) statsEl.appendChild(h('div', { class: 'bk-stat' }, h('b', {}, String(t.n)), ' ' + t.type));
-    } catch { statsEl.textContent = 'нет связи с сервером'; }
+      statsEl.appendChild(h('div', { class: 'bk-stat' }, h('b', {}, String(s.total)), ' ' + t('backup.totalSuffix')));
+      for (const row of s.byType) statsEl.appendChild(h('div', { class: 'bk-stat' }, h('b', {}, String(row.n)), ' ' + row.type));
+    } catch { statsEl.textContent = t('backup.noServer'); }
   }
 
   outlet.appendChild(h('div', { class: 'content bk-content' },
-    h('div', { class: 'cards-head' }, h('h1', { class: 'cat-h' }, '💾 Бэкап / восстановление')),
-    h('p', { class: 'bk-intro' }, 'Сохрани все данные приложения — пейлоады, твои заметки и готовые команды, прогресс и заметки чек-листов, избранное — в один JSON-файл. Восстановление заменяет текущую базу содержимым файла. Делай бэкап перед обновлениями и важными правками.'),
+    h('div', { class: 'cards-head' }, h('h1', { class: 'cat-h' }, '💾 ' + t('backup.title'))),
+    h('p', { class: 'bk-intro' }, t('backup.intro')),
     h('div', { class: 'bk-row' }, exportA, importBtn),
     fileInp,
     msg,
-    h('div', { class: 'cards-head', style: { marginTop: '24px' } }, h('h2', { class: 'bk-h2' }, 'Сейчас в базе')),
+    h('div', { class: 'cards-head', style: { marginTop: '24px' } }, h('h2', { class: 'bk-h2' }, t('backup.nowInDb'))),
     statsEl,
   ));
 

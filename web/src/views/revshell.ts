@@ -4,20 +4,21 @@ import { copyButton } from '../lib/copy';
 import { SearchField } from '../components/searchfield';
 import { fmt, applyEncoding, ENCODINGS, type Encoding } from '../data/revshells';
 import { rsgData, CommandType } from '../data/rsg-data';
+import { t } from '../lib/i18n';
 
 interface Cmd { name: string; command: string; meta: string[]; }
 const DATA = rsgData as unknown as { reverseShellCommands: Cmd[]; listenerCommands: [string, string][]; shells: string[] };
 const CT = CommandType as unknown as Record<string, string>;
 
 const TABS: { id: string; label: string }[] = [
-  { id: CT.ReverseShell, label: 'Reverse' },
-  { id: CT.BindShell, label: 'Bind' },
+  { id: CT.ReverseShell, label: t('revshell.tabReverse') },
+  { id: CT.BindShell, label: t('revshell.tabBind') },
   { id: CT.MSFVenom, label: 'MSFVenom' },
   { id: CT.HoaxShell, label: 'HoaxShell' },
-  { id: CT.Assembled, label: 'Assembled' },
+  { id: CT.Assembled, label: t('revshell.tabAssembled') },
 ];
 const OSES: { id: string; label: string }[] = [
-  { id: '', label: 'All' }, { id: 'linux', label: 'Linux' }, { id: 'windows', label: 'Windows' }, { id: 'mac', label: 'Mac' },
+  { id: '', label: t('revshell.osAll') }, { id: 'linux', label: 'Linux' }, { id: 'windows', label: 'Windows' }, { id: 'mac', label: 'Mac' },
 ];
 
 const isPwsh = (c: Cmd) => /powershell|pwsh/i.test(c.name) || /^\s*powershell/i.test(c.command);
@@ -66,7 +67,7 @@ export function RevShellView(outlet: HTMLElement): () => void {
   // ── IP & Port panel ──
   const ipInput = h('input', { class: 'input', value: ip, spellcheck: 'false' }) as HTMLInputElement;
   const portInput = h('input', { class: 'input', value: port, spellcheck: 'false' }) as HTMLInputElement;
-  const plus1 = h('button', { class: 'rev-plus', title: 'port +1' }, '+1');
+  const plus1 = h('button', { class: 'rev-plus', title: t('revshell.portPlus1') }, '+1');
   ipInput.addEventListener('input', () => {
     ip = ipInput.value.trim(); LS.set('ip', ip);
     try { localStorage.setItem('cmd.lhost', ip); } catch { /* ignore */ } // share LHOST with Commands
@@ -76,8 +77,8 @@ export function RevShellView(outlet: HTMLElement): () => void {
   portInput.addEventListener('input', () => { port = portInput.value.trim(); LS.set('port', port); live(); });
   plus1.addEventListener('click', () => { port = String((parseInt(port, 10) || 0) + 1); portInput.value = port; LS.set('port', port); live(); });
   const ipPanel = h('div', { class: 'rev-panel' },
-    h('div', { class: 'rev-panel-h' }, 'IP & Port'),
-    h('div', { class: 'rev-ipport' }, field('IP / LHOST', ipInput, 'rev-ip'), field('Port', portInput, 'rev-port'), plus1),
+    h('div', { class: 'rev-panel-h' }, t('revshell.ipPort')),
+    h('div', { class: 'rev-ipport' }, field(t('revshell.ipLhost'), ipInput, 'rev-ip'), field(t('revshell.port'), portInput, 'rev-port'), plus1),
   );
 
   // ── Listener panel ──
@@ -87,9 +88,9 @@ export function RevShellView(outlet: HTMLElement): () => void {
   const listenerCopy = copyButton(() => { const l = DATA.listenerCommands.find((x) => x[0] === listenerName); return l ? fmtListener(l[1], ip, port) : ''; });
   listenerSel.addEventListener('change', () => { listenerName = listenerSel.value; renderListener(); });
   const listenerPanel = h('div', { class: 'rev-panel' },
-    h('div', { class: 'rev-panel-h' }, 'Listener'),
+    h('div', { class: 'rev-panel-h' }, t('revshell.listener')),
     listenerOut,
-    h('div', { class: 'rev-panel-foot' }, field('Type', listenerSel), h('span', { class: 'spacer' }), listenerCopy),
+    h('div', { class: 'rev-panel-foot' }, field(t('revshell.type'), listenerSel), h('span', { class: 'spacer' }), listenerCopy),
   );
 
   // ── Tabs ──
@@ -99,8 +100,8 @@ export function RevShellView(outlet: HTMLElement): () => void {
   // ── Control row ──
   const osSel = h('select', { class: 'input' }, ...OSES.map((o) => h('option', { value: o.id }, o.label))) as HTMLSelectElement;
   osSel.addEventListener('change', () => { osf = osSel.value; renderList(); renderDetail(); });
-  const search = SearchField({ placeholder: 'Поиск (bash, python, powershell…)', onInput: () => { renderList(); renderDetail(); } });
-  const ctl = h('div', { class: 'rev-ctl' }, field('ОС', osSel), search.el);
+  const search = SearchField({ placeholder: t('revshell.searchPh'), onInput: () => { renderList(); renderDetail(); } });
+  const ctl = h('div', { class: 'rev-ctl' }, field(t('revshell.os'), osSel), search.el);
 
   // ── Master list + detail ──
   const listScroll = h('div', { class: 'scroll' });
@@ -115,7 +116,7 @@ export function RevShellView(outlet: HTMLElement): () => void {
   encSel.addEventListener('change', () => { enc = encSel.value as Encoding; LS.set('enc', enc); renderDetail(); });
   const detail = h('div', { class: 'rev-detail' },
     detailOut,
-    h('div', { class: 'rev-detail-foot' }, field('Shell', shellSel), field('Encoding', encSel)),
+    h('div', { class: 'rev-detail-foot' }, field(t('revshell.shell'), shellSel), field(t('revshell.encoding'), encSel)),
   );
 
   outlet.appendChild(
@@ -143,7 +144,7 @@ export function RevShellView(outlet: HTMLElement): () => void {
     const list = currentList();
     if (!list.some((c) => c.name === selectedName)) selectedName = list[0]?.name ?? null;
     clear(listScroll);
-    if (!list.length) { listScroll.appendChild(h('div', { class: 'empty', style: { padding: '24px 10px' } }, 'Пусто')); return; }
+    if (!list.length) { listScroll.appendChild(h('div', { class: 'empty', style: { padding: '24px 10px' } }, t('revshell.empty'))); return; }
     for (const c of list) {
       const osTag = c.meta.includes('windows') && !c.meta.includes('linux') ? 'win' : c.meta.find((m) => m === 'linux' || m === 'mac') ?? '';
       listScroll.appendChild(
@@ -159,9 +160,9 @@ export function RevShellView(outlet: HTMLElement): () => void {
   function renderDetail() {
     clear(detailOut);
     const c = sel();
-    if (!c) { detailOut.appendChild(h('div', { class: 'empty' }, 'Выбери тип слева')); return; }
-    const rawBtn = copyButton(() => gen(c, false), 'Raw');
-    const copyBtn = copyButton(() => gen(c, true), 'Copy');
+    if (!c) { detailOut.appendChild(h('div', { class: 'empty' }, t('revshell.pickLeft'))); return; }
+    const rawBtn = copyButton(() => gen(c, false), t('revshell.raw'));
+    const copyBtn = copyButton(() => gen(c, true), t('revshell.copy'));
     detailOut.appendChild(
       h('div', { class: 'card rev-cmd-card' },
         h('div', { class: 'card-top' },

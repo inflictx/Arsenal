@@ -4,6 +4,7 @@ import { SearchField } from '../components/searchfield';
 import { ScrollTop } from '../components/scrolltop';
 import { copyButton } from '../lib/copy';
 import { renderMarkdown } from '../lib/markdown';
+import { t } from '../lib/i18n';
 
 const LS_TARGET = 'cmd.target';
 const LS_LHOST = 'cmd.lhost';
@@ -76,21 +77,21 @@ interface SMode { name: string; desc?: string; target?: string; }
 export function CommandsView(outlet: HTMLElement, params: Record<string, string>): () => void {
   clear(outlet);
 
-  const targetInput = h('input', { class: 'cmd-field', placeholder: '10.10.11.50 · target.htb · http://…', spellcheck: 'false' }) as HTMLInputElement;
-  const lhostInput = h('input', { class: 'cmd-field', placeholder: 'ваш IP (LHOST)', spellcheck: 'false' }) as HTMLInputElement;
+  const targetInput = h('input', { class: 'cmd-field', placeholder: t('commands.targetPh'), spellcheck: 'false' }) as HTMLInputElement;
+  const lhostInput = h('input', { class: 'cmd-field', placeholder: t('commands.lhostPh'), spellcheck: 'false' }) as HTMLInputElement;
   targetInput.value = localStorage.getItem(LS_TARGET) ?? '';
   lhostInput.value = localStorage.getItem(LS_LHOST) ?? '';
   const bar = h('div', { class: 'cmd-bar' },
-    h('div', { class: 'cmd-field-wrap' }, h('label', {}, 'Target'), targetInput),
-    h('div', { class: 'cmd-field-wrap' }, h('label', {}, 'LHOST'), lhostInput),
-    h('div', { class: 'cmd-bar-hint' }, 'подставляется в команды и сборщик'),
+    h('div', { class: 'cmd-field-wrap' }, h('label', {}, t('commands.target')), targetInput),
+    h('div', { class: 'cmd-field-wrap' }, h('label', {}, t('commands.lhost')), lhostInput),
+    h('div', { class: 'cmd-bar-hint' }, t('commands.barHint')),
   );
 
-  const filter = SearchField({ placeholder: 'Поиск по тулзам…', onInput: () => renderTree() });
+  const filter = SearchField({ placeholder: t('commands.searchPh'), onInput: () => renderTree() });
   const treeScroll = h('div', { class: 'scroll burp-tree' });
   const left = h('aside', { class: 'catlist' }, filter.el, treeScroll);
 
-  const titleEl = h('h1', { class: 'cat-h' }, 'Commands');
+  const titleEl = h('h1', { class: 'cat-h' }, t('commands.title'));
   const subEl = h('div', { class: 'cmd-purpose' });
   const bodyEl = h('article', { class: 'md cmd-md' });
   const right = h('div', { style: { minWidth: '0' } }, h('div', { class: 'cards-head' }, titleEl), subEl, bodyEl);
@@ -162,9 +163,9 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
 
   function plural(n: number): string {
     const m10 = n % 10, m100 = n % 100;
-    if (m10 === 1 && m100 !== 11) return 'результат';
-    if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return 'результата';
-    return 'результатов';
+    if (m10 === 1 && m100 !== 11) return t('commands.result1');
+    if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return t('commands.result2');
+    return t('commands.result5');
   }
 
   function renderTree() {
@@ -174,7 +175,7 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
     if (q) {
       wasSearching = true;
       const hits = searchDocs(q);
-      treeScroll.appendChild(h('div', { class: 'burp-hits' }, hits.length ? `${hits.length} ${plural(hits.length)}` : 'Ничего не найдено'));
+      treeScroll.appendChild(h('div', { class: 'burp-hits' }, hits.length ? `${hits.length} ${plural(hits.length)}` : t('commands.notFound')));
       for (const p of hits) treeScroll.appendChild(makeRow(p, p.category));
       return;
     }
@@ -242,7 +243,7 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
     const code = h('code', {}, subst ? substTokens(text) : text);
     const pre = h('pre', { class: 'cmd-box' }, code);
     if (subst) highlight(pre);
-    const b = copyButton(() => code.textContent ?? '', 'Copy');
+    const b = copyButton(() => code.textContent ?? '', t('commands.copy'));
     b.classList.add('doc-copy');
     pre.appendChild(b);
     return pre;
@@ -257,7 +258,7 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
       const code = pre.querySelector('code');
       const raw = (code?.textContent ?? pre.textContent ?? '').replace(/\n+$/, '');
       const clean = raw.split('\n').map((l) => l.replace(/\s{2,}#.*$/, '').replace(/\s+$/, '')).join('\n').trim();
-      const btn = copyButton(() => clean || raw, 'Copy');
+      const btn = copyButton(() => clean || raw, t('commands.copy'));
       btn.classList.add('doc-copy');
       pre.appendChild(btn);
     });
@@ -271,7 +272,7 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
     clear(bodyEl);
     if (m.purpose) bodyEl.appendChild(h('p', { class: 'cmd-purpose-text' }, m.purpose));
     if (m.install) {
-      bodyEl.appendChild(h('div', { class: 'cmd-section-label' }, 'Установка'));
+      bodyEl.appendChild(h('div', { class: 'cmd-section-label' }, t('commands.install')));
       bodyEl.appendChild(codeBox(m.install, false));
     }
 
@@ -290,11 +291,11 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
 
     // ── builder bar (sticky) ──
     const cmdLine = h('code', { class: 'builder-cmd' });
-    const copyBtn = copyButton(() => cmdLine.textContent ?? '', 'Copy');
+    const copyBtn = copyButton(() => cmdLine.textContent ?? '', t('commands.copy'));
     copyBtn.classList.add('builder-copy');
-    const resetBtn = h('button', { class: 'builder-reset', type: 'button', title: 'Снять все флаги и вернуть значения к примерам',
-      onclick: () => { applyDefaults(); values.clear(); renderFlags(); assemble(); } }, '↺ Сброс');
-    const saveBtn = h('button', { class: 'builder-save', type: 'button', title: 'Сохранить собранную команду в рецепты (в базу)',
+    const resetBtn = h('button', { class: 'builder-reset', type: 'button', title: t('commands.resetTitle'),
+      onclick: () => { applyDefaults(); values.clear(); renderFlags(); assemble(); } }, t('commands.reset'));
+    const saveBtn = h('button', { class: 'builder-save', type: 'button', title: t('commands.saveTitle'),
       onclick: async () => {
         if (!lastRaw.trim()) return;
         try {
@@ -306,7 +307,7 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
           recipesOpen = true;
           renderRecipes();
         } catch { /* ignore */ }
-      } }, '★ В рецепты');
+      } }, t('commands.save'));
     const builderLine = h('div', { class: 'builder-line' }, cmdLine);
     const modesRow = h('div', { class: 'builder-modes' });
     if (modes.length) {
@@ -316,11 +317,11 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
     }
     bodyEl.appendChild(h('div', { class: 'builder' },
       h('div', { class: 'builder-head' },
-        h('span', { class: 'builder-label' }, '⚙ Сборка команды'),
+        h('span', { class: 'builder-label' }, t('commands.buildLabel')),
         h('div', { class: 'builder-actions' }, saveBtn, resetBtn, copyBtn)),
       builderLine,
       modes.length ? modesRow : null,
-      h('div', { class: 'builder-hint' }, 'тыкай флаги ниже — они попадают в команду')));
+      h('div', { class: 'builder-hint' }, t('commands.buildHint'))));
 
     function assemble() {
       const head: string[] = [m.binary || ''];
@@ -358,21 +359,21 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
       recipesWrap.appendChild(
         h('div', { class: 'recipes-head' + (recipesOpen ? ' open' : ''), onclick: () => { recipesOpen = !recipesOpen; renderRecipes(); } },
           h('span', { class: 'burp-chevron' }, recipesOpen ? '▾' : '▸'),
-          h('span', { class: 'recipes-title' }, 'Готовые команды'),
+          h('span', { class: 'recipes-title' }, t('commands.recipes')),
           h('span', { class: 'recipes-n' }, String(built.length + user.length)),
-          h('span', { class: 'recipes-hint' }, recipesOpen ? 'свернуть' : 'развернуть')));
+          h('span', { class: 'recipes-hint' }, recipesOpen ? t('commands.collapse') : t('commands.expand'))));
       if (!recipesOpen) return;
       const list = h('div', { class: 'recipes-list' });
       // user-saved commands first (newest on top), drag-to-reorder by the grip
       user.forEach((e, idx) => {
         const item = h('div', { class: 'recipe-item' });
-        const grip = h('span', { class: 'recipe-grip', draggable: 'true', title: 'Перетащить' }, '⠿');
+        const grip = h('span', { class: 'recipe-grip', draggable: 'true', title: t('commands.drag') }, '⠿');
         grip.addEventListener('dragstart', (ev: DragEvent) => { dragFrom = idx; ev.dataTransfer?.setData('text/plain', String(idx)); item.classList.add('dragging'); });
         grip.addEventListener('dragend', () => item.classList.remove('dragging'));
         item.addEventListener('dragover', (ev: DragEvent) => { ev.preventDefault(); item.classList.add('drop-target'); });
         item.addEventListener('dragleave', () => item.classList.remove('drop-target'));
         item.addEventListener('drop', (ev: DragEvent) => { ev.preventDefault(); item.classList.remove('drop-target'); reorderUser(dragFrom, idx); dragFrom = -1; });
-        const del = h('button', { class: 'recipe-del', type: 'button', title: 'Удалить рецепт',
+        const del = h('button', { class: 'recipe-del', type: 'button', title: t('commands.delRecipe'),
           onclick: async () => {
             try { await api.remove(e.id); } catch { /* ignore */ }
             const arr = recipeCache.get(title) ?? [];
@@ -468,8 +469,8 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
     } catch { /* ignore */ }
     if (!docs.length) {
       renderTree();
-      bodyEl.innerHTML = '<p>Справочник ещё не загружен — выполни <code>npm run seed</code>.</p>';
-      titleEl.textContent = 'Commands';
+      bodyEl.innerHTML = '<p>' + t('commands.notSeeded') + '</p>';
+      titleEl.textContent = t('commands.title');
       subEl.style.display = 'none';
       return;
     }
