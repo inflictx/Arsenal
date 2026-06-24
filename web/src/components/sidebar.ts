@@ -1,5 +1,6 @@
 import { h } from '../lib/dom';
 import { navigate } from '../router';
+import { t } from '../lib/i18n';
 
 export interface NavItem { id: string; label: string; icon: string; }
 
@@ -34,10 +35,10 @@ export function Sidebar(): { el: HTMLElement; setActive: (name: string) => void 
 
   const el = h('aside', { class: 'sidebar' },
     h('div', { class: 'brand' }, h('span', { class: 'g' }, 'ARS3NAL')),
-    h('div', { class: 'brand-sub' }, '// personal payload toolkit'),
-    ...group('Reference', NAV_REFERENCE),
-    ...group('Workspace', NAV_WORKSPACE),
-    h('div', { class: 'sidebar-footer' }, h('span', { class: 'dot' }), 'offline · v0.1'),
+    h('div', { class: 'brand-sub' }, t('sidebar.brandSub')),
+    ...group(t('nav.reference'), NAV_REFERENCE),
+    ...group(t('nav.workspace'), NAV_WORKSPACE),
+    h('div', { class: 'sidebar-footer' }, h('span', { class: 'dot' }), t('sidebar.offline')),
   );
   function setActive(name: string) {
     for (const it of items) it.classList.toggle('active', it.getAttribute('data-id') === name);

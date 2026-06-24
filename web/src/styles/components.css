@@ -447,3 +447,9 @@ select.input { cursor: pointer; min-width: 160px; }
 /* ===== CyberChef (embedded offline bundle in a full-height iframe) ===== */
 .cc-wrap { height: calc(100vh - 75px); }
 .cc-frame { width: 100%; height: 100%; border: 0; display: block; background: #1c1c1c; }
+
+/* language toggle (topbar) */
+.lang-toggle{display:inline-flex;align-items:center;gap:1px;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-right:14px}
+.lang-opt{padding:4px 9px;font-size:12px;font-weight:700;letter-spacing:.02em;color:var(--muted);background:transparent;border:0;cursor:pointer;line-height:1.4}
+.lang-opt:hover{color:var(--text)}
+.lang-opt.on{background:var(--cyan,#496dff);color:#fff}

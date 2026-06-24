@@ -2,8 +2,11 @@ import './styles/tokens.css';
 import './styles/base.css';
 import './styles/components.css';
 import { injectFonts } from './lib/fonts';
+import { getLang } from './lib/i18n';
 
 injectFonts(); // @font-face at runtime so URLs honor the Vite base path (works on GitHub Pages)
+document.documentElement.lang = getLang(); // reflect current UI language on <html>
+
 
 import { h } from './lib/dom';
 import { Sidebar } from './components/sidebar';
