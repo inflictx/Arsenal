@@ -91,8 +91,9 @@ function seedContent(locale: 'ru' | 'en'): number {
   total += insertMany(withLocale(structuredEntries, locale));
   total += insertMany(withLocale(md, locale));
 
-  // GTFOBins + wordlist refs (mostly English data; RU copy as fallback for 'en').
-  total += insertMany(withLocale(parseGtfobins(), locale));
+  // GTFOBins: en uses the original English function descriptions + technique comments
+  // (no RU overlay). Wordlist refs are mostly English data (RU copy fallback for now).
+  total += insertMany(withLocale(parseGtfobins(locale), locale));
   total += insertMany(withLocale(parseWordlistsRef(), locale));
 
   return total;

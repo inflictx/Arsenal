@@ -51,7 +51,7 @@ function loadComments(): Record<string, string> {
   return map;
 }
 
-function renderBinary(data: BinData, defs: FnDefs, comments: Record<string, string>): { body: string; tags: string[] } {
+function renderBinary(data: BinData, defs: FnDefs, comments: Record<string, string>, en: boolean): { body: string; tags: string[] } {
   const tags = new Set<string>();
   const fnOrder = Object.keys(defs);
   const fnKeys = Object.keys(data.functions ?? {});
@@ -62,16 +62,17 @@ function renderBinary(data: BinData, defs: FnDefs, comments: Record<string, stri
     if (!Array.isArray(techniques) || !techniques.length) continue;
     tags.add(fn);
     body += `### ${defs[fn]?.label ?? fn}\n`;
-    const desc = RU_DESC[fn] ?? defs[fn]?.description;
+    // en: original English description from functions.yml; ru: our translated override.
+    const desc = en ? defs[fn]?.description : (RU_DESC[fn] ?? defs[fn]?.description);
     if (desc) body += `${desc}\n\n`;
     for (const t of techniques) {
       if (t.description) body += `${t.description}\n\n`;
       if (t.code) body += '```\n' + String(t.code).trim() + '\n```\n';
-      if (t.comment) { const cn = norm(t.comment); body += `\n> ${comments[cn] ?? cn}\n`; }
+      if (t.comment) { const cn = norm(t.comment); body += `\n> ${en ? cn : (comments[cn] ?? cn)}\n`; }
       const ctxs = t.contexts ?? {};
       const ctxKeys = Object.keys(ctxs);
       for (const c of ctxKeys) tags.add(c);
-      if (ctxKeys.length) body += `\n*Контексты: ${ctxKeys.map(ctxLabel).join(' · ')}*\n`;
+      if (ctxKeys.length) body += `\n*${en ? 'Contexts' : 'Контексты'}: ${ctxKeys.map(ctxLabel).join(' · ')}*\n`;
       for (const c of ctxKeys) {
         const v = ctxs[c];
         if (v && v.code) body += `\n**${ctxLabel(c)}:**\n` + '```\n' + String(v.code).trim() + '\n```\n';
@@ -83,16 +84,17 @@ function renderBinary(data: BinData, defs: FnDefs, comments: Record<string, stri
 }
 
 // Parse GTFOBins binaries (seed/gtfobins-src/binaries/*) into type=gtfobin entries.
-export function parseGtfobins(): EntryInput[] {
+export function parseGtfobins(locale: 'ru' | 'en' = 'ru'): EntryInput[] {
   if (!existsSync(BIN_DIR)) return [];
+  const en = locale === 'en';
   const defs = loadFnDefs();
-  const comments = loadComments();
+  const comments = en ? {} : loadComments(); // en keeps the original English technique comments
   const rows: EntryInput[] = [];
   for (const file of readdirSync(BIN_DIR).sort()) {
     let data: BinData;
     try { data = yamlLoad(readFileSync(join(BIN_DIR, file), 'utf8')) as BinData; } catch { continue; }
     if (!data?.functions) continue;
-    const { body, tags } = renderBinary(data, defs, comments);
+    const { body, tags } = renderBinary(data, defs, comments, en);
     if (!body) continue;
     rows.push({
       type: 'gtfobin',
