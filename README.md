@@ -1,5 +1,7 @@
 <h1 align="center">ARS3NAL</h1>
 
+<p align="center"><b>English</b> · <a href="README.ru.md">Русский</a></p>
+
 <p align="center">
   <b>A local, offline-first arsenal for pentesting &amp; bug bounty.</b><br>
   Payloads, a click-to-build command generator, GTFOBins, wordlists, an embedded CyberChef,
