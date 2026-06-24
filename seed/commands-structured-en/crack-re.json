@@ -1,0 +1,283 @@
+{
+  "category": "Password Cracking",
+  "catOrder": 5,
+  "tools": [
+    {
+      "category": "Password Cracking",
+      "catOrder": 5,
+      "title": "hashcat",
+      "subcategory": "GPU hash cracker",
+      "purpose": "The fastest GPU-accelerated hash cracker. Brute-forces passwords by wordlist, mask, or hybrid mode for hundreds of hash types. The main tool for offline password recovery.",
+      "install": "sudo apt install hashcat",
+      "binary": "hashcat",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Wordlist / mask (positional argument)",
+          "flags": [
+            { "flag": "wordlist", "value": "/usr/share/wordlists/rockyou.txt", "desc": "Path to the wordlist (for -a 0/1 attacks) or the mask (for -a 3). Supplied last, after the hash file. Edit freely.", "positional": true, "on": true }
+          ]
+        },
+        {
+          "name": "Hash mode (-m)",
+          "flags": [
+            { "flag": "-m", "value": "1000", "desc": "Hash type (--hash-type). Key ones: 0 MD5, 100 SHA1, 1000 NTLM, 1400 SHA256, 1800 sha512crypt, 3200 bcrypt, 5600 NetNTLMv2, 13100 Kerberos TGS-REP (Kerberoasting), 18200 Kerberos AS-REP (AS-REP Roasting), 16800 WPA-PMKID, 22000 WPA-PBKDF2." },
+            { "flag": "--username", "desc": "Ignore usernames at the start of hash-file lines (user:hash format)." },
+            { "flag": "--hash-info", "desc": "Show help for a specific -m: sample hash, salt type, etc." }
+          ]
+        },
+        {
+          "name": "Attack (-a)",
+          "flags": [
+            { "flag": "-a", "value": "0", "desc": "Attack mode (--attack-mode): 0 straight wordlist, 1 combinator (2 wordlists), 3 mask brute-force, 6 hybrid wordlist+mask, 7 hybrid mask+wordlist." },
+            { "flag": "?l?u?d?s", "desc": "Mask placeholders (for -a 3): ?l lowercase a-z, ?u uppercase A-Z, ?d digits 0-9, ?s special characters, ?a everything (?l?u?d?s), ?b byte 0x00-0xff. Example mask: Password?d?d." },
+            { "flag": "-1", "value": "?l?d", "desc": "Custom charset 1 (--custom-charset1..4: -1/-2/-3/-4), then used in the mask as ?1." },
+            { "flag": "--increment", "desc": "Increment the mask length (from short to long)." },
+            { "flag": "--increment-min", "value": "4", "desc": "Minimum mask length with --increment." },
+            { "flag": "--increment-max", "value": "8", "desc": "Maximum mask length with --increment." }
+          ]
+        },
+        {
+          "name": "Rules and speed",
+          "flags": [
+            { "flag": "-r", "value": "/usr/share/hashcat/rules/best64.rule", "desc": "Word-mutation rules file (--rules-file). Repeatable. Classics: best64.rule, d3ad0ne.rule." },
+            { "flag": "-O", "desc": "Optimized kernels (--optimized-kernel-enable): noticeably faster, but limits the maximum password length (usually 31)." },
+            { "flag": "-w", "value": "3", "desc": "Workload profile (--workload-profile): 1 low, 2 default, 3 high, 4 nightmare (headless only)." },
+            { "flag": "-D", "value": "1,2", "desc": "Device types (--opencl-device-types): 1 CPU, 2 GPU." },
+            { "flag": "--force", "desc": "Ignore warnings (run without a supported GPU, etc.)." }
+          ]
+        },
+        {
+          "name": "Service and output",
+          "flags": [
+            { "flag": "--show", "desc": "Show already cracked hashes from the potfile (compares the hashlist with the potfile) without cracking anything." },
+            { "flag": "-o", "value": "cracked.txt", "desc": "File to write found passwords to (--outfile)." },
+            { "flag": "--potfile-disable", "desc": "Do not use or write the potfile (force a fresh crack)." },
+            { "flag": "--stdout", "desc": "Only generate candidates and print them without cracking (test masks/rules)." },
+            { "flag": "--session", "value": "job1", "desc": "Session name for resuming (--session)." },
+            { "flag": "--restore", "desc": "Resume an interrupted session (by the name from --session)." },
+            { "flag": "--runtime", "value": "3600", "desc": "Abort after N seconds." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "hashcat -m 0 -a 0 {TARGET} /usr/share/wordlists/rockyou.txt", "note": "Wordlist attack on MD5 with rockyou - the baseline scenario." },
+        { "cmd": "hashcat -m 1000 -a 0 {TARGET} /usr/share/wordlists/rockyou.txt -r /usr/share/hashcat/rules/best64.rule", "note": "NTLM hashes with a wordlist and best64 mutation rules." },
+        { "cmd": "hashcat -m 22000 -a 3 {TARGET} '?d?d?d?d?d?d?d?d'", "note": "WPA handshake: brute-force an 8-digit numeric password by mask." },
+        { "cmd": "hashcat -m 13100 {TARGET} /usr/share/wordlists/rockyou.txt", "note": "Kerberoasting: crack TGS-REP tickets extracted from AD." },
+        { "cmd": "hashcat -m 1000 {TARGET} --show", "note": "Show already cracked NTLM from the potfile without re-cracking." },
+        { "cmd": "hashcat -m 1800 -a 6 {TARGET} /usr/share/wordlists/rockyou.txt '?d?d?d'", "note": "Hybrid: a wordlist word + three digits at the end (sha512crypt)." }
+      ],
+      "notes": "The target is a hash file (one hash per line), followed by the wordlist or mask as a positional argument. The hash type (-m) is critical: the wrong mode = zero matches; determine it with hashid/--example-hashes. The potfile (~/.hashcat/hashcat.potfile) accumulates cracked hashes between runs. -O speeds things up but cuts the password length. On a VM/without a GPU you need --force. 22000 replaced the deprecated 2500/16800 for WPA."
+    },
+    {
+      "category": "Password Cracking",
+      "catOrder": 5,
+      "title": "john (John the Ripper)",
+      "subcategory": "universal hash cracker (CPU)",
+      "purpose": "The classic CPU password cracker with hash-type autodetection and a rich set of *2john converters. Handles ZIP/SSH/PDF/KeePass and hundreds of hash formats. Indispensable when there is no GPU.",
+      "install": "sudo apt install john",
+      "binary": "john",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Cracking modes",
+          "flags": [
+            { "flag": "--wordlist", "value": "/usr/share/wordlists/rockyou.txt", "desc": "Wordlist attack (--wordlist=FILE). Read candidates from a file." },
+            { "flag": "--rules", "value": "Jumbo", "desc": "Enable word-mutation rules (--rules[=SECTION]). Without a section it is [List.Rules:Wordlist]." },
+            { "flag": "--single", "desc": "Single crack mode: rules based on usernames/GECOS (--single). A fast first pass." },
+            { "flag": "--incremental", "value": "ASCII", "desc": "Incremental brute-force using a Markov model (--incremental[=MODE], default ASCII)." },
+            { "flag": "--mask", "value": "?l?l?l?l?d?d", "desc": "Mask attack (--mask=MASK). Placeholders as in hashcat: ?l ?u ?d ?s ?a." },
+            { "flag": "--loopback", "desc": "Take candidates from john.pot (--loopback[=FILE]) - mutations of already cracked passwords." }
+          ]
+        },
+        {
+          "name": "Format and result",
+          "flags": [
+            { "flag": "--format", "value": "NT", "desc": "Explicitly set the hash type (--format=NAME): NT, raw-md5, sha512crypt, bcrypt, krb5tgs, etc. Disables autodetection." },
+            { "flag": "--show", "desc": "Show already cracked passwords for the file (--show[=left] - show the UNcracked ones)." },
+            { "flag": "--list", "value": "formats", "desc": "Reference lists (--list=WHAT): formats, subformats, build-info, rules." },
+            { "flag": "--test", "value": "5", "desc": "Benchmark formats for N seconds (--test[=TIME])." }
+          ]
+        },
+        {
+          "name": "Performance",
+          "flags": [
+            { "flag": "--fork", "value": "4", "desc": "Run N parallel processes on CPU cores (--fork=N)." },
+            { "flag": "--node", "value": "1-2/4", "desc": "Distributed cracking: range/total (--node=MIN[-MAX]/TOTAL)." },
+            { "flag": "--max-run-time", "value": "3600", "desc": "Stop after N seconds." }
+          ]
+        },
+        {
+          "name": "Session and filters",
+          "flags": [
+            { "flag": "--session", "value": "job1", "desc": "Session name for resuming (--session=NAME, .rec file)." },
+            { "flag": "--restore", "desc": "Resume an interrupted session (--restore[=NAME], default john.rec)." },
+            { "flag": "--status", "desc": "Show the status of an active/interrupted session (--status[=NAME])." },
+            { "flag": "--pot", "value": "custom.pot", "desc": "Custom potfile for results (--pot=NAME)." },
+            { "flag": "--users", "value": "admin", "desc": "Only the specified users/UIDs (--users=[-]LOGIN|UID; minus = exclude)." },
+            { "flag": "--stdout", "desc": "Only print candidates without checking (--stdout[=LENGTH]) - a word generator." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "john --wordlist=/usr/share/wordlists/rockyou.txt {TARGET}", "note": "Standard wordlist attack with format autodetection." },
+        { "cmd": "john --wordlist=/usr/share/wordlists/rockyou.txt --rules {TARGET}", "note": "Wordlist + mutation rules (l33t, case, trailing digits)." },
+        { "cmd": "john --format=NT --wordlist=/usr/share/wordlists/rockyou.txt {TARGET}", "note": "Explicitly specify the NTLM format (autodetection on NT sometimes misses)." },
+        { "cmd": "john --show {TARGET}", "note": "Show already cracked passwords from john.pot." },
+        { "cmd": "zip2john secret.zip > {TARGET}; john {TARGET}", "note": "Extract the hash from a ZIP with the converter and crack it right away (same for ssh2john/pdf2john/keepass2john)." },
+        { "cmd": "john --incremental --fork=4 {TARGET}", "note": "Full brute-force on 4 cores when wordlists did not help." }
+      ],
+      "notes": "The target is a hash file (positional). The *2john converters (zip2john, ssh2john, rar2john, pdf2john, keepass2john, gpg2john, office2john) turn a protected file into a hash for john. Results accumulate in ~/.john/john.pot - a re-run does not re-crack what is already cracked (for a clean run use --pot or wipe the pot). Format names come from --list=formats. In Kali the binary is the Jumbo build (john-the-ripper-jumbo), hence the hundreds of formats."
+    },
+    {
+      "category": "Password Cracking",
+      "catOrder": 5,
+      "title": "hashid / hash-identifier",
+      "subcategory": "hash type identification",
+      "purpose": "Identifies a hash type by its appearance and immediately suggests the hashcat mode (-m) and the John format (-j). The first step before any cracking: without the right type the cracker is useless.",
+      "install": "pipx install hashid",
+      "binary": "hashid",
+      "target": "'{TARGET}'",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Input",
+          "flags": [
+            { "flag": "'{TARGET}'", "desc": "Hash in quotes (positional). You can pass a path to a file with hashes or feed it via STDIN." }
+          ]
+        },
+        {
+          "name": "Cracker mode output",
+          "flags": [
+            { "flag": "-m", "desc": "Show the matching hashcat mode (--mode), the number for the hashcat -m flag." },
+            { "flag": "-j", "desc": "Show the matching John the Ripper format (--john), the name for --format." }
+          ]
+        },
+        {
+          "name": "Options",
+          "flags": [
+            { "flag": "-e", "desc": "Extended mode (--extended): enable all algorithms, including salted password hashes." },
+            { "flag": "-o", "value": "result.txt", "desc": "Write the result to a file instead of STDOUT (--outfile FILE)." },
+            { "flag": "--help", "desc": "Show help." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "hashid '{TARGET}'", "note": "Basic identification: a list of likely hash types." },
+        { "cmd": "hashid -m -j '{TARGET}'", "note": "Show the hashcat mode and the John format at once - ready to copy into the cracker." },
+        { "cmd": "hashid -e '{TARGET}'", "note": "Extended list, including salted variants." },
+        { "cmd": "hashid -m hashes.txt", "note": "Identify the types for all hashes in a file." }
+      ],
+      "notes": "hashid recognizes more types by structure/prefix than the old hash-identifier (especially with prefixes like $1$, $6$, $2y$). This is a heuristic: for short hashes (MD5/NTLM look identical - 32 hex) several candidates are returned, try them one by one. hash-identifier is an interactive analogue without flags (you type the hash at the prompt). An online/CLI alternative is name-that-hash (nth)."
+    },
+    {
+      "category": "Password Cracking",
+      "catOrder": 5,
+      "title": "cewl / crunch",
+      "subcategory": "wordlist generators",
+      "purpose": "CeWL scrapes words from a target site into a custom wordlist (names, terms, products). Crunch generates a wordlist by mask/charset. Both produce targeted lists for a specific victim.",
+      "install": "sudo apt install cewl crunch",
+      "binary": "cewl",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Depth and words (cewl)",
+          "flags": [
+            { "flag": "-d", "value": "2", "desc": "Spider crawl depth (--depth), default 2." },
+            { "flag": "-m", "value": "3", "desc": "Minimum word length (--min_word_length), default 3." },
+            { "flag": "--with-numbers", "desc": "Accept words that contain digits." },
+            { "flag": "--lowercase", "desc": "Convert all collected words to lowercase." },
+            { "flag": "-c", "desc": "Show the frequency of each word (--count)." }
+          ]
+        },
+        {
+          "name": "Scope and collection (cewl)",
+          "flags": [
+            { "flag": "-o", "desc": "Allow the spider to go off to other sites (--offsite)." },
+            { "flag": "-a", "desc": "Collect metadata from files (--meta)." },
+            { "flag": "-e", "desc": "Collect email addresses (--email)." },
+            { "flag": "--meta_file", "value": "meta.txt", "desc": "Separate file for metadata." },
+            { "flag": "--email_file", "value": "emails.txt", "desc": "Separate file for email addresses." }
+          ]
+        },
+        {
+          "name": "Output and request (cewl)",
+          "flags": [
+            { "flag": "-w", "value": "wordlist.txt", "desc": "Write the wordlist to a file (--write)." },
+            { "flag": "-u", "value": "Mozilla/5.0", "desc": "Custom User-Agent (--ua)." },
+            { "flag": "-v", "desc": "Verbose output (--verbose)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "cewl {TARGET} -d 2 -m 5 -w wordlist.txt", "note": "Collect words of 5+ letters from the page, depth 2, into a file." },
+        { "cmd": "cewl {TARGET} --with-numbers -w wordlist.txt", "note": "Include words with digits (passwords like Company2024)." },
+        { "cmd": "cewl {TARGET} -a --meta_file meta.txt -e --email_file mails.txt", "note": "Also pull document metadata and email addresses." },
+        { "cmd": "crunch 8 8 -t @@@@%%%% -o wordlist.txt", "note": "Crunch: 4 lowercase letters + 4 digits (e.g. pass1234), save to a file." },
+        { "cmd": "crunch 6 6 0123456789abcdef -o hex6.txt", "note": "Crunch: all 6-character hex combinations from the given charset." }
+      ],
+      "notes": "CeWL: the target is a URL (positional), requires access to the site. The larger -d is, the wider the coverage and the longer it runs. The resulting list is fed into hashcat/john/hydra. CRUNCH (syntax: crunch MIN MAX [charset] [options]): -t pattern placeholders - @ lowercase letters, , (comma) uppercase letters, % digits, ^ symbols; the charset order is always lowercase-uppercase-digits-symbols, replace an unneeded set with a plus + (default charset). Crunch options: -o output file, -t pattern, -b max file size (1MB/1GB), -f charset.lst name (named charset), -p strings (permutations), -s start. Caution: crunch easily generates terabytes - estimate the size (the first line of output shows the size)."
+    },
+    {
+      "category": "Reverse Engineering",
+      "catOrder": 7,
+      "title": "ltrace / strace",
+      "subcategory": "call tracing",
+      "purpose": "strace intercepts a program's system calls (open, read, connect), ltrace - library calls (strcmp, malloc). Dynamic binary analysis: you see files, network, and password comparisons in the clear.",
+      "install": "sudo apt install strace ltrace",
+      "binary": "strace",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "What to trace",
+          "flags": [
+            { "flag": "-f", "desc": "Follow child processes (--follow-forks): fork/vfork/clone." },
+            { "flag": "-e", "value": "trace=open,read", "desc": "Call filter (--expression). Groups: trace=file, network, memory, signal, process; or a comma-separated list of names." },
+            { "flag": "-e", "value": "signal=!SIGIO", "desc": "Which signals to show (minus/! = exclude)." },
+            { "flag": "-v", "desc": "Full structure output without abbreviation (--no-abbrev)." }
+          ]
+        },
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "{TARGET}", "desc": "The traced binary with its arguments (positional, after the options): strace [options] ./prog args." },
+            { "flag": "-p", "value": "1234", "desc": "Attach to an already running process by PID (--attach)." },
+            { "flag": "-E", "value": "VAR=val", "desc": "Set an environment variable for the launched program." }
+          ]
+        },
+        {
+          "name": "Output details",
+          "flags": [
+            { "flag": "-s", "value": "256", "desc": "Maximum length of printed strings (--string-limit), default 32 - increase it to see passwords in full." },
+            { "flag": "-y", "desc": "Print paths for file descriptors (--decode-fds)." },
+            { "flag": "-T", "desc": "Show the time spent in each call (--syscall-times)." },
+            { "flag": "-t", "desc": "Timestamps (-t time, -tt with microseconds, -ttt epoch)." },
+            { "flag": "-k", "desc": "Print the call stack after each syscall (--stack-trace)." }
+          ]
+        },
+        {
+          "name": "Summary and file",
+          "flags": [
+            { "flag": "-c", "desc": "Summary table: count and time per call instead of the full trace (--summary-only)." },
+            { "flag": "-o", "value": "trace.txt", "desc": "Write the trace to a file instead of stderr (--output)." },
+            { "flag": "-ff", "desc": "With -o: a separate file per PID (trace.txt.PID)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "strace ./{TARGET}", "note": "Full system-call trace - see file opens, network, config reads." },
+        { "cmd": "strace -f -e trace=network ./{TARGET}", "note": "Network calls only, including child processes (where the binary connects to)." },
+        { "cmd": "strace -e trace=open,openat ./{TARGET}", "note": "Which files the program tries to open (looking for configs/flags)." },
+        { "cmd": "strace -c ./{TARGET}", "note": "Call summary - quickly grasp the program's behavior profile." },
+        { "cmd": "ltrace -s 256 ./{TARGET}", "note": "Library-call trace with long strings - often shows the password comparison via strcmp." },
+        { "cmd": "ltrace -e strcmp+strncmp ./{TARGET}", "note": "String comparisons only: peek at the entered and expected password in the clear." }
+      ],
+      "notes": "The target is a path to an executable file (positional, after the flags), the program arguments follow. LTRACE - same logic, but it intercepts calls into dynamic LIBRARIES (strcmp, memcmp, strcpy, system, getenv) rather than system calls; the flags match: -f children, -e FILTER (malloc+free format), -p PID, -s STRSIZE string length, -o FILE, -c summary, plus -S (also show syscalls), -l LIBRARY (only calls into the specified library). For CTF crackme, ltrace -s is the most useful: the password is often compared via strcmp and is visible right in the trace. They work only with dynamically linked binaries; a static one (ldd says 'not a dynamic executable') will not work with ltrace. Sometimes they require sudo or disabling ptrace protection."
+    }
+  ]
+}

@@ -1,0 +1,135 @@
+{
+  "category": "Business Logic Errors",
+  "source": "PayloadsAllTheThings/Business Logic Errors/",
+  "entries": [
+    {
+      "subcategory": "What it is",
+      "title": "What business logic errors are",
+      "language": "text",
+      "tags": ["methodology", "what-is-it"],
+      "body": "Business logic flaws are vulnerabilities that arise not from code defects (like SQLi or XSS) but from the application's business rules themselves: pricing models, transaction limits, the sequence of steps in a multi-stage process.\n\nThe key difference: you do not break the code with unfiltered input; instead you use the regular, intended functionality in a way the developer did not anticipate, and you produce outcomes undesirable for the business. That is why such bugs are almost never caught by scanners and require domain knowledge."
+    },
+    {
+      "subcategory": "What it is",
+      "title": "Where to look for logic bugs",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "Look where there is money, privileges, and multi-step processes:\n• Cart, checkout, payment, refunds, subscriptions, premium features.\n• Coupons/promo codes, bonuses, referral credits, cashback.\n• Any fields with price, quantity, currency, delivery fee.\n• Multi-step workflows (registration → KYC → payment, a wizard of several pages).\n• Reviews, ratings, comments, votes - anywhere there is a \"once only\" limit.\n\nApproach: walk through the legitimate scenario end to end, recording the traffic in Burp, and at each step ask \"what happens if I do this out of order / repeat it / send an unexpected value / do it in parallel?\"."
+    },
+    {
+      "subcategory": "Price and quantity manipulation",
+      "title": "Negative quantities and values in the cart",
+      "language": "text",
+      "tags": ["price-manipulation", "cart", "negative"],
+      "body": "• Add items with a negative quantity together with other items to balance out (reduce) the total.\n• Try negative values for the delivery fee - sometimes this reduces the total amount due.\n• Check rounding: unit price × negative/fractional quantity may yield a favorable total.\n\nWhere to edit: quantity, unit price, discount/fee fields in the request body - server-side validation is often missing."
+    },
+    {
+      "subcategory": "Price and quantity manipulation",
+      "title": "Exceeding stock and limits",
+      "language": "text",
+      "tags": ["price-manipulation", "cart", "overflow"],
+      "body": "• Try adding more of an item to the cart than is in stock.\n• Check for overflow: a very large quantity may overflow the integer type and wrap into a negative/zero total.\n• Check \"no more than N per account/order\" limits - they are bypassed by repeating the request, splitting into multiple line items, or a race condition."
+    },
+    {
+      "subcategory": "Price and quantity manipulation",
+      "title": "Rounding error",
+      "language": "text",
+      "tags": ["rounding", "price-manipulation", "crypto"],
+      "body": "A classic example is a bug in the internal transfer system of a crypto platform (XBT/Bitcoin), where rounding lets you create money out of thin air.\n\nThe attacker initiates a transfer of 0.000000005 XBT (0.5 satoshi) - which is below the system's minimum precision (1 satoshi):\n• The sender's balance does not change: the algorithm rounds the debited amount down to 0 satoshi.\n• The recipient's balance grows by 1 satoshi (0.00000001): the algorithm rounds the credited amount up to 1 satoshi.\n\nResult: 0.00000001 XBT generated out of nothing. With no rate-limit, OTP, or anti-fraud, the process is automated and repeated endlessly, effectively printing money. Root cause of the bug: instead of rejecting the transfer / enforcing a minimum, the system ignores the debit from the sender but credits the recipient. (Source: hackerone #176461.)"
+    },
+    {
+      "subcategory": "Price and quantity manipulation",
+      "title": "Rounding: debit vs credit (example)",
+      "language": "table",
+      "tags": ["rounding", "table"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Side", "Transfer of 0.5 satoshi → rounding", "Balance change"],
+          "rows": [
+            ["Sender", "debit rounded down to 0", "0 (unchanged)"],
+            ["Recipient", "credit rounded up to 1 satoshi", "+0.00000001 XBT"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Delivery and currency manipulation",
+      "title": "Delivery-fee manipulation",
+      "language": "text",
+      "tags": ["delivery-fee", "price-manipulation"],
+      "body": "• Substitute negative values for the delivery cost - this may reduce the total.\n• Check whether free delivery can be enabled by changing request parameters (a free_delivery flag, zeroing out the shipping field)."
+    },
+    {
+      "subcategory": "Delivery and currency manipulation",
+      "title": "Currency arbitrage",
+      "language": "text",
+      "tags": ["currency-arbitrage", "refund"],
+      "body": "• Try paying in one currency (for example, USD) and requesting the refund in another (for example, EUR). The difference in conversion rates may yield a profit.\n• Look for the same trick in any refund and balance-exchange scenarios between currencies."
+    },
+    {
+      "subcategory": "Bypassing workflow steps",
+      "title": "Premium features without a subscription",
+      "language": "text",
+      "tags": ["workflow-bypass", "premium", "authorization"],
+      "body": "• Check access to premium-only sections/endpoints without an active subscription (direct navigation to the URL, direct API call).\n• Buy a premium feature, cancel it, and check whether it remains accessible after the refund.\n• Look for true/false values in requests/responses that validate premium access; change them via Burp Match & Replace to gain unauthorized access.\n• Inspect cookies and localStorage for variables confirming premium access (isPremium, plan=pro)."
+    },
+    {
+      "subcategory": "Bypassing workflow steps",
+      "title": "Refund abuse",
+      "language": "text",
+      "tags": ["workflow-bypass", "refund"],
+      "body": "• Buy an item, request a refund, and check whether the item/content stays accessible after the refund.\n• Look for currency-arbitrage opportunities on refunds.\n• Send several subscription-cancellation requests to check whether you can get refunded multiple times for a single purchase."
+    },
+    {
+      "subcategory": "Parameter tampering",
+      "title": "Trusting client-side data",
+      "language": "text",
+      "tags": ["parameter-tampering", "client-trust"],
+      "body": "The basic class of logic bugs - the server trusts data that the client fully controls.\n\n• Look in the traffic for fields that determine price, discount, privileges, payment status, role, limits.\n• Inspect cookies, localStorage, hidden form fields, and request parameters for access flags (isAdmin, isPremium, paid=true).\n• Use Burp Match & Replace to automatically substitute such values with the ones you want and see whether the server re-validates them on its side.\n• If the final price/amount is sent by the client, it is almost always a bug: the price must be computed only on the server."
+    },
+    {
+      "subcategory": "Parameter tampering",
+      "title": "Mass Assignment and HTTP Parameter Pollution",
+      "language": "text",
+      "tags": ["parameter-tampering", "mass-assignment", "hpp"],
+      "body": "• Check for Mass Assignment: add fields to the request body that are not in the form (role, balance, discount, is_verified) and see whether the backend accepts them.\n• Check for HTTP Parameter Pollution: duplicate a parameter (for example, code=A&code=B) to apply multiple values where the application expects one.\n• A typical case is applying multiple promo codes at once, even though the interface allows only one."
+    },
+    {
+      "subcategory": "Abusing coupons and limits",
+      "title": "Testing promo codes and discounts",
+      "language": "text",
+      "tags": ["discount-code", "coupon", "limits"],
+      "body": "• Apply the same promo code several times - check whether it is reusable.\n• If the code is single-use/unique, check for a race condition: apply one code on two accounts simultaneously.\n• Mass Assignment / HPP - try applying several discount codes when the application expects one.\n• Check the code input field for missing sanitization: XSS, SQL Injection.\n• Try applying a discount to non-discounted items by manipulating the server request (substituting the item/category id)."
+    },
+    {
+      "subcategory": "Abusing coupons and limits",
+      "title": "Testing the review feature",
+      "language": "text",
+      "tags": ["review", "limits", "logic"],
+      "body": "• Check whether you can leave a review as a \"verified buyer\" without having bought the item.\n• Give a rating outside the allowed scale: 0, 6, or a negative number in a 1-5 system.\n• Check whether a single user can leave multiple ratings on one item (useful for detecting races).\n• Check whether the file-upload field accepts any extensions - protection on such endpoints is often forgotten.\n• Try leaving a review on behalf of another user (impersonation).\n• Check for CSRF on this feature - it is often not protected by tokens."
+    },
+    {
+      "subcategory": "Abusing coupons and limits",
+      "title": "Testing comments in a thread",
+      "language": "text",
+      "tags": ["comment", "limits", "logic"],
+      "body": "• Check whether there is a limit on the number of comments in a thread.\n• If a user can comment only once, use a race condition to check whether you can post multiple comments.\n• If the system allows comments only from verified/privileged users, supply those parameters and check whether you can comment.\n• Try posting comments on behalf of another user (impersonation)."
+    },
+    {
+      "subcategory": "Logic races",
+      "title": "Race conditions in business logic",
+      "language": "text",
+      "tags": ["race-condition", "concurrency", "limits"],
+      "body": "A race condition breaks \"only once / no more than N\" limit checks that the application performs sequentially (check → then write). If you send several requests simultaneously, they all pass the check before the state is updated.\n\nWhere to apply:\n• Single-use/unique promo code - apply in parallel across several accounts or multiple times on one.\n• \"One review/rating/comment per user\" - post several at once.\n• Multiple refunds/cancellations for a single purchase.\n• Debiting balance/bonuses twice, withdrawing funds beyond the remaining balance.\n\nHow to test: assemble a reference request and send a batch of identical parallel requests (Burp Repeater group → Send in parallel / single-packet attack, Turbo Intruder). A sign of the bug is success more than once or a total beyond the limit."
+    },
+    {
+      "subcategory": "Testing checklist",
+      "title": "Logic-bug testing checklist",
+      "language": "text",
+      "tags": ["checklist", "methodology"],
+      "body": "Price and quantity\n☐ Negative item quantity (balancing the total)\n☐ Negative/zero price, discount, delivery fee\n☐ Quantity overflow (huge number → negative total)\n☐ Fractional values and rounding errors\n☐ Exceeding stock on hand / per-order limit\n\nCoupons and limits\n☐ Re-applying a single promo code\n☐ Multiple promo codes at once (Mass Assignment / HPP)\n☐ Discount on a non-promo item (id substitution)\n☐ Bypassing \"once only\" limits: reviews, ratings, comments\n\nWorkflow and access\n☐ Access to premium endpoints without a subscription\n☐ Access to a feature/content persists after a refund/cancellation\n☐ Multiple refunds/cancellations for a single purchase\n☐ Skipping/reordering steps of a multi-step process\n☐ Currency arbitrage: pay in one currency, refund in another\n\nClient trust and races\n☐ Final price/amount/privileges come from the client and are not re-validated\n☐ Substituting access flags in cookie/localStorage/hidden fields\n☐ Races on \"only once\" checks (parallel requests)\n☐ Impersonation: acting on behalf of another user\n☐ CSRF on unprotected actions (reviews, etc.)"
+    }
+  ]
+}

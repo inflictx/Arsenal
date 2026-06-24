@@ -1,0 +1,85 @@
+{
+  "category": "Race Condition",
+  "source": "PayloadsAllTheThings/Race Condition/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What is a Race Condition",
+      "language": "text",
+      "tags": ["methodology", "concept"],
+      "body": "A race condition occurs when a process's behavior critically and unexpectedly depends on the order or timing of other events. In a web application many requests are processed simultaneously, and developers often leave the question of concurrency to the framework, server, or language.\n\nThe essence of the attack: the application checks a condition and then does something based on it (the TOCTOU pattern - time-of-check to time-of-use). If you manage to send several requests so that they fall into this \"window\" between the check and the action, the check fires once, but the action - many times."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Where to look for a race condition",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "Look where there is a limit check and an action tied to it over a shared resource:\n• Limits on a single action: redeeming a gift card/coupon once, invitation limit, voting limit.\n• Money and balance: debit/credit, withdrawal of funds, exceeding a limit (overdraw), spending one gift card multiple times.\n• Anti-bruteforce and rate-limit: bypassing the limit on the number of attempts (login, OTP entry), 2FA bypass.\n• Registration/invites: registering several users with one invitation.\n• Anything \"can only be done once / no more than N times\" where the value is read and then overwritten."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Limit-overrun",
+      "language": "text",
+      "tags": ["methodology", "limit-overrun"],
+      "body": "Limit-overrun is a scenario where several threads or processes compete to update/access a shared resource, as a result of which the resource goes beyond its intended limits.\n\nExamples: overdrawing, multiple voting, spending a gift card multiple times.\n\nPublic reports:\n• Race Condition allows to redeem multiple times gift cards which leads to free \"money\" - @muon4 (hackerone.com/reports/759247)\n• Race conditions can be used to bypass invitation limit - @franjkovic (hackerone.com/reports/115007)\n• Register multiple users using one invitation - @franjkovic (hackerone.com/reports/148609)"
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Rate-limit Bypass",
+      "language": "text",
+      "tags": ["methodology", "rate-limit", "2fa"],
+      "body": "A rate-limit bypass happens when an attacker exploits the lack of proper synchronization in the rate-limiting mechanism to exceed the intended request limit. Rate-limiting is intended to control the frequency of actions (API requests, login attempts), but a race condition allows bypassing these restrictions.\n\nExamples: bypassing an anti-bruteforce mechanism and 2FA.\n\nCase: Instagram Password Reset Mechanism Race Condition - Laxman Muthiyah (youtu.be/4O9FjTMlHUM)."
+    },
+    {
+      "subcategory": "Techniques",
+      "title": "HTTP/2 Single-packet Attack",
+      "language": "text",
+      "tags": ["technique", "http2", "single-packet"],
+      "body": "In HTTP/2 you can send several HTTP requests in parallel over a single connection. In a single-packet attack, around ~20/30 requests are sent, and they all arrive at the server simultaneously. Using a single packet removes network jitter.\n\nHow to do it in Burp Suite:\n• Send the request to Repeater\n• Duplicate the request 20 times (CTRL+R)\n• Create a new group and add all the requests to it\n• Send group in parallel (single-packet attack)\n\nReady-made script: PortSwigger/turbo-intruder/race-single-packet-attack.py\n\nCase: CVE-2022-4037 - Discovering a race condition vulnerability in Gitlab with the single-packet attack - James Kettle (youtu.be/Y0NVIVucQNE)."
+    },
+    {
+      "subcategory": "Techniques",
+      "title": "HTTP/1.1 Last-byte Synchronization",
+      "language": "text",
+      "tags": ["technique", "http1", "last-byte-sync"],
+      "body": "Send all requests except the last byte, then \"release\" each request by sending the final byte. This synchronizes the arrival of requests at the server over HTTP/1.1 when the single-packet attack is not available."
+    },
+    {
+      "subcategory": "Techniques",
+      "title": "Last-byte synchronization via Turbo Intruder",
+      "language": "python",
+      "tags": ["last-byte-sync", "turbo-intruder"],
+      "body": "engine.queue(request, gate='race1')\nengine.queue(request, gate='race1')\nengine.openGate('race1')",
+      "meta": {
+        "tip": "queue with the same gate puts the requests in a queue, holding back the last byte; openGate synchronously sends it to all requests. Case: Cracking reCAPTCHA, Turbo Intruder style - James Kettle (portswigger.net/research/cracking-recaptcha-turbo-intruder-style)."
+      }
+    },
+    {
+      "subcategory": "Turbo Intruder",
+      "title": "Turbo Intruder - Example 1 (single endpoint)",
+      "language": "python",
+      "tags": ["turbo-intruder", "limit-overrun"],
+      "body": "def queueRequests(target, wordlists):\n    engine = RequestEngine(endpoint=target.endpoint,\n                        concurrentConnections=30,\n                        requestsPerConnection=30,\n                        pipeline=False\n                        )\n\nfor i in range(30):\n    engine.queue(target.req, i)\n        engine.queue(target.req, target.baseInput, gate='race1')\n\n\n    engine.start(timeout=5)\nengine.openGate('race1')\n\n    engine.complete(timeout=60)\n\n\ndef handleResponse(req, interesting):\n    table.add(req)",
+      "meta": {
+        "tip": "Order of actions: 1) send the request to Turbo Intruder; 2) paste this python code as the payload; 3) set an external HTTP header x-request: %s (Turbo Intruder needs it); 4) click \"Attack\". The script is reproduced verbatim from PayloadsAllTheThings - its indentation is \"broken\", so before running, align the for/engine.start/openGate/complete blocks inside queueRequests."
+      }
+    },
+    {
+      "subcategory": "Turbo Intruder",
+      "title": "Turbo Intruder - Example 2 (two endpoints, request2 right after request1)",
+      "language": "python",
+      "tags": ["turbo-intruder", "multi-endpoint"],
+      "body": "def queueRequests(target, wordlists):\n    engine = RequestEngine(endpoint=target.endpoint,\n                           concurrentConnections=30,\n                           requestsPerConnection=100,\n                           pipeline=False\n                           )\n    request1 = '''\nPOST /target-URI-1 HTTP/1.1\nHost: <REDACTED>\nCookie: session=<REDACTED>\n\nparameterName=parameterValue\n    '''\n\n    request2 = '''\nGET /target-URI-2 HTTP/1.1\nHost: <REDACTED>\nCookie: session=<REDACTED>\n    '''\n\n    engine.queue(request1, gate='race1')\n    for i in range(30):\n        engine.queue(request2, gate='race1')\n    engine.openGate('race1')\n    engine.complete(timeout=60)\ndef handleResponse(req, interesting):\n    table.add(req)",
+      "meta": {
+        "tip": "A template for the case when request2 needs to be sent right after request1, and the window is only a few milliseconds. Substitute your own URIs, Host, and session cookie in place of <REDACTED>."
+      }
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Tools for race condition",
+      "language": "text",
+      "tags": ["tools"],
+      "body": "• PortSwigger/turbo-intruder - a Burp Suite extension for sending a large number of HTTP requests and analyzing the results.\n• JavanXD/Raceocat - makes exploiting race conditions in web applications efficient and convenient.\n• nxenon/h2spacex - a low-level library/tool for the HTTP/2 Single Packet Attack based on Scapy + exploitation of timing attacks."
+    }
+  ]
+}

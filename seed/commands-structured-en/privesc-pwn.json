@@ -1,0 +1,369 @@
+{
+  "category": "Privilege Escalation",
+  "catOrder": 4,
+  "tools": [
+    {
+      "category": "Privilege Escalation",
+      "catOrder": 4,
+      "title": "linpeas / winpeas",
+      "subcategory": "auto-enumeration for privilege escalation",
+      "purpose": "A recon script: automatically collects everything on the machine that could lead to privilege escalation (SUID, cron, permissions, credentials, kernel, configs) and highlights findings by color. The first thing to run after getting a shell.",
+      "install": "curl -L https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh -o linpeas.sh; chmod +x linpeas.sh",
+      "binary": "./linpeas.sh",
+      "target": "",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Scope of checks",
+          "flags": [
+            { "flag": "-a", "desc": "All checks (except regex): digs deeper - process monitoring, password search, user brute. Recommended for CTF, but slower (5-10 min)." },
+            { "flag": "-s", "desc": "Stealth and fast mode: skips long checks, writes nothing to disk (fewer traces)." },
+            { "flag": "-e", "desc": "Extra enumeration - additional checks beyond the defaults." },
+            { "flag": "-r", "desc": "Enable regex search (API keys, credentials). Slow and noisy, separate from -a." },
+            { "flag": "-o", "value": "SysI,Devs", "desc": "Run only the selected check groups (comma-separated)." },
+            { "flag": "-L", "desc": "Force linpeas to run (force execution) if auto-detection gets in the way." }
+          ]
+        },
+        {
+          "name": "Access and passwords",
+          "flags": [
+            { "flag": "-P", "value": "password", "desc": "Pass the current user's password - it will be used for sudo -l and brute-forcing other users." },
+            { "flag": "-D", "desc": "Debug mode: show failed checks and timings (diagnostics)." },
+            { "flag": "-w", "desc": "Pause between major check blocks (read the output in parts)." }
+          ]
+        },
+        {
+          "name": "Network recon",
+          "flags": [
+            { "flag": "-t", "desc": "Automatic network scan and internet access check." },
+            { "flag": "-d", "value": "10.0.0.0/24", "desc": "Discover live hosts in a subnet via ping/fping." },
+            { "flag": "-p", "value": "22,80,443", "desc": "Scan the specified TCP ports (together with -d)." },
+            { "flag": "-i", "value": "{TARGET}", "desc": "Scan a specific IP for open ports." }
+          ]
+        },
+        {
+          "name": "Output and misc",
+          "flags": [
+            { "flag": "-N", "desc": "No colors - convenient when saving to a file." },
+            { "flag": "-q", "desc": "Do not show the banner." },
+            { "flag": "-h", "desc": "Show flag help." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "./linpeas.sh -a | tee linpeas.txt", "note": "Full enumeration with all checks, save the output (view color via less -r)." },
+        { "cmd": "./linpeas.sh -s -N", "note": "Quick stealth pass without writing to disk and without color." },
+        { "cmd": "curl -L https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh | sh", "note": "Run entirely in memory, leaving no file on disk (fileless)." },
+        { "cmd": "./linpeas.sh -P 'MyPass123' -a", "note": "Full run with a password for sudo -l and user brute." }
+      ],
+      "notes": "The active fork is peass-ng/PEASS-ng (not the old carlospolop repo). No target is needed: the script scans the local machine it runs on. WINPEAS (the Windows counterpart) from the same release: winPEASx64.exe / winPEASany.exe (.NET) and winPEAS.bat (no dependencies). winpeas arguments are positional, not flags: winpeas.exe quiet (no banner), systeminfo / userinfo (only these groups), searchall (extended search of files with credentials), cmd (for execution), log (write to a file). Run in memory where possible - AV catches winpeas by signature."
+    },
+    {
+      "category": "Privilege Escalation",
+      "catOrder": 4,
+      "title": "pspy",
+      "subcategory": "process monitoring without root",
+      "purpose": "Sniffs process launches and file system events WITHOUT root rights. Catches cron jobs, other users' commands, and scripts at the moment of execution - the main tool for finding privileged cron jobs/timers.",
+      "install": "curl -L https://github.com/DominicBreuker/pspy/releases/latest/download/pspy64 -o pspy64; chmod +x pspy64",
+      "binary": "./pspy64",
+      "target": "",
+      "modes": [],
+      "groups": [
+        {
+          "name": "What to output",
+          "flags": [
+            { "flag": "-p", "desc": "Print commands (processes) to stdout. Enabled by default; disable with -p=false." },
+            { "flag": "-f", "desc": "Print file system events (inotify) to stdout. Disabled by default." },
+            { "flag": "-c", "desc": "Color commands by process UID (file system events are not colored)." }
+          ]
+        },
+        {
+          "name": "Process scanning",
+          "flags": [
+            { "flag": "-i", "value": "100", "desc": "Interval in milliseconds between procfs scans. Smaller means a better chance of catching short-lived processes (default 100ms, not counting inotify events)." }
+          ]
+        },
+        {
+          "name": "Directory watching",
+          "flags": [
+            { "flag": "-r", "value": "/etc", "desc": "Watch a directory recursively (including subdirectories) via inotify. Repeatable. Default: /usr /tmp /etc /home /var /opt." },
+            { "flag": "-d", "value": "/tmp", "desc": "Watch ONLY the directory itself, without subdirectories (non-recursive). Repeatable." }
+          ]
+        },
+        {
+          "name": "Debugging",
+          "flags": [
+            { "flag": "--debug", "desc": "Verbose error messages that are otherwise hidden." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "./pspy64", "note": "Basic run with defaults - watch processes and cron as they appear." },
+        { "cmd": "./pspy64 -pf -i 1000", "note": "Commands + FS events, scan procfs once per second (as in the official example)." },
+        { "cmd": "./pspy64 -f -p=false", "note": "File system events only, without command output." },
+        { "cmd": "./pspy64 -r /usr -r /home -d /var/spool/cron", "note": "Recursively watch /usr and /home, non-recursively watch the cron directory." }
+      ],
+      "notes": "No target is needed - it monitors the local system. pspy64 / pspy32 are static binaries with no dependencies; there are also 'short' pspy64s builds. The key feature: it sees cron jobs and other users' commands without root, which instantly reveals privileged scripts to exploit. Run it and wait 1-2 minutes for a cron timer to fire."
+    },
+    {
+      "category": "Privilege Escalation",
+      "catOrder": 4,
+      "title": "linux-exploit-suggester / windows-exploit-suggester",
+      "subcategory": "kernel exploit matching",
+      "purpose": "Matches the kernel/OS version against a list of publicly known exploits and produces a ranked list of applicable CVEs with links. A quick check for kernel-exploit privesc.",
+      "install": "curl -L https://github.com/The-Z-Labs/linux-exploit-suggester/raw/master/linux-exploit-suggester.sh -o les.sh; chmod +x les.sh",
+      "binary": "./linux-exploit-suggester.sh",
+      "target": "",
+      "modes": [],
+      "groups": [
+        {
+          "name": "System data source",
+          "flags": [
+            { "flag": "--kernel", "value": "3.2.0", "desc": "Assess exploits for the specified kernel version (without running on the machine itself)." },
+            { "flag": "--uname", "value": "uname-string", "desc": "Assess based on a provided uname -a string (analysis from another machine)." },
+            { "flag": "--pkglist-file", "value": "pkgs.txt", "desc": "File with a list of installed packages (to check userspace exploits offline)." },
+            { "flag": "--cvelist-file", "value": "cves.txt", "desc": "Your own file with a list of CVEs to match against." }
+          ]
+        },
+        {
+          "name": "Search scope",
+          "flags": [
+            { "flag": "--kernelspace-only", "desc": "Show only kernel-level (kernelspace) exploits." },
+            { "flag": "--userspace-only", "desc": "Show only userspace exploits (sudo, pkexec, etc.)." },
+            { "flag": "-d", "desc": "Also show DoS exploits (--show-dos), hidden by default." },
+            { "flag": "--skip-more-checks", "desc": "Skip additional applicability checks (faster, but more false positives)." },
+            { "flag": "--skip-pkg-versions", "desc": "Do not compare package versions during assessment." }
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            { "flag": "-f", "desc": "Full output (--full): all available information for each exploit." },
+            { "flag": "-g", "desc": "Short/compact output (--short)." },
+            { "flag": "--checksec", "desc": "Show the state of the system's protection mechanisms (an OS analog of checksec)." }
+          ]
+        },
+        {
+          "name": "Downloading exploits",
+          "flags": [
+            { "flag": "-b", "desc": "Download ready-made exploit binaries (--fetch-binaries)." },
+            { "flag": "-s", "desc": "Download exploit sources (--fetch-sources)." },
+            { "flag": "-V", "desc": "Show the tool version (--version)." },
+            { "flag": "-h", "desc": "Help (--help)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "./linux-exploit-suggester.sh", "note": "Run on the target machine - auto-detect the kernel and assess exploits." },
+        { "cmd": "./linux-exploit-suggester.sh --uname \"$(uname -a)\"", "note": "Pass a uname string (if you are analyzing a dump/another system)." },
+        { "cmd": "./linux-exploit-suggester.sh --kernel 4.4.0", "note": "Assess exploits for a specific kernel version offline." },
+        { "cmd": "./linux-exploit-suggester.sh --checksec", "note": "Show the enabled OS protections (NX, ASLR, RELRO, etc.)." }
+      ],
+      "notes": "The active repository is The-Z-Labs/linux-exploit-suggester (there is an outdated mzet- fork). With no flags it runs on the machine and reads /proc/version itself. It ranks findings by likelihood (Highly probable / Probable). IMPORTANT: kernel exploits can crash the machine - be careful in production. The Windows counterpart is WES-NG (bitsadmin/wesng), the wes.py script - works offline from systeminfo output: first wes.py --update (download the CVE DB), then wes.py systeminfo.txt; useful flags -e/--exploits-only (only those with exploits), -i/--impact (filter by type: 'Elevation of Privilege'), -s/--severity, --hide (hide noise like Edge/Flash). The old Windows-Exploit-Suggester.py (GDSSecurity) is abandoned and requires an Excel DB - use WES-NG."
+    },
+    {
+      "category": "Pwn",
+      "catOrder": 6,
+      "title": "checksec",
+      "subcategory": "binary protection check",
+      "purpose": "Shows which protection mechanisms are enabled in an ELF/PE: RELRO, Stack Canary, NX, PIE, FORTIFY, RPATH. The first step in analyzing a pwn task - it determines which exploitation techniques are applicable.",
+      "install": "pip install pwntools  # provides 'checksec' and 'pwn checksec'; or apt install checksec",
+      "binary": "checksec",
+      "target": "--file={TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "What to check",
+          "flags": [
+            { "flag": "--file", "value": "{TARGET}", "desc": "Check the protections of the specified binary (classic syntax: --file=./bin)." },
+            { "flag": "--dir", "value": "/usr/bin", "desc": "Check all executable files in a directory." },
+            { "flag": "--proc", "value": "nginx", "desc": "Check the protections of a running process by name." },
+            { "flag": "--proc-all", "desc": "Check all running processes." },
+            { "flag": "--kernel", "desc": "Show the state of Linux kernel protections and hardening config options." }
+          ]
+        },
+        {
+          "name": "FORTIFY_SOURCE",
+          "flags": [
+            { "flag": "--fortify-file", "value": "{TARGET}", "desc": "Check FORTIFY_SOURCE for a file (which functions are protected)." },
+            { "flag": "--fortify-proc", "value": "1234", "desc": "Check FORTIFY for a process by PID." }
+          ]
+        },
+        {
+          "name": "Output format",
+          "flags": [
+            { "flag": "--format", "value": "json", "desc": "Output format: cli (default), csv, xml, json (in the Go version the flag is --output)." },
+            { "flag": "--output", "value": "json", "desc": "Same as --format, in the new Go version: cli/json/xml/yaml." },
+            { "flag": "--extended", "desc": "Extended output (additional binary properties)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "checksec --file={TARGET}", "note": "Classic Bash checksec.sh syntax - check the binary's protections." },
+        { "cmd": "pwn checksec {TARGET}", "note": "The pwntools version - the most common in CTF, the target is positional." },
+        { "cmd": "checksec --file={TARGET} --format=json", "note": "Machine-readable output for parsing in scripts." },
+        { "cmd": "checksec file {TARGET} --output json", "note": "New Go syntax (slimm609/checksec): the file subcommand instead of --file=." }
+      ],
+      "notes": "There are several implementations. The classic checksec.sh (slimm609, Bash) and checksec from pwntools use --file=BIN. The recent Go version slimm609/checksec switched to subcommand syntax: 'checksec file BIN --output json' (options as --output, without =). In CTF pwntools is most often used: 'pwn checksec ./bin' or ELF('./bin').checksec in Python. The target is required - without it there is nothing to check."
+    },
+    {
+      "category": "Pwn",
+      "catOrder": 6,
+      "title": "ROPgadget / ropper",
+      "subcategory": "ROP gadget search",
+      "purpose": "Searches a binary for ROP/JOP gadgets (short instruction chains ending in ret/jmp) to build exploitation chains that bypass NX. Can automatically assemble a ropchain for execve(/bin/sh).",
+      "install": "pip install ROPgadget",
+      "binary": "ROPgadget",
+      "target": "--binary {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target and auto-chain",
+          "flags": [
+            { "flag": "--binary", "value": "{TARGET}", "desc": "Binary to analyze (ELF/PE/Mach-O)." },
+            { "flag": "--ropchain", "desc": "Automatically assemble a ROP chain (execve /bin/sh) and output a ready-made Python script." },
+            { "flag": "--depth", "value": "10", "desc": "Gadget search depth in bytes (default 10)." },
+            { "flag": "--all", "desc": "Do not remove duplicate gadgets from the output." },
+            { "flag": "--dump", "desc": "Show the gadget bytes (opcodes)." }
+          ]
+        },
+        {
+          "name": "Gadget filtering",
+          "flags": [
+            { "flag": "--only", "value": "pop|ret", "desc": "Show only gadgets with these instructions (separated by |). E.g. 'pop|ret'." },
+            { "flag": "--filter", "value": "jmp|call", "desc": "Exclude gadgets with these mnemonics." },
+            { "flag": "--range", "value": "0x400000-0x401000", "desc": "Search for gadgets only in this address range." },
+            { "flag": "--badbytes", "value": "00|0a", "desc": "Discard gadgets whose address contains these bytes (separated by |)." },
+            { "flag": "--re", "value": "regexp", "desc": "Filter gadgets by a regular expression." },
+            { "flag": "--align", "value": "4", "desc": "Only gadgets with addresses aligned to N bytes." }
+          ]
+        },
+        {
+          "name": "String and opcode search",
+          "flags": [
+            { "flag": "--string", "value": "/bin/sh", "desc": "Search for a string in readable segments (addresses for arguments)." },
+            { "flag": "--memstr", "value": "/bin/sh", "desc": "Find the address of each byte of the string separately (when the whole string is absent)." },
+            { "flag": "--opcode", "value": "c3", "desc": "Search for an opcode (hex) in the executable segment." }
+          ]
+        },
+        {
+          "name": "Types and raw",
+          "flags": [
+            { "flag": "--nojop", "desc": "Do not search for JOP gadgets (jmp/call)." },
+            { "flag": "--nosys", "desc": "Do not search for syscall gadgets." },
+            { "flag": "--norop", "desc": "Do not search for ROP gadgets (when only JOP/sys are needed)." },
+            { "flag": "--multibr", "desc": "Allow gadgets with multiple branches (longer, but more options)." },
+            { "flag": "--callPreceded", "desc": "Only gadgets preceded by a call (to bypass CFG)." },
+            { "flag": "--rawArch", "value": "x86", "desc": "Architecture for a raw file without a header (x86/x64/arm/arm64...)." },
+            { "flag": "--rawMode", "value": "64", "desc": "Bitness for a raw file (32/64)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "ROPgadget --binary {TARGET}", "note": "Output all gadgets found in the binary." },
+        { "cmd": "ROPgadget --binary {TARGET} --ropchain", "note": "Automatically assemble a working ROP chain for /bin/sh." },
+        { "cmd": "ROPgadget --binary {TARGET} --only 'pop|ret'", "note": "Only pop gadgets - the basis for assembling a chain by hand." },
+        { "cmd": "ROPgadget --binary {TARGET} --string '/bin/sh'", "note": "Find the address of the /bin/sh string for the execve argument." }
+      ],
+      "notes": "The target is required. An alternative is ropper (sashs/Ropper, pip install ropper), often more convenient and with semantic search: ropper -f BIN (all gadgets), ropper -f BIN --search 'pop rdi; ret' (search with ?/% substitution), ropper -f BIN --string '/bin/sh', ropper -f BIN --chain execve (auto-chain), ropper -f BIN --type jop, -b 00 (badbytes), -j esp (jmp reg). ropper's --inst-count defaults to 6. In pwntools the pwnlib.rop.ROP module is usually used for ROP, but ROPgadget/ropper are needed for manual research and --ropchain."
+    },
+    {
+      "category": "Pwn",
+      "catOrder": 6,
+      "title": "one_gadget",
+      "subcategory": "search for one-shot RCE in libc",
+      "purpose": "Finds 'magic' addresses (one-gadget) in libc, jumping to which immediately yields execve(\"/bin/sh\") without arguments. Indispensable when you have a libc address leak and a single write (GOT/return).",
+      "install": "gem install one_gadget",
+      "binary": "one_gadget",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "libc source",
+          "flags": [
+            { "flag": "-b", "value": "BuildID", "desc": "Search by libc BuildID[sha1] (when the file itself is absent but the build-id is known). An alternative to the positional file." },
+            { "flag": "-f", "desc": "Force searching gadgets in the file rather than by build-id (--force-file)." }
+          ]
+        },
+        {
+          "name": "Output and count",
+          "flags": [
+            { "flag": "-l", "value": "1", "desc": "Output level (--level): how many gadgets to show. Default 0 (only the most reliable); higher means more candidates." },
+            { "flag": "-o", "value": "raw", "desc": "Output format (--output-format): pretty (default), raw, json." },
+            { "flag": "-r", "desc": "Alias for -o raw: output only gadget offsets separated by spaces (handy for scripts)." }
+          ]
+        },
+        {
+          "name": "Addresses and sorting",
+          "flags": [
+            { "flag": "--base", "value": "0x7f0000000000", "desc": "libc base address - output absolute addresses instead of offsets." },
+            { "flag": "-n", "value": "system", "desc": "Sort gadgets by proximity to the specified functions or to the file's GOT functions (--near)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "one_gadget {TARGET}", "note": "Find one-gadgets in libc (provide the path to libc.so.6 as the target)." },
+        { "cmd": "one_gadget {TARGET} -l 1", "note": "Show more candidates if the default ones did not work due to constraints." },
+        { "cmd": "one_gadget {TARGET} --base 0x7ffff7a0d000", "note": "Output absolute addresses when the libc base is known." },
+        { "cmd": "one_gadget -b 3a9b... ", "note": "Search by BuildID when the libc file is not at hand." }
+      ],
+      "notes": "The target is the libc file (usually libc.so.6), NOT the binary under study. Each gadget comes with a list of constraints (for example 'rsp & 0xf == 0' or '[rsp+0x30] == NULL') - at the moment of the jump they MUST hold, otherwise it will crash; try different gadgets. pwntools has auto-selection, but one_gadget shows the constraints more precisely. Requires Ruby."
+    },
+    {
+      "category": "Pwn",
+      "catOrder": 6,
+      "title": "patchelf",
+      "subcategory": "editing ELF dynamic sections",
+      "purpose": "Changes the interpreter (ld-linux), RPATH, and dependencies (DT_NEEDED) in a prebuilt ELF. In pwn tasks it lets you run a binary with the required libc/loader version without recompiling.",
+      "install": "sudo apt install patchelf",
+      "binary": "patchelf",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Interpreter (loader)",
+          "flags": [
+            { "flag": "--set-interpreter", "value": "./ld-2.31.so", "desc": "Replace the dynamic loader (ELF interpreter) with the specified one - run with the required ld." },
+            { "flag": "--print-interpreter", "desc": "Show the binary's current interpreter." }
+          ]
+        },
+        {
+          "name": "Dependencies (DT_NEEDED)",
+          "flags": [
+            { "flag": "--replace-needed", "value": "libc.so.6 ./libc.so.6", "desc": "Replace a declared dependency with another (two arguments: old new)." },
+            { "flag": "--add-needed", "value": "./libc.so.6", "desc": "Add a new required library." },
+            { "flag": "--remove-needed", "value": "libfoo.so", "desc": "Remove a dependency (DT_NEEDED). Can be used multiple times." },
+            { "flag": "--print-needed", "desc": "Show the list of required libraries." }
+          ]
+        },
+        {
+          "name": "RPATH / RUNPATH",
+          "flags": [
+            { "flag": "--set-rpath", "value": ".", "desc": "Set RPATH/RUNPATH (where to look for libc) - e.g. '.' to take libc from the current folder." },
+            { "flag": "--add-rpath", "value": ".", "desc": "Add a path to the existing RPATH." },
+            { "flag": "--print-rpath", "desc": "Show the current RPATH." },
+            { "flag": "--remove-rpath", "desc": "Remove the RPATH entirely." },
+            { "flag": "--force-rpath", "desc": "Use DT_RPATH instead of DT_RUNPATH (old search behavior)." }
+          ]
+        },
+        {
+          "name": "Misc and output",
+          "flags": [
+            { "flag": "--set-soname", "value": "libc.so.6", "desc": "Change the SONAME of a shared library." },
+            { "flag": "--print-soname", "desc": "Show the library's SONAME." },
+            { "flag": "--output", "value": "patched", "desc": "Write the result to a new file without touching the original." },
+            { "flag": "--page-size", "value": "4096", "desc": "Specify the target architecture's page size (for cross-patching)." },
+            { "flag": "--version", "desc": "Show the patchelf version." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "patchelf --set-interpreter ./ld-2.31.so {TARGET}", "note": "Swap the loader for the required ld version from the task." },
+        { "cmd": "patchelf --replace-needed libc.so.6 ./libc.so.6 {TARGET}", "note": "Force the binary to link against the supplied libc." },
+        { "cmd": "patchelf --set-rpath . {TARGET}", "note": "Look for libraries in the current folder (the libc placed alongside)." },
+        { "cmd": "patchelf --set-interpreter ./ld.so --set-rpath . --output patched {TARGET}", "note": "Combine loader+rpath into a new file without spoiling the original." }
+      ],
+      "notes": "The target is required - it is the ELF being patched. A typical pwn workflow: the organizers provide libc.so.6 and ld-X.so from the remote host; to reproduce the environment locally, you patch the interpreter and RPATH to those files (or use pwninit, which does this automatically). Any string argument can be supplied from a file with the @ prefix. Make a backup of the binary or use --output - the patch is irreversible."
+    }
+  ]
+}

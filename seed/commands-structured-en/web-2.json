@@ -1,0 +1,538 @@
+{
+  "category": "WEB",
+  "catOrder": 2,
+  "tools": [
+    {
+      "title": "httpx",
+      "subcategory": "HTTP probing and host analysis",
+      "purpose": "Fast multipurpose HTTP toolkit from ProjectDiscovery: checks host liveness, grabs status codes, headers, technologies, favicons, takes screenshots.",
+      "install": "go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest",
+      "binary": "httpx",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Input",
+          "flags": [
+            {"flag": "-u", "value": "https://example.com", "desc": "Target(s) to probe (host, URL; comma-separated)"},
+            {"flag": "-l", "value": "hosts.txt", "desc": "File with a list of hosts (one target per line)"},
+            {"flag": "-rr", "value": "req.txt", "desc": "File with a raw HTTP request to send"},
+            {"flag": "-p", "value": "80,443,8080", "desc": "Ports to probe (nmap-like syntax)"},
+            {"flag": "-path", "value": "/admin", "desc": "Path(s) to probe (comma-separated or a file)"}
+          ]
+        },
+        {
+          "name": "Probes (what to show)",
+          "flags": [
+            {"flag": "-sc", "desc": "Show the response code (status-code)"},
+            {"flag": "-title", "desc": "Show the page <title>"},
+            {"flag": "-td", "desc": "Detect and show technologies (tech-detect)"},
+            {"flag": "-server", "desc": "Show the Server header"},
+            {"flag": "-cl", "desc": "Show the response Content-Length"},
+            {"flag": "-ct", "desc": "Show the response Content-Type"},
+            {"flag": "-ip", "desc": "Show the host's IP address"},
+            {"flag": "-cdn", "desc": "Show the CDN/WAF in use"},
+            {"flag": "-favicon", "desc": "Show the favicon mmh3 hash"},
+            {"flag": "-location", "desc": "Show the Location header on a redirect"},
+            {"flag": "-method", "desc": "Show the HTTP request method"}
+          ]
+        },
+        {
+          "name": "Filters and matchers",
+          "flags": [
+            {"flag": "-mc", "value": "200,302", "desc": "Keep only the given status codes"},
+            {"flag": "-fc", "value": "404,403", "desc": "Filter out the given status codes"},
+            {"flag": "-ms", "value": "admin", "desc": "Keep responses containing the string"},
+            {"flag": "-fs", "value": "Not Found", "desc": "Filter out responses with the string"},
+            {"flag": "-mr", "value": "[a-z]+", "desc": "Keep responses by regex"},
+            {"flag": "-ml", "value": "1024", "desc": "Keep by Content-Length"},
+            {"flag": "-fl", "value": "0", "desc": "Filter out by Content-Length"},
+            {"flag": "-fd", "desc": "Remove near-identical (duplicate) responses"}
+          ]
+        },
+        {
+          "name": "HTTP config",
+          "flags": [
+            {"flag": "-H", "value": "Cookie: a=b", "desc": "Custom HTTP header (repeatable)"},
+            {"flag": "-proxy", "value": "http://127.0.0.1:8080", "desc": "Proxy (http/socks) for requests"},
+            {"flag": "-random-agent", "desc": "Random User-Agent on each request"},
+            {"flag": "-x", "value": "GET,POST", "desc": "Methods to probe"},
+            {"flag": "-body", "value": "a=1", "desc": "POST request body"},
+            {"flag": "-fr", "desc": "Follow HTTP redirects"},
+            {"flag": "-maxr", "value": "10", "desc": "Maximum redirects to follow"},
+            {"flag": "-r", "value": "8.8.8.8", "desc": "Custom DNS resolvers (file or comma-separated)"}
+          ]
+        },
+        {
+          "name": "Speed and optimization",
+          "flags": [
+            {"flag": "-t", "value": "50", "desc": "Number of threads"},
+            {"flag": "-rl", "value": "150", "desc": "Requests-per-second limit"},
+            {"flag": "-timeout", "value": "5", "desc": "Request timeout in seconds"},
+            {"flag": "-retries", "value": "2", "desc": "Number of retries on error"},
+            {"flag": "-delay", "value": "1s", "desc": "Pause between requests"}
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            {"flag": "-o", "value": "out.txt", "desc": "File to write results to"},
+            {"flag": "-j", "desc": "Output in JSONL format"},
+            {"flag": "-csv", "desc": "Output in CSV format"},
+            {"flag": "-ss", "desc": "Page screenshots via a headless browser"},
+            {"flag": "-sr", "desc": "Save HTTP responses to disk"},
+            {"flag": "-silent", "desc": "Silent mode: results only"},
+            {"flag": "-nc", "desc": "Disable color in the output"},
+            {"flag": "-stats", "desc": "Show scan statistics"}
+          ]
+        }
+      ],
+      "recipes": [
+        {"cmd": "httpx -l hosts.txt -sc -title -td -silent", "note": "Basic run: liveness + code + title + technologies"},
+        {"cmd": "subfinder -d {TARGET} -silent | httpx -sc -title -td -ip -silent", "note": "Chain: subdomains straight into httpx"},
+        {"cmd": "httpx -l urls.txt -mc 200 -fr -silent -o live.txt", "note": "Only live 200s while following redirects"},
+        {"cmd": "httpx -l hosts.txt -ss -srd shots -silent", "note": "Screenshots of all hosts into a folder"}
+      ],
+      "notes": "Put global options before positional ones. Accepts targets via stdin nicely (echo url | httpx)."
+    },
+    {
+      "title": "katana",
+      "subcategory": "URL and endpoint crawler",
+      "purpose": "Fast web crawler from ProjectDiscovery: collects links, forms and endpoints, including from JavaScript, in standard and headless modes.",
+      "install": "CGO_ENABLED=1 go install github.com/projectdiscovery/katana/cmd/katana@latest",
+      "binary": "katana",
+      "target": "-u {TARGET}",
+      "modes": ["standard", "headless"],
+      "groups": [
+        {
+          "name": "Input",
+          "flags": [
+            {"flag": "-u", "value": "https://example.com", "desc": "URL(s) to crawl (comma-separated) or a file"},
+            {"flag": "-list", "value": "urls.txt", "desc": "File with a list of URLs to crawl"},
+            {"flag": "-e", "value": "cdn,private-ips", "desc": "Exclude hosts (cdn, private-ips, cidr, ip, regex)"},
+            {"flag": "-resume", "value": "resume.cfg", "desc": "Resume a previous scan"}
+          ]
+        },
+        {
+          "name": "Crawling configuration",
+          "flags": [
+            {"flag": "-d", "value": "3", "desc": "Maximum crawl depth"},
+            {"flag": "-jc", "desc": "Parse endpoints from JavaScript (js-crawl)"},
+            {"flag": "-kf", "value": "all", "desc": "Crawl known files (all, robotstxt, sitemapxml)"},
+            {"flag": "-ct", "value": "10m", "desc": "Crawl time limit (s, m, h, d)"},
+            {"flag": "-aff", "desc": "Auto form fill (experimental)"},
+            {"flag": "-fx", "desc": "Extract forms into the JSONL output"},
+            {"flag": "-s", "value": "breadth-first", "desc": "Traversal strategy (depth-first, breadth-first)"},
+            {"flag": "-H", "value": "Cookie: a=b", "desc": "Custom headers/cookies (header:value)"},
+            {"flag": "-proxy", "value": "http://127.0.0.1:8080", "desc": "HTTP/SOCKS5 proxy"},
+            {"flag": "-timeout", "value": "10", "desc": "Request timeout in seconds"}
+          ]
+        },
+        {
+          "name": "Headless",
+          "flags": [
+            {"flag": "-hl", "desc": "Hybrid headless crawling (renders JS in a browser)"},
+            {"flag": "-sc", "desc": "Use a local Chrome instead of the bundled one"},
+            {"flag": "-sb", "desc": "Show the browser window"},
+            {"flag": "-nos", "desc": "Launch Chrome in --no-sandbox mode"},
+            {"flag": "-xhr", "desc": "Extract XHR requests into JSONL"}
+          ]
+        },
+        {
+          "name": "Scope",
+          "flags": [
+            {"flag": "-cs", "value": "login", "desc": "regex for in-scope URLs"},
+            {"flag": "-cos", "value": "logout", "desc": "regex for out-of-scope URLs"},
+            {"flag": "-fs", "value": "fqdn", "desc": "Scope field (dn, rdn, fqdn) or a custom regex"},
+            {"flag": "-do", "desc": "Also show external endpoints"}
+          ]
+        },
+        {
+          "name": "Filters",
+          "flags": [
+            {"flag": "-mr", "value": "admin", "desc": "Keep URLs by regex"},
+            {"flag": "-fr", "value": "logout", "desc": "Filter out URLs by regex"},
+            {"flag": "-em", "value": "php,js", "desc": "Keep only the given extensions"},
+            {"flag": "-ef", "value": "png,css", "desc": "Filter out the given extensions"},
+            {"flag": "-mdc", "value": "status_code==200", "desc": "Match condition (DSL)"}
+          ]
+        },
+        {
+          "name": "Speed and output",
+          "flags": [
+            {"flag": "-c", "value": "10", "desc": "Number of parallel workers (fetchers)"},
+            {"flag": "-p", "value": "10", "desc": "Parallel processing of input targets"},
+            {"flag": "-rl", "value": "150", "desc": "Requests-per-second limit (global)"},
+            {"flag": "-rd", "value": "1", "desc": "Delay between requests (sec)"},
+            {"flag": "-o", "value": "urls.txt", "desc": "Output file"},
+            {"flag": "-j", "desc": "Output in JSONL format"},
+            {"flag": "-sr", "desc": "Save requests/responses to disk"},
+            {"flag": "-silent", "desc": "Silent mode: results only"}
+          ]
+        }
+      ],
+      "recipes": [
+        {"cmd": "katana -u {TARGET} -silent", "note": "Quick crawl of a single site"},
+        {"cmd": "katana -u {TARGET} -jc -d 5 -silent", "note": "Deep crawl with JS parsing"},
+        {"cmd": "katana -u {TARGET} -hl -jc -silent", "note": "Headless crawling of JS apps (SPA)"},
+        {"cmd": "katana -list urls.txt -em php,asp -silent -o endpoints.txt", "note": "Collect only dynamic endpoints"}
+      ],
+      "notes": "Global options before positional ones. Accepts targets via stdin. Headless needs Chrome; the build requires CGO."
+    },
+    {
+      "title": "gau / waybackurls",
+      "subcategory": "URL collection from web archives",
+      "purpose": "getallurls (gau) pulls a domain's known URLs from the Wayback Machine, Common Crawl, OTX and URLScan. Passive collection without touching the site itself.",
+      "install": "go install github.com/lc/gau/v2/cmd/gau@latest",
+      "binary": "gau",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Sources",
+          "flags": [
+            {"flag": "--providers", "value": "wayback,otx", "desc": "Data sources (wayback, commoncrawl, otx, urlscan)"},
+            {"flag": "--subs", "desc": "Include subdomains in the results"},
+            {"flag": "--from", "value": "202301", "desc": "Start date for the URL selection (YYYYMM)"},
+            {"flag": "--to", "value": "202412", "desc": "End date for the URL selection (YYYYMM)"}
+          ]
+        },
+        {
+          "name": "Filters",
+          "flags": [
+            {"flag": "--blacklist", "value": "png,jpg,css,woff", "desc": "Skip the given file extensions"},
+            {"flag": "--mc", "value": "200,500", "desc": "Keep URLs only with these status codes"},
+            {"flag": "--fc", "value": "404,302", "desc": "Filter out URLs with these status codes"},
+            {"flag": "--mt", "value": "text/html", "desc": "Keep only these MIME types"},
+            {"flag": "--ft", "value": "image/png", "desc": "Filter out these MIME types"},
+            {"flag": "--fp", "desc": "Remove duplicate endpoints with different parameters"}
+          ]
+        },
+        {
+          "name": "Network",
+          "flags": [
+            {"flag": "--threads", "value": "5", "desc": "Number of worker threads"},
+            {"flag": "--timeout", "value": "60", "desc": "HTTP timeout in seconds"},
+            {"flag": "--retries", "value": "5", "desc": "Number of HTTP client retries"},
+            {"flag": "--proxy", "value": "http://127.0.0.1:8080", "desc": "HTTP/SOCKS5 proxy"}
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            {"flag": "--o", "value": "urls.txt", "desc": "Write results to a file"},
+            {"flag": "--json", "desc": "Output in JSON format"},
+            {"flag": "--verbose", "desc": "Verbose output"},
+            {"flag": "--config", "value": "$HOME/.gau.toml", "desc": "Path to the configuration file"}
+          ]
+        }
+      ],
+      "recipes": [
+        {"cmd": "gau {TARGET}", "note": "All known URLs of the domain from archives"},
+        {"cmd": "gau --subs {TARGET}", "note": "Including subdomains"},
+        {"cmd": "gau --blacklist png,jpg,css,js {TARGET} | sort -u", "note": "Without static assets, unique only"},
+        {"cmd": "gau {TARGET} | httpx -mc 200 -silent", "note": "Run archived URLs through a liveness check"}
+      ],
+      "notes": "Alternative: waybackurls (tomnomnom) - simpler, Wayback Machine only: 'waybackurls {TARGET}' or 'cat domains | waybackurls'. The domain is passed to gau positionally or via stdin."
+    },
+    {
+      "title": "subfinder",
+      "subcategory": "Passive subdomain discovery",
+      "purpose": "Passive subdomain enumeration from ProjectDiscovery via many online sources (crt.sh, VirusTotal, etc.). Fast and quiet against the target.",
+      "install": "go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest",
+      "binary": "subfinder",
+      "target": "-d {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Input",
+          "flags": [
+            {"flag": "-d", "value": "example.com", "desc": "Domain(s) to find subdomains for (comma-separated)"},
+            {"flag": "-dL", "value": "domains.txt", "desc": "File with a list of domains"}
+          ]
+        },
+        {
+          "name": "Sources",
+          "flags": [
+            {"flag": "-s", "value": "crtsh,github", "desc": "Use only the given sources"},
+            {"flag": "-es", "value": "shodan", "desc": "Exclude the given sources"},
+            {"flag": "-all", "desc": "Use all sources (slower)"},
+            {"flag": "-recursive", "desc": "Only sources that support recursive search"},
+            {"flag": "-ls", "desc": "Show the list of available sources"}
+          ]
+        },
+        {
+          "name": "Filters and resolution",
+          "flags": [
+            {"flag": "-m", "value": "dev", "desc": "Keep only matching subdomains"},
+            {"flag": "-f", "value": "test", "desc": "Filter out the given subdomains"},
+            {"flag": "-nW", "desc": "Show only active (resolving) subdomains"},
+            {"flag": "-r", "value": "8.8.8.8", "desc": "Custom DNS resolvers (comma-separated)"},
+            {"flag": "-rL", "value": "resolvers.txt", "desc": "File with a list of resolvers"}
+          ]
+        },
+        {
+          "name": "Speed and optimization",
+          "flags": [
+            {"flag": "-rl", "value": "10", "desc": "HTTP requests-per-second limit"},
+            {"flag": "-t", "value": "10", "desc": "Number of threads for resolution"},
+            {"flag": "-timeout", "value": "30", "desc": "HTTP timeout in seconds"},
+            {"flag": "-max-time", "value": "10", "desc": "Maximum enumeration time (minutes)"},
+            {"flag": "-proxy", "value": "http://127.0.0.1:8080", "desc": "HTTP proxy"}
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            {"flag": "-o", "value": "subs.txt", "desc": "File to write results to"},
+            {"flag": "-oJ", "desc": "Output in JSONL format"},
+            {"flag": "-oD", "value": "out/", "desc": "Output folder when there are multiple domains"},
+            {"flag": "-cs", "desc": "Add the source to the JSON output"},
+            {"flag": "-oI", "desc": "Show resolved IPs (active only)"},
+            {"flag": "-silent", "desc": "Silent mode: subdomains only"},
+            {"flag": "-nc", "desc": "Disable output color"},
+            {"flag": "-v", "desc": "Verbose output"}
+          ]
+        }
+      ],
+      "recipes": [
+        {"cmd": "subfinder -d {TARGET} -silent", "note": "Basic passive list of subdomains"},
+        {"cmd": "subfinder -d {TARGET} -all -silent", "note": "Maximum coverage using all sources"},
+        {"cmd": "subfinder -d {TARGET} -silent | httpx -sc -title -silent", "note": "Subdomains straight into a liveness check"},
+        {"cmd": "subfinder -dL domains.txt -all -oJ -o subs.json", "note": "Bulk enumeration over a list of domains in JSON"}
+      ],
+      "notes": "Global options before positional ones. Paid sources require API keys in provider-config.yaml."
+    },
+    {
+      "title": "amass",
+      "subcategory": "Deep DNS/subdomain recon",
+      "purpose": "Powerful OWASP framework for DNS recon and attack surface mapping: passive sources, brute-forcing and active validation of subdomains with a graph database.",
+      "install": "go install -v github.com/owasp-amass/amass/v4/...@master",
+      "binary": "amass",
+      "target": "enum -d {TARGET}",
+      "modes": ["passive", "normal", "active"],
+      "groups": [
+        {
+          "name": "Input and mode",
+          "flags": [
+            {"flag": "-d", "value": "example.com", "desc": "Target domain(s) (comma-separated, repeatable)"},
+            {"flag": "-df", "value": "domains.txt", "desc": "File with root domains"},
+            {"flag": "-passive", "desc": "Passive collection from sources only (no DNS)"},
+            {"flag": "-active", "desc": "Active recon (touching the found nodes)"},
+            {"flag": "-brute", "desc": "Brute-force subdomains from a wordlist"},
+            {"flag": "-w", "value": "wordlist.txt", "desc": "Custom wordlist for brute-forcing"}
+          ]
+        },
+        {
+          "name": "Sources",
+          "flags": [
+            {"flag": "-include", "value": "crtsh", "desc": "Use only the given sources"},
+            {"flag": "-exclude", "value": "shodan", "desc": "Exclude the given sources"},
+            {"flag": "-list", "desc": "Show the list of available sources"},
+            {"flag": "-config", "value": "config.yaml", "desc": "YAML config (API keys, scope, wordlists)"}
+          ]
+        },
+        {
+          "name": "DNS and resolvers",
+          "flags": [
+            {"flag": "-r", "value": "8.8.8.8,1.1.1.1", "desc": "Untrusted DNS resolvers (repeatable)"},
+            {"flag": "-rf", "value": "resolvers.txt", "desc": "File with untrusted resolvers"},
+            {"flag": "-tr", "value": "1.1.1.1", "desc": "Trusted DNS resolvers"},
+            {"flag": "-dns-qps", "value": "200", "desc": "DNS queries-per-second limit (across all resolvers)"},
+            {"flag": "-norecursive", "desc": "Disable recursive brute-forcing"},
+            {"flag": "-max-depth", "value": "3", "desc": "Maximum subdomain labels for brute-forcing"}
+          ]
+        },
+        {
+          "name": "Scope and filters",
+          "flags": [
+            {"flag": "-bl", "value": "old.example.com", "desc": "Subdomain blacklist (exclude)"},
+            {"flag": "-blf", "value": "blacklist.txt", "desc": "File with a subdomain blacklist"},
+            {"flag": "-nf", "value": "names.txt", "desc": "File with already-known names (to mix in)"},
+            {"flag": "-p", "value": "443,8443", "desc": "Ports to check (default 443)"},
+            {"flag": "-timeout", "value": "30", "desc": "Enumeration runtime (minutes)"}
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            {"flag": "-o", "value": "out.txt", "desc": "Text output file"},
+            {"flag": "-oA", "value": "amass_scan", "desc": "Prefix for all output formats"},
+            {"flag": "-dir", "value": "amass_db", "desc": "Folder for the results graph database"},
+            {"flag": "-ip", "desc": "Show IPs of found names"},
+            {"flag": "-ipv4", "desc": "Show only IPv4 addresses"},
+            {"flag": "-v", "desc": "Verbose output (status/debug)"},
+            {"flag": "-silent", "desc": "Disable all output during the run"},
+            {"flag": "-nocolor", "desc": "Disable output color"}
+          ]
+        }
+      ],
+      "recipes": [
+        {"cmd": "amass enum -passive -d {TARGET}", "note": "Quick passive subdomain collection"},
+        {"cmd": "amass enum -d {TARGET} -brute -w wordlist.txt", "note": "Enumeration with wordlist brute-forcing"},
+        {"cmd": "amass enum -active -d {TARGET} -ip -o subs.txt", "note": "Active recon with IP resolution"},
+        {"cmd": "amass intel -d {TARGET} -whois", "note": "Organization recon (intel) via reverse WHOIS"}
+      ],
+      "notes": "Works through subcommands: enum (subdomain enumeration), intel (OSINT on the organization), db (graph database management). Without -passive/-active the normal mode is used: sources + DNS validation. v5 is also available (the owasp-amass repository)."
+    },
+    {
+      "title": "naabu",
+      "subcategory": "Fast port scanner",
+      "purpose": "Fast Go port scanner from ProjectDiscovery: SYN/CONNECT scans, host discovery, convenient pairing with httpx and nmap for verification.",
+      "install": "go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest",
+      "binary": "naabu",
+      "target": "-host {TARGET}",
+      "modes": ["SYN", "CONNECT"],
+      "groups": [
+        {
+          "name": "Input",
+          "flags": [
+            {"flag": "-host", "value": "example.com", "desc": "Host(s) to scan (comma-separated)"},
+            {"flag": "-list", "value": "hosts.txt", "desc": "File with a list of hosts"},
+            {"flag": "-eh", "value": "10.0.0.1", "desc": "Exclude hosts (comma-separated)"},
+            {"flag": "-ef", "value": "exclude.txt", "desc": "File with hosts to exclude"}
+          ]
+        },
+        {
+          "name": "Ports",
+          "flags": [
+            {"flag": "-p", "value": "80,443,8000-9000", "desc": "Ports to scan (comma-separated/range)"},
+            {"flag": "-tp", "value": "1000", "desc": "Top ports (full, 100, 1000)"},
+            {"flag": "-ep", "value": "22", "desc": "Exclude ports"},
+            {"flag": "-pf", "value": "ports.txt", "desc": "File with a list of ports"},
+            {"flag": "-ec", "desc": "Do not scan CDN/WAF in full (only 80,443)"}
+          ]
+        },
+        {
+          "name": "Scan mode",
+          "flags": [
+            {"flag": "-s", "value": "SYN", "desc": "Scan type: SYN or CONNECT (default CONNECT)"},
+            {"flag": "-sa", "desc": "Scan all IPs associated with the domain"},
+            {"flag": "-iv", "value": "4", "desc": "IP versions (4, 6)"},
+            {"flag": "-nmap-cli", "value": "nmap -sV", "desc": "Run the found ports through nmap"},
+            {"flag": "-passive", "desc": "Passive mode via Shodan InternetDB"},
+            {"flag": "-proxy", "value": "socks5://127.0.0.1:9050", "desc": "SOCKS5 proxy"}
+          ]
+        },
+        {
+          "name": "Host discovery",
+          "flags": [
+            {"flag": "-sn", "desc": "Host discovery only (no port scan)"},
+            {"flag": "-Pn", "desc": "Skip host discovery (scan all)"},
+            {"flag": "-pe", "desc": "ICMP echo ping for discovery"},
+            {"flag": "-ps", "value": "80", "desc": "TCP SYN ping on ports"}
+          ]
+        },
+        {
+          "name": "Speed and optimization",
+          "flags": [
+            {"flag": "-c", "value": "25", "desc": "Number of workers (threads)"},
+            {"flag": "-rate", "value": "1000", "desc": "Packets per second"},
+            {"flag": "-retries", "value": "3", "desc": "Number of retries"},
+            {"flag": "-timeout", "value": "1000", "desc": "Timeout in milliseconds"},
+            {"flag": "-verify", "desc": "TCP verification of found ports (no false positives)"}
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            {"flag": "-o", "value": "ports.txt", "desc": "Output file"},
+            {"flag": "-j", "desc": "Output in JSONL format"},
+            {"flag": "-csv", "desc": "Output in CSV format"},
+            {"flag": "-silent", "desc": "Silent mode: results only"},
+            {"flag": "-v", "desc": "Verbose output"},
+            {"flag": "-cdn", "desc": "Show the CDN in use"}
+          ]
+        }
+      ],
+      "recipes": [
+        {"cmd": "naabu -host {TARGET} -silent", "note": "Scan the top 100 ports of a single host"},
+        {"cmd": "naabu -host {TARGET} -p - -silent", "note": "Scan all 65535 ports"},
+        {"cmd": "naabu -list hosts.txt -tp 1000 -silent | httpx -sc -title -silent", "note": "Ports over a list, live ones into httpx"},
+        {"cmd": "naabu -host {TARGET} -p 80,443 -nmap-cli 'nmap -sV' -silent", "note": "Find ports and grab service versions with nmap"}
+      ],
+      "notes": "Global options before positional ones. SYN scan (-s SYN) requires root/privileges and libpcap; CONNECT works without them."
+    },
+    {
+      "title": "dnsx",
+      "subcategory": "Fast DNS resolver and toolkit",
+      "purpose": "Fast multipurpose DNS tool from ProjectDiscovery: bulk resolution, querying any record type, DNS brute-forcing and wildcard filtering.",
+      "install": "go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest",
+      "binary": "dnsx",
+      "target": "-l {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Input",
+          "flags": [
+            {"flag": "-l", "value": "hosts.txt", "desc": "List of domains/hosts to resolve (or stdin)"},
+            {"flag": "-d", "value": "example.com", "desc": "Domain(s) for brute-forcing (with -w)"},
+            {"flag": "-w", "value": "words.txt", "desc": "Wordlist for DNS brute-forcing"}
+          ]
+        },
+        {
+          "name": "Record types",
+          "flags": [
+            {"flag": "-a", "desc": "Query the A record (default)"},
+            {"flag": "-aaaa", "desc": "Query the AAAA record (IPv6)"},
+            {"flag": "-cname", "desc": "Query the CNAME record"},
+            {"flag": "-ns", "desc": "Query the NS record"},
+            {"flag": "-txt", "desc": "Query the TXT record"},
+            {"flag": "-mx", "desc": "Query the MX record"},
+            {"flag": "-ptr", "desc": "Query the PTR record (reverse DNS)"},
+            {"flag": "-soa", "desc": "Query the SOA record"},
+            {"flag": "-axfr", "desc": "Attempt a zone transfer (AXFR)"},
+            {"flag": "-recon", "desc": "Query all DNS record types"}
+          ]
+        },
+        {
+          "name": "Filters and probes",
+          "flags": [
+            {"flag": "-re", "desc": "Show the DNS response (resp)"},
+            {"flag": "-ro", "desc": "Show the response only (resp-only)"},
+            {"flag": "-rc", "value": "noerror", "desc": "Filter by DNS status (noerror, servfail, nxdomain)"},
+            {"flag": "-cdn", "desc": "Show the CDN name"},
+            {"flag": "-asn", "desc": "Show the host's ASN"}
+          ]
+        },
+        {
+          "name": "Resolvers and wildcard",
+          "flags": [
+            {"flag": "-r", "value": "8.8.8.8,1.1.1.1", "desc": "Custom resolvers (UDP/TCP/DOH/DOT)"},
+            {"flag": "-wt", "value": "5", "desc": "Wildcard filter threshold"},
+            {"flag": "-wd", "value": "example.com", "desc": "Domain for wildcard filtering"},
+            {"flag": "-hf", "desc": "Use the system hosts file"},
+            {"flag": "-trace", "desc": "DNS tracing"}
+          ]
+        },
+        {
+          "name": "Speed and optimization",
+          "flags": [
+            {"flag": "-t", "value": "100", "desc": "Number of parallel threads"},
+            {"flag": "-rl", "value": "-1", "desc": "DNS queries-per-second limit (-1 = off)"},
+            {"flag": "-retry", "value": "2", "desc": "Number of DNS attempts"},
+            {"flag": "-timeout", "value": "3s", "desc": "Request timeout"}
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            {"flag": "-o", "value": "resolved.txt", "desc": "File to write results to"},
+            {"flag": "-j", "desc": "Output in JSONL format"},
+            {"flag": "-silent", "desc": "Silent mode: results only"},
+            {"flag": "-v", "desc": "Verbose output"},
+            {"flag": "-nc", "desc": "Disable output color"},
+            {"flag": "-stats", "desc": "Show statistics"}
+          ]
+        }
+      ],
+      "recipes": [
+        {"cmd": "subfinder -d {TARGET} -silent | dnsx -silent", "note": "Filter live (resolving) subdomains"},
+        {"cmd": "dnsx -l hosts.txt -a -re -silent", "note": "Resolve A records showing the response"},
+        {"cmd": "dnsx -d {TARGET} -w words.txt -silent", "note": "DNS brute-forcing of subdomains from a wordlist"},
+        {"cmd": "dnsx -l hosts.txt -cname -ro -silent", "note": "CNAME only (hunting dangling records/takeover)"}
+      ],
+      "notes": "Global options before positional ones. Works great chained via stdin (subfinder | dnsx | httpx)."
+    }
+  ]
+}

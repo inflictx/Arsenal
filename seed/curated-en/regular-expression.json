@@ -1,0 +1,86 @@
+{
+  "category": "Regular Expression",
+  "source": "PayloadsAllTheThings/Regular Expression/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What is ReDoS",
+      "language": "text",
+      "tags": ["methodology", "redos", "dos"],
+      "body": "Regular Expression Denial of Service (ReDoS) is an attack that exploits the fact that some regular expressions can take an extremely long time to process. This causes the application or service to stop responding or crash.\n\nThe essence: with an \"evil\" pattern (evil regex), a specially crafted string forces the engine to try a huge number of matching variants (catastrophic backtracking) before it realizes there is no match."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Where to look for ReDoS",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "• Any user input that is later validated by a regular expression (validation of email, phone numbers, URLs, names, passwords).\n• Places where the regex itself is taken from user input or configuration (search, filters, rules).\n• Server-side and client-side code: both backend validation and JS form validation are vulnerable.\n• First look in the pattern for \"dangerous\" constructs: nested quantifiers and overlapping alternations (see Evil Regex), then craft a string for backtracking."
+    },
+    {
+      "subcategory": "Evil Regex",
+      "title": "What an evil regex consists of",
+      "language": "text",
+      "tags": ["evil-regex", "redos", "backtracking"],
+      "body": "An Evil Regex contains:\n\n• Grouping with repetition.\n• Inside the repeated group:\n  - Repetition.\n  - Alternation with overlapping."
+    },
+    {
+      "subcategory": "Evil Regex",
+      "title": "Examples of vulnerable patterns",
+      "language": "text",
+      "tags": ["evil-regex", "redos", "patterns"],
+      "body": "(a+)+\n([a-zA-Z]+)*\n(a|aa)+\n(a|a?)+\n(.*a){x}   # when x > 10"
+    },
+    {
+      "subcategory": "Evil Regex",
+      "title": "String for catastrophic backtracking",
+      "language": "text",
+      "tags": ["evil-regex", "redos", "payload"],
+      "body": "aaaaaaaaaaaaaaaaaaaa!",
+      "meta": {
+        "note": "20 'a' characters followed by '!'. On such input the engine tries all possible ways to group the 'a' characters before realizing there is no match because of the '!' - this is what causes the explosion in the number of backtracking attempts. Suitable for patterns like (a+)+ and ([a-zA-Z]+)*."
+      }
+    },
+    {
+      "subcategory": "Backtrack Limit",
+      "title": "What backtracking and the limit are",
+      "language": "text",
+      "tags": ["backtracking", "redos", "php"],
+      "body": "Backtracking in regular expressions occurs when the engine tries to match a pattern, hits a mismatch, and goes back to the previous matching position to try another path. This process can repeat a great many times - especially on complex patterns and large input strings.\n\nSometimes you can force a regex to exceed more than 100,000 recursions, which causes ReDoS and leads to preg_match returning false."
+    },
+    {
+      "subcategory": "Backtrack Limit",
+      "title": "PHP PCRE configuration options",
+      "language": "table",
+      "tags": ["backtracking", "php", "pcre"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Name", "Default", "Note"],
+          "rows": [
+            ["pcre.backtrack_limit", "1000000", "100000 for PHP < 5.3.7"],
+            ["pcre.recursion_limit", "100000", "/"],
+            ["pcre.jit", "1", "/"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Backtrack Limit",
+      "title": "Exceeding the backtracking limit in PHP (preg_match -> false)",
+      "language": "php",
+      "tags": ["backtracking", "php", "preg-match"],
+      "body": "$pattern = '/(a+)+$/';\n$subject = str_repeat('a', 1000) . 'b';\n\nif (preg_match($pattern, $subject)) {\n    echo \"Match found\";\n} else {\n    echo \"No match\";\n}",
+      "meta": {
+        "note": "When the recursion limit is exceeded, preg_match returns false (not \"no match\", but a runtime error). If the code treats false as \"validation failed / no match\", this can be used for a bypass or DoS."
+      }
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Tools for finding ReDoS",
+      "language": "text",
+      "tags": ["tools", "redos"],
+      "body": "tjenkinson/redos-detector - https://github.com/tjenkinson/redos-detector\nA CLI and library that checks with certainty whether a pattern is safe from ReDoS. Works in the browser, Node, and Deno.\n\ndoyensec/regexploit - https://github.com/doyensec/regexploit\nFinds regular expressions vulnerable to ReDoS.\n\ndevina.io/redos-checker - https://devina.io/redos-checker\nAn online check of regular expressions for potential ReDoS vulnerabilities."
+    }
+  ]
+}

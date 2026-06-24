@@ -1,0 +1,725 @@
+{
+  "category": "Network / AD",
+  "catOrder": 3,
+  "tools": [
+    {
+      "title": "netexec (nxc, formerly crackmapexec)",
+      "subcategory": "mass AD/network protocol auditing",
+      "purpose": "Swiss army knife for domain and network auditing: credential checks, SMB/LDAP enumeration, secrets dumping, command execution over WMI/SMB, and running modules across a host list at once. Direct successor to CrackMapExec.",
+      "install": "pipx install netexec",
+      "binary": "nxc",
+      "target": "{TARGET}",
+      "modes": [
+        { "name": "smb", "desc": "SMB auditing: shares, users, RID-brute, SAM/NTDS dump, command execution.", "target": "{TARGET}" },
+        { "name": "ldap", "desc": "AD enumeration over LDAP: users, AS-REP/Kerberoast, delegation, BloodHound.", "target": "{TARGET}" },
+        { "name": "winrm", "desc": "Credential checks and command execution over WinRM (5985/5986).", "target": "{TARGET}" },
+        { "name": "mssql", "desc": "MSSQL auditing: login, T-SQL execution, and xp_cmdshell.", "target": "{TARGET}" },
+        { "name": "ssh", "desc": "SSH credential checks and command execution.", "target": "{TARGET}" },
+        { "name": "wmi", "desc": "Credential checks and command execution over WMI.", "target": "{TARGET}" }
+      ],
+      "groups": [
+        {
+          "name": "Authentication",
+          "flags": [
+            { "flag": "-u", "value": "user", "desc": "Username or a file with a list of names." },
+            { "flag": "-p", "value": "password", "desc": "Password or a file with a list of passwords (tried against all -u)." },
+            { "flag": "-H", "value": "NTHASH", "desc": "NTLM hash for Pass-the-Hash instead of a password." },
+            { "flag": "-k", "desc": "Authenticate via Kerberos (uses a ticket from the environment / ccache)." },
+            { "flag": "--local-auth", "desc": "Local authentication on the host rather than domain (for local accounts)." },
+            { "flag": "-d", "value": "domain.local", "desc": "Domain for domain authentication." },
+            { "flag": "--kdcHost", "value": "{TARGET}", "desc": "Address of the KDC/domain controller (needed for Kerberos)." },
+            { "flag": "--continue-on-success", "desc": "Do not stop after the first valid login - for password spray across a list." }
+          ]
+        },
+        {
+          "name": "SMB enumeration",
+          "flags": [
+            { "flag": "--shares", "desc": "Enumerate network shares and access rights (READ/WRITE) to them." },
+            { "flag": "--users", "desc": "Enumerate domain users." },
+            { "flag": "--rid-brute", "value": "4000", "desc": "Brute-force RIDs to extract users (works even with a null session). Optional max RID." },
+            { "flag": "--pass-pol", "desc": "Retrieve the domain password policy." },
+            { "flag": "--sam", "desc": "Dump local hashes from SAM (requires admin rights)." },
+            { "flag": "--ntds", "desc": "Dump hashes of all domain accounts from NTDS.dit (on the DC, via DRSUAPI)." }
+          ]
+        },
+        {
+          "name": "SMB enumeration (extra)",
+          "flags": [
+            { "flag": "--groups", "value": "Domain Admins", "desc": "Enumerate domain groups (or members of a specific group)." },
+            { "flag": "--local-groups", "desc": "Enumerate local groups on the host." },
+            { "flag": "--sessions", "desc": "Show active sessions on the host." },
+            { "flag": "--loggedon-users", "desc": "Show logged-on users." },
+            { "flag": "--disks", "desc": "Enumerate disks on the host." },
+            { "flag": "--lsa", "desc": "Dump LSA secrets." }
+          ]
+        },
+        {
+          "name": "Command execution",
+          "flags": [
+            { "flag": "-x", "value": "whoami", "desc": "Run a command via cmd on the target." },
+            { "flag": "-X", "value": "$PSVersionTable", "desc": "Run a command via PowerShell on the target." },
+            { "flag": "--exec-method", "value": "wmiexec", "desc": "Execution method: wmiexec, atexec, smbexec, mmcexec." }
+          ]
+        },
+        {
+          "name": "Modules",
+          "flags": [
+            { "flag": "-L", "desc": "Show the list of available modules for the protocol." },
+            { "flag": "-M", "value": "spider_plus", "desc": "Run a module by name." },
+            { "flag": "-o", "value": "KEY=value", "desc": "Pass options to the module (KEY=value, multiple allowed). List options via --options." },
+            { "flag": "--options", "desc": "Show options of the selected module (-M ... --options)." }
+          ]
+        },
+        {
+          "name": "LDAP attacks",
+          "flags": [
+            { "flag": "--asreproast", "value": "asrep.txt", "desc": "Collect AS-REP hashes of users without pre-authentication (to a file).", "mode": "ldap" },
+            { "flag": "--kerberoasting", "value": "kerb.txt", "desc": "Collect TGS hashes of service accounts (Kerberoasting, to a file).", "mode": "ldap" },
+            { "flag": "--trusted-for-delegation", "desc": "Find accounts with unconstrained delegation.", "mode": "ldap" },
+            { "flag": "--bloodhound", "desc": "Collect data for BloodHound via LDAP (with --collection).", "mode": "ldap" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "nxc smb {TARGET} -u user -p password --shares", "note": "Check credentials and enumerate available shares on the host." },
+        { "cmd": "nxc smb {TARGET} -u '' -p '' --rid-brute", "note": "Extract users via a null session with RID brute." },
+        { "cmd": "nxc smb {TARGET} -u user -p 'Password1' --continue-on-success", "note": "Password spray a single password across a host/target list." },
+        { "cmd": "nxc smb {TARGET} -u admin -H aad3b...:31d6c... --ntds", "note": "Pass-the-Hash on the DC and dump NTDS.dit with all domain hashes." },
+        { "cmd": "nxc ldap {TARGET} -u user -p pass --asreproast asrep.txt", "note": "Collect AS-REP hashes of users without pre-authentication." },
+        { "cmd": "nxc smb {TARGET} -u user -p pass -x whoami", "note": "Run a command on the target (by default via wmiexec/smbexec)." }
+      ],
+      "notes": "The first argument after nxc is always the protocol (smb/ldap/winrm/mssql/ssh/wmi/rdp/ftp/vnc), then the target (IP/CIDR/file). -u and -p accept files - all pairs are tried automatically. Green (+) means valid credentials, (Pwn3d!) means admin access. Config and logs: ~/.nxc/. Inherits CrackMapExec syntax."
+    },
+    {
+      "title": "enum4linux-ng",
+      "subcategory": "comprehensive SMB/RPC enumeration",
+      "purpose": "enum4linux rewritten in Python: in a single run it collects users, groups, shares, password policy, OS, RID-cycling from an SMB/RPC host and exports to JSON/YAML. Handy for quick Windows/Samba recon.",
+      "install": "pipx install enum4linux-ng",
+      "binary": "enum4linux-ng",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Main",
+          "flags": [
+            { "flag": "-A", "desc": "Full 'simple' enumeration: users, groups, shares, policy, OS, NetBIOS, printers (-U -G -S -P -O -N -I -L)." },
+            { "flag": "-As", "desc": "Same as -A but without NetBIOS queries." },
+            { "flag": "-R", "value": "100", "desc": "RID-cycling - brute-forcing RIDs to extract users. Optional batch size." },
+            { "flag": "-v", "desc": "Verbose output." }
+          ]
+        },
+        {
+          "name": "What to enumerate",
+          "flags": [
+            { "flag": "-U", "desc": "Retrieve users via RPC." },
+            { "flag": "-G", "desc": "Retrieve groups via RPC." },
+            { "flag": "-Gm", "desc": "Retrieve groups along with their members via RPC." },
+            { "flag": "-S", "desc": "Retrieve shares via RPC." },
+            { "flag": "-P", "desc": "Retrieve the password policy via RPC." },
+            { "flag": "-O", "desc": "Retrieve OS information." },
+            { "flag": "-L", "desc": "Retrieve domain information via LDAP/LDAPS." },
+            { "flag": "-I", "desc": "Retrieve printer information via RPC." },
+            { "flag": "-N", "desc": "NetBIOS name lookup." },
+            { "flag": "-C", "desc": "Retrieve services via RPC." }
+          ]
+        },
+        {
+          "name": "Authentication",
+          "flags": [
+            { "flag": "-u", "value": "user", "desc": "Username (empty by default - null session)." },
+            { "flag": "-p", "value": "password", "desc": "Password (empty by default)." },
+            { "flag": "-H", "value": "NTHASH", "desc": "Authentication with an NT hash." },
+            { "flag": "-K", "value": "ticket.ccache", "desc": "Authentication via a Kerberos ticket (for AD)." },
+            { "flag": "--local-auth", "desc": "Local authentication rather than domain." },
+            { "flag": "-w", "value": "DOMAIN", "desc": "Specify the workgroup/domain (auto-detected by default)." }
+          ]
+        },
+        {
+          "name": "Fine tuning",
+          "flags": [
+            { "flag": "-d", "desc": "Detailed information on users and groups (with -U/-G/-R)." },
+            { "flag": "-r", "value": "500-550,1000-1050", "desc": "RID ranges to brute-force (default 500-550,1000-1050)." },
+            { "flag": "-k", "value": "administrator,guest,krbtgt", "desc": "Known existing names to test (comma-separated)." },
+            { "flag": "-s", "value": "shares.txt", "desc": "Brute-force shares using a wordlist from a file." },
+            { "flag": "-t", "value": "10", "desc": "Connection timeout in seconds (default 10)." }
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            { "flag": "-oJ", "value": "out", "desc": "Export results to JSON (extension added automatically)." },
+            { "flag": "-oY", "value": "out", "desc": "Export results to YAML." },
+            { "flag": "-oA", "value": "out", "desc": "Export to both JSON and YAML at once." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "enum4linux-ng -A {TARGET}", "note": "Full enumeration with a null session - the standard first run." },
+        { "cmd": "enum4linux-ng -A -u user -p password {TARGET}", "note": "Same, but with valid domain credentials (more data)." },
+        { "cmd": "enum4linux-ng -R -r 500-2000 {TARGET}", "note": "Enumerate users via RID-cycling over an extended range." },
+        { "cmd": "enum4linux-ng -A -oA result {TARGET}", "note": "Full run with output saved to result.json and result.yaml." }
+      ],
+      "notes": "The target is a positional argument (IP/hostname) at the end of the command. By default it works anonymously (null session). -A covers most needs; targeted flags (-U/-S/...) are handy for noisy targets. Requires the smbclient/samba-common packages (used under the hood)."
+    },
+    {
+      "title": "smbclient / smbmap",
+      "subcategory": "access to SMB shares",
+      "purpose": "smbclient is an FTP-like client for connecting to SMB shares, listing, and downloading/uploading files. smbmap does mass share enumeration with access-rights display, recursive traversal, and command execution.",
+      "install": "sudo apt install smbclient; pipx install smbmap",
+      "binary": "smbclient",
+      "target": "-L //{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target and connection",
+          "flags": [
+            { "flag": "-L", "value": "//{TARGET}", "desc": "Enumerate available shares on the server (//host or host)." },
+            { "flag": "-p", "value": "445", "desc": "SMB port (default 445)." },
+            { "flag": "-m", "value": "SMB3", "desc": "Maximum SMB protocol version (SMB2/SMB3)." },
+            { "flag": "-I", "value": "{TARGET}", "desc": "Explicitly set the target IP (if the name does not resolve)." }
+          ]
+        },
+        {
+          "name": "Authentication",
+          "flags": [
+            { "flag": "-U", "value": "user", "desc": "Username (can be DOMAIN/user or user%password)." },
+            { "flag": "-N", "desc": "No password (anonymous/null access) - do not prompt for a password." },
+            { "flag": "--pw-nt-hash", "desc": "Treat the password from -U as an NT hash (Pass-the-Hash)." },
+            { "flag": "-k", "desc": "Authenticate via Kerberos." },
+            { "flag": "-W", "value": "DOMAIN", "desc": "Workgroup/domain." }
+          ]
+        },
+        {
+          "name": "Execution and output",
+          "flags": [
+            { "flag": "-c", "value": "ls; get file", "desc": "Run commands non-interactively (separated by ;): ls, get, put, mget..." },
+            { "flag": "-d", "value": "1", "desc": "Debug level." },
+            { "flag": "-g", "desc": "Machine-readable (grep-friendly) output." }
+          ]
+        },
+        {
+          "name": "Commands inside a session",
+          "flags": [
+            { "flag": "ls", "desc": "List files in the current directory of the share." },
+            { "flag": "get", "value": "file", "desc": "Download a file from the share." },
+            { "flag": "put", "value": "file", "desc": "Upload a file to the share." },
+            { "flag": "mget", "value": "*", "desc": "Download multiple files by mask (with prompt OFF / recurse ON)." },
+            { "flag": "cd", "value": "dir", "desc": "Change to a directory on the share." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "smbclient -L //{TARGET} -N", "note": "Anonymously enumerate shares on the host." },
+        { "cmd": "smbclient //{TARGET}/share -U 'user%password'", "note": "Connect to a specific share with credentials (interactive session)." },
+        { "cmd": "smbclient //{TARGET}/share -N -c 'recurse ON; ls'", "note": "Anonymously and recursively list the entire contents of the share." },
+        { "cmd": "smbclient //{TARGET}/share -U user --pw-nt-hash -c 'get secret.txt'", "note": "Pass-the-Hash and file download in a single command." },
+        { "cmd": "smbmap -H {TARGET} -u user -p password -R", "note": "smbmap: recursively show shares and access rights." }
+      ],
+      "notes": "smbclient: target in the form //host/share (or -L //host for listing). smbmap (binary smbmap) is a separate tool: -H host (target), -u/-p/-d (creds/domain), -L (all drives), -r [PATH] (directory listing), -R [PATH] (recursive), --download / --upload SRC DST (files), -x 'cmd' (run a command). smbmap is more convenient for a quick overview of rights across all shares at once."
+    },
+    {
+      "title": "rpcclient",
+      "subcategory": "MS-RPC client for AD enumeration",
+      "purpose": "A client for calling MS-RPC functions on Windows/Samba. The main tool for manual domain enumeration via a null session or with credentials: users, groups, SIDs, password policy, server information.",
+      "install": "sudo apt install smbclient",
+      "binary": "rpcclient",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Connection",
+          "flags": [
+            { "flag": "-U", "value": "user%password", "desc": "Credentials (user, user%password, or DOMAIN/user)." },
+            { "flag": "-N", "desc": "No password - null session (anonymous)." },
+            { "flag": "-W", "value": "DOMAIN", "desc": "Workgroup/domain." },
+            { "flag": "-k", "desc": "Authenticate via Kerberos." },
+            { "flag": "--pw-nt-hash", "desc": "Treat the password from -U as an NT hash (Pass-the-Hash)." },
+            { "flag": "-c", "value": "enumdomusers", "desc": "Run command(s) non-interactively (separated by ;) instead of an interactive session." }
+          ]
+        },
+        {
+          "name": "Commands: users/groups",
+          "flags": [
+            { "flag": "enumdomusers", "desc": "List domain users and their RIDs." },
+            { "flag": "enumdomgroups", "desc": "List domain groups and their RIDs." },
+            { "flag": "querydispinfo", "desc": "Users with names, full name, and description (often sees more than enumdomusers)." },
+            { "flag": "queryuser", "value": "0x457", "desc": "Detailed information about a user by RID." },
+            { "flag": "queryusergroups", "value": "0x457", "desc": "A user's groups by their RID." }
+          ]
+        },
+        {
+          "name": "Commands: domain/SID",
+          "flags": [
+            { "flag": "lsaquery", "desc": "Retrieve the domain SID and name." },
+            { "flag": "lookupnames", "value": "administrator", "desc": "Get the SID for an account name." },
+            { "flag": "lookupsids", "value": "S-1-5-21-...-500", "desc": "Get the account name for a SID (manual RID-cycling)." },
+            { "flag": "getdompwinfo", "desc": "Domain password policy (minimum length, complexity)." },
+            { "flag": "enumdomains", "desc": "List domains on the server." }
+          ]
+        },
+        {
+          "name": "Commands: server/misc",
+          "flags": [
+            { "flag": "srvinfo", "desc": "Server information (type, OS version)." },
+            { "flag": "netshareenumall", "desc": "Enumerate all shares via RPC." },
+            { "flag": "enumprinters", "desc": "Enumerate printers." },
+            { "flag": "lsaenumsid", "desc": "Enumerate SIDs known to LSA." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "rpcclient -U '' -N {TARGET}", "note": "Open an interactive null session for manual enumeration." },
+        { "cmd": "rpcclient -U '' -N {TARGET} -c 'enumdomusers'", "note": "Quickly extract the list of domain users anonymously." },
+        { "cmd": "rpcclient -U '' -N {TARGET} -c 'querydispinfo'", "note": "Users with descriptions (sometimes passwords are stored there)." },
+        { "cmd": "rpcclient -U 'user%pass' {TARGET} -c 'getdompwinfo; lsaquery'", "note": "Password policy and domain SID with valid credentials." }
+      ],
+      "notes": "The target is a positional argument (IP/hostname). Without -c it opens an interactive rpcclient $> shell where commands are entered one at a time. With -c, commands are separated by ';'. A null session (-U '' -N) is often available on old/misconfigured DCs. The querydispinfo and enumdomusers commands may yield different coverage - try both."
+    },
+    {
+      "title": "ldapsearch",
+      "subcategory": "queries to LDAP/AD",
+      "purpose": "The standard OpenLDAP client for directory queries. In AD pentesting - extracting users, groups, descriptions, SPNs, and attributes via anonymous or authenticated bind. Precise control over filters and attributes.",
+      "install": "sudo apt install ldap-utils",
+      "binary": "ldapsearch",
+      "target": "-H ldap://{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Connection and bind",
+          "flags": [
+            { "flag": "-H", "value": "ldap://{TARGET}", "desc": "Server URI (ldap://host:389 or ldaps://host:636)." },
+            { "flag": "-x", "desc": "Simple authentication (required even for anonymous bind, instead of SASL)." },
+            { "flag": "-D", "value": "user@domain.local", "desc": "Bind DN - the account for authentication (UPN or full DN)." },
+            { "flag": "-w", "value": "password", "desc": "Password on the command line." },
+            { "flag": "-W", "desc": "Prompt for the password interactively (do not expose it in history)." },
+            { "flag": "-y", "value": "pass.txt", "desc": "Read the password from a file." }
+          ]
+        },
+        {
+          "name": "Search parameters",
+          "flags": [
+            { "flag": "-b", "value": "DC=domain,DC=local", "desc": "Search base (Base DN) - the root to search from." },
+            { "flag": "-s", "value": "sub", "desc": "Search scope: base, one, sub (sub by default)." },
+            { "flag": "-z", "value": "1000", "desc": "Limit on the number of records in the response." },
+            { "flag": "-l", "value": "60", "desc": "Time limit for the search (seconds)." }
+          ]
+        },
+        {
+          "name": "Output format",
+          "flags": [
+            { "flag": "-LLL", "desc": "Strip comments and the LDIF version from the output (clean result)." },
+            { "flag": "-o", "value": "ldif-wrap=no", "desc": "Output options; ldif-wrap=no disables wrapping of long lines." },
+            { "flag": "-E", "value": "pr=1000/noprompt", "desc": "Query extension; paged results (pr) to bypass the AD limit of 1000 records." },
+            { "flag": "-t", "desc": "Save binary attribute values to temporary files." }
+          ]
+        },
+        {
+          "name": "Filter and attributes (positional)",
+          "flags": [
+            { "flag": "(objectClass=*)", "desc": "Search filter - the first positional argument after options." },
+            { "flag": "(objectClass=user)", "desc": "Find all user objects." },
+            { "flag": "(&(objectClass=user)(servicePrincipalName=*))", "desc": "Accounts with an SPN - Kerberoasting candidates." },
+            { "flag": "sAMAccountName description", "desc": "List of attributes to output - after the filter (otherwise all attributes)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "ldapsearch -H ldap://{TARGET} -x -s base -b '' defaultNamingContext", "note": "Anonymously learn the domain Base DN (RootDSE is almost always accessible)." },
+        { "cmd": "ldapsearch -H ldap://{TARGET} -x -LLL -b 'DC=domain,DC=local' '(objectClass=user)' sAMAccountName description", "note": "Enumerate users and their descriptions (anonymously, if bind is allowed)." },
+        { "cmd": "ldapsearch -H ldap://{TARGET} -x -D 'user@domain.local' -w pass -b 'DC=domain,DC=local' '(objectClass=*)' -o ldif-wrap=no", "note": "Full directory dump with valid credentials without line wrapping." },
+        { "cmd": "ldapsearch -H ldap://{TARGET} -x -D 'u@d.local' -w pass -b 'DC=d,DC=local' '(&(objectClass=user)(servicePrincipalName=*))' servicePrincipalName", "note": "Find accounts with an SPN for Kerberoasting." }
+      ],
+      "notes": "AD forbids anonymous search except for RootDSE - credentials (-D/-w) are usually required. The filter and attribute list go POSITIONALLY after all options. For dumping >1000 objects use paged results: -E pr=1000/noprompt. The Base DN can be pulled from RootDSE (-s base -b ''). Related tools: windapsearch, ldapdomaindump."
+    },
+    {
+      "title": "kerbrute",
+      "subcategory": "Kerberos pre-auth brute force",
+      "purpose": "Fast and relatively quiet brute force via Kerberos pre-auth: username validation, password spray, and brute force. Does not trigger event 4625 on a failed pre-authentication, so it is stealthier than typical methods.",
+      "install": "go install github.com/ropnop/kerbrute@latest",
+      "binary": "kerbrute",
+      "target": "--dc {TARGET}",
+      "modes": [
+        { "name": "userenum", "desc": "Check the existence of usernames against a wordlist.", "target": "--dc {TARGET}" },
+        { "name": "passwordspray", "desc": "A single password against a list of users.", "target": "--dc {TARGET}" },
+        { "name": "bruteuser", "desc": "Brute-force passwords from a wordlist against a single user.", "target": "--dc {TARGET}" },
+        { "name": "bruteforce", "desc": "Brute-force user:password pairs from a file or stdin.", "target": "--dc {TARGET}" }
+      ],
+      "groups": [
+        {
+          "name": "Target (required)",
+          "flags": [
+            { "flag": "--dc", "value": "{TARGET}", "desc": "Address of the domain controller (KDC). If not set, it is looked up via DNS." },
+            { "flag": "-d", "value": "domain.local", "desc": "Fully qualified domain name (e.g. contoso.com). One of --dc/-d is required." }
+          ]
+        },
+        {
+          "name": "Performance",
+          "flags": [
+            { "flag": "-t", "value": "10", "desc": "Number of threads (default 10)." },
+            { "flag": "--delay", "value": "100", "desc": "Delay between attempts (ms); enables single-threaded mode." },
+            { "flag": "--safe", "desc": "Abort if a locked account is detected (protection against lockout)." }
+          ]
+        },
+        {
+          "name": "Misc",
+          "flags": [
+            { "flag": "-o", "value": "results.txt", "desc": "Write the log to a file." },
+            { "flag": "-v", "desc": "Log failures and errors (only successes by default)." },
+            { "flag": "--downgrade", "desc": "Force weak encryption (arcfour-hmac-md5)." }
+          ]
+        },
+        {
+          "name": "userenum arguments",
+          "flags": [
+            { "flag": "users.txt", "desc": "File with a list of usernames to check (positional)." }
+          ]
+        },
+        {
+          "name": "passwordspray arguments",
+          "flags": [
+            { "flag": "users.txt", "desc": "File with a list of users (1st positional)." },
+            { "flag": "Password1", "desc": "A single password to test against all (2nd positional)." }
+          ]
+        },
+        {
+          "name": "bruteuser / bruteforce arguments",
+          "flags": [
+            { "flag": "passwords.txt", "desc": "bruteuser: password wordlist (1st positional), then the username (2nd)." },
+            { "flag": "combos.txt", "desc": "bruteforce: file with user:password pairs (or '-' for stdin)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "kerbrute userenum --dc {TARGET} -d domain.local users.txt", "note": "Check which names from the wordlist are valid domain accounts." },
+        { "cmd": "kerbrute passwordspray --dc {TARGET} -d domain.local users.txt 'Spring2026!'", "note": "Spray a single password across all users (with --safe against lockout)." },
+        { "cmd": "kerbrute bruteuser --dc {TARGET} -d domain.local rockyou.txt administrator", "note": "Brute-force passwords from a wordlist against a single user." },
+        { "cmd": "kerbrute bruteforce --dc {TARGET} -d domain.local combos.txt", "note": "Brute-force ready-made user:password pairs from a file." }
+      ],
+      "notes": "You must specify the domain (-d) and preferably --dc (otherwise the KDC is resolved via DNS). userenum does not trigger the failed-login event 4625 - the quietest way to validate names. For spray always add --safe to avoid locking out accounts. Usernames are sensitive to existence but do not cause lockout during userenum."
+    },
+    {
+      "title": "responder",
+      "subcategory": "LLMNR/NBT-NS/MDNS poisoning",
+      "purpose": "A poisoner for name resolution protocols (LLMNR, NBT-NS, MDNS) with built-in rogue HTTP/SMB/MSSQL/LDAP servers. Captures NTLMv1/v2 hashes from victims' broadcast queries for subsequent cracking or relay.",
+      "install": "sudo apt install responder",
+      "binary": "responder",
+      "target": "",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Interface and mode",
+          "flags": [
+            { "flag": "-I", "value": "tun0", "desc": "Network interface to listen on (required)." },
+            { "flag": "-A", "desc": "Analysis mode - only observe requests, do NOT respond (passive recon)." },
+            { "flag": "-v", "desc": "Verbose output." },
+            { "flag": "-Q", "desc": "Quiet mode." }
+          ]
+        },
+        {
+          "name": "Poisoning",
+          "flags": [
+            { "flag": "-w", "desc": "Enable the rogue WPAD proxy (capture browser HTTP authentication)." },
+            { "flag": "-F", "desc": "Force authentication for WPAD (rogue PAC requires login)." },
+            { "flag": "-P", "desc": "Force authentication on the proxy (together with -w)." },
+            { "flag": "-d", "desc": "Respond to NetBIOS domain suffix queries." },
+            { "flag": "-r", "desc": "Respond to NetBIOS wredir queries (careful - noisy)." }
+          ]
+        },
+        {
+          "name": "DHCP poisoning",
+          "flags": [
+            { "flag": "-D", "desc": "Enable rogue DHCP responses (DHCPv4) with WPAD/DNS injection." },
+            { "flag": "--dhcpv6", "desc": "Enable DHCPv6 poisoning (mitm6-like)." }
+          ]
+        },
+        {
+          "name": "Authentication and fine points",
+          "flags": [
+            { "flag": "-b", "desc": "Serve Basic HTTP authentication instead of NTLM (cleartext passwords)." },
+            { "flag": "--lm", "desc": "Force a downgrade to LM hashes (easier to crack) on old clients." },
+            { "flag": "--disable-ess", "desc": "Disable Extended Session Security (NTLMv1 downgrade)." },
+            { "flag": "-E", "desc": "Return an error code instead of an authentication challenge (force a retry)." },
+            { "flag": "-u", "value": "HOST:PORT", "desc": "Upstream proxy for captured traffic." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "responder -I {LHOST_IF} -A", "note": "Passive analysis: see who is sending LLMNR/NBT-NS without poisoning anything." },
+        { "cmd": "sudo responder -I tun0", "note": "Basic LLMNR/NBT-NS/MDNS poisoning with NTLM hash collection." },
+        { "cmd": "sudo responder -I tun0 -wd", "note": "Poisoning + rogue WPAD proxy + responses to domain suffix." },
+        { "cmd": "sudo responder -I tun0 -b", "note": "Capture Basic authentication (cleartext passwords, not hashes)." }
+      ],
+      "notes": "The interface is set via -I; there is no separate positional target (the entire broadcast segment is poisoned). Captured hashes and logs: /usr/share/responder/logs/ (in hashcat format). Config is /etc/responder/Responder.conf (specific servers are enabled/disabled there). Before a relay attack, disable the SMB/HTTP servers in the config and use ntlmrelayx. Run as root."
+    },
+    {
+      "title": "evil-winrm",
+      "subcategory": "interactive WinRM shell",
+      "purpose": "A full-featured shell for remote access to Windows over WinRM (5985/5986). Supports Pass-the-Hash, Kerberos, file upload/download, .NET assembly execution, and AMSI bypass. The standard after obtaining credentials with WinRM access.",
+      "install": "gem install evil-winrm",
+      "binary": "evil-winrm",
+      "target": "-i {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target and connection",
+          "flags": [
+            { "flag": "-i", "value": "{TARGET}", "desc": "Target IP or hostname (required)." },
+            { "flag": "-P", "value": "5985", "desc": "Port (default 5985; with -S becomes 5986)." },
+            { "flag": "-S", "desc": "Enable SSL/TLS (port 5986)." },
+            { "flag": "-U", "value": "/wsman", "desc": "Endpoint URL (default /wsman)." }
+          ]
+        },
+        {
+          "name": "Authentication",
+          "flags": [
+            { "flag": "-u", "value": "user", "desc": "Username." },
+            { "flag": "-p", "value": "password", "desc": "Password." },
+            { "flag": "-H", "value": "NTHASH", "desc": "NT hash for Pass-the-Hash (instead of a password)." },
+            { "flag": "-r", "value": "domain.local", "desc": "Realm for Kerberos authentication." },
+            { "flag": "-K", "value": "ticket.ccache", "desc": "Kerberos ticket (ccache or kirbi)." },
+            { "flag": "--spn", "value": "HTTP", "desc": "SPN prefix for Kerberos (default HTTP)." }
+          ]
+        },
+        {
+          "name": "Certificates (SSL)",
+          "flags": [
+            { "flag": "-c", "value": "cert.pem", "desc": "Public certificate for certificate-based authentication." },
+            { "flag": "-k", "value": "key.pem", "desc": "Private key for certificate-based authentication." },
+            { "flag": "-a", "value": "Mozilla/5.0", "desc": "Custom connection User-Agent." }
+          ]
+        },
+        {
+          "name": "Loading scripts/binaries and logging",
+          "flags": [
+            { "flag": "-s", "value": "/opt/scripts/", "desc": "Path to local PowerShell scripts (loaded by invoking them by name)." },
+            { "flag": "-e", "value": "/opt/bins/", "desc": "Path to local C#/.NET assemblies (for Invoke-Binary)." },
+            { "flag": "-l", "desc": "Log the session." },
+            { "flag": "-N", "desc": "Disable remote path autocompletion (if it is slow)." }
+          ]
+        },
+        {
+          "name": "Commands inside the shell",
+          "flags": [
+            { "flag": "upload", "value": "local remote", "desc": "Upload a file from the attacker to the target." },
+            { "flag": "download", "value": "remote local", "desc": "Download a file from the target." },
+            { "flag": "Invoke-Binary", "value": "/path/exe.exe args", "desc": "Execute a .NET assembly in memory (from the -e directory)." },
+            { "flag": "Bypass-4MSI", "desc": "Patch AMSI in memory." },
+            { "flag": "services", "desc": "List services and rights on them." },
+            { "flag": "menu", "desc": "Show loaded functions/commands." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "evil-winrm -i {TARGET} -u user -p password", "note": "Basic connection with a username and password." },
+        { "cmd": "evil-winrm -i {TARGET} -u administrator -H 31d6cfe0d16ae931b73c59d7e0c089c0", "note": "Pass-the-Hash - login with an NT hash without a password." },
+        { "cmd": "evil-winrm -i {TARGET} -u user -p pass -S", "note": "Connect over WinRM with SSL (port 5986)." },
+        { "cmd": "evil-winrm -i {TARGET} -u user -p pass -s /opt/ps/ -e /opt/bins/", "note": "With local PS scripts and .NET assemblies loaded for post-exploitation." }
+      ],
+      "notes": "The target is set with the -i flag (not positionally). Access requires the user to be a member of the Remote Management Users group (or an admin). Inside the shell, upload/download, Invoke-Binary, Bypass-4MSI, Dll-Loader, and Donut-Loader are available. For Kerberos you need a valid ticket in KRB5CCNAME and -r with a realm. SSL (-S) switches the port to 5986."
+    },
+    {
+      "title": "bloodhound / bloodhound-python",
+      "subcategory": "data collection for the AD graph",
+      "purpose": "bloodhound-python (BloodHound.py) is a Python ingestor: it collects users, groups, sessions, ACLs, trusts, and attack paths from the domain into JSON for import into BloodHound. Does not require running on Windows - works from Linux over the network.",
+      "install": "pipx install bloodhound-ce",
+      "binary": "bloodhound-python",
+      "target": "-ns {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target and DNS",
+          "flags": [
+            { "flag": "-ns", "value": "{TARGET}", "desc": "DNS server (usually the DC itself) - critical for resolving domain names." },
+            { "flag": "-dc", "value": "dc01.domain.local", "desc": "Name (FQDN) of the domain controller for queries." },
+            { "flag": "-gc", "value": "dc01.domain.local", "desc": "Global catalog server." },
+            { "flag": "--dns-tcp", "desc": "Use TCP for DNS queries." },
+            { "flag": "-di", "desc": "Disable Global Catalog auto-detection (--disable-autogc)." }
+          ]
+        },
+        {
+          "name": "Authentication",
+          "flags": [
+            { "flag": "-u", "value": "user@domain.local", "desc": "Username (UPN)." },
+            { "flag": "-p", "value": "password", "desc": "Password." },
+            { "flag": "--hashes", "value": "LM:NT", "desc": "NT hash (or LM:NT) for Pass-the-Hash." },
+            { "flag": "-k", "desc": "Authenticate via Kerberos." },
+            { "flag": "-d", "value": "domain.local", "desc": "Domain name (required)." },
+            { "flag": "--use-ldaps", "desc": "Use LDAPS (636) instead of LDAP." }
+          ]
+        },
+        {
+          "name": "Data collection",
+          "flags": [
+            { "flag": "-c", "value": "Default", "desc": "Collection methods: Default, All, Group, LocalAdmin, Session, Trusts, ACL, ObjectProps, Container, RDP, DCOM, PSRemote, LoggedOn, DCOnly." },
+            { "flag": "-w", "value": "10", "desc": "Number of worker threads (--workers)." },
+            { "flag": "--auth-method", "value": "auto", "desc": "Authentication method (auto/ntlm/kerberos)." }
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            { "flag": "-op", "value": "prefix", "desc": "Prefix for output file names (--outputprefix)." },
+            { "flag": "--zip", "desc": "Pack the collected JSON into a single zip archive (handy for import)." },
+            { "flag": "-v", "desc": "Verbose output." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "bloodhound-python -u user -p password -d domain.local -ns {TARGET} -c All --zip", "note": "Full data collection and packing into a zip for import into BloodHound." },
+        { "cmd": "bloodhound-python -u user@domain.local -p pass -d domain.local -dc dc01.domain.local -ns {TARGET} -c DCOnly", "note": "Quiet collection via the DC only (without contacting every host)." },
+        { "cmd": "bloodhound-python -u user --hashes :NThash -d domain.local -ns {TARGET} -c All --zip", "note": "Collection via Pass-the-Hash without a password." },
+        { "cmd": "bloodhound-python -u user -p pass -d domain.local -ns {TARGET} -k -c All --use-ldaps", "note": "Collection via Kerberos and LDAPS." }
+      ],
+      "notes": "-ns is REQUIRED and must point to the domain DNS (usually the DC), otherwise names will not resolve. -c All collects everything except LoggedOn; DCOnly is the quietest (only LDAP queries to the DC). For BloodHound CE install bloodhound-ce-python (the output format differs from legacy). Import: the zip archive via the web interface. The Windows alternative is SharpHound."
+    },
+    {
+      "title": "certipy",
+      "subcategory": "attacks on AD CS (ESC1-ESC16)",
+      "purpose": "A tool for enumerating and exploiting AD Certificate Services. Finds vulnerable certificate templates (ESC1-16), requests and forges certificates, performs NTLM relay and Shadow Credentials for privilege escalation and account takeover.",
+      "install": "pipx install certipy-ad",
+      "binary": "certipy",
+      "target": "-dc-ip {TARGET}",
+      "modes": [
+        { "name": "find", "desc": "Enumerate CAs and templates, find ESC vulnerabilities.", "target": "-dc-ip {TARGET}" },
+        { "name": "req", "desc": "Request a certificate by template from the CA.", "target": "-dc-ip {TARGET}" },
+        { "name": "auth", "desc": "Authenticate with a certificate (PKINIT) to get a TGT/NT hash.", "target": "-dc-ip {TARGET}" },
+        { "name": "relay", "desc": "NTLM relay to an AD CS HTTP/RPC endpoint (ESC8/ESC11).", "target": "" },
+        { "name": "shadow", "desc": "Shadow Credentials - account takeover via msDS-KeyCredentialLink.", "target": "-dc-ip {TARGET}" },
+        { "name": "forge", "desc": "Forge a certificate when the CA private key is available (Golden Cert).", "target": "" }
+      ],
+      "groups": [
+        {
+          "name": "Authentication and connection",
+          "flags": [
+            { "flag": "-u", "value": "user@domain.local", "desc": "Username (UPN)." },
+            { "flag": "-p", "value": "password", "desc": "Password." },
+            { "flag": "-hashes", "value": "LM:NT", "desc": "NT hash (or LM:NT) for Pass-the-Hash." },
+            { "flag": "-k", "desc": "Authenticate via Kerberos." },
+            { "flag": "-no-pass", "desc": "Do not prompt for a password (with -k or when anonymous)." },
+            { "flag": "-dc-ip", "value": "{TARGET}", "desc": "Domain controller IP." },
+            { "flag": "-ns", "value": "{TARGET}", "desc": "DNS server (usually the DC)." },
+            { "flag": "-target", "value": "ca.domain.local", "desc": "Target host (CA/server) to connect to." }
+          ]
+        },
+        {
+          "name": "find",
+          "flags": [
+            { "flag": "-vulnerable", "desc": "Show only vulnerable templates (ESC).", "mode": "find" },
+            { "flag": "-enabled", "desc": "Only enabled (published) templates.", "mode": "find" },
+            { "flag": "-stdout", "desc": "Print the result to the console instead of files.", "mode": "find" },
+            { "flag": "-bloodhound", "desc": "Export for BloodHound.", "mode": "find" },
+            { "flag": "-hide-admins", "desc": "Hide admin rights in the output (less noise).", "mode": "find" }
+          ]
+        },
+        {
+          "name": "req (certificate request)",
+          "flags": [
+            { "flag": "-ca", "value": "DOMAIN-CA", "desc": "Name of the certification authority (CA).", "mode": "req" },
+            { "flag": "-template", "value": "User", "desc": "Certificate template name.", "mode": "req" },
+            { "flag": "-upn", "value": "administrator@domain.local", "desc": "Inject a UPN into the SAN (ESC1 - impersonate another user).", "mode": "req" },
+            { "flag": "-dns", "value": "dc01.domain.local", "desc": "Inject a DNS name into the SAN.", "mode": "req" },
+            { "flag": "-sid", "value": "S-1-5-21-...-500", "desc": "Inject a SID into the certificate.", "mode": "req" },
+            { "flag": "-application-policies", "value": "Client Authentication", "desc": "Application policies (for ESC15).", "mode": "req" },
+            { "flag": "-out", "value": "cert", "desc": "Filename prefix for saving the .pfx.", "mode": "req" }
+          ]
+        },
+        {
+          "name": "auth / shadow",
+          "flags": [
+            { "flag": "-pfx", "value": "cert.pfx", "desc": "The .pfx certificate file for authentication.", "mode": "auth" },
+            { "flag": "-username", "value": "administrator", "desc": "Username for certificate-based authentication.", "mode": "auth" },
+            { "flag": "-domain", "value": "domain.local", "desc": "Domain for authentication.", "mode": "auth" },
+            { "flag": "-ldap-shell", "desc": "Open an LDAP shell after authentication.", "mode": "auth" },
+            { "flag": "-account", "value": "target$", "desc": "Target account for Shadow Credentials.", "mode": "shadow" }
+          ]
+        },
+        {
+          "name": "forge / relay",
+          "flags": [
+            { "flag": "-ca-pfx", "value": "ca.pfx", "desc": "CA certificate+key for forging (Golden Certificate).", "mode": "forge" },
+            { "flag": "-subject", "value": "CN=Administrator", "desc": "Subject of the forged certificate.", "mode": "forge" },
+            { "flag": "-serial", "value": "1", "desc": "Serial number of the forged certificate.", "mode": "forge" },
+            { "flag": "-target", "value": "http://ca.domain.local", "desc": "Relay target (protocol://host) for ESC8/ESC11.", "mode": "relay" },
+            { "flag": "-template", "value": "DomainController", "desc": "Template to request during relay.", "mode": "relay" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "certipy find -u user@domain.local -p pass -dc-ip {TARGET} -vulnerable -stdout", "note": "Find vulnerable certificate templates (ESC) and print to the console." },
+        { "cmd": "certipy req -u user@domain.local -p pass -dc-ip {TARGET} -ca DOMAIN-CA -template VulnTemplate -upn administrator@domain.local", "note": "ESC1: request a certificate with the UPN spoofed to an admin." },
+        { "cmd": "certipy auth -pfx administrator.pfx -dc-ip {TARGET}", "note": "Authenticate with the certificate and obtain a TGT + the admin's NT hash." },
+        { "cmd": "certipy shadow auto -u user@domain.local -p pass -dc-ip {TARGET} -account target$", "note": "Shadow Credentials: take over an account and obtain its NT hash automatically." },
+        { "cmd": "certipy forge -ca-pfx ca.pfx -upn administrator@domain.local -subject 'CN=Administrator'", "note": "Forge a Golden Certificate when the CA key is available." }
+      ],
+      "notes": "The first argument is the subcommand (find/req/auth/relay/shadow/forge/ca/cert/account/template/parse). Flags use a SINGLE hyphen (-dc-ip, -no-pass) in impacket style. The classic ESC1 path: find -vulnerable -> req with -upn -> auth. shadow auto does add+auth+clear automatically. For relay (ESC8) DC-ip is not needed - the target is set via -target."
+    },
+    {
+      "title": "hydra",
+      "subcategory": "network login brute force",
+      "purpose": "A fast parallel brute-forcer for network services: SSH, FTP, RDP, SMB, HTTP forms, databases, and dozens of other protocols. Brute-forces logins and passwords from wordlists against a service on the target.",
+      "install": "sudo apt install hydra",
+      "binary": "hydra",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Logins and passwords",
+          "flags": [
+            { "flag": "-l", "value": "admin", "desc": "A single login." },
+            { "flag": "-L", "value": "users.txt", "desc": "File with a list of logins." },
+            { "flag": "-p", "value": "password", "desc": "A single password." },
+            { "flag": "-P", "value": "rockyou.txt", "desc": "File with a list of passwords." },
+            { "flag": "-C", "value": "combos.txt", "desc": "File with login:password pairs (instead of -L/-P)." },
+            { "flag": "-e", "value": "nsr", "desc": "Extra checks: n - empty password, s - password=login, r - reversed login." },
+            { "flag": "-u", "desc": "Iterate logins first, then passwords (the default is the other way around)." }
+          ]
+        },
+        {
+          "name": "Target and service",
+          "flags": [
+            { "flag": "-s", "value": "2222", "desc": "Non-standard service port." },
+            { "flag": "-S", "desc": "Use SSL for the connection." },
+            { "flag": "-M", "value": "targets.txt", "desc": "File with a list of targets (mass attack)." },
+            { "flag": "-4", "desc": "IPv4 only." },
+            { "flag": "-6", "desc": "IPv6 only." }
+          ]
+        },
+        {
+          "name": "Speed and control",
+          "flags": [
+            { "flag": "-t", "value": "16", "desc": "Number of parallel tasks per target (for SSH lower it to ~4)." },
+            { "flag": "-T", "value": "64", "desc": "Total number of parallel connects (with -M)." },
+            { "flag": "-w", "value": "30", "desc": "Response wait timeout (seconds)." },
+            { "flag": "-f", "desc": "Stop after the first valid login:password pair on a host." },
+            { "flag": "-F", "desc": "Stop on the first success on any of the hosts (with -M)." }
+          ]
+        },
+        {
+          "name": "Output and session",
+          "flags": [
+            { "flag": "-o", "value": "found.txt", "desc": "Write found credentials to a file." },
+            { "flag": "-b", "value": "text", "desc": "Output file format: text, json, jsonv1." },
+            { "flag": "-V", "desc": "Show every login:password attempt (very verbose)." },
+            { "flag": "-v", "desc": "Verbose output." },
+            { "flag": "-R", "desc": "Restore an interrupted session from hydra.restore." },
+            { "flag": "-I", "desc": "Ignore the restore file (start over)." }
+          ]
+        },
+        {
+          "name": "Password brute force",
+          "flags": [
+            { "flag": "-x", "value": "6:8:a1", "desc": "Generate passwords: min:max:charset (a-letters, 1-digits, !-special characters)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "hydra -l root -P rockyou.txt {TARGET} ssh -t 4", "note": "Brute-force SSH for a single user (few threads so it does not fail)." },
+        { "cmd": "hydra -L users.txt -P passwords.txt {TARGET} ssh -f", "note": "Brute-force login/password pairs over SSH, stop on the first success." },
+        { "cmd": "hydra -l admin -P rockyou.txt {TARGET} http-post-form '/login:user=^USER^&pass=^PASS^:F=incorrect'", "note": "Brute-force an HTTP form: ^USER^/^PASS^ are fields, F= is the failure marker string." },
+        { "cmd": "hydra -L users.txt -p 'Password1' {TARGET} smb", "note": "Password spray a single password across a user list over SMB." },
+        { "cmd": "hydra -l admin -P rockyou.txt -s 3306 {TARGET} mysql", "note": "Brute-force MySQL on a non-standard port." }
+      ],
+      "notes": "Syntax: hydra [options] target service [module parameters]. The target is positional (second to last argument), the service is last (ssh, ftp, smb, rdp, mysql, http-post-form, http-get...). For http-post-form the format is 'path:body:marker': ^USER^/^PASS^ are placeholders, F=string is the failure marker, S=string is the success marker. For SSH keep -t <= 4. Module help: hydra -U http-post-form."
+    }
+  ]
+}

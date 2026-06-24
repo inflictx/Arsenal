@@ -1,0 +1,100 @@
+{
+  "category": "HTTP Parameter Pollution",
+  "source": "PayloadsAllTheThings/HTTP Parameter Pollution/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What HTTP Parameter Pollution is",
+      "language": "text",
+      "tags": ["methodology", "hpp"],
+      "body": "HTTP Parameter Pollution (HPP) is a bypass technique in which an attacker passes several instances of the same parameter with the same name (?param1=value&param1=value) to influence the application logic or extract hidden information.\n\nThere is no formal standard for parsing repeated parameters: each technology parses them in its own way. Some take the first occurrence, others the last, others collect everything into an array. It is exactly this discrepancy that gets exploited - for example, to bypass signature-based filters/WAFs, or to split an attack vector across several copies of a parameter."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Where to look and the two levels of HPP",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "HPP hits at two levels:\n• Client-Side HPP - exploits the JavaScript code on the client side (in the browser): user input ends up in links/forms, and an extra parameter overrides the frontend behavior.\n• Server-Side HPP - exploits how the server handles several parameters with the same name.\n\nWhere to try:\n• Any endpoint where a single parameter participates in logic (flags, amounts, identifiers, access filters).\n• Points that pass through several layers (WAF -> proxy -> backend) - if the layers parse duplicates differently, the filter sees one value while the backend uses another.\n• Forms, redirects, links that are assembled from input on the client.\n\nHow to test: duplicate the target parameter and observe which value was actually applied; change the order of the values; try different notations (param[], %26, nested keys)."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Tools",
+      "language": "text",
+      "tags": ["methodology", "tools"],
+      "body": "• Burp Suite - edit the request manually and add duplicate parameters.\n• OWASP ZAP - intercept and modify HTTP parameters."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Examples of manipulating logic",
+      "language": "text",
+      "tags": ["hpp", "logic", "examples"],
+      "body": "/app?debug=false&debug=true\n/transfer?amount=1&amount=5000"
+    },
+    {
+      "subcategory": "Parser behavior",
+      "title": "How different technologies parse duplicates (?par1=a&par1=b)",
+      "language": "table",
+      "tags": ["hpp", "parsing", "reference"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Technology", "Parsing result", "Outcome (par1=)"],
+          "rows": [
+            ["ASP.NET/IIS", "All occurrences", "a,b"],
+            ["ASP/IIS", "All occurrences", "a,b"],
+            ["Golang net/http — r.URL.Query().Get(\"param\")", "First occurrence", "a"],
+            ["Golang net/http — r.URL.Query()[\"param\"]", "All occurrences in an array", "['a','b']"],
+            ["IBM HTTP Server", "First occurrence", "a"],
+            ["IBM Lotus Domino", "First occurrence", "a"],
+            ["JSP, Servlet/Tomcat", "First occurrence", "a"],
+            ["mod_wsgi (Python)/Apache", "First occurrence", "a"],
+            ["Nodejs", "All occurrences", "a,b"],
+            ["Perl CGI/Apache", "First occurrence", "a"],
+            ["PHP/Apache", "Last occurrence", "b"],
+            ["PHP/Zues", "Last occurrence", "b"],
+            ["Python Django", "Last occurrence", "b"],
+            ["Python Flask", "First occurrence", "a"],
+            ["Python/Zope", "All occurrences in an array", "['a','b']"],
+            ["Ruby on Rails", "Last occurrence", "b"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Exploitation",
+      "title": "Duplicating a parameter",
+      "language": "text",
+      "tags": ["hpp", "duplicate"],
+      "body": "param=value1&param=value2"
+    },
+    {
+      "subcategory": "Exploitation",
+      "title": "Array injection",
+      "language": "text",
+      "tags": ["hpp", "array"],
+      "body": "param[]=value1\nparam[]=value1&param[]=value2\nparam[]=value1&param=value2\nparam=value1&param[]=value2"
+    },
+    {
+      "subcategory": "Exploitation",
+      "title": "Encoded injection (gluing on an extra parameter)",
+      "language": "text",
+      "tags": ["hpp", "encoded", "waf-bypass"],
+      "body": "param=value1%26other=value2"
+    },
+    {
+      "subcategory": "Exploitation",
+      "title": "Nested injection (nested keys)",
+      "language": "text",
+      "tags": ["hpp", "nested"],
+      "body": "param[key1]=value1&param[key2]=value2"
+    },
+    {
+      "subcategory": "Exploitation",
+      "title": "JSON injection (duplicate key in the body)",
+      "language": "json",
+      "tags": ["hpp", "json"],
+      "body": "{\n    \"test\": \"user\",\n    \"test\": \"admin\"\n}"
+    }
+  ]
+}

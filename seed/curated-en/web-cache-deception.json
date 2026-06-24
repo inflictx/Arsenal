@@ -1,0 +1,140 @@
+{
+  "category": "Web Cache Deception",
+  "source": "PayloadsAllTheThings/Web Cache Deception/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "How the cache is \"deceived\" (attack scheme)",
+      "language": "image",
+      "tags": ["methodology", "wcd", "concept"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/web-cache-deception/wcd.jpg",
+        "caption": "The victim opens http://www.example.com/home.php/non-existent.css. The cache server does not find the resource and forwards the request to the origin. The origin returns the content of home.php (with the victim's private data), often with \"do not cache\" headers. The cache sees the .css extension, treats the response as static, and stores it. The attacker requests the same URL and receives the victim's cached private response. Source: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "What is Web Cache Deception (WCD)",
+      "language": "text",
+      "tags": ["methodology", "concept", "wcd"],
+      "body": "Web Cache Deception (WCD) is a vulnerability where a web server or caching proxy interprets the requested path differently, and as a result the cache stores a private/sensitive response as if it were public static content.\n\nClassic example: the attacker lures a logged-in victim into opening http://www.example.com/home.php/non-existent.css\n\n1. The victim's browser requests /home.php/non-existent.css.\n2. The cache server looks for the resource locally and does not find it (cache miss).\n3. The request is forwarded to the origin (main server).\n4. The origin returns the content of /home.php - usually with the victim's private data and headers prohibiting caching.\n5. The response passes back through the cache.\n6. The cache sees that the path ends with .css.\n7. A home.php folder is created under the cache directory, and inside it the fake \"CSS\" file (non-existent.css) is cached.\n8. The attacker requests the same /home.php/non-existent.css -> the cache returns the stored response with the sensitive data from the victim's home.php."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "WCD vs Web Cache Poisoning - what's the difference",
+      "language": "text",
+      "tags": ["methodology", "concept", "cache-poisoning"],
+      "body": "These are two different attacks on the same cache.\n\n• Web Cache Deception (WCD): the victim themselves requests a \"tricky\" path (for example /account/home/x.css). The goal is to make the cache store the victim's PRIVATE response, in order to later steal it via the same URL. The payload is a discrepancy in how the path/extension is interpreted between the cache and the origin. The victim is a specific logged-in user.\n\n• Web Cache Poisoning: through an un-keyed input (a header not included in the cache key) the attacker \"poisons\" the cached response for a SHARED URL, and then this malicious response (for example with XSS) is served to all visitors. The victim is all users of the page.\n\nIn short: with WCD the cache serves someone else's private data to the wrong person; with poisoning the cache serves attacker-supplied malicious content to everyone."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Where to look: starting URLs for testing the cache",
+      "language": "text",
+      "tags": ["methodology", "recon", "tricks"],
+      "body": "First find an endpoint with private data (profile, /home, /account, /api/.../session, tokens). Then append a \"static tail\" to it and check whether the private response got cached.\n\nGood starting URL formats for testing the \"cache\" feature:\nhttps://example.com/app/conversation/.js?test\nhttps://example.com/app/conversation/;.js\nhttps://example.com/home.php/non-existent.css\n\nSign of a vulnerability: a repeat request to the same URL from a clean session (private window/no cookies) returns the victim's data; also check the cache headers (X-Cache: HIT, Age, CF-Cache-Status: HIT)."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Tools",
+      "language": "text",
+      "tags": ["tools", "cache-poisoning"],
+      "body": "• PortSwigger/param-miner - a Burp extension for finding un-keyed inputs and Web Cache Poisoning (github.com/PortSwigger/param-miner).\n• The PayloadsAllTheThings catalog contains Intruders/param_miner_lowercase_headers.txt - a wordlist of lowercase HTTP headers for brute-forcing potentially un-keyed headers."
+    },
+
+    {
+      "subcategory": "Path confusion",
+      "title": "Path confusion - append a fake static extension",
+      "language": "text",
+      "tags": ["path-confusion", "static-extension", "exploitation"],
+      "body": "https://example.com/home.php/non-existent.css\nhttps://example.com/myaccount/home/malicious.css\nhttps://example.com/app/conversation/.js?test"
+    },
+    {
+      "subcategory": "Path confusion",
+      "title": "Caching sensitive data - attack example (PayPal Home)",
+      "language": "text",
+      "tags": ["path-confusion", "exploitation", "sensitive-data"],
+      "body": "Web Cache Deception on the home page (example by Omer Gil, PayPal):\n\n1. Normal visit to your home page: https://www.example.com/myaccount/home/\n2. Open a malicious link: https://www.example.com/myaccount/home/malicious.css\n3. The page renders as /home, and the cache stores the response.\n4. Open a private window with the same URL: https://www.example.com/myaccount/home/malicious.css\n5. The content from the cache is displayed (the victim's private data)."
+    },
+    {
+      "subcategory": "Path confusion",
+      "title": "Caching sensitive data - JWT theft (OpenAI)",
+      "language": "text",
+      "tags": ["path-confusion", "exploitation", "jwt", "account-takeover"],
+      "body": "Web Cache Deception on OpenAI (JWT theft -> account takeover):\n\n1. The attacker crafts a special .css path to the /api/auth/session endpoint.\n2. The attacker distributes the link.\n3. Victims follow the legitimate link.\n4. The response (with session data/JWT) is cached.\n5. The attacker collects JWT credentials from the cache."
+    },
+
+    {
+      "subcategory": "Delimiter tricks",
+      "title": "Detecting a delimiter discrepancy (;)",
+      "language": "text",
+      "tags": ["delimiter", "detection", "path-confusion"],
+      "body": "Delimiter discrepancy: /path/<dynamic-resource>;<static-resource>\n\nExample: /settings/profile;script.js\n\n• If the origin uses ; as a delimiter, but the cache does not:\n  - The cache interprets the path as: /settings/profile;script.js (sees .js -> static -> caches).\n  - The origin interprets the path as: /settings/profile (returns the private profile).\n-> The private response of /settings/profile is cached under a \"static\" URL.\n\nOther delimiter variants: https://example.com/app/conversation/;.js\n\nFull list of delimiter characters: PortSwigger \"Web cache deception lab delimiter list\" (portswigger.net/web-security/web-cache-deception/wcd-lab-delimiter-list)."
+    },
+
+    {
+      "subcategory": "Normalization bypass",
+      "title": "Detecting a path normalization discrepancy (..%2f)",
+      "language": "text",
+      "tags": ["normalization", "detection", "path-traversal"],
+      "body": "Normalization discrepancy: /wcd/..%2fprofile\n\n• If the origin unwinds (normalizes) the path traversal sequence, but the cache does not:\n  - The cache interprets the path as: /wcd/..%2fprofile (sees it as a separate \"static\" path, for example /wcd/... ).\n  - The origin interprets the path as: /profile (after normalizing ..%2f).\n-> The private response of /profile is cached under a URL that the cache considers safe to cache."
+    },
+
+    {
+      "subcategory": "Caching Custom JavaScript",
+      "title": "Un-keyed inputs for Cache Poisoning",
+      "language": "text",
+      "tags": ["cache-poisoning", "unkeyed-input", "headers"],
+      "body": "Find an un-keyed input (a value that affects the response but is not included in the cache key) to poison the cache:\n\nValues: User-Agent\nValues: Cookie\nHeader: X-Forwarded-Host\nHeader: X-Host\nHeader: X-Forwarded-Server\nHeader: X-Forwarded-Scheme (header; also in combination with X-Forwarded-Host)\nHeader: X-Original-URL (Symfony)\nHeader: X-Rewrite-URL (Symfony)"
+    },
+    {
+      "subcategory": "Caching Custom JavaScript",
+      "title": "Cache Poisoning via X-Forwarded-Host (XSS)",
+      "language": "http",
+      "tags": ["cache-poisoning", "x-forwarded-host", "xss"],
+      "body": "GET /test?buster=123 HTTP/1.1\nHost: target.com\nX-Forwarded-Host: test\"><script>alert(1)</script>\n\nHTTP/1.1 200 OK\nCache-Control: public, no-cache\n[..]\n<meta property=\"og:image\" content=\"https://test\"><script>alert(1)</script>\">",
+      "meta": {
+        "tip": "Use a cache buster (?buster=123) to poison exactly this page, not the site's home page. X-Forwarded-Host lands in the og:image attribute without escaping -> the reflected payload gets fixed in the cache and is served to everyone."
+      }
+    },
+
+    {
+      "subcategory": "CloudFlare",
+      "title": "When CloudFlare caches a response",
+      "language": "text",
+      "tags": ["cloudflare", "cdn", "caching-rules"],
+      "body": "CloudFlare caches a resource when the Cache-Control header = public and max-age is greater than 0.\n\n• Cloudflare CDN by default does NOT cache HTML.\n• Cloudflare caches by file extension, not by MIME type (developers.cloudflare.com/cache/about/default-cache-behavior/).\n\nCloudflare CDN has \"Cache Deception Armor\" - by default it is DISABLED. When Armor is enabled, the rule checks that the URL extension matches the returned Content-Type (otherwise the response is not cached as static)."
+    },
+    {
+      "subcategory": "CloudFlare",
+      "title": "Extensions cached by CloudFlare by default",
+      "language": "table",
+      "tags": ["cloudflare", "static-extension", "caching-rules"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["", "", "", "", "", "", ""],
+          "rows": [
+            ["7Z", "CSV", "GIF", "MIDI", "PNG", "TIF", "ZIP"],
+            ["AVI", "DOC", "GZ", "MKV", "PPT", "TIFF", "ZST"],
+            ["AVIF", "DOCX", "ICO", "MP3", "PPTX", "TTF", "CSS"],
+            ["APK", "DMG", "ISO", "MP4", "PS", "WEBM", "FLAC"],
+            ["BIN", "EJS", "JAR", "OGG", "RAR", "WEBP", "MID"],
+            ["BMP", "EOT", "JPG", "OTF", "SVG", "WOFF", "PLS"],
+            ["BZ2", "EPS", "JPEG", "PDF", "SVGZ", "WOFF2", "TAR"],
+            ["CLASS", "EXE", "JS", "PICT", "SWF", "XLS", "XLSX"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "CloudFlare",
+      "title": "Exceptions and bypasses of Cache Deception Armor",
+      "language": "text",
+      "tags": ["cloudflare", "bypass", "armor"],
+      "body": "• If the returned Content-Type = application/octet-stream, the extension does not matter - this is usually a signal for the browser to save the file rather than display it, so Cloudflare caches it.\n• Cloudflare allows serving .jpg as image/webp or .gif as video/webm and other pairs that it considers unlikely attacks - such mismatches slip past Armor.\n• Bypass Cache Deception Armor via the .avif extension (fixed): hackerone.com/reports/1391635."
+    }
+  ]
+}

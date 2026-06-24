@@ -1,0 +1,137 @@
+{
+  "category": "XS-Leaks",
+  "source": "PayloadsAllTheThings/XS-Leak/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What is XS-Leak",
+      "language": "text",
+      "tags": ["methodology", "side-channel", "xs-leak"],
+      "body": "Cross-Site Leaks (XS-Leaks) are vulnerabilities of the side-channel class: the attacker infers sensitive information about a target origin WITHOUT reading the response body.\nThe exploitation works not through data (as in XSS), but through observable browser behavior: differences in response time, side effects, error events.\nThey bypass classic CORS / SOP protections, because the attacker does not need to read the response - it is enough to distinguish two states (result present / no result, authorized / not)."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Attacker primitives (what leaks and through what)",
+      "language": "table",
+      "tags": ["methodology", "oracle", "primitives"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Primitive", "What leaks"],
+          "rows": [
+            ["Timing", "Resource size / complexity"],
+            ["Frame count", "Differences in content"],
+            ["Errors", "Access control decisions"],
+            ["Cache", "Past visits"],
+            ["Navigation", "Authorization state"],
+            ["Rendering", "Text length"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "XS-Search - a boolean oracle from search systems",
+      "language": "text",
+      "tags": ["methodology", "xs-search", "oracle"],
+      "body": "XS-Search attacks abuse query-based search systems to extract a user's data.\nBy measuring a side effect of a search query (response time, frame count, error event), the attacker determines whether the search returned results or not.\nThis boolean oracle (yes/no) allows brute-forcing a secret character by character.\n\nExample: open 50 tabs and use the timing difference from a CSP violation in an iframe on the search results page to brute-force the flag character by character."
+    },
+    {
+      "subcategory": "Timing attacks",
+      "title": "Principle of a timing attack",
+      "language": "text",
+      "tags": ["timing", "side-channel", "oracle"],
+      "body": "In a timing attack, information is extracted by measuring HOW LONG the system takes to respond to specific requests.\nScripts are delivered to the target application that hit the API, send AJAX, or initiate CORS interactions.\nBy measuring and comparing the response times of these operations, the attacker draws conclusions about internal behavior, data validation processes, or protective mechanisms.\nKey point: the task is to distinguish two states by time, not to read the response."
+    },
+    {
+      "subcategory": "Frame counting",
+      "title": "Frame Counting - principle",
+      "language": "text",
+      "tags": ["frame-counting", "iframe", "oracle"],
+      "body": "If a page loads a DIFFERENT number of iframes depending on the user's state (for example, by search results), the attacker counts them and infers data.\nwindow.length on a window reference (window.open / iframe.contentWindow) returns the number of nested frames - this is precisely a boolean/numeric oracle available cross-origin (SOP does not block it)."
+    },
+    {
+      "subcategory": "Frame counting",
+      "title": "Frame Counting - PoC (window.length)",
+      "language": "javascript",
+      "tags": ["frame-counting", "poc", "window-open"],
+      "body": "// Get a reference to the window\nvar win = window.open('https://example.org');\n\n// Wait for the page to load\nsetTimeout(() => {\n  // Read the number of iframes loaded\n  console.log(\"%d iframes detected\", win.length);\n}, 2000);"
+    },
+    {
+      "subcategory": "Cache probing",
+      "title": "Cache Probing - principle",
+      "language": "text",
+      "tags": ["cache-probing", "cache", "oracle"],
+      "body": "In a cache probing attack, a malicious site tries to determine whether a specific resource of the target site is already in the victim's browser cache.\nThe attacker forces the browser to request a resource (an image, script, endpoint) that could have gotten into the cache only if the user is authorized or previously visited a particular page.\nBy measuring how fast the resource loaded, or by observing the difference in behavior between a cached and a non-cached response, the attacker infers sensitive information.\nA typical technique: flush the cache (with a CORS error or a POST request), then measure the reload."
+    },
+    {
+      "subcategory": "Known oracles",
+      "title": "Catalog of known XS-Leak oracles (xsinator)",
+      "language": "table",
+      "tags": ["oracle", "catalog", "xsinator"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Oracle", "What it detects / leaks"],
+          "rows": [
+            ["Cache Leak (CORS)", "Detects resources loaded by a page. The cache is flushed with a CORS error."],
+            ["Cache Leak (POST)", "Detects resources loaded by a page. The cache is flushed with a POST request."],
+            ["ContentDocument X-Frame Leak", "Detects X-Frame-Options via ContentDocument."],
+            ["COOP Leak", "Detects the Cross-Origin-Opener-Policy header via popup."],
+            ["CORB Leak", "Detects X-Content-Type-Options combined with a certain content type via CORB."],
+            ["CORP Leak", "Detects the Cross-Origin-Resource-Policy header via fetch."],
+            ["CORS Error Leak", "Leaks the target URL of a redirect via a CORS error."],
+            ["CSP Directive Leak", "Detects CSP directives via the csp attribute on an iframe."],
+            ["CSP Redirect Detection", "Detects cross-origin redirects via a CSP violation event."],
+            ["CSP Violation Leak", "Leaks the target of a cross-origin redirect via a CSP violation event."],
+            ["CSS Property Leak", "Leaks CSS rules via getComputedStyle."],
+            ["Download Detection", "Detects downloads (the Content-Disposition header)."],
+            ["Duration Redirect Leak", "Detects cross-origin redirects by duration."],
+            ["ETag header length", "Detects the response body size by the length of the ETag header."],
+            ["Event Handler Leak (Object)", "Detects errors via onload/onerror on an object."],
+            ["Event Handler Leak (Script)", "Detects errors via onload/onerror on a script."],
+            ["Event Handler Leak (Stylesheet)", "Detects errors via onload/onerror on a stylesheet."],
+            ["Fetch Redirect Leak", "Detects HTTP redirects via the Fetch API."],
+            ["Frame Count Leak", "Detects the number of iframes on a page."],
+            ["History Length Leak", "Detects javascript redirects via the History API."],
+            ["Id Attribute Leak", "Leaks the id attribute of focusable HTML elements via onblur."],
+            ["Max Redirect Leak", "Detects a server redirect by abusing the max redirect limit."],
+            ["Media Dimensions Leak", "Leaks the dimensions of images or videos."],
+            ["Media Duration Leak", "Leaks the duration of audio or video."],
+            ["MediaError Leak", "Detects status codes via the MediaError message."],
+            ["Payment API Leak", "Detects that another tab is using the Payment API."],
+            ["Performance API CORP Leak", "Detects the Cross-Origin-Resource-Policy header via the Performance API."],
+            ["Performance API Download Detection", "Detects downloads (Content-Disposition) via the Performance API."],
+            ["Performance API Empty Page Leak", "Detects empty responses via the Performance API."],
+            ["Performance API Error Leak", "Detects errors via the Performance API."],
+            ["Performance API X-Frame Leak", "Detects X-Frame-Options via the Performance API."],
+            ["Performance API XSS Auditor Leak", "Detects scripts/event handlers on a page via the Performance API."],
+            ["Redirect Start Leak", "Detects cross-origin HTTP redirects by the redirectStart timing."],
+            ["Request Merging Error Leak", "Detects errors via request merging."],
+            ["SRI Error Leak", "Leaks content length via an SRI error."],
+            ["Style Reload Error Leak", "Detects errors via a style reload bug."],
+            ["URL Max Length Leak", "Detects a server redirect by abusing the max URL length."],
+            ["WebSocket Leak (FF)", "Detects the number of websockets on a page via socket limit exhaustion (Firefox)."],
+            ["WebSocket Leak (GC)", "Detects the number of websockets on a page via socket limit exhaustion (Chrome)."]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Known oracles",
+      "title": "Disk cache grooming",
+      "language": "text",
+      "tags": ["cache-probing", "oracle", "disk-cache"],
+      "body": "Disk cache grooming is a technique for manipulating the browser's disk cache to build an oracle.\nSource (PoC): https://gist.github.com/parrot409/e3b546d3b76e9f9044d22456e4cc8622"
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Tools for XS-Leaks",
+      "language": "text",
+      "tags": ["tools", "xsinator", "autoleak"],
+      "body": "RUB-NDS/xsinator.com - XS-Leak Browser Test Suite (a ready-made set of oracle tests in the browser).\nRUB-NDS/AutoLeak - finding XS-Leaks in the browser via diffing DOM graphs in two states."
+    }
+  ]
+}

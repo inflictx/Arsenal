@@ -1,0 +1,62 @@
+{
+  "category": "Virtual Hosts",
+  "source": "PayloadsAllTheThings/Virtual Hosts/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What a vhost is and why to brute-force the Host header",
+      "language": "text",
+      "tags": ["vhost", "methodology", "recon"],
+      "body": "A single IP can host many domains/subdomains (Apache/Nginx/IIS) — the server selects the site by the Host header.\nDefault requests only hit the main vhost; HIDDEN hosts may expose extra functionality or vulnerabilities.\nIdea: supply different Host values and compare the responses."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "How Host drives routing",
+      "language": "http",
+      "tags": ["vhost", "host-header"],
+      "body": "GET / HTTP/1.1\nHost: site-a.com\n\n--- different Host -> different content ---\n\nGET / HTTP/1.1\nHost: site-b.com"
+    },
+    {
+      "subcategory": "vhost fingerprinting",
+      "title": "curl with a spoofed Host",
+      "language": "bash",
+      "tags": ["vhost", "curl"],
+      "body": "curl -H \"Host: admin.example.com\" http://10.10.10.10/"
+    },
+    {
+      "subcategory": "vhost fingerprinting",
+      "title": "Signs that you hit a different vhost",
+      "language": "text",
+      "tags": ["vhost", "fingerprint"],
+      "body": "• Different <title>, meta description, brand\n• Different Content-Length / body size\n• Different status code (200 vs 403 / redirect)\n• Custom error pages\n• Redirect chains to a completely different domain\n• A certificate with different domains in SAN"
+    },
+    {
+      "subcategory": "vhost brute-force",
+      "title": "gobuster vhost",
+      "language": "bash",
+      "tags": ["vhost", "gobuster", "bruteforce"],
+      "body": "gobuster vhost -u https://example.com -w /path/to/wordlist.txt"
+    },
+    {
+      "subcategory": "WAF bypass (origin)",
+      "title": "hakoriginfinder — find the origin behind a proxy/WAF",
+      "language": "bash",
+      "tags": ["vhost", "origin", "waf-bypass"],
+      "body": "prips 93.184.216.0/24 | hakoriginfinder -h https://example.com:443/foo"
+    },
+    {
+      "subcategory": "WAF bypass (origin)",
+      "title": "DNS history -> real IP",
+      "language": "text",
+      "tags": ["recon", "waf-bypass", "dns"],
+      "body": "Use DNS history to find the domain's old IPs. Then \"spray\" the current domains across those IPs. A successful response = the real origin -> you can bypass Cloudflare/WAF by hitting the server directly."
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Tools",
+      "language": "text",
+      "tags": ["vhost", "tools"],
+      "body": "VhostFinder — search by response similarity.\nVHostScan — detect catch-all, aliases, dynamic default pages.\nhakoriginfinder — origin behind a reverse proxy.\ngobuster vhost — brute-force."
+    }
+  ]
+}

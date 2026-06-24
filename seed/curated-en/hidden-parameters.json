@@ -1,0 +1,97 @@
+{
+  "category": "Hidden Parameters",
+  "source": "PayloadsAllTheThings/Hidden Parameters/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What hidden parameters are",
+      "language": "text",
+      "tags": ["methodology", "hidden-parameters"],
+      "body": "Hidden (undocumented) parameters are request parameters that the application processes on the backend but never exposes in the interface: they are absent from forms, links and visible JS. Fuzzing helps discover them, and a hidden parameter once found often turns out to be vulnerable to a wide range of attacks (IDOR, SSRF, injections, authorization bypass, toggling debug modes).\n\nThe idea is simple: the application \"listens\" for more than it shows. Developers leave debug, legacy and service parameters behind, forget to remove them, or assume nobody knows about them. Brute-forcing them with a wordlist and comparing the server's reaction is a separate recon technique."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Where to look for hidden parameters",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "• Any endpoint that accepts something: pages, APIs, forms, export/import, PDF and email generation.\n• Old versions of pages and URLs - via the Wayback Machine and archives (the parameter was removed from the UI long ago, but the backend handler remains).\n• JS files: look for parameter names in the frontend code, including commented-out and unused branches.\n• Points where you see a difference in behavior when the input changes: different response, length, status, response time, new fields in the JSON.\n\nHow to test: brute-force parameter names with a wordlist and compare the response with the baseline (without the parameter). A difference in the response code, body length, error text or timing is a signal that the parameter is \"live\"."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Tools",
+      "language": "text",
+      "tags": ["methodology", "tools"],
+      "body": "• PortSwigger/param-miner - a Burp extension for finding hidden, unlinked parameters and headers.\n• s0md3v/Arjun - a toolset for discovering HTTP parameters.\n• Sh1Yo/x8 - a toolset for discovering hidden parameters.\n• tomnomnom/waybackurls - pulls all URLs known to the Wayback Machine for a domain.\n• devanshbatham/ParamSpider - mines URLs (and parameters) from web archives for bug hunting and fuzzing."
+    },
+    {
+      "subcategory": "Parameter brute-force",
+      "title": "Brute-forcing parameters with x8",
+      "language": "bash",
+      "tags": ["bruteforce", "x8", "fuzzing"],
+      "body": "x8 -u \"https://example.com/\" -w <wordlist>\nx8 -u \"https://example.com/\" -X POST -w <wordlist>"
+    },
+    {
+      "subcategory": "Parameter brute-force",
+      "title": "How parameter brute-force works",
+      "language": "text",
+      "tags": ["bruteforce", "methodology"],
+      "body": "You take a wordlist of common parameter names and send them to the endpoint, watching for unexpected backend behavior: a change in the response code, body length, the appearance of new data or errors. Any difference from the baseline request is a candidate for a hidden parameter that you then verify manually."
+    },
+    {
+      "subcategory": "Parameter brute-force",
+      "title": "Brute-forcing with Arjun",
+      "language": "bash",
+      "tags": ["bruteforce", "arjun"],
+      "body": "arjun -u \"https://example.com/\"\narjun -u \"https://example.com/\" -m POST\narjun -u \"https://example.com/\" -m JSON\narjun -u \"https://example.com/\" -w params.txt"
+    },
+    {
+      "subcategory": "Parameter brute-force",
+      "title": "Brute-forcing with ffuf (via FUZZ in the parameter name)",
+      "language": "bash",
+      "tags": ["bruteforce", "ffuf"],
+      "body": "ffuf -u \"https://example.com/?FUZZ=test\" -w params.txt -fs <baseline-size>\nffuf -u \"https://example.com/\" -X POST -d \"FUZZ=test\" -H \"Content-Type: application/x-www-form-urlencoded\" -w params.txt -fs <baseline-size>"
+    },
+    {
+      "subcategory": "Parameter brute-force",
+      "title": "Parameter name wordlists",
+      "language": "text",
+      "tags": ["bruteforce", "wordlists"],
+      "body": "Arjun: db/large.txt, db/medium.txt, db/small.txt - https://github.com/s0md3v/Arjun (arjun/db directory)\nsamlists: sam-cc-parameters-lowercase-all.txt, sam-cc-parameters-mixedcase-all.txt - https://github.com/the-xentropy/samlists\nSecLists: Discovery/Web-Content/burp-parameter-names.txt"
+    },
+    {
+      "subcategory": "Common hidden parameters",
+      "title": "Common hidden parameter names",
+      "language": "text",
+      "tags": ["wordlist", "common-params"],
+      "body": "debug\ntest\nadmin\nsource\nedit\ngrant\ntoken\nadmin_only\ndebug_mode\ninclude\nfile\nurl\ncallback\nredirect\npreview\nenable\ndisable\nmode\nrole\nuser\nuser_id\naccount\nis_admin\nshow\nverbose\ntrace\nformat"
+    },
+    {
+      "subcategory": "Common hidden parameters",
+      "title": "Why try debug / test / admin / source",
+      "language": "text",
+      "tags": ["common-params", "tips"],
+      "body": "Some parameter names enable \"service\" behavior more often than others, and they are worth trying first:\n• debug / debug_mode / verbose / trace - extended output, stack traces, variable dumps, disabling some checks.\n• test - test code branches, mock data, weakened checks.\n• admin / is_admin / role / grant - an attempt to escalate privileges or enable admin mode (often paired with mass assignment).\n• source / view-source / raw - returning the page/template source instead of rendering it.\n\nTry different values: 1, true, on, yes, debug, and also an empty value."
+    },
+    {
+      "subcategory": "Delivery methods",
+      "title": "Where to try the parameter - GET / POST / JSON / header",
+      "language": "text",
+      "tags": ["methodology", "methods"],
+      "body": "The server may accept the same hidden parameter from different places - check every channel:\n• GET - in the query string: ?param=value.\n• POST (form) - in the application/x-www-form-urlencoded body: param=value.\n• JSON - a key in the application/json body: {\"param\":\"value\"}.\n• Header - a custom HTTP header: X-Param: value (especially X-Forwarded-For, X-Original-URL, X-Rewrite-URL, X-Debug).\n\nSometimes the parameter is ignored in GET but works in the JSON body or in a header - so the brute-force is worth repeating for each method."
+    },
+    {
+      "subcategory": "Delivery methods",
+      "title": "Examples of passing one parameter in different ways",
+      "language": "http",
+      "tags": ["methods", "examples"],
+      "body": "GET /endpoint?debug=true HTTP/1.1\nHost: example.com\n\n---\n\nPOST /endpoint HTTP/1.1\nHost: example.com\nContent-Type: application/x-www-form-urlencoded\n\ndebug=true\n\n---\n\nPOST /endpoint HTTP/1.1\nHost: example.com\nContent-Type: application/json\n\n{\"debug\": true}\n\n---\n\nGET /endpoint HTTP/1.1\nHost: example.com\nX-Debug: true"
+    },
+    {
+      "subcategory": "Sources of parameter names",
+      "title": "Old parameters from web archives and JS",
+      "language": "text",
+      "tags": ["recon", "wayback", "sources"],
+      "body": "Hidden parameters often do not need to be guessed - they can be pulled from history and code:\n• Wayback Machine (http://web.archive.org/) - old versions of pages with parameters already removed from the UI.\n• JS files - go through the frontend code and find parameter names, including commented-out and unused ones.\n• waybackurls / ParamSpider - automatically collect URLs (and parameters) from web archives for further fuzzing.\n\nAdd the names collected this way to your brute-force wordlist - they are more accurate than generic lists."
+    }
+  ]
+}

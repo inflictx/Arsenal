@@ -1,0 +1,91 @@
+{
+  "category": "Client Side Path Traversal",
+  "source": "PayloadsAllTheThings/Client Side Path Traversal/",
+  "entries": [
+    {
+      "subcategory": "What is CSPT",
+      "title": "Client-Side Path Traversal - the essence of the vulnerability",
+      "language": "text",
+      "tags": ["detection", "cspt", "methodology"],
+      "body": "CSPT (Client-Side Path Traversal), sometimes \"On-site Request Forgery\", is a bug that is used as a tool for CSRF or XSS attacks.\n\nThe essence: client-side code makes a request via fetch to a URL whose path includes controllable input. If the input is not encoded, you can inject \"../\" into the path - after the browser normalizes it, the request goes to a different URL.\n\nSince the request is initiated from the application's own frontend, the browser automatically attaches cookies and other authentication - and they become available for exploitation."
+    },
+    {
+      "subcategory": "What is CSPT",
+      "title": "Where to look for CSPT",
+      "language": "text",
+      "tags": ["detection", "recon"],
+      "body": "• Any client-side fetch / XHR where the URL path is built from user input (query parameter, fragment, form field).\n• An \"identifier\" parameter that the frontend inserts into the path of an API request (newsitemid, email, inviteCode, channelname, etc.).\n• Places where input is NOT URL-encoded before being inserted into the path - that is where \"../\" will slip through.\n• The goal is to make the request go to an arbitrary endpoint on the same origin, to which the browser itself will attach cookies / CSRF token."
+    },
+    {
+      "subcategory": "CSPT → XSS",
+      "title": "CSPT to XSS - technique of manipulating the path in fetch",
+      "language": "text",
+      "tags": ["cspt", "xss", "fetch"],
+      "body": "After loading, the page calls fetch and sends a request to a URL with controllable input that is not encoded in the path. This allows you to inject \"../\" sequences and steer the request to an arbitrary endpoint - this is CSPT.\n\nIf you steer the fetch to an endpoint that returns controllable content (for example, JS with text-injection), and that content ends up in the DOM / gets executed, you get XSS from CSPT."
+    },
+    {
+      "subcategory": "CSPT → XSS",
+      "title": "CSPT to XSS - exploitation example",
+      "language": "text",
+      "tags": ["cspt", "xss", "exploitation"],
+      "body": "• The page https://example.com/static/cms/news.html accepts a newsitemid parameter\n• It then fetches the content of https://example.com/newitems/<newsitemid>\n• Separately, a text-injection was found in https://example.com/pricing/default.js via the cb parameter\n• Final payload (newsitemid with \"../\" steers the fetch to the vulnerable default.js):\n\nhttps://example.com/static/cms/news.html?newsitemid=../pricing/default.js?cb=alert(document.domain)//"
+    },
+    {
+      "subcategory": "CSPT → CSRF (CSPT2CSRF)",
+      "title": "CSPT to CSRF - the essence of the technique",
+      "language": "text",
+      "tags": ["cspt", "csrf", "cspt2csrf"],
+      "body": "CSPT redirects legitimate HTTP requests. The frontend itself adds the necessary tokens to such requests (authentication, CSRF token). If you steer a request via \"../\" to a \"sink\" endpoint that performs an action, you can bypass existing CSRF protection.\n\nThis is exactly why CSPT2CSRF works where ordinary CSRF is powerless: the client itself inserts the tokens, and SameSite=Lax does not get in the way (the request originates from within the site itself)."
+    },
+    {
+      "subcategory": "CSPT → CSRF (CSPT2CSRF)",
+      "title": "CSRF vs CSPT2CSRF - comparison",
+      "language": "table",
+      "tags": ["cspt2csrf", "csrf", "comparison"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Capability", "CSRF", "CSPT2CSRF"],
+          "rows": [
+            ["POST CSRF?", "yes", "yes"],
+            ["Control over the request body?", "yes", "no"],
+            ["Works with an anti-CSRF token?", "no", "yes"],
+            ["Works with SameSite=Lax?", "no", "yes"],
+            ["GET / PATCH / PUT / DELETE CSRF?", "no", "yes"],
+            ["1-click CSRF?", "no", "yes"],
+            ["Impact depends on source and sink?", "no", "yes"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "CSPT → CSRF (CSPT2CSRF)",
+      "title": "CSPT2CSRF with a POST sink - Mattermost (CVE-2023-45316)",
+      "language": "http",
+      "tags": ["cspt2csrf", "cve", "post"],
+      "body": "/<team>/channels/channelname?telem_action=under_control&forceRHSOpen&telem_run_id=../../../../../../api/v4/caches/invalidate"
+    },
+    {
+      "subcategory": "CSPT → CSRF (CSPT2CSRF)",
+      "title": "CSPT2CSRF - bypass via \"../\" in email/inviteCode (erasec.be)",
+      "language": "http",
+      "tags": ["cspt2csrf", "bypass", "exploitation"],
+      "body": "https://example.com/signup/invite?email=foo%40bar.com&inviteCode=123456789/../../../cards/123e4567-e89b-42d3-a456-556642440000/cancel?a="
+    },
+    {
+      "subcategory": "CSPT → CSRF (CSPT2CSRF)",
+      "title": "Real-world CSPT2CSRF cases",
+      "language": "text",
+      "tags": ["cspt2csrf", "cve", "recon"],
+      "body": "• 1-click CSPT2CSRF in Rocket.Chat.\n• CVE-2023-45316 - CSPT2CSRF with a POST sink in Mattermost.\n• CVE-2023-6458 - CSPT2CSRF with a GET sink in Mattermost.\n• CVE-2023-5123 - CSPT2CSRF in Grafana JSON API Plugin.\n• Client Side Path Manipulation (erasec.be) - CSPT2CSRF via the invite flow.\n\nThe pattern: the impact of CSPT2CSRF depends on the pair source (where the path injection is) → sink (which action endpoint the request can be steered to)."
+    },
+    {
+      "subcategory": "Tools and labs",
+      "title": "Tools and platforms for CSPT",
+      "language": "text",
+      "tags": ["tools", "labs"],
+      "body": "• doyensec/CSPTBurpExtension - a Burp Suite extension for finding and exploiting Client-Side Path Traversal.\n• doyensec/CSPTPlayground - an open playground for finding and exploiting CSPT.\n• Root Me - CSPT - The Ruler - a CSPT lab challenge."
+    }
+  ]
+}

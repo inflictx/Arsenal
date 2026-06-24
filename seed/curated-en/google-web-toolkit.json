@@ -1,0 +1,34 @@
+{
+  "category": "Google Web Toolkit",
+  "source": "PayloadsAllTheThings/Google Web Toolkit/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What GWT is and where to look",
+      "language": "text",
+      "tags": ["gwt", "methodology", "recon"],
+      "body": "GWT is a JavaScript frontend compiled from Java (RPC calls to the server). Indicators: the bootstrap file *.nocache.js and the permutations *.cache.js.\nGoal: extract the list of RPC services/methods from the bootstrap and attack them (often EL injection -> RCE)."
+    },
+    {
+      "subcategory": "GWTMap",
+      "title": "Method enumeration (bootstrap / permutation / proxy / local)",
+      "language": "bash",
+      "tags": ["gwt", "gwtmap", "enumeration"],
+      "body": "# from bootstrap (random permutation) + local code backup\n./gwtmap.py -u http://10.10.10.10/olympian/olympian.nocache.js --backup\n\n# specific permutation\n./gwtmap.py -u http://10.10.10.10/olympian/C39AB19B83398A76A21E0CD04EC9B14C.cache.js\n\n# via HTTP proxy (Burp)\n./gwtmap.py -u http://10.10.10.10/olympian/olympian.nocache.js --backup -p http://127.0.0.1:8080\n\n# from a local copy of a permutation\n./gwtmap.py -F test_data/olympian/C39AB19B83398A76A21E0CD04EC9B14C.cache.js"
+    },
+    {
+      "subcategory": "GWTMap",
+      "title": "Service filter, generation and RPC probe",
+      "language": "bash",
+      "tags": ["gwt", "gwtmap", "rpc"],
+      "body": "# filter by service/method\n./gwtmap.py -u http://10.10.10.10/olympian/olympian.nocache.js --filter AuthenticationService.login\n\n# generate RPC payloads for all methods of a service (with color)\n./gwtmap.py -u http://10.10.10.10/olympian/olympian.nocache.js --filter AuthenticationService --rpc --color\n\n# automatically probe the generated RPC request\n./gwtmap.py -u http://10.10.10.10/olympian/olympian.nocache.js --filter AuthenticationService.login --rpc --probe"
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Tools",
+      "language": "text",
+      "tags": ["gwt", "tools"],
+      "body": "GWTMap (FSecureLABS) - maps the attack surface of GWT applications.\nGWT-Penetration-Testing-Toolset (GDSSecurity) - a toolset for pentesting GWT.\nClassic: EL injection in GWT -> RCE (srcincite)."
+    }
+  ]
+}

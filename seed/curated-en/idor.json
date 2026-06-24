@@ -1,0 +1,88 @@
+{
+  "category": "Insecure Direct Object References",
+  "source": "PayloadsAllTheThings/Insecure Direct Object References/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What IDOR is",
+      "language": "text",
+      "tags": ["methodology", "idor"],
+      "body": "IDOR (Insecure Direct Object Reference) - the application grants direct access to an object (a file, a DB record, a URL) based on user input without checking permissions. You change the identifier in the URL or API request -> you read/modify/delete someone else's data.\n\nExample: a profile is available at https://example.com/profile?user_id=123. If the server does not check that the current user is allowed to view profile 123, it is enough to substitute someone else's id:\nhttps://example.com/profile?user_id=124"
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "IDOR diagram - requesting someone else's document",
+      "language": "image",
+      "tags": ["methodology", "idor"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/idor/idor.png",
+        "caption": "A user requests their own document #1000 - the server serves it. Then they request document #1002 (someone else's) - and the server serves it anyway, without checking the owner. This is exactly IDOR. Source: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Where to look for and how to test IDOR",
+      "language": "text",
+      "tags": ["methodology", "recon", "authz"],
+      "body": "• Any identifier parameter: user_id, account, order, doc, file, invoice, message, id in the URL, in the query, in the body, in JSON, in headers, in cookies.\n• Create two accounts (A and B). Perform the action as A, substitute the identifier of B's object -> if access is granted, it is IDOR.\n• Check not only reads (GET) but also modification/deletion (POST/PUT/DELETE).\n• The Burp extensions Authz / AuthMatrix / Autorize often help - they automatically replay requests from another session and highlight the difference."
+    },
+    {
+      "subcategory": "Numeric identifiers",
+      "title": "Enumerating numeric IDs (increment/decrement)",
+      "language": "text",
+      "tags": ["enumeration", "numeric"],
+      "body": "Increment/decrement the value to reach someone else's data.\n\n• Decimal:    287789, 287790, 287791, ...\n• Hexadecimal: 0x4642d, 0x4642e, 0x4642f, ...\n• Unix epoch timestamp: 1695574808, 1695575098, ..."
+    },
+    {
+      "subcategory": "Guessable identifiers",
+      "title": "Names, email, base64",
+      "language": "text",
+      "tags": ["enumeration", "identifiers"],
+      "body": "Some identifiers are guessable (names and emails) and may open access to customer data.\n\n• Name:  john, doe, john.doe, ...\n• Email: john.doe@mail.com\n• Base64 encoded value: am9obi5kb2VAbWFpbC5jb20="
+    },
+    {
+      "subcategory": "Weak generator (PRNG)",
+      "title": "Predictable UUID/GUID v1 and MongoDB ObjectId",
+      "language": "text",
+      "tags": ["prng", "uuid", "mongodb"],
+      "body": "• UUID/GUID v1 is predictable if you know the creation time: 95f6e264-bb00-11ec-8833-00155d01ef00\n• MongoDB ObjectId is generated predictably: 5ae9b90a2c144b9def01ec37\n    - 4 bytes - seconds since the Unix epoch\n    - 3 bytes - machine identifier\n    - 2 bytes - process id\n    - 3 bytes - a counter, starting from a random value"
+    },
+    {
+      "subcategory": "Hashed identifiers",
+      "title": "ID/token as a hash of username/email",
+      "language": "text",
+      "tags": ["hash", "enumeration"],
+      "body": "Sometimes an id or token is a hash of a known value, for example sha1(username), md5(email). Compute the hash yourself and substitute it.\n\n• MD5:  098f6bcd4621d373cade4e832627b4f6\n• SHA1: a94a8fe5ccb19ba61c4c0873d391e987982fbbd3\n• SHA2: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    },
+    {
+      "subcategory": "Wildcard parameter",
+      "title": "Substituting a wildcard instead of an ID",
+      "language": "http",
+      "tags": ["wildcard", "enumeration"],
+      "body": "GET /api/users/* HTTP/1.1\nGET /api/users/% HTTP/1.1\nGET /api/users/_ HTTP/1.1\nGET /api/users/. HTTP/1.1"
+    },
+    {
+      "subcategory": "Wildcard parameter",
+      "title": "The wildcard idea",
+      "language": "text",
+      "tags": ["wildcard", "enumeration"],
+      "body": "Send a wildcard (*, %, ., _) instead of a specific ID - some backends will respond with the data of all users."
+    },
+    {
+      "subcategory": "Bypass tricks",
+      "title": "IDOR Tips - changing the method, the type, an array, parameter pollution",
+      "language": "text",
+      "tags": ["bypass", "parameter-pollution", "tricks"],
+      "body": "• Change the HTTP method:    POST -> PUT\n• Change the content type:   XML -> JSON\n• Wrap the number in an array: {\"id\":19} -> {\"id\":[19]}\n• Parameter Pollution:       user_id=hacker_id&user_id=victim_id"
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Burp extensions for access checks",
+      "language": "text",
+      "tags": ["tools", "burp"],
+      "body": "• Authz - replays requests from another session and compares the responses.\n• AuthMatrix - a matrix of roles/endpoints for authorization testing.\n• Autorize - automatically sends every request from a low-priv session and flags bypassed authorization.\nAll three are from the PortSwigger BApp Store."
+    }
+  ]
+}

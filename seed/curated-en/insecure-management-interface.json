@@ -1,0 +1,34 @@
+{
+  "category": "Insecure Management Interface",
+  "source": "PayloadsAllTheThings/Insecure Management Interface/",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What it is and where to look",
+      "language": "text",
+      "tags": ["admin", "methodology", "recon"],
+      "body": "Admin/management interfaces (routers, databases, clouds, web admin panels) are often poorly protected: no/weak authentication, default credentials (admin/admin), exposed to the internet, plain HTTP.\nWhere to look: predictable URLs (/admin), control panels, APIs without auth, network devices with defaults."
+    },
+    {
+      "subcategory": "Discovery",
+      "title": "nuclei - default logins and exposed panels",
+      "language": "bash",
+      "tags": ["nuclei", "default-creds", "exposed-panels"],
+      "body": "nuclei -t http/default-logins -u https://example.com\nnuclei -t http/exposed-panels -u https://example.com\nnuclei -t http/exposures -u https://example.com"
+    },
+    {
+      "subcategory": "Examples",
+      "title": "Typical targets",
+      "language": "text",
+      "tags": ["admin", "examples"],
+      "body": "• Network devices - routers/switches/firewalls with default credentials or unpatched bugs.\n• Web applications - admin panels without authentication or at predictable URLs (/admin).\n• Clouds - API endpoints without auth or with overly broad roles."
+    },
+    {
+      "subcategory": "Spring Boot Actuator",
+      "title": "Spring Boot Actuator - sensitive endpoints",
+      "language": "text",
+      "tags": ["spring-boot", "actuator", "rce"],
+      "body": "Exposed Actuator endpoints often lead to leaks and RCE:\n/actuator/env, /actuator/heapdump (memory dump → secrets), /actuator/mappings, /actuator/jolokia (→ RCE via MBean), /env (older versions).\nFor fuzzing paths there is the wordlist Intruder/springboot_actuator.txt. See Veracode \"Exploiting Spring Boot Actuators\"."
+    }
+  ]
+}

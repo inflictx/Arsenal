@@ -1,0 +1,590 @@
+{
+  "category": "WEB",
+  "catOrder": 2,
+  "tools": [
+    {
+      "title": "nikto",
+      "subcategory": "Web server vulnerability scanner",
+      "purpose": "A classic web server scanner: sends thousands of requests and looks for dangerous files, default configs, outdated software and known holes. A fast initial audit of an HTTP/HTTPS service.",
+      "install": "sudo apt install nikto",
+      "binary": "nikto",
+      "target": "-h {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target and connection",
+          "flags": [
+            { "flag": "-h", "value": "{TARGET}", "desc": "Target: URL, host or IP (can be a file with a list of hosts)" },
+            { "flag": "-port", "value": "443", "desc": "Scan port(s) (default 80); can be a comma-separated list" },
+            { "flag": "-ssl", "desc": "Force HTTPS/SSL for all requests" },
+            { "flag": "-nossl", "desc": "Disallow SSL, work only over plain HTTP" },
+            { "flag": "-vhost", "value": "{TARGET}", "desc": "Host header value (virtual host on a single IP)" },
+            { "flag": "-root", "value": "/app/", "desc": "Path prefix added to all requests" },
+            { "flag": "-nolookup", "desc": "Do not perform DNS resolution of the hostname" },
+            { "flag": "-useproxy", "value": "http://127.0.0.1:8080", "desc": "Send requests through a proxy (handy for capturing traffic in Burp)" }
+          ]
+        },
+        {
+          "name": "What to look for (Tuning)",
+          "flags": [
+            { "flag": "-Tuning", "value": "123bde", "desc": "Which check classes to enable: 1 interesting files, 2 default/misconfig, 3 info disclosure, 4 injections (XSS), 5 LFI in web-root, 6 DoS, 7 remote file read, 8 command execution, 9 SQLi, 0 file upload, a authorization bypass, b software identification, c remote source inclusion, x inversion (exclude the specified)" },
+            { "flag": "-Plugins", "value": "@@DEFAULT", "desc": "Which plugins to run (default @@DEFAULT); list separated by ;" },
+            { "flag": "-list-plugins", "desc": "Show all available plugins and databases without scanning anything" },
+            { "flag": "-mutate", "value": "2", "desc": "Guess names: 1 files in all directories, 2 password file names, 3 users via Apache UserDir, 4 users via cgiwrap, 5 subdomains, 6 directories by wordlist" },
+            { "flag": "-mutate-options", "value": "words.txt", "desc": "Extra data for -mutate (for example, a wordlist for directory guessing)" }
+          ]
+        },
+        {
+          "name": "Authentication",
+          "flags": [
+            { "flag": "-id", "value": "user:pass", "desc": "HTTP Basic authentication credentials (login:password)" }
+          ]
+        },
+        {
+          "name": "Stealth and IDS evasion",
+          "flags": [
+            { "flag": "-evasion", "value": "1", "desc": "IDS evasion techniques (libwhisker): 1 random URI encoding, 2 directory self-reference, 3 premature URL ending, 4 long random string, 5 fake parameter, 6 TAB as separator, 7 URL case change, 8 windows slash, A carriage return as separator, B byte 0x0b as separator" },
+            { "flag": "-useragent", "value": "Mozilla/5.0", "desc": "Spoof the User-Agent string" },
+            { "flag": "-Pause", "value": "2", "desc": "Pause in seconds between each request (reduce load/noise)" },
+            { "flag": "-timeout", "value": "10", "desc": "Request timeout in seconds (default 10)" },
+            { "flag": "-maxtime", "value": "1h", "desc": "Maximum scan time for a single host" }
+          ]
+        },
+        {
+          "name": "Output and report",
+          "flags": [
+            { "flag": "-output", "value": "report.html", "desc": "Save the result to a file" },
+            { "flag": "-Format", "value": "htm", "desc": "Report format for -output: csv, htm, txt, xml, msf, json" },
+            { "flag": "-Display", "value": "V", "desc": "What to show on screen: 1 redirects, 2 cookies, 3 all 200/OK responses, 4 those requiring auth, D debug, E HTTP errors, P progress, V verbose output" },
+            { "flag": "-Save", "value": "out_dir", "desc": "Save positive server responses to the specified directory" },
+            { "flag": "-no404", "desc": "Disable the 404 page check (faster but more false positives)" },
+            { "flag": "-nointeractive", "desc": "Non-interactive mode - ask no questions during the scan" }
+          ]
+        },
+        {
+          "name": "Utility",
+          "flags": [
+            { "flag": "-update", "desc": "Update the plugin and signature databases" },
+            { "flag": "-dbcheck", "desc": "Check the databases for syntax errors" },
+            { "flag": "-Version", "desc": "Show the nikto and database version" },
+            { "flag": "-Help", "desc": "Show help on the options" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "nikto -h {TARGET}", "note": "Basic host scan with all default checks" },
+        { "cmd": "nikto -h {TARGET} -ssl -port 443", "note": "Scan an HTTPS site on port 443" },
+        { "cmd": "nikto -h {TARGET} -Tuning 123b -output report.html -Format htm", "note": "Only interesting files/misconfig/info/software, report in HTML" },
+        { "cmd": "nikto -h {TARGET} -useproxy http://127.0.0.1:8080", "note": "Route traffic through Burp for analysis" }
+      ],
+      "notes": "A noisy tool: for bug bounty, align it with the program rules. -Tuning x inverts the selection (excludes the specified classes)."
+    },
+    {
+      "title": "whatweb",
+      "subcategory": "Site technology detection",
+      "purpose": "Fingerprints a web site: identifies CMS, frameworks, servers, libraries, analytics, versions and over 1800 technologies by signatures. A fast way to understand what a site is built on.",
+      "install": "sudo apt install whatweb",
+      "binary": "whatweb",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "-i", "value": "urls.txt", "desc": "Read a list of targets from a file (--input-file)" },
+            { "flag": "-a", "value": "3", "desc": "Aggression level: 1 stealthy (1 request), 3 aggressive (extra requests on a match), 4 heavy (many requests, all aggressive plugins)" }
+          ]
+        },
+        {
+          "name": "HTTP and authentication",
+          "flags": [
+            { "flag": "-U", "value": "Mozilla/5.0", "desc": "Spoof the User-Agent (--user-agent)" },
+            { "flag": "-H", "value": "X-Forwarded-For: 127.0.0.1", "desc": "Add an arbitrary HTTP header (--header)" },
+            { "flag": "-c", "value": "session=abc", "desc": "Pass cookies (--cookie), format name=value; name2=value2" },
+            { "flag": "-u", "value": "user:pass", "desc": "HTTP Basic authentication (--user), format login:password" },
+            { "flag": "--follow-redirect", "value": "always", "desc": "Behavior on redirects: never, http-only, meta-only, same-site, always" }
+          ]
+        },
+        {
+          "name": "Proxy",
+          "flags": [
+            { "flag": "--proxy", "value": "127.0.0.1:8080", "desc": "Use an HTTP proxy (default port 8080)" },
+            { "flag": "--proxy-user", "value": "user:pass", "desc": "Login and password for the proxy" }
+          ]
+        },
+        {
+          "name": "Plugins",
+          "flags": [
+            { "flag": "-p", "value": "WordPress,Apache", "desc": "Run only the selected plugins (--plugins), supports +/-" },
+            { "flag": "-l", "desc": "Show the list of all available plugins (--list-plugins)" },
+            { "flag": "-I", "value": "wordpress", "desc": "Detailed plugin info with a keyword search (--info-plugins)" },
+            { "flag": "--search-plugins", "value": "cms", "desc": "Search plugins by keyword" }
+          ]
+        },
+        {
+          "name": "Performance",
+          "flags": [
+            { "flag": "-t", "value": "25", "desc": "Number of threads (--max-threads, default 25)" },
+            { "flag": "--open-timeout", "value": "15", "desc": "Connection establishment timeout in seconds" },
+            { "flag": "--read-timeout", "value": "30", "desc": "Response read timeout in seconds" },
+            { "flag": "--wait", "value": "1", "desc": "Pause between connections in seconds (useful with 1 thread)" }
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            { "flag": "-v", "desc": "Verbose output with plugin descriptions (--verbose); twice - debug" },
+            { "flag": "-q", "desc": "Quiet mode - do not print the brief log to stdout (--quiet)" },
+            { "flag": "--colour", "value": "always", "desc": "Output color control: never, always, auto" },
+            { "flag": "--no-errors", "desc": "Hide error messages" },
+            { "flag": "--log-brief", "value": "out.txt", "desc": "Log to a brief single-line grep format" },
+            { "flag": "--log-verbose", "value": "out.txt", "desc": "Log to a human-readable format" },
+            { "flag": "--log-json", "value": "out.json", "desc": "Log in JSON format" },
+            { "flag": "--log-xml", "value": "out.xml", "desc": "Log in XML format" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "whatweb {TARGET}", "note": "Quick fingerprint of a single site" },
+        { "cmd": "whatweb -a 3 -v {TARGET}", "note": "Aggressive mode with verbose version output" },
+        { "cmd": "whatweb -i urls.txt --log-json out.json", "note": "Mass scan of a list with a JSON log" }
+      ],
+      "notes": "Aggression levels 3 and 4 send more requests - on bug bounty mind the rate limit."
+    },
+    {
+      "title": "wafw00f",
+      "subcategory": "WAF detection in front of the target",
+      "purpose": "Determines whether a web firewall (WAF) sits in front of a site and which one exactly - Cloudflare, Akamai, AWS WAF, Imperva and about 150 more products. Helps understand why payloads are blocked and which bypass to look for.",
+      "install": "pip install wafw00f",
+      "binary": "wafw00f",
+      "target": "{TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "-i", "value": "urls.txt", "desc": "Read targets from a file (--input), format csv/json/text" }
+          ]
+        },
+        {
+          "name": "Detection mode",
+          "flags": [
+            { "flag": "-a", "desc": "Find ALL matched WAFs, do not stop at the first (--findall)" },
+            { "flag": "-r", "desc": "Do not follow 3xx redirects (--noredirect)" },
+            { "flag": "-t", "value": "Cloudflare", "desc": "Check only one specific WAF (--test); see the names in -l" },
+            { "flag": "-l", "desc": "Show the list of all WAFs it can detect (--list)" }
+          ]
+        },
+        {
+          "name": "HTTP and proxy",
+          "flags": [
+            { "flag": "-p", "value": "http://127.0.0.1:8080", "desc": "Use an HTTP proxy for requests (--proxy)" },
+            { "flag": "-H", "value": "headers.txt", "desc": "File with custom headers on top of the standard ones (--headers)" },
+            { "flag": "-T", "value": "7", "desc": "Request timeout in seconds (--timeout)" }
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            { "flag": "-v", "desc": "Verbose output; repeating -v increases detail (--verbose)" },
+            { "flag": "-o", "value": "result.json", "desc": "Save output to a file; format by extension csv/json/text (--output)" },
+            { "flag": "-f", "value": "json", "desc": "Force output format: csv, json, text (--format)" },
+            { "flag": "--no-colors", "desc": "Disable ANSI colors in the output" },
+            { "flag": "-V", "desc": "Show the wafw00f version (--version)" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "wafw00f {TARGET}", "note": "Check which WAF protects the site" },
+        { "cmd": "wafw00f -a {TARGET}", "note": "Find all WAFs (there can be several layers)" },
+        { "cmd": "wafw00f -i urls.txt -o result.json -f json", "note": "Mass check of a list with JSON output" }
+      ],
+      "notes": "Run it first thing: knowing the WAF defines the filter-bypass strategy."
+    },
+    {
+      "title": "gospider",
+      "subcategory": "Fast web crawler in Go",
+      "purpose": "A fast Go spider: recursively walks a site, extracts links, forms, endpoints and URLs from JS files, robots.txt and the sitemap. Can also pull URLs from external sources (archive.org, CommonCrawl). A foundation for collecting attack surface.",
+      "install": "go install github.com/jaeles-project/gospider@latest",
+      "binary": "gospider",
+      "target": "-s {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "-s", "value": "{TARGET}", "desc": "A single site to crawl (--site)" },
+            { "flag": "-S", "value": "sites.txt", "desc": "File with a list of sites (--sites)" },
+            { "flag": "-o", "value": "out_dir", "desc": "Folder to save the results (--output)" }
+          ]
+        },
+        {
+          "name": "Link sources",
+          "flags": [
+            { "flag": "--js", "desc": "Find links inside JS files via LinkFinder (on by default)" },
+            { "flag": "--sitemap", "desc": "Try to crawl sitemap.xml" },
+            { "flag": "--robots", "desc": "Try to crawl robots.txt (on by default)" },
+            { "flag": "-a", "desc": "Pull URLs from third-party sources: Archive.org, CommonCrawl, VirusTotal, AlienVault (--other-source)" },
+            { "flag": "-w", "desc": "Include subdomains from third-party sources (--include-subs, together with -a)" },
+            { "flag": "-r", "desc": "Also crawl/request URLs from third-party sources (--include-other-source)" },
+            { "flag": "--subs", "desc": "Include subdomains while crawling" }
+          ]
+        },
+        {
+          "name": "Scope and filters",
+          "flags": [
+            { "flag": "-d", "value": "3", "desc": "Crawl recursion depth; 0 = unlimited (--depth, default 1)" },
+            { "flag": "--whitelist", "value": "/api/", "desc": "Regex: crawl only matching URLs" },
+            { "flag": "--blacklist", "value": "logout", "desc": "Regex: exclude matching URLs" },
+            { "flag": "--whitelist-domain", "value": "example.com", "desc": "Allowed domain to crawl" },
+            { "flag": "-L", "value": "100", "desc": "Filter by response length (--filter-length)" },
+            { "flag": "-l", "desc": "Show response length (--length)" }
+          ]
+        },
+        {
+          "name": "HTTP and authentication",
+          "flags": [
+            { "flag": "-u", "value": "web", "desc": "User-Agent: web (random desktop), mobi or a custom string (--user-agent)" },
+            { "flag": "-H", "value": "X-Test: 1", "desc": "Add a header; the flag can be repeated (--header)" },
+            { "flag": "--cookie", "value": "session=abc", "desc": "Pass cookies" },
+            { "flag": "--burp", "value": "req.txt", "desc": "Load headers and cookies from a raw Burp HTTP request" },
+            { "flag": "-p", "value": "http://127.0.0.1:8080", "desc": "Proxy (--proxy)" },
+            { "flag": "--no-redirect", "desc": "Do not follow redirects" }
+          ]
+        },
+        {
+          "name": "Performance",
+          "flags": [
+            { "flag": "-t", "value": "5", "desc": "Number of threads - sites in parallel (--threads, default 1)" },
+            { "flag": "-c", "value": "5", "desc": "Max concurrent requests to a single domain (--concurrent, default 5)" },
+            { "flag": "-k", "value": "1", "desc": "Pause in seconds before a new request (--delay)" },
+            { "flag": "-K", "value": "2", "desc": "Extra random seconds added to --delay (--random-delay)" },
+            { "flag": "-m", "value": "10", "desc": "Request timeout in seconds (--timeout, default 10)" }
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            { "flag": "--json", "desc": "Output in JSON format" },
+            { "flag": "-q", "desc": "Quiet mode - show only found URLs (--quiet)" },
+            { "flag": "-v", "desc": "Verbose output (--verbose)" },
+            { "flag": "--debug", "desc": "Debug mode" },
+            { "flag": "-B", "desc": "HTML content only, everything else disabled (--base)" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "gospider -s {TARGET}", "note": "Basic crawl of a single site" },
+        { "cmd": "gospider -s {TARGET} -d 3 -c 10 -t 5 --subs", "note": "Deep crawl with subdomains and parallelism" },
+        { "cmd": "gospider -s {TARGET} -a -w -r --json -o out", "note": "With third-party sources (archive/CC) and JSON output" },
+        { "cmd": "gospider -s {TARGET} --burp req.txt", "note": "Crawl with headers/cookies from a captured Burp request" }
+      ],
+      "notes": ""
+    },
+    {
+      "title": "hakrawler",
+      "subcategory": "Minimalist crawler for pipelines",
+      "purpose": "A simple fast Go spider for collecting URLs and endpoints. Reads targets from STDIN and fits well into pipelines (subfinder | httpx | hakrawler). Minimum settings - maximum speed.",
+      "install": "go install github.com/hakluke/hakrawler@latest",
+      "binary": "hakrawler",
+      "target": "",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "(stdin)", "desc": "Targets are read from STDIN line by line: echo {TARGET} | hakrawler or cat urls.txt | hakrawler" }
+          ]
+        },
+        {
+          "name": "Crawl scope",
+          "flags": [
+            { "flag": "-d", "value": "2", "desc": "Crawl depth (default 2)" },
+            { "flag": "-subs", "desc": "Include subdomains while crawling" },
+            { "flag": "-i", "desc": "Crawl only within the path (scope restriction)" },
+            { "flag": "-dr", "desc": "Do not follow HTTP redirects" }
+          ]
+        },
+        {
+          "name": "HTTP",
+          "flags": [
+            { "flag": "-h", "value": "Cookie: a=b;;X-Test: 1", "desc": "Custom headers; multiple are separated by a double ;;" },
+            { "flag": "-insecure", "desc": "Disable TLS certificate verification" },
+            { "flag": "-proxy", "value": "http://127.0.0.1:8080", "desc": "Proxy URL" },
+            { "flag": "-timeout", "value": "10", "desc": "Max time to crawl a single URL in seconds (-1 = no limit)" },
+            { "flag": "-size", "value": "1000", "desc": "Page size limit in KB (-1 = no limit)" }
+          ]
+        },
+        {
+          "name": "Performance",
+          "flags": [
+            { "flag": "-t", "value": "8", "desc": "Number of threads (default 8)" }
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            { "flag": "-u", "desc": "Show only unique URLs" },
+            { "flag": "-json", "desc": "Output in JSON format" },
+            { "flag": "-s", "desc": "Show the source of each URL (href, form, script)" },
+            { "flag": "-w", "desc": "Show on which page the URL was found" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "echo {TARGET} | hakrawler", "note": "Basic crawl of a single target via stdin" },
+        { "cmd": "echo {TARGET} | hakrawler -d 3 -subs -u", "note": "Deeper, with subdomains, unique URLs only" },
+        { "cmd": "echo {TARGET} | hakrawler -insecure -proxy http://127.0.0.1:8080", "note": "Through Burp and without TLS verification" }
+      ],
+      "notes": "The target is ALWAYS fed via stdin (echo/cat); there is no separate URL flag."
+    },
+    {
+      "title": "paramspider",
+      "subcategory": "Collecting parameterized URLs from the archive",
+      "purpose": "Pulls from the Wayback Machine (web.archive.org) all historical URLs of a domain that have GET parameters and replaces the parameter values with the FUZZ placeholder. A ready list of targets for fuzzing XSS/SQLi/LFI and the like.",
+      "install": "git clone https://github.com/devanshbatham/ParamSpider && cd ParamSpider && pip install .",
+      "binary": "paramspider",
+      "target": "-d {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "-d", "value": "{TARGET}", "desc": "Target domain for collecting URLs from the Wayback Machine (--domain)" },
+            { "flag": "-l", "value": "domains.txt", "desc": "File with a list of domains - batch mode (--list)" }
+          ]
+        },
+        {
+          "name": "Output and format",
+          "flags": [
+            { "flag": "-p", "value": "FUZZ", "desc": "Placeholder instead of parameter values (--placeholder, default FUZZ)" },
+            { "flag": "-s", "desc": "Stream found URLs straight to the terminal as they are processed (--stream)" }
+          ]
+        },
+        {
+          "name": "Network",
+          "flags": [
+            { "flag": "--proxy", "value": "127.0.0.1:8080", "desc": "Proxy address for requests" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "paramspider -d {TARGET}", "note": "Collect parameterized URLs of a domain (result in the results/ folder)" },
+        { "cmd": "paramspider -d {TARGET} -s", "note": "See URLs in the terminal right away" },
+        { "cmd": "paramspider -d {TARGET} -p '\"><h1>x</h1>'", "note": "Custom placeholder instead of FUZZ" }
+      ],
+      "notes": "In the current version the output is automatically written to the results/<domain>.txt folder - there is no separate -o flag. The --subs and --exclude flags from older versions have been removed."
+    },
+    {
+      "title": "interactsh-client",
+      "subcategory": "OOB interaction catcher (Collaborator analog)",
+      "purpose": "An open-source analog of Burp Collaborator for blind vulnerabilities. You run the client - it hands out a unique domain like xxxx.oast.pro. You put that domain into a payload (SSRF, blind XXE, blind RCE, blind SQLi). When the target server itself resolves/requests the domain, the client prints the incoming DNS/HTTP/SMTP ping with the IP, time and protocol - which proves the vulnerability fired.",
+      "install": "go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest",
+      "binary": "interactsh-client",
+      "target": "",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Launch",
+          "flags": [
+            { "flag": "(no target)", "desc": "No target is set: run the client, get a domain *.oast.pro (oast.live, oast.site, oast.online, oast.fun, oast.me) and put it into the payload" },
+            { "flag": "-n", "value": "1", "desc": "How many payload domains to generate (--number, default 1)" }
+          ]
+        },
+        {
+          "name": "Server",
+          "flags": [
+            { "flag": "-s", "value": "oast.pro", "desc": "Which interactsh server to use; can be your own self-hosted one (--server)" },
+            { "flag": "-t", "value": "TOKEN", "desc": "Authentication token for a protected/own server (--token)" },
+            { "flag": "-config", "value": "config.yaml", "desc": "Client configuration file" }
+          ]
+        },
+        {
+          "name": "Polling and session",
+          "flags": [
+            { "flag": "-pi", "value": "5", "desc": "Server poll interval in seconds (--poll-interval, default 5)" },
+            { "flag": "-sf", "value": "session.txt", "desc": "Session file: save/read to get the same subdomain back (--session-file)" },
+            { "flag": "-nf", "desc": "Disable HTTP fallback on registration (--no-http-fallback)" },
+            { "flag": "-kai", "value": "1m", "desc": "Keep-alive interval (--keep-alive-interval)" }
+          ]
+        },
+        {
+          "name": "Interaction filtering",
+          "flags": [
+            { "flag": "-dns-only", "desc": "Show only DNS interactions" },
+            { "flag": "-http-only", "desc": "Show only HTTP interactions" },
+            { "flag": "-smtp-only", "desc": "Show only SMTP interactions" },
+            { "flag": "-m", "value": "admin", "desc": "Show only interactions matching a pattern (--match)" },
+            { "flag": "-f", "value": "favicon", "desc": "Hide interactions matching a pattern (--filter)" },
+            { "flag": "-asn", "desc": "Show ASN information for the source IP" }
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            { "flag": "-o", "value": "interactions.txt", "desc": "Save interactions to a file" },
+            { "flag": "-json", "desc": "Output in JSONL format" },
+            { "flag": "-v", "desc": "Verbose mode - show the full request/response" },
+            { "flag": "-ps", "desc": "Save the generated payload domains (--payload-store)" },
+            { "flag": "-psf", "value": "payloads.txt", "desc": "File to store the payloads (--payload-store-file)" }
+          ]
+        },
+        {
+          "name": "Utility",
+          "flags": [
+            { "flag": "-up", "desc": "Update interactsh-client to the latest version (--update)" },
+            { "flag": "-version", "desc": "Show the tool version" },
+            { "flag": "-hc", "desc": "Diagnostic health check (--health-check)" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "interactsh-client", "note": "Run and get a domain *.oast.pro to insert into a payload" },
+        { "cmd": "interactsh-client -v", "note": "See full details of incoming requests (useful for debugging SSRF)" },
+        { "cmd": "interactsh-client -n 5 -ps -o oob.txt", "note": "Generate 5 domains, save the payloads and interactions" },
+        { "cmd": "interactsh-client -s {TARGET} -t TOKEN", "note": "Connect to your own self-hosted server" }
+      ],
+      "notes": "Workflow: launch -> you get *.oast.pro -> drop the domain into a blind vulnerability payload -> catch DNS/HTTP pings in the terminal. That is the proof it fired."
+    },
+    {
+      "title": "graphw00f",
+      "subcategory": "GraphQL engine fingerprint",
+      "purpose": "A GraphQL analog of wafw00f: finds the GraphQL endpoint on a target and determines which implementation exactly sits behind it (Apollo, Graphene, graphql-ruby, HyperGraphQL and others). The engine tells you which attacks and bypasses apply.",
+      "install": "git clone https://github.com/dolevf/graphw00f && cd graphw00f && pip install -r requirements.txt",
+      "binary": "graphw00f",
+      "target": "-t {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "-t", "value": "{TARGET}", "desc": "Target URL together with the path to check (--target)" }
+          ]
+        },
+        {
+          "name": "Operation mode",
+          "flags": [
+            { "flag": "-d", "desc": "detect mode: find the GraphQL endpoint path by brute-forcing known paths (--detect)" },
+            { "flag": "-f", "desc": "fingerprint mode: determine which GraphQL engine is running (--fingerprint)" },
+            { "flag": "-w", "value": "paths.txt", "desc": "Custom wordlist of GraphQL endpoint paths for detect mode (--wordlist)" },
+            { "flag": "-l", "desc": "Show the list of all engines it can detect and exit (--list)" }
+          ]
+        },
+        {
+          "name": "HTTP",
+          "flags": [
+            { "flag": "-u", "value": "Mozilla/5.0", "desc": "Custom User-Agent (--user-agent)" },
+            { "flag": "-H", "value": "Authorization: Bearer x", "desc": "Custom header; can be specified multiple times (--header); cookies go here too" },
+            { "flag": "-p", "value": "http://127.0.0.1:8080", "desc": "HTTP(S) proxy, format http://user:pass@host:port (--proxy)" },
+            { "flag": "-T", "value": "10", "desc": "Request timeout in seconds (--timeout, default 10)" },
+            { "flag": "-r", "desc": "Do not follow 3xx redirects (--noredirect)" }
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            { "flag": "-o", "value": "result.csv", "desc": "Write the results to a CSV file (--output-file)" },
+            { "flag": "-v", "desc": "Show the version and exit (--version)" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "python3 main.py -f -d -t {TARGET}", "note": "Find the endpoint and immediately determine the engine" },
+        { "cmd": "python3 main.py -f -t {TARGET}", "note": "Fingerprint an already known /graphql endpoint" },
+        { "cmd": "python3 main.py -d -t {TARGET} -w paths.txt", "note": "Only endpoint discovery by a custom wordlist of paths" },
+        { "cmd": "python3 main.py -l", "note": "List of all detectable engines" }
+      ],
+      "notes": "Runs as python3 main.py from the repository folder. detect (-d) finds WHERE the endpoint is, fingerprint (-f) determines WHAT the engine is; they are usually used together."
+    },
+    {
+      "title": "smuggler",
+      "subcategory": "HTTP Request Smuggling discovery",
+      "purpose": "Checks an endpoint for HTTP Request Smuggling vulnerabilities (CL.TE / TE.CL desync). Sends a series of mutated requests and determines whether the frontend and backend get out of sync on body-length parsing.",
+      "install": "git clone https://github.com/defparam/smuggler && cd smuggler",
+      "binary": "python3 smuggler.py",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "Target URL with the endpoint (--url); or feed the URL via stdin" },
+            { "flag": "-v", "value": "vhost", "desc": "Specify the virtual host - the Host header (--vhost)" }
+          ]
+        },
+        {
+          "name": "Request",
+          "flags": [
+            { "flag": "-m", "value": "POST", "desc": "HTTP request method (--method, default POST)" },
+            { "flag": "-t", "value": "5", "desc": "Socket timeout in seconds (--timeout, default 5)" },
+            { "flag": "-c", "value": "default.py", "desc": "Mutation/payload configuration file (--configfile, default default.py)" }
+          ]
+        },
+        {
+          "name": "Output and behavior",
+          "flags": [
+            { "flag": "-x", "desc": "Exit on the first vulnerability found on an endpoint (--exit_early)" },
+            { "flag": "-q", "desc": "Quiet mode - output only the problems found (--quiet)" },
+            { "flag": "-l", "value": "scan.log", "desc": "Log file (--log)" },
+            { "flag": "--no-color", "desc": "Disable ANSI colors" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "python3 smuggler.py -u {TARGET}", "note": "Basic check of an endpoint for smuggling" },
+        { "cmd": "echo {TARGET} | python3 smuggler.py", "note": "Feed the URL via stdin" },
+        { "cmd": "python3 smuggler.py -u {TARGET} -m POST -x -q", "note": "POST method, stop on the first finding, quiet" }
+      ],
+      "notes": "The target is fed either via -u or via stdin (echo {TARGET} | python3 smuggler.py). Mutation configs are in the config/ folder."
+    },
+    {
+      "title": "crlfuzz",
+      "subcategory": "CRLF injection scanner",
+      "purpose": "A fast CRLF injection scanner in Go. Inserts newline control characters into URLs and headers and checks whether the HTTP response can be split (HTTP response splitting / header injection). Works on a single URL, a list or from stdin.",
+      "install": "go install github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest",
+      "binary": "crlfuzz",
+      "target": "-u {TARGET}",
+      "modes": [],
+      "groups": [
+        {
+          "name": "Target",
+          "flags": [
+            { "flag": "-u", "value": "{TARGET}", "desc": "A single URL to fuzz (--url)" },
+            { "flag": "-l", "value": "urls.txt", "desc": "File with a list of URLs (--list)" },
+            { "flag": "(stdin)", "desc": "URLs can be fed via stdin: cat urls.txt | crlfuzz" }
+          ]
+        },
+        {
+          "name": "Request",
+          "flags": [
+            { "flag": "-X", "value": "GET", "desc": "HTTP request method (--method, default GET)" },
+            { "flag": "-d", "value": "a=1", "desc": "Request body / POST data (--data)" },
+            { "flag": "-H", "value": "Cookie: a=b", "desc": "Custom header; can be specified multiple times (--header)" },
+            { "flag": "-x", "value": "http://127.0.0.1:8080", "desc": "Use a proxy (--proxy)" }
+          ]
+        },
+        {
+          "name": "Performance",
+          "flags": [
+            { "flag": "-c", "value": "25", "desc": "Concurrency level (--concurrent, default 25)" }
+          ]
+        },
+        {
+          "name": "Output",
+          "flags": [
+            { "flag": "-s", "desc": "Quiet mode - show only vulnerable targets (--silent)" },
+            { "flag": "-o", "value": "out.txt", "desc": "Save the results to a file (--output)" },
+            { "flag": "-v", "desc": "Verbose mode - show errors/details (--verbose)" },
+            { "flag": "-V", "desc": "Show the version (--version)" }
+          ]
+        }
+      ],
+      "recipes": [
+        { "cmd": "crlfuzz -u {TARGET}", "note": "Check a single URL for CRLF injection" },
+        { "cmd": "crlfuzz -l urls.txt -s -o vuln.txt", "note": "Scan a list, vulnerable only, to a file" },
+        { "cmd": "cat urls.txt | crlfuzz -c 50", "note": "From stdin with increased concurrency (for pipelines)" }
+      ],
+      "notes": ""
+    }
+  ]
+}

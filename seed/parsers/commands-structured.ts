@@ -25,14 +25,14 @@ export function cmdKey(category: string | null | undefined, title: string): stri
 
 // Structured tool reference (powers the command builder). Returns entries + the set of tool keys
 // it covers, so the seed drops ONLY those markdown tools (mixed domains stay partly markdown).
-export function parseStructuredCommands(): { entries: EntryInput[]; coveredKeys: Set<string> } {
+export function parseStructuredCommands(dir: string = DIR): { entries: EntryInput[]; coveredKeys: Set<string> } {
   const coveredKeys = new Set<string>();
   const entries: EntryInput[] = [];
-  if (!existsSync(DIR)) return { entries, coveredKeys };
+  if (!existsSync(dir)) return { entries, coveredKeys };
   let order = 0;
-  for (const file of readdirSync(DIR).filter((f) => f.endsWith('.json')).sort()) {
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json')).sort()) {
     let data: SFile;
-    try { data = JSON.parse(readFileSync(join(DIR, file), 'utf8')); } catch { continue; }
+    try { data = JSON.parse(readFileSync(join(dir, file), 'utf8')); } catch { continue; }
     if (!data?.tools?.length) continue;
     for (const t of data.tools) {
       const category = t.category ?? data.category;
