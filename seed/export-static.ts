@@ -28,34 +28,40 @@ const toEntry = (r: any) => ({
   notes: null,
 });
 
-// Reference entries only (is_custom=0). Same ordering the server uses.
-const rows = (db.prepare('SELECT * FROM entries WHERE is_custom=0 ORDER BY is_favorite DESC, id').all() as any[]).map(toEntry);
-
-const byType: Record<string, any[]> = {};
-for (const e of rows) (byType[e.type] ??= []).push(e);
-for (const [type, arr] of Object.entries(byType)) {
-  writeFileSync(join(OUT, `entries-${type}.json`), JSON.stringify(arr));
-}
-
-// Lightweight search index (no full bodies → fast ⌘K; full entry loaded on open).
-const index = rows.map((e) => ({
-  id: e.id, type: e.type, title: e.title, category: e.category,
-  tags: e.tags, snippet: (e.body ?? '').replace(/\s+/g, ' ').trim().slice(0, 160),
-}));
-writeFileSync(join(OUT, 'search-index.json'), JSON.stringify(index));
-
-// Checklist DEFINITIONS (progress/notes are per-browser in IndexedDB on static).
+// Checklist DEFINITIONS (locale-independent for now; progress lives per-browser in IndexedDB).
+// Shared at data/checklists.json — both languages read the same definitions.
 const cls = (db.prepare('SELECT * FROM checklists ORDER BY sort, slug').all() as any[]).map((r) => ({
   slug: r.slug, title: r.title, category: r.category, sort: r.sort,
   research: r.research ?? '', sections: r.sections ? JSON.parse(r.sections) : [],
 }));
 writeFileSync(join(OUT, 'checklists.json'), JSON.stringify(cls));
 
-const manifest = {
-  types: Object.fromEntries(Object.entries(byType).map(([t, a]) => [t, a.length])),
-  checklists: cls.length,
-};
-writeFileSync(join(OUT, 'manifest.json'), JSON.stringify(manifest));
+// Reference entries (is_custom=0), exported per locale into data/<locale>/.
+const LOCALES = ['ru', 'en'] as const;
+for (const locale of LOCALES) {
+  const outDir = join(OUT, locale);
+  mkdirSync(outDir, { recursive: true });
+  const rows = (db.prepare('SELECT * FROM entries WHERE is_custom=0 AND locale=? ORDER BY is_favorite DESC, id').all(locale) as any[]).map(toEntry);
 
-console.log(`[export-static] ${rows.length} entries across ${Object.keys(byType).length} types + ${cls.length} checklists → web/public/data/`);
-for (const [t, a] of Object.entries(byType)) console.log(`  entries-${t}.json: ${a.length}`);
+  const byType: Record<string, any[]> = {};
+  for (const e of rows) (byType[e.type] ??= []).push(e);
+  for (const [type, arr] of Object.entries(byType)) {
+    writeFileSync(join(outDir, `entries-${type}.json`), JSON.stringify(arr));
+  }
+
+  // Lightweight search index (no full bodies → fast ⌘K; full entry loaded on open).
+  const index = rows.map((e) => ({
+    id: e.id, type: e.type, title: e.title, category: e.category,
+    tags: e.tags, snippet: (e.body ?? '').replace(/\s+/g, ' ').trim().slice(0, 160),
+  }));
+  writeFileSync(join(outDir, 'search-index.json'), JSON.stringify(index));
+
+  const manifest = {
+    types: Object.fromEntries(Object.entries(byType).map(([t, a]) => [t, a.length])),
+    checklists: cls.length,
+  };
+  writeFileSync(join(outDir, 'manifest.json'), JSON.stringify(manifest));
+
+  console.log(`[export-static] ${locale}: ${rows.length} entries across ${Object.keys(byType).length} types → web/public/data/${locale}/`);
+}
+console.log(`[export-static] ${cls.length} checklists → web/public/data/checklists.json`);

@@ -6,8 +6,10 @@
 //   - search runs in-memory over a lightweight index (same payload/gtfobin bias).
 // The local (server) build never imports this — it keeps using httpApi.
 import type { Entry, Stats, Category, ChecklistSummary, Checklist, ChecklistSection } from '../api';
+import { getLang } from './i18n';
 
-const DATA = import.meta.env.BASE_URL + 'data/';
+const DATA_ROOT = import.meta.env.BASE_URL + 'data/';
+const DATA = DATA_ROOT + getLang() + '/'; // per-locale reference content (data/ru/, data/en/)
 const USER_BASE = 1_000_000_000; // user-entry ids start here so they never clash with reference ids
 
 // ── IndexedDB (tiny promise wrapper, no deps) ────────────────────────────────
@@ -105,7 +107,7 @@ async function stateMap(): Promise<Map<string, CS>> {
 }
 let _cls: any[] | null = null;
 async function checklistDefs(): Promise<any[]> {
-  if (!_cls) { try { _cls = await (await fetch(DATA + 'checklists.json')).json(); } catch { _cls = []; } }
+  if (!_cls) { try { _cls = await (await fetch(DATA_ROOT + 'checklists.json')).json(); } catch { _cls = []; } }
   return _cls!;
 }
 
