@@ -7,11 +7,11 @@ import { getSetting } from './db';
 export async function registerRoutes(app: FastifyInstance) {
   app.get('/health', async () => ({ ok: true, name: 'ARS3NAL' }));
 
-  app.get('/stats', async () => repo.stats());
+  app.get('/stats', async (req) => repo.stats((req.query as { locale?: string }).locale));
 
   app.get('/categories', async (req) => {
-    const { type } = req.query as { type?: string };
-    return repo.listCategories(type ?? 'payload');
+    const { type, locale } = req.query as { type?: string; locale?: string };
+    return repo.listCategories(type ?? 'payload', locale);
   });
 
   app.get('/entries', async (req) => {
@@ -21,6 +21,7 @@ export async function registerRoutes(app: FastifyInstance) {
       category: q.category,
       tag: q.tag,
       favorite: q.favorite === '1' || q.favorite === 'true',
+      locale: q.locale,
       limit: q.limit ? Number(q.limit) : undefined,
       offset: q.offset ? Number(q.offset) : undefined,
     });
@@ -68,9 +69,9 @@ export async function registerRoutes(app: FastifyInstance) {
   });
 
   app.get('/search', async (req) => {
-    const { q, type, limit } = req.query as { q?: string; type?: string; limit?: string };
+    const { q, type, limit, locale } = req.query as { q?: string; type?: string; limit?: string; locale?: string };
     if (!q) return [];
-    return repo.search(q, type, limit ? Number(limit) : undefined);
+    return repo.search(q, type, limit ? Number(limit) : undefined, locale);
   });
 
   // ── Checklists ──────────────────────────────────────────────────────────

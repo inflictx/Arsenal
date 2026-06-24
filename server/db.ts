@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS entries (
   title       TEXT NOT NULL,
   body        TEXT,
   language    TEXT,
+  locale      TEXT NOT NULL DEFAULT 'ru',   -- UI content language: 'ru' | 'en'
   tags        TEXT,                 -- JSON array of strings
   source      TEXT,
   meta        TEXT,                 -- JSON object
@@ -112,6 +113,17 @@ CREATE TABLE IF NOT EXISTS findings (
 );
 CREATE INDEX IF NOT EXISTS idx_findings_target ON findings(target_id);
 `);
+
+// Migration: add `locale` to entries on databases created before bilingual support.
+{
+  const cols = db.prepare('PRAGMA table_info(entries)').all() as { name: string }[];
+  if (!cols.some((c) => c.name === 'locale')) {
+    db.exec("ALTER TABLE entries ADD COLUMN locale TEXT NOT NULL DEFAULT 'ru'");
+  }
+  // Created here (not in the schema block above) so it also works on pre-locale DBs,
+  // where the column only exists after the ALTER right above.
+  db.exec('CREATE INDEX IF NOT EXISTS idx_entries_locale ON entries(type, locale)');
+}
 
 export function getSetting(key: string): string | null {
   const row = db.prepare('SELECT value FROM settings WHERE key=?').get(key) as { value: string } | undefined;

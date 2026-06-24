@@ -26,6 +26,7 @@ export interface EntryInput {
   title: string;
   body?: string | null;
   language?: string | null;
+  locale?: string;            // 'ru' | 'en' (defaults to 'ru')
   tags?: string[];
   source?: string | null;
   meta?: unknown;
@@ -42,8 +43,8 @@ function toEntry(r: any): Entry {
 }
 
 const insertStmt = db.prepare(`
-  INSERT INTO entries (type, category, subcategory, title, body, language, tags, source, meta, is_custom)
-  VALUES (@type, @category, @subcategory, @title, @body, @language, @tags, @source, @meta, @is_custom)
+  INSERT INTO entries (type, category, subcategory, title, body, language, locale, tags, source, meta, is_custom)
+  VALUES (@type, @category, @subcategory, @title, @body, @language, @locale, @tags, @source, @meta, @is_custom)
 `);
 
 export function insertEntry(input: EntryInput, isCustom = false): number {
@@ -54,6 +55,7 @@ export function insertEntry(input: EntryInput, isCustom = false): number {
     title: input.title,
     body: input.body ?? null,
     language: input.language ?? null,
+    locale: input.locale ?? 'ru',
     tags: JSON.stringify(input.tags ?? []),
     source: input.source ?? null,
     meta: input.meta != null ? JSON.stringify(input.meta) : null,
@@ -68,20 +70,21 @@ export const insertMany = db.transaction((rows: EntryInput[], isCustom = false):
   return rows.length;
 });
 
-export function stats() {
-  const total = (db.prepare('SELECT COUNT(*) n FROM entries').get() as any).n as number;
-  const byType = db.prepare('SELECT type, COUNT(*) n FROM entries GROUP BY type').all() as { type: string; n: number }[];
+export function stats(locale?: string) {
+  const lc = locale ? ' WHERE (locale=? OR is_custom=1)' : '';
+  const args = locale ? [locale] : [];
+  const total = (db.prepare(`SELECT COUNT(*) n FROM entries${lc}`).get(...args) as any).n as number;
+  const byType = db.prepare(`SELECT type, COUNT(*) n FROM entries${lc} GROUP BY type`).all(...args) as { type: string; n: number }[];
   return { total, byType };
 }
 
-export function listCategories(type: string) {
-  return db
-    .prepare(
-      `SELECT category, COUNT(*) n FROM entries
-       WHERE type=? AND category IS NOT NULL AND category<>''
-       GROUP BY category ORDER BY category COLLATE NOCASE`,
-    )
-    .all(type) as { category: string; n: number }[];
+export function listCategories(type: string, locale?: string) {
+  const params: any[] = [type];
+  let sql = `SELECT category, COUNT(*) n FROM entries
+       WHERE type=? AND category IS NOT NULL AND category<>''`;
+  if (locale) { sql += ' AND (locale=? OR is_custom=1)'; params.push(locale); }
+  sql += ' GROUP BY category ORDER BY category COLLATE NOCASE';
+  return db.prepare(sql).all(...params) as { category: string; n: number }[];
 }
 
 export function listEntries(o: {
@@ -89,6 +92,7 @@ export function listEntries(o: {
   category?: string;
   tag?: string;
   favorite?: boolean;
+  locale?: string;
   limit?: number;
   offset?: number;
 }): Entry[] {
@@ -98,6 +102,7 @@ export function listEntries(o: {
   if (o.category) { where.push('category=?'); params.push(o.category); }
   if (o.tag) { where.push('tags LIKE ?'); params.push(`%"${o.tag}"%`); }
   if (o.favorite) { where.push('is_favorite=1'); }
+  if (o.locale) { where.push('(locale=? OR is_custom=1)'); params.push(o.locale); }
   const sql =
     `SELECT * FROM entries ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
      ORDER BY is_favorite DESC, id
@@ -154,12 +159,13 @@ export function setNotes(id: number, notes: string): Entry | null {
   return getEntry(id);
 }
 
-export function search(q: string, type?: string, limit = 50): Entry[] {
+export function search(q: string, type?: string, limit = 50, locale?: string): Entry[] {
   const match = ftsQuery(q);
   if (!match) return [];
   const params: any[] = [match];
   let sql = `SELECT e.* FROM entries_fts JOIN entries e ON e.id = entries_fts.rowid WHERE entries_fts MATCH ?`;
   if (type) { sql += ' AND e.type=?'; params.push(type); }
+  if (locale) { sql += ' AND (e.locale=? OR e.is_custom=1)'; params.push(locale); }
   // Bias ⌘K toward copy-ready things (payloads/recipes/gtfobins) over prose (docs) and filenames (wordlist refs).
   sql += " ORDER BY rank + (CASE WHEN e.type IN ('payload','cmd_recipe','gtfobin') THEN 0.0 ELSE 4.0 END) LIMIT ?";
   params.push(Math.min(limit, 200));
@@ -183,12 +189,12 @@ const restoreTx = db.transaction((data: any) => {
   const now = new Date().toISOString();
   db.prepare('DELETE FROM entries').run();
   const ins = db.prepare(`INSERT INTO entries
-    (id, type, category, subcategory, title, body, language, tags, source, meta, is_custom, is_favorite, notes, created_at, updated_at)
-    VALUES (@id, @type, @category, @subcategory, @title, @body, @language, @tags, @source, @meta, @is_custom, @is_favorite, @notes, @created_at, @updated_at)`);
+    (id, type, category, subcategory, title, body, language, locale, tags, source, meta, is_custom, is_favorite, notes, created_at, updated_at)
+    VALUES (@id, @type, @category, @subcategory, @title, @body, @language, @locale, @tags, @source, @meta, @is_custom, @is_favorite, @notes, @created_at, @updated_at)`);
   for (const e of entries) {
     ins.run({
       id: e.id ?? null, type: e.type, category: e.category ?? null, subcategory: e.subcategory ?? null,
-      title: e.title, body: e.body ?? null, language: e.language ?? null,
+      title: e.title, body: e.body ?? null, language: e.language ?? null, locale: e.locale ?? 'ru',
       // accept both string (server backup) and array/object (static/IndexedDB backup) shapes
       tags: typeof e.tags === 'string' ? e.tags : (e.tags != null ? JSON.stringify(e.tags) : null),
       source: e.source ?? null,

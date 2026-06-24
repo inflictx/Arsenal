@@ -1,4 +1,5 @@
 import { localApi } from './lib/local-api';
+import { getLang } from './lib/i18n';
 
 export interface Entry {
   id: number;
@@ -50,11 +51,11 @@ const json = (body: unknown): RequestInit => ({
 });
 
 const httpApi = {
-  stats: (): Promise<Stats> => req('/stats'),
-  categories: (type: string): Promise<Category[]> => req('/categories' + qs({ type })),
-  entries: (params: Record<string, unknown>): Promise<Entry[]> => req('/entries' + qs(params)),
+  stats: (): Promise<Stats> => req('/stats' + qs({ locale: getLang() })),
+  categories: (type: string): Promise<Category[]> => req('/categories' + qs({ type, locale: getLang() })),
+  entries: (params: Record<string, unknown>): Promise<Entry[]> => req('/entries' + qs({ ...params, locale: getLang() })),
   entry: (id: number): Promise<Entry> => req('/entries/' + id),
-  search: (q: string, type?: string, limit?: number): Promise<Entry[]> => req('/search' + qs({ q, type, limit })),
+  search: (q: string, type?: string, limit?: number): Promise<Entry[]> => req('/search' + qs({ q, type, limit, locale: getLang() })),
   create: (body: Partial<Entry>): Promise<Entry> => req('/entries', { method: 'POST', ...json(body) }),
   update: (id: number, body: Partial<Entry>): Promise<Entry> => req('/entries/' + id, { method: 'PUT', ...json(body) }),
   remove: (id: number): Promise<{ ok: boolean }> => req('/entries/' + id, { method: 'DELETE' }),

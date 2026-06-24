@@ -18,7 +18,7 @@ function section(label: string) {
   console.log(`\n── ${label} ${'─'.repeat(Math.max(0, 40 - label.length))}`);
 }
 
-function rowsFromCategory(cat: CuratedCategory): EntryInput[] {
+function rowsFromCategory(cat: CuratedCategory, locale: string): EntryInput[] {
   return cat.entries.map((e) => ({
     type: e.type ?? 'payload',
     category: cat.category,
@@ -26,10 +26,68 @@ function rowsFromCategory(cat: CuratedCategory): EntryInput[] {
     title: e.title,
     body: e.body,
     language: e.language ?? null,
+    locale,
     tags: e.tags ?? [],
     source: cat.source ?? null,
     meta: e.meta ?? null,
   }));
+}
+
+const withLocale = (rows: EntryInput[], locale: string): EntryInput[] => rows.map((r) => ({ ...r, locale }));
+
+// Seed all REFERENCE content for one locale. For 'en' we prefer translated
+// sources in the parallel `*-en/` folders and fall back to the Russian source
+// (a copy) wherever a translation does not exist yet, so the English build is
+// never empty and fills in progressively as translations land.
+function seedContent(locale: 'ru' | 'en'): number {
+  const en = locale === 'en';
+  let total = 0;
+
+  // Curated categories authored in TypeScript (no EN variant yet → RU copy as fallback).
+  for (const cat of CURATED) total += insertMany(rowsFromCategory(cat, locale));
+
+  // Curated categories authored as JSON (prefer curated-en/<file> for 'en').
+  const curatedDir = join(here, 'curated');
+  const curatedEnDir = join(here, 'curated-en');
+  for (const file of readdirSync(curatedDir).filter((n) => n.endsWith('.json'))) {
+    let cat: CuratedCategory | null = null;
+    const enFile = join(curatedEnDir, file);
+    if (en && existsSync(enFile)) {
+      try { cat = JSON.parse(readFileSync(enFile, 'utf8')) as CuratedCategory; }
+      catch { cat = null; } // malformed/half-written translation → fall back to ru
+    }
+    if (!cat) cat = JSON.parse(readFileSync(join(curatedDir, file), 'utf8')) as CuratedCategory;
+    total += insertMany(rowsFromCategory(cat, locale));
+  }
+
+  // Burp docs (prefer burp-en/ for 'en').
+  const burpEnDir = join(here, 'burp-en');
+  const burpDir = en && existsSync(burpEnDir) ? burpEnDir : join(here, 'burp');
+  if (existsSync(burpDir)) {
+    for (const file of readdirSync(burpDir).filter((f) => f.endsWith('.json'))) {
+      const sec = JSON.parse(readFileSync(join(burpDir, file), 'utf8')) as {
+        section: string; order?: number; entries: { title: string; path: string; order?: number; subcategory?: string; body: string }[];
+      };
+      total += insertMany(sec.entries.map((e) => ({
+        type: 'doc', category: sec.section, subcategory: e.subcategory ?? null, title: e.title, body: e.body,
+        language: 'md', locale, tags: [], source: 'https://portswigger.net' + e.path,
+        meta: { path: e.path, sectionOrder: sec.order ?? 99, pageOrder: e.order ?? 0 },
+      })));
+    }
+  }
+
+  // Commands (structured builders + markdown refs). EN reuses the RU parser output
+  // for now (flags/values are English; only descriptions are RU) until wired to -en.
+  const structured = parseStructuredCommands();
+  const md = parseCommands().filter((e) => !structured.coveredKeys.has(cmdKey(e.category, e.title)));
+  total += insertMany(withLocale(structured.entries, locale));
+  total += insertMany(withLocale(md, locale));
+
+  // GTFOBins + wordlist refs (mostly English data; RU copy as fallback for 'en').
+  total += insertMany(withLocale(parseGtfobins(), locale));
+  total += insertMany(withLocale(parseWordlistsRef(), locale));
+
+  return total;
 }
 
 function main() {
@@ -44,86 +102,23 @@ function main() {
   const cleared = db.prepare('DELETE FROM entries WHERE is_custom=0').run().changes;
   if (cleared) console.log(`  cleared ${cleared} previously-seeded rows`);
 
-  let total = 0;
-
-  // Curated categories — hand-reviewed one at a time (payloads, commands, tips, images, tables).
-  section('Curated categories');
-  for (const cat of CURATED) {
-    const rows = rowsFromCategory(cat);
-    total += insertMany(rows);
-    console.log(`  + ${rows.length} · ${cat.category}`);
-  }
-
-  // Curated categories authored as JSON (used when payloads have many ${ } / backticks).
-  const curatedDir = join(here, 'curated');
-  for (const file of readdirSync(curatedDir).filter((n) => n.endsWith('.json'))) {
-    const cat = JSON.parse(readFileSync(join(curatedDir, file), 'utf8')) as CuratedCategory;
-    const rows = rowsFromCategory(cat);
-    total += insertMany(rows);
-    console.log(`  + ${rows.length} · ${cat.category} (json)`);
-  }
+  // Reference content for both locales (en prefers *-en/ sources, falls back to ru copy).
+  section('Russian content');
+  const ruTotal = seedContent('ru');
+  console.log(`  = ${ruTotal} ru entries`);
+  section('English content');
+  const enTotal = seedContent('en');
+  console.log(`  = ${enTotal} en entries`);
+  let total = ruTotal + enTotal;
 
   // Checklists — parsed from operational.md + research.md into structured form.
   // Definitions are replaced; the user's ticks & notes (checklist_state) are NEVER touched.
+  // (Currently Russian only; the English UI shows the Russian checklists until translated.)
   section('Checklists');
   const lists = parseChecklists();
   replaceChecklists(lists);
   const itemTotal = lists.reduce((n, l) => n + l.sections.reduce((m, s) => m + s.items.length, 0), 0);
-  for (const l of lists) {
-    const n = l.sections.reduce((m, s) => m + s.items.length, 0);
-    console.log(`  + ${String(n).padStart(3)} items · ${l.title}`);
-  }
   console.log(`  = ${lists.length} checklists · ${itemTotal} items`);
-
-  // Burp Suite docs (translated to Russian) — type=doc, grouped by section.
-  section('Burp docs');
-  const burpDir = join(here, 'burp');
-  if (existsSync(burpDir)) {
-    let n = 0;
-    for (const file of readdirSync(burpDir).filter((f) => f.endsWith('.json'))) {
-      const sec = JSON.parse(readFileSync(join(burpDir, file), 'utf8')) as {
-        section: string; order?: number; entries: { title: string; path: string; order?: number; subcategory?: string; body: string }[];
-      };
-      const rows: EntryInput[] = sec.entries.map((e) => ({
-        type: 'doc',
-        category: sec.section,
-        subcategory: e.subcategory ?? null,
-        title: e.title,
-        body: e.body,
-        language: 'md',
-        tags: [],
-        source: 'https://portswigger.net' + e.path,
-        meta: { path: e.path, sectionOrder: sec.order ?? 99, pageOrder: e.order ?? 0 },
-      }));
-      total += insertMany(rows);
-      n += rows.length;
-      console.log(`  + ${String(rows.length).padStart(3)} · ${sec.section} (${file})`);
-    }
-    console.log(`  = ${n} burp doc pages`);
-  }
-
-  // Commands — practical CTF/pentest/HTB tool reference (type=command).
-  // Structured tools (seed/commands-structured/*.json) power the command builder and override the
-  // markdown version of any category they cover; remaining categories come from seed/commands/*.md.
-  section('Commands');
-  const structured = parseStructuredCommands();
-  const md = parseCommands().filter((e) => !structured.coveredKeys.has(cmdKey(e.category, e.title)));
-  total += insertMany(structured.entries);
-  total += insertMany(md);
-  const cmdCats = new Set([...structured.entries, ...md].map((c) => c.category)).size;
-  console.log(`  = ${structured.entries.length} structured + ${md.length} md · ${cmdCats} categories`);
-
-  // GTFOBins — Unix binaries abusable for shell / file ops / privesc (type=gtfobin).
-  section('GTFOBins');
-  const gtfo = parseGtfobins();
-  total += insertMany(gtfo);
-  console.log(`  = ${gtfo.length} gtfobins`);
-
-  // Wordlists reference — curated guide to the top wordlists, paths + GitHub links (type=wordlist_ref).
-  section('Wordlists reference');
-  const wlref = parseWordlistsRef();
-  total += insertMany(wlref);
-  console.log(`  = ${wlref.length} wordlist refs`);
 
   // Re-apply the preserved ★/notes onto the freshly-seeded rows.
   if (preserved.length) {
