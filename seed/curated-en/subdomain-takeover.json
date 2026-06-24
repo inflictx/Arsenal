@@ -1,0 +1,90 @@
+{
+  "category": "Subdomain Takeover",
+  "source": "PayloadsAllTheThings + EdOverflow/can-i-take-over-xyz",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "What subdomain takeover is",
+      "language": "text",
+      "tags": ["methodology", "subdomain-takeover", "dns"],
+      "body": "Subdomain takeover is hijacking someone's subdomain because of a dangling DNS record. A subdomain (e.g. blog.target.com) points via CNAME to an external service (GitHub Pages, S3, Heroku, etc.), but the resource on that service has been DELETED or was never claimed. The attacker registers that resource on the provider under their own name and now controls the content served on blog.target.com.\n\nImpact: arbitrary content on a trusted domain -> phishing, cookie theft (if the cookie scope is *.target.com), CSP/CORS bypass, OAuth redirect_uri hijack, XSS in the context of the main domain."
+    },
+    {
+      "subcategory": "Methodology",
+      "title": "How a dangling record appears",
+      "language": "text",
+      "tags": ["methodology", "lifecycle"],
+      "body": "Typical lifecycle:\n1. A team creates a subdomain and points its CNAME at a third-party service (app on Heroku, static site on GitHub Pages, files in S3).\n2. Later the service/resource is deleted (project shut down, bucket removed) BUT the DNS record is forgotten.\n3. The CNAME keeps pointing at the now-free name on the provider.\n4. The attacker claims that name on the provider and takes over the subdomain.\n\nA separate class is dangling NS: a zone delegation to a DNS provider where the zone has been deleted."
+    },
+    {
+      "subcategory": "Detection",
+      "title": "Finding takeover candidates",
+      "language": "bash",
+      "tags": ["detection", "recon", "cname"],
+      "body": "# 1) Collect subdomains\nsubfinder -d target.com -all -silent -o subs.txt\namass enum -passive -d target.com >> subs.txt\n\n# 2) Resolve CNAMEs - look for pointers to external services\ndnsx -l subs.txt -cname -resp -silent\nfor s in $(cat subs.txt); do echo \"$s -> $(dig +short CNAME $s)\"; done\n\n# 3) Live HTTP + bodies/headers with service error signatures\nhttpx -l subs.txt -title -status-code -silent"
+    },
+    {
+      "subcategory": "Detection",
+      "title": "Service fingerprint strings",
+      "language": "text",
+      "tags": ["detection", "fingerprint"],
+      "body": "A takeover signal is a CNAME to a service + a page that says \"nothing is configured\":\n• GitHub Pages: There isn't a GitHub Pages site here.\n• AWS S3: NoSuchBucket / The specified bucket does not exist\n• Heroku: No such app (herokucdn.com/error-pages/no-such-app.html)\n• Fastly: Fastly error: unknown domain\n• Shopify: Sorry, this shop is currently unavailable\n• Surge.sh: project not found\n• Tumblr: Whatever you were looking for doesn't currently exist at this address\n• Bitbucket: Repository not found\n• Read the Docs: unknown to Read the Docs\n• Azure: 404 Web Site not found (*.azurewebsites.net / *.cloudapp.net / *.trafficmanager.net)"
+    },
+    {
+      "subcategory": "Service matrix",
+      "title": "can-i-take-over-xyz reference",
+      "language": "text",
+      "tags": ["matrix", "services", "reference"],
+      "body": "EdOverflow/can-i-take-over-xyz is the map of \"which service can be taken over\". For each: fingerprint, status (Vulnerable / Not vulnerable / Edge case) and instructions.\n\nClassically takeover-able: GitHub Pages, AWS S3, Heroku, Surge.sh, Tumblr, Webflow, Cargo, Tilda, Helpjuice, Helpscout, Pingdom, UserVoice. Some have been fixed over time.\n\nIMPORTANT: status changes - providers add domain-ownership verification. Always check the current matrix and verify manually, not just by signature."
+    },
+    {
+      "subcategory": "Exploitation",
+      "title": "GitHub Pages takeover",
+      "language": "bash",
+      "tags": ["exploit", "github-pages"],
+      "body": "Condition: the subdomain CNAME -> <user>.github.io, and the Pages site/repo does not exist.\n\n1. Create a repository on your own GitHub account.\n2. Enable GitHub Pages (Settings -> Pages).\n3. Put a CNAME file at the repo root containing the target subdomain:\n   echo 'blog.target.com' > CNAME\n   git add CNAME && git commit -m init && git push\n4. GitHub binds blog.target.com to your site - content is under your control.\n\nNote: sometimes you must wait and retry (GitHub checks the domain is not bound to another account)."
+    },
+    {
+      "subcategory": "Exploitation",
+      "title": "AWS S3 bucket takeover",
+      "language": "bash",
+      "tags": ["exploit", "aws", "s3"],
+      "body": "Condition: the subdomain points (CNAME) to <bucket>.s3.amazonaws.com or an S3 website endpoint, and the bucket is deleted -> NoSuchBucket.\n\n1. Get the bucket name from the CNAME/URL.\n2. Create a bucket with the SAME name (S3 names are globally unique) in the right region:\n   aws s3 mb s3://<bucket-name> --region <region>\n3. Enable static website hosting, upload your index.html.\n4. Requests to the subdomain now serve your content.\n\nNote: the region must match the one in the endpoint, otherwise you get a redirect/error."
+    },
+    {
+      "subcategory": "Exploitation",
+      "title": "Heroku and Azure",
+      "language": "text",
+      "tags": ["exploit", "heroku", "azure"],
+      "body": "Heroku: CNAME -> <app>.herokuapp.com, app deleted (No such app). Create a Heroku app and add the custom domain:\n   heroku domains:add blog.target.com\nIf the domain is not pinned to another account, you take it over.\n\nAzure: CNAME to *.azurewebsites.net / *.cloudapp.net / *.trafficmanager.net / *.blob.core.windows.net with the resource deleted. Create a resource with the same name in your subscription. Azure added dangling-DNS protection - check edge cases."
+    },
+    {
+      "subcategory": "Exploitation",
+      "title": "Dangling NS (zone delegation)",
+      "language": "dns",
+      "tags": ["exploit", "ns", "delegation"],
+      "body": "More dangerous than a CNAME takeover: if a subdomain's NS record is delegated to a DNS provider where the zone is deleted/unconfigured, the attacker registers the zone on that provider and controls the ENTIRE subdomain (any record).\n\nDetection:\n  dig NS sub.target.com\n  # NS point at a provider (e.g. *.dnsmadeeasy.com, ns-XXXX.awsdns-XX.org)\n  # where the zone is not set up -> SERVFAIL / REFUSED on resolution\n\nCheck whether you can create the zone sub.target.com on that provider under your account."
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Automated discovery",
+      "language": "bash",
+      "tags": ["tools", "automation"],
+      "body": "# subjack - the classic\nsubjack -w subs.txt -t 100 -timeout 30 -ssl -c fingerprints.json -v\n\n# nuclei - takeover templates\nnuclei -l subs.txt -t http/takeovers/ -silent\n\n# dnsReaper - modern, dozens of signatures\npython3 dnsreaper.py file --filename subs.txt\n\n# subzy\nsubzy run --targets subs.txt\n\n# SubOver\nSubOver -l subs.txt\n\nAlways confirm a hit manually: auto-signatures produce false positives."
+    },
+    {
+      "subcategory": "PoC and report",
+      "title": "Proving it and reporting",
+      "language": "text",
+      "tags": ["poc", "reporting"],
+      "body": "Safe PoC: put a harmless page with your marker on the taken-over subdomain (e.g. /poc.txt with your handle and date), take a screenshot, record the CNAME and fingerprint.\n\nDo NOT host malicious/phishing content. In the report state: the vulnerable subdomain, which service the CNAME dangled to, the fingerprint, takeover steps, impact (cookie scope, OAuth redirect, CSP bypass) and the fix.\n\nFix: remove the dangling DNS record OR re-claim the resource on the provider."
+    },
+    {
+      "subcategory": "Defense",
+      "title": "Prevention",
+      "language": "text",
+      "tags": ["defense", "prevention"],
+      "body": "• Decommission in order: remove the DNS record FIRST, then the resource on the provider.\n• Regularly audit CNAME/NS records for dangling entries (dnsReaper/nuclei in CI).\n• Prefer providers with domain-ownership verification (TXT check).\n• Avoid wildcard CNAMEs to external services.\n• Monitoring: alert when fingerprint errors appear on your own subdomains."
+    }
+  ]
+}

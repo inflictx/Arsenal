@@ -88,7 +88,7 @@ export function EngageView(outlet: HTMLElement): () => void {
     if (!active) return;
     Object.assign(active, patch);
     const i = targets.findIndex((x) => x.id === active!.id);
-    if (i >= 0) Object.assign(targets[i], patch);
+    if (i >= 0) { const row = targets[i]; if (row) Object.assign(row, patch); }
     clearTimeout(tTimer);
     tTimer = setTimeout(() => {
       api.updateTarget(active!.id, patch).then(() => renderList()).catch(() => toast(t('engage.notSaved')));

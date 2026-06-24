@@ -11,7 +11,7 @@ let backdrop: HTMLElement | null = null;
 
 function firstCodeBlock(body: string): string | null {
   const m = body.match(/```[^\n]*\n([\s\S]*?)```/);
-  return m ? m[1].trim() : null;
+  return m ? (m[1] ?? '').trim() : null;
 }
 // The clean value the ⧉ button copies — or null when there's nothing useful to copy
 // (e.g. Burp docs are prose). When null the copy button is hidden, so you never copy junk.

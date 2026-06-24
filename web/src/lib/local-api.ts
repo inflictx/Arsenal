@@ -273,6 +273,52 @@ export const localApi = {
     return { entries: entries.length, checklist_state: cs.length };
   },
 
+  // Merge a backup's personal data into the current IndexedDB without wiping anything.
+  async merge(data: any): Promise<{ addedEntries: number; mergedState: number; addedTargets: number; addedFindings: number }> {
+    const entries: any[] = Array.isArray(data?.entries) ? data.entries : [];
+    const existing = await userEntries();
+    const key = (e: any) => e.type + ' ' + e.title + ' ' + (e.body ?? '');
+    const seen = new Set(existing.map(key));
+    let maxUser = (await dbGet<any>('kv', 'seq:entry'))?.v ?? USER_BASE;
+    let addedEntries = 0;
+    for (const e of entries) {
+      if (!e.is_custom) continue;
+      const ent = { ...e, tags: typeof e.tags === 'string' ? JSON.parse(e.tags) : (e.tags ?? []), meta: typeof e.meta === 'string' ? (e.meta ? JSON.parse(e.meta) : null) : e.meta, is_custom: true, is_favorite: !!e.is_favorite };
+      if (seen.has(key(ent))) continue;
+      ent.id = ++maxUser; seen.add(key(ent));
+      await dbPut('userEntries', ent); addedEntries++;
+    }
+    await dbPut('kv', { k: 'seq:entry', v: maxUser });
+
+    const cs: any[] = Array.isArray(data?.checklist_state) ? data.checklist_state : [];
+    let mergedState = 0;
+    for (const r of cs) {
+      const cur = await dbGet<any>('checklistState', r.key);
+      const checked = !!(cur?.checked) || !!r.checked;
+      const note = (r.note != null && r.note !== '') ? r.note : (cur?.note ?? null);
+      await dbPut('checklistState', { key: r.key, checked, note });
+      mergedState++;
+    }
+
+    const tg = Array.isArray(data?.targets) ? data.targets : [];
+    const fd = Array.isArray(data?.findings) ? data.findings : [];
+    let maxT = (await dbGet<any>('kv', 'seq:target'))?.v ?? 0;
+    let maxF = (await dbGet<any>('kv', 'seq:finding'))?.v ?? 0;
+    let addedTargets = 0, addedFindings = 0;
+    for (const tt of tg) {
+      const newId = ++maxT;
+      await dbPut('targets', { ...tt, id: newId, is_active: false });
+      addedTargets++;
+      for (const f of fd.filter((x: any) => x.target_id === tt.id)) {
+        await dbPut('findings', { ...f, id: ++maxF, target_id: newId });
+        addedFindings++;
+      }
+    }
+    if (tg.length) await dbPut('kv', { k: 'seq:target', v: maxT });
+    if (addedFindings) await dbPut('kv', { k: 'seq:finding', v: maxF });
+    return { addedEntries, mergedState, addedTargets, addedFindings };
+  },
+
   async exportBackup(): Promise<any> {
     const users = await userEntries();
     const ovs = (await dbAll<Override>('overrides')).filter((o) => !o.deleted);

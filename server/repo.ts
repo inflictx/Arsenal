@@ -32,11 +32,17 @@ export interface EntryInput {
   meta?: unknown;
 }
 
+/** Parse a JSON column, never throwing: corrupt data falls back instead of 500-ing the request. */
+function safeParse<T>(s: unknown, fallback: T): T {
+  if (typeof s !== 'string' || s === '') return fallback;
+  try { return JSON.parse(s) as T; } catch { return fallback; }
+}
+
 function toEntry(r: any): Entry {
   return {
     ...r,
-    tags: r.tags ? JSON.parse(r.tags) : [],
-    meta: r.meta ? JSON.parse(r.meta) : null,
+    tags: safeParse<string[]>(r.tags, []),
+    meta: safeParse<unknown>(r.meta, null),
     is_custom: !!r.is_custom,
     is_favorite: !!r.is_favorite,
   };
@@ -223,6 +229,65 @@ const restoreTx = db.transaction((data: any) => {
 
 export function importData(data: unknown) {
   const result = restoreTx(data);
+  try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* ignore */ }
+  return result;
+}
+
+// ── Merge: add a backup's personal data to the current DB WITHOUT wiping anything ──
+const mergeTx = db.transaction((data: any) => {
+  const entries: any[] = Array.isArray(data?.entries) ? data.entries : [];
+  const cs: any[] = Array.isArray(data?.checklist_state) ? data.checklist_state : [];
+  const now = new Date().toISOString();
+  let addedEntries = 0, mergedState = 0, addedTargets = 0, addedFindings = 0;
+
+  // 1) Personal entries only (is_custom); seeded content already exists from the seed.
+  //    Dedup by type+title+body so re-merging the same file doesn't pile up duplicates.
+  const exists = db.prepare("SELECT 1 FROM entries WHERE type=? AND title=? AND IFNULL(body,'')=IFNULL(?,'') LIMIT 1");
+  const insEntry = db.prepare(`INSERT INTO entries
+    (type, category, subcategory, title, body, language, locale, tags, source, meta, is_custom, is_favorite, notes)
+    VALUES (@type,@category,@subcategory,@title,@body,@language,@locale,@tags,@source,@meta,1,@is_favorite,@notes)`);
+  for (const e of entries) {
+    if (!e.is_custom) continue;
+    if (exists.get(e.type, e.title, e.body ?? '')) continue;
+    insEntry.run({
+      type: e.type, category: e.category ?? null, subcategory: e.subcategory ?? null,
+      title: e.title, body: e.body ?? null, language: e.language ?? null, locale: e.locale ?? 'ru',
+      tags: typeof e.tags === 'string' ? e.tags : (e.tags != null ? JSON.stringify(e.tags) : null),
+      source: e.source ?? null,
+      meta: typeof e.meta === 'string' ? e.meta : (e.meta != null ? JSON.stringify(e.meta) : null),
+      is_favorite: e.is_favorite ? 1 : 0, notes: e.notes ?? null,
+    });
+    addedEntries++;
+  }
+
+  // 2) Checklist progress: union — keep a tick if either side has it; fill missing notes.
+  const csUpsert = db.prepare(`INSERT INTO checklist_state (key, checked, note, updated_at)
+    VALUES (@key,@checked,@note,@updated_at)
+    ON CONFLICT(key) DO UPDATE SET
+      checked = MAX(checklist_state.checked, excluded.checked),
+      note = COALESCE(NULLIF(excluded.note,''), checklist_state.note),
+      updated_at = excluded.updated_at`);
+  for (const r of cs) { csUpsert.run({ key: r.key, checked: r.checked ? 1 : 0, note: r.note ?? null, updated_at: r.updated_at ?? now }); mergedState++; }
+
+  // 3) Targets + findings: append, remapping ids so they never collide with existing rows.
+  if (Array.isArray(data?.targets)) {
+    const findings: any[] = Array.isArray(data?.findings) ? data.findings : [];
+    const insT = db.prepare('INSERT INTO targets (name,host,lhost,scope,status,notes,is_active) VALUES (@name,@host,@lhost,@scope,@status,@notes,0)');
+    const insF = db.prepare('INSERT INTO findings (target_id,title,severity,url,status,body,sort) VALUES (@target_id,@title,@severity,@url,@status,@body,@sort)');
+    for (const tg of data.targets) {
+      const newId = Number(insT.run({ name: tg.name ?? 'target', host: tg.host ?? null, lhost: tg.lhost ?? null, scope: tg.scope ?? null, status: tg.status ?? 'active', notes: tg.notes ?? null }).lastInsertRowid);
+      addedTargets++;
+      for (const f of findings.filter((x) => x.target_id === tg.id)) {
+        insF.run({ target_id: newId, title: f.title ?? 'finding', severity: f.severity ?? 'medium', url: f.url ?? null, status: f.status ?? 'open', body: f.body ?? null, sort: f.sort ?? 0 });
+        addedFindings++;
+      }
+    }
+  }
+  return { addedEntries, mergedState, addedTargets, addedFindings };
+});
+
+export function mergeData(data: unknown) {
+  const result = mergeTx(data);
   try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* ignore */ }
   return result;
 }

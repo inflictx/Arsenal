@@ -63,6 +63,7 @@ const httpApi = {
   setNotes: (id: number, notes: string): Promise<Entry> => req('/entries/' + id + '/notes', { method: 'PATCH', ...json({ notes }) }),
   config: (name: string): Promise<any> => req('/config/' + name),
   restore: (data: unknown): Promise<{ entries: number; checklist_state: number }> => req('/restore', { method: 'POST', ...json(data) }),
+  merge: (data: unknown): Promise<{ addedEntries: number; mergedState: number; addedTargets: number; addedFindings: number }> => req('/merge', { method: 'POST', ...json(data) }),
   exportBackup: (): Promise<any> => req('/backup'),
 
   targets: (): Promise<any[]> => req('/targets'),

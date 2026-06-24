@@ -11,6 +11,7 @@ const p: { ru: Record<string, string>; en: Record<string, string> } = {
     'card.saveFailed': 'Не сохранилось',
     'card.chipScheme': 'схема',
     'card.chipTable': 'таблица',
+    'card.targetedHint': 'Примеры-хосты заменены на твою цель / LHOST',
     // ── palette ──
     'palette.placeholder': 'Поиск по всему, payloads, commands, GTFOBins, docs · ↵ открыть',
     'palette.clear': 'Очистить',
@@ -43,6 +44,12 @@ const p: { ru: Record<string, string>; en: Record<string, string> } = {
     'backup.title': 'Бэкап / восстановление',
     'backup.intro': 'Сохрани все данные приложения — пейлоады, твои заметки и готовые команды, прогресс и заметки чек-листов, избранное — в один JSON-файл. Восстановление заменяет текущую базу содержимым файла. Делай бэкап перед обновлениями и важными правками.',
     'backup.nowInDb': 'Сейчас в базе',
+    'backup.mergeBtn': 'Слить из файла…',
+    'backup.confirmMergeHead': 'Слить бэкап с текущими данными?',
+    'backup.confirmMergeBody': 'Твои записи и прогресс из файла добавятся к текущим. Ничего не удалится.',
+    'backup.doneMerged': 'Готово: добавлено',
+    'backup.mergedEntries': 'записей',
+    'backup.mergedMarks': 'отметок',
     // ── favorites ──
     'favorites.typeNote': 'Заметка',
     'favorites.typeRecipe': 'Готовая команда',
@@ -106,6 +113,7 @@ const p: { ru: Record<string, string>; en: Record<string, string> } = {
     'card.saveFailed': 'Could not save',
     'card.chipScheme': 'diagram',
     'card.chipTable': 'table',
+    'card.targetedHint': 'Example hosts replaced with your target / LHOST',
     // ── palette ──
     'palette.placeholder': 'Search everything, payloads, commands, GTFOBins, docs · ↵ open',
     'palette.clear': 'Clear',
@@ -138,6 +146,12 @@ const p: { ru: Record<string, string>; en: Record<string, string> } = {
     'backup.title': 'Backup / restore',
     'backup.intro': 'Save all app data — payloads, your notes and command recipes, checklist progress and notes, favorites — into a single JSON file. Restoring replaces the current database with the file contents. Make a backup before updates and important edits.',
     'backup.nowInDb': 'Currently in the database',
+    'backup.mergeBtn': 'Merge from file…',
+    'backup.confirmMergeHead': 'Merge backup into the current data?',
+    'backup.confirmMergeBody': 'Your entries and progress from the file are added to the current ones. Nothing is deleted.',
+    'backup.doneMerged': 'Done: added',
+    'backup.mergedEntries': 'entries',
+    'backup.mergedMarks': 'marks',
     // ── favorites ──
     'favorites.typeNote': 'Note',
     'favorites.typeRecipe': 'Command recipe',

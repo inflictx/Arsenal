@@ -1,0 +1,146 @@
+[
+  {
+    "category": "Cracking rules (hashcat)",
+    "name": "best64.rule",
+    "purpose": "The 64 most effective base mutations (case, appending digits/years, leet, reversal). Best coverage-to-speed ratio - the first rule for any cracking job.",
+    "whenToUse": "First pass over rockyou: maximum hits for minimum time before you reach for heavy rules.",
+    "size": "64 rules",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/best64.rule"],
+    "github": "https://github.com/hashcat/hashcat/blob/master/rules/best64.rule",
+    "tags": ["rules", "hashcat", "kali", "starter", "classic"]
+  },
+  {
+    "category": "Cracking rules (hashcat)",
+    "name": "rockyou-30000.rule",
+    "purpose": "~30,000 rules derived from analyzing the RockYou leak. A good mid-size set: much wider than best64 but still fast.",
+    "whenToUse": "Second pass after best64 when you want more coverage without moving to huge rule sets.",
+    "size": "~30,000 rules",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/rockyou-30000.rule"],
+    "github": "https://github.com/hashcat/hashcat/blob/master/rules/rockyou-30000.rule",
+    "tags": ["rules", "hashcat", "kali", "rockyou"]
+  },
+  {
+    "category": "Cracking rules (hashcat)",
+    "name": "dive.rule",
+    "purpose": "One of the largest built-in sets (~99,000 rules) - very deep mutations. High coverage at the cost of time.",
+    "whenToUse": "When fast rules are exhausted, you have time/GPU, and want to squeeze the most out of a given wordlist.",
+    "size": "~99,000 rules",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/dive.rule"],
+    "github": "https://github.com/hashcat/hashcat/blob/master/rules/dive.rule",
+    "tags": ["rules", "hashcat", "kali", "heavy"]
+  },
+  {
+    "category": "Cracking rules (hashcat)",
+    "name": "d3ad0ne.rule",
+    "purpose": "Popular set (~34,000 rules) by d3ad0ne - balanced mutations that catch human password variations well.",
+    "whenToUse": "An alternative/complement to dive: run it when best64 and rockyou-30000 didn't finish the hashes.",
+    "size": "~34,000 rules",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/d3ad0ne.rule"],
+    "github": "https://github.com/hashcat/hashcat/blob/master/rules/d3ad0ne.rule",
+    "tags": ["rules", "hashcat", "kali"]
+  },
+  {
+    "category": "Cracking rules (hashcat)",
+    "name": "T0XlC.rule / T0XlC-insert_*.rule",
+    "purpose": "The T0XlC set (~11,000 rules) and its insert variants (inserting symbols/digits at various positions). Good against passwords with special chars inside the word.",
+    "whenToUse": "When you suspect inserts of special chars/digits not only at the end but inside the word.",
+    "size": "~11,000 rules (base T0XlC)",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/T0XlC.rule", "/usr/share/hashcat/rules/T0XlC-insert_top_50_1_2_3.rule"],
+    "github": "https://github.com/hashcat/hashcat/tree/master/rules",
+    "tags": ["rules", "hashcat", "kali", "insert"]
+  },
+  {
+    "category": "Cracking rules (hashcat)",
+    "name": "generated2.rule",
+    "purpose": "A machine-generated set (~65,000 rules) - broad mutation coverage. Heavy but effective on large hash lists.",
+    "whenToUse": "A deep pass when you need maximum variation and have the compute budget.",
+    "size": "~65,000 rules",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/generated2.rule"],
+    "github": "https://github.com/hashcat/hashcat/blob/master/rules/generated2.rule",
+    "tags": ["rules", "hashcat", "kali", "heavy"]
+  },
+  {
+    "category": "Cracking rules (hashcat)",
+    "name": "leetspeak.rule",
+    "purpose": "A small set of leet substitutions (a->4, e->3, o->0, s->$, etc.). Targets leet variations of dictionary words.",
+    "whenToUse": "When passwords are words with leet substitutions; cheap to add to any wordlist.",
+    "size": "~15 rules",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/leetspeak.rule"],
+    "github": "https://github.com/hashcat/hashcat/blob/master/rules/leetspeak.rule",
+    "tags": ["rules", "hashcat", "kali", "leet"]
+  },
+  {
+    "category": "Cracking rules (hashcat)",
+    "name": "toggles1-5.rule",
+    "purpose": "Toggle-case across the first N positions: toggles1 - 1 position, ... toggles5 - up to 5. For cases like Password vs pAssword vs PASSword.",
+    "whenToUse": "When hashes are case-sensitive but your candidates are lowercase; layer on top of a wordlist.",
+    "size": "toggles1 ... toggles5 (grows with the number of positions)",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/toggles1.rule", "/usr/share/hashcat/rules/toggles5.rule"],
+    "github": "https://github.com/hashcat/hashcat/tree/master/rules",
+    "tags": ["rules", "hashcat", "kali", "case"]
+  },
+  {
+    "category": "Cracking rules (hashcat)",
+    "name": "InsidePro-PasswordsPro.rule / InsidePro-HashManager.rule",
+    "purpose": "Large sets from InsidePro (PasswordsPro / HashManager). Broad mutations that perform well on real leaks.",
+    "whenToUse": "As a heavy alternative to dive/generated2 for a deep pass.",
+    "size": "several thousand rules each",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/InsidePro-PasswordsPro.rule", "/usr/share/hashcat/rules/InsidePro-HashManager.rule"],
+    "github": "https://github.com/hashcat/hashcat/tree/master/rules",
+    "tags": ["rules", "hashcat", "kali", "insidepro"]
+  },
+  {
+    "category": "Cracking rules (hashcat)",
+    "name": "OneRuleToRuleThemAll.rule",
+    "purpose": "The famous set (~52,000 rules) by NotSoSecure/stealthsploit: assembled from the best public rules. One of the most effective universal sets.",
+    "whenToUse": "When you want one strong universal rule instead of cycling through several. NOT in stock Kali - download from GitHub.",
+    "size": "~52,000 rules",
+    "tool": "hashcat",
+    "paths": ["~/rules/OneRuleToRuleThemAll.rule"],
+    "github": "https://github.com/stealthsploit/OneRuleToRuleThemAll",
+    "raw": "https://raw.githubusercontent.com/stealthsploit/OneRuleToRuleThemAll/master/OneRuleToRuleThemAll.rule",
+    "tags": ["rules", "hashcat", "external", "universal", "popular"]
+  },
+  {
+    "category": "Cracking rules (hashcat)",
+    "name": "OneRuleToRuleThemStill.rule",
+    "purpose": "The updated/optimized successor to OneRuleToRuleThemAll: fewer rules at comparable coverage - faster on slow hashes.",
+    "whenToUse": "When One Rule is too heavy for a slow algorithm (bcrypt, etc.) but you still want its coverage.",
+    "size": "~49,000 rules",
+    "tool": "hashcat",
+    "paths": ["~/rules/OneRuleToRuleThemStill.rule"],
+    "github": "https://github.com/stealthsploit/OneRuleToRuleThemStill",
+    "tags": ["rules", "hashcat", "external", "universal", "optimized"]
+  },
+  {
+    "category": "Cracking rules (hashcat)",
+    "name": "Kaonashi.rule",
+    "purpose": "Rules from the Kaonashi project (research into real-world passwords): strong human-like mutations that complement One Rule well.",
+    "whenToUse": "For a deep pass on real leaks; download from GitHub (not in stock Kali).",
+    "size": "~13,000 rules",
+    "tool": "hashcat",
+    "paths": ["~/rules/Kaonashi.rule"],
+    "github": "https://github.com/kaonashi-passwords/Kaonashi",
+    "tags": ["rules", "hashcat", "external"]
+  },
+  {
+    "category": "Cracking rules (hashcat)",
+    "name": "How to apply rules (syntax)",
+    "purpose": "Rules (-r) combine with a wordlist in dictionary-attack mode (-a 0). You can chain several -r flags - they apply sequentially (a cartesian product of mutations).",
+    "whenToUse": "Cheat sheet for running any rule above.",
+    "size": "-",
+    "tool": "hashcat",
+    "paths": ["hashcat -m 0 -a 0 hash.txt /usr/share/wordlists/rockyou.txt -r /usr/share/hashcat/rules/best64.rule"],
+    "github": "https://hashcat.net/wiki/doku.php?id=rule_based_attack",
+    "tags": ["rules", "hashcat", "syntax", "howto"]
+  }
+]

@@ -24,16 +24,22 @@ export async function copyText(text: string): Promise<boolean> {
 const ICON_COPY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>`;
 const ICON_CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>`;
 
+// label is rendered via textContent (never innerHTML) so a caller-supplied label can't inject markup.
 export function copyButton(getText: () => string, label = 'Copy'): HTMLButtonElement {
-  const btn = h('button', { class: 'btn', html: `${ICON_COPY}<span>${label}</span>` }) as HTMLButtonElement;
+  const btn = h('button', { class: 'btn' }) as HTMLButtonElement;
+  const render = (icon: string, text: string) => {
+    btn.innerHTML = icon;                     // icon is a trusted static SVG constant
+    btn.appendChild(h('span', null, text));   // label/text via createTextNode, not innerHTML
+  };
+  render(ICON_COPY, label);
   btn.addEventListener('click', async (ev) => {
     ev.stopPropagation();
     if (!(await copyText(getText()))) return;
     btn.classList.add('copied');
-    btn.innerHTML = `${ICON_CHECK}<span>Copied</span>`;
+    render(ICON_CHECK, 'Copied');
     setTimeout(() => {
       btn.classList.remove('copied');
-      btn.innerHTML = `${ICON_COPY}<span>${label}</span>`;
+      render(ICON_COPY, label);
     }, 1300);
   });
   return btn;

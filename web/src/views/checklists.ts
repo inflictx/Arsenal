@@ -75,7 +75,7 @@ export function ChecklistsView(outlet: HTMLElement, params: Record<string, strin
     if (!catIndex.length) return [];
     const codeNeedles = new Set<string>();
     for (const m of text.matchAll(/`([^`]+)`/g)) {
-      for (const s of m[1].toLowerCase().match(/[a-zа-яё0-9_]{3,}/gi) || []) codeNeedles.add(s);
+      for (const s of (m[1] ?? '').toLowerCase().match(/[a-zа-яё0-9_]{3,}/gi) || []) codeNeedles.add(s);
     }
     const plain = text.toLowerCase().replace(/`[^`]+`/g, ' ');
     const words = new Set((plain.match(/[a-zа-яё0-9_]{3,}/gi) || []).filter((w) => !STOP.has(w)));

@@ -4,6 +4,7 @@ import { copyButton } from '../lib/copy';
 import { toast } from '../lib/toast';
 import { t } from '../lib/i18n';
 import { api, type Entry } from '../api';
+import { substTarget } from '../lib/target';
 
 interface TableData { headers: string[]; rows: string[][]; }
 
@@ -19,10 +20,11 @@ function tableToText(t: TableData): string {
   return [t.headers.join('\t'), ...t.rows.map((r) => r.join('\t'))].join('\n');
 }
 
-export function PayloadCard(e: Entry): HTMLElement {
+export function PayloadCard(e: Entry, opts?: { onEdit?: (e: Entry) => void; onDelete?: (e: Entry) => void }): HTMLElement {
   const meta = (e.meta ?? {}) as Record<string, any>;
   const kind: string | undefined = meta.kind;
   const body = e.body ?? '';
+  const titleR = substTarget(e.title);
 
   const star = h('button', {
     class: 'star' + (e.is_favorite ? ' on' : ''),
@@ -40,6 +42,7 @@ export function PayloadCard(e: Entry): HTMLElement {
   let content: HTMLElement;
   let actions: (HTMLElement | null)[];
   let chip: string | null = e.language;
+  let targeted = titleR.changed;
 
   if (kind === 'image') {
     content = h('figure', { class: 'card-figure' },
@@ -53,13 +56,20 @@ export function PayloadCard(e: Entry): HTMLElement {
     actions = [star, copyButton(() => tableToText(meta.table as TableData))];
     chip = t('card.chipTable');
   } else {
-    content = codeBlock(body, { wrap: body.length > 110 });
-    actions = [star, copyButton(() => body)];
+    const subst = substTarget(body);
+    if (subst.changed) targeted = true;
+    content = codeBlock(subst.out, { wrap: subst.out.length > 110 });
+    actions = [star, copyButton(() => subst.out)];
   }
+
+  if (opts?.onEdit) actions.push(h('button', { class: 'btn card-edit', type: 'button', title: t('payloads.edit'), onclick: (ev: Event) => { ev.stopPropagation(); opts.onEdit!(e); } }, '✎'));
+  if (opts?.onDelete && e.is_custom) actions.push(h('button', { class: 'btn card-del', type: 'button', title: t('payloads.delete'), onclick: (ev: Event) => { ev.stopPropagation(); opts.onDelete!(e); } }, '🗑'));
 
   const sub = e.subcategory ? h('div', { class: 'card-sub' }, e.subcategory) : null;
   const top = h('div', { class: 'card-top' },
-    h('span', { class: 'card-title', title: e.title }, e.title),
+    h('span', { class: 'card-title', title: titleR.out }, titleR.out),
+    e.is_custom ? h('span', { class: 'card-mine', title: t('payloads.mineTag') }, t('payloads.mineTag')) : null,
+    targeted ? h('span', { class: 'card-targeted', title: t('card.targetedHint') }, '🎯') : null,
     chip ? h('span', { class: 'lang' }, chip) : null,
     h('div', { class: 'card-actions' }, ...actions),
   );

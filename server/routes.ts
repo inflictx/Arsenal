@@ -4,6 +4,34 @@ import * as checklists from './checklists';
 import * as engage from './engage';
 import { getSetting } from './db';
 
+// `:id` params are validated as positive integers. Fastify coerces "5" -> 5 and rejects junk
+// with a clean 400 instead of letting NaN reach better-sqlite3 and 500 the request.
+const idSchema = {
+  schema: {
+    params: {
+      type: 'object',
+      required: ['id'],
+      additionalProperties: false,
+      properties: { id: { type: 'integer', minimum: 1 } },
+    },
+  },
+};
+
+// POST /entries: type + title are mandatory; everything else (meta/tags/locale/...) passes through.
+const newEntrySchema = {
+  schema: {
+    body: {
+      type: 'object',
+      required: ['type', 'title'],
+      additionalProperties: true,
+      properties: {
+        type: { type: 'string', minLength: 1 },
+        title: { type: 'string', minLength: 1 },
+      },
+    },
+  },
+};
+
 export async function registerRoutes(app: FastifyInstance) {
   app.get('/health', async () => ({ ok: true, name: 'ARS3NAL' }));
 
@@ -27,43 +55,41 @@ export async function registerRoutes(app: FastifyInstance) {
     });
   });
 
-  app.get('/entries/:id', async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const e = repo.getEntry(Number(id));
+  app.get('/entries/:id', idSchema, async (req, reply) => {
+    const { id } = req.params as { id: number };
+    const e = repo.getEntry(id);
     if (!e) return reply.code(404).send({ error: 'not found' });
     return e;
   });
 
-  app.post('/entries', async (req, reply) => {
-    const body = req.body as repo.EntryInput;
-    if (!body?.type || !body?.title) return reply.code(400).send({ error: 'type and title are required' });
-    return repo.createEntry(body);
+  app.post('/entries', newEntrySchema, async (req) => {
+    return repo.createEntry(req.body as repo.EntryInput);
   });
 
-  app.put('/entries/:id', async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const e = repo.updateEntry(Number(id), req.body as Partial<repo.EntryInput>);
+  app.put('/entries/:id', idSchema, async (req, reply) => {
+    const { id } = req.params as { id: number };
+    const e = repo.updateEntry(id, req.body as Partial<repo.EntryInput>);
     if (!e) return reply.code(404).send({ error: 'not found' });
     return e;
   });
 
-  app.delete('/entries/:id', async (req, reply) => {
-    const { id } = req.params as { id: string };
-    if (!repo.deleteEntry(Number(id))) return reply.code(404).send({ error: 'not found' });
+  app.delete('/entries/:id', idSchema, async (req, reply) => {
+    const { id } = req.params as { id: number };
+    if (!repo.deleteEntry(id)) return reply.code(404).send({ error: 'not found' });
     return { ok: true };
   });
 
-  app.patch('/entries/:id/favorite', async (req, reply) => {
-    const { id } = req.params as { id: string };
-    const e = repo.toggleFavorite(Number(id));
+  app.patch('/entries/:id/favorite', idSchema, async (req, reply) => {
+    const { id } = req.params as { id: number };
+    const e = repo.toggleFavorite(id);
     if (!e) return reply.code(404).send({ error: 'not found' });
     return e;
   });
 
-  app.patch('/entries/:id/notes', async (req, reply) => {
-    const { id } = req.params as { id: string };
+  app.patch('/entries/:id/notes', idSchema, async (req, reply) => {
+    const { id } = req.params as { id: number };
     const { notes } = req.body as { notes: string };
-    const e = repo.setNotes(Number(id), notes ?? '');
+    const e = repo.setNotes(id, notes ?? '');
     if (!e) return reply.code(404).send({ error: 'not found' });
     return e;
   });
@@ -127,13 +153,13 @@ export async function registerRoutes(app: FastifyInstance) {
   // ── Engagements (targets) + findings ──────────────────────────────────────
   app.get('/targets', async () => engage.listTargets());
   app.post('/targets', async (req) => engage.createTarget(req.body as Partial<engage.Target>));
-  app.put('/targets/:id', async (req, reply) => {
-    const t = engage.updateTarget(Number((req.params as { id: string }).id), req.body as Partial<engage.Target>);
+  app.put('/targets/:id', idSchema, async (req, reply) => {
+    const t = engage.updateTarget((req.params as { id: number }).id, req.body as Partial<engage.Target>);
     return t ?? reply.code(404).send({ error: 'not found' });
   });
-  app.delete('/targets/:id', async (req) => ({ ok: engage.deleteTarget(Number((req.params as { id: string }).id)) }));
-  app.post('/targets/:id/activate', async (req, reply) => {
-    const t = engage.activateTarget(Number((req.params as { id: string }).id));
+  app.delete('/targets/:id', idSchema, async (req) => ({ ok: engage.deleteTarget((req.params as { id: number }).id) }));
+  app.post('/targets/:id/activate', idSchema, async (req, reply) => {
+    const t = engage.activateTarget((req.params as { id: number }).id);
     return t ?? reply.code(404).send({ error: 'not found' });
   });
   app.get('/findings', async (req) => {
@@ -141,11 +167,11 @@ export async function registerRoutes(app: FastifyInstance) {
     return engage.listFindings(t != null && t !== '' ? Number(t) : undefined);
   });
   app.post('/findings', async (req) => engage.createFinding(req.body as Partial<engage.Finding>));
-  app.put('/findings/:id', async (req, reply) => {
-    const f = engage.updateFinding(Number((req.params as { id: string }).id), req.body as Partial<engage.Finding>);
+  app.put('/findings/:id', idSchema, async (req, reply) => {
+    const f = engage.updateFinding((req.params as { id: number }).id, req.body as Partial<engage.Finding>);
     return f ?? reply.code(404).send({ error: 'not found' });
   });
-  app.delete('/findings/:id', async (req) => ({ ok: engage.deleteFinding(Number((req.params as { id: string }).id)) }));
+  app.delete('/findings/:id', idSchema, async (req) => ({ ok: engage.deleteFinding((req.params as { id: number }).id) }));
 
   // ── Backup / restore ──────────────────────────────────────────────────────
   app.get('/backup', async (_req, reply) => {
@@ -158,5 +184,12 @@ export async function registerRoutes(app: FastifyInstance) {
     const body = req.body as { entries?: unknown };
     if (!body || !Array.isArray(body.entries)) return reply.code(400).send({ error: 'invalid backup file' });
     return repo.importData(body);
+  });
+
+  // Merge: add a backup's personal data without wiping the current DB.
+  app.post('/merge', async (req, reply) => {
+    const body = req.body as { entries?: unknown };
+    if (!body || !Array.isArray(body.entries)) return reply.code(400).send({ error: 'invalid backup file' });
+    return repo.mergeData(body);
   });
 }

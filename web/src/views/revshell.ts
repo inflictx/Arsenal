@@ -7,8 +7,8 @@ import { rsgData, CommandType } from '../data/rsg-data';
 import { t } from '../lib/i18n';
 
 interface Cmd { name: string; command: string; meta: string[]; }
-const DATA = rsgData as unknown as { reverseShellCommands: Cmd[]; listenerCommands: [string, string][]; shells: string[] };
-const CT = CommandType as unknown as Record<string, string>;
+const DATA = rsgData as { reverseShellCommands: Cmd[]; listenerCommands: [string, string][]; shells: string[] };
+const CT = CommandType;
 
 const TABS: { id: string; label: string }[] = [
   { id: CT.ReverseShell, label: t('revshell.tabReverse') },
@@ -56,7 +56,7 @@ export function RevShellView(outlet: HTMLElement): () => void {
   let enc = LS.get('enc', 'none') as Encoding;
   let tab = CT.ReverseShell;
   let osf = '';
-  let listenerName = DATA.listenerCommands[0][0];
+  let listenerName = DATA.listenerCommands[0]?.[0] ?? '';
   let selectedName: string | null = null;
 
   const gen = (c: Cmd, withEnc: boolean) => {
@@ -181,7 +181,7 @@ export function RevShellView(outlet: HTMLElement): () => void {
   }
   function switchTab(t: string) {
     tab = t;
-    for (let i = 0; i < tabBtns.length; i++) tabBtns[i].classList.toggle('active', TABS[i].id === t);
+    for (let i = 0; i < tabBtns.length; i++) tabBtns[i]?.classList.toggle('active', TABS[i]?.id === t);
     selectedName = null;
     renderList();
     renderDetail();

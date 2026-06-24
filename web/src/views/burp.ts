@@ -58,7 +58,7 @@ export function BurpView(outlet: HTMLElement, params: Record<string, string>): (
     return [...map.entries()]
       .map(([name, pages]) => ({
         name,
-        order: (pages[0].meta?.sectionOrder ?? 99) as number,
+        order: (pages[0]?.meta?.sectionOrder ?? 99) as number,
         pages: pages.slice().sort((a, b) => ((a.meta?.pageOrder ?? 0) as number) - ((b.meta?.pageOrder ?? 0) as number)),
       }))
       .sort((a, b) => a.order - b.order);

@@ -195,9 +195,9 @@ function splitH2(md: string): RawSection[] {
   for (const line of md.split('\n')) {
     const m = line.match(/^##\s+(.+?)\s*$/);
     if (m) {
-      const heading = m[1];
+      const heading = m[1] ?? '';
       const numM = heading.match(/^(\d+)\.\s*(.+)$/);
-      cur = numM ? { num: Number(numM[1]), title: numM[2].trim(), body: '' } : { num: null, title: heading.trim(), body: '' };
+      cur = numM ? { num: Number(numM[1] ?? ''), title: (numM[2] ?? '').trim(), body: '' } : { num: null, title: heading.trim(), body: '' };
       out.push(cur);
     } else if (cur) {
       cur.body += line + '\n';
@@ -219,7 +219,7 @@ function parseOperationalBody(slug: string, body: string, locale: 'ru' | 'en'): 
     const itemM = line.match(/^-\s*\[\s*\]\s*(.+)$/);
     if (itemM) {
       if (!cur) { cur = { name: locale === 'en' ? 'Steps' : 'Шаги', items: [] }; sections.push(cur); }
-      const text = itemM[1].trim();
+      const text = (itemM[1] ?? '').trim();
       cur.items.push({ key: itemKey(slug, text), text });
       continue;
     }
@@ -228,8 +228,8 @@ function parseOperationalBody(slug: string, body: string, locale: 'ru' | 'en'): 
 
     const boldM = line.match(/^\*\*(.+?)\*\*(.*)$/);
     if (boldM) {
-      const label = boldM[1].trim();
-      const rest = boldM[2].trim();
+      const label = (boldM[1] ?? '').trim();
+      const rest = (boldM[2] ?? '').trim();
       if (label.endsWith(':') || rest) {
         info.push(`**${label}** ${rest}`.trim());
       } else {

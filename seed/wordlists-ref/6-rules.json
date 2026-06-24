@@ -1,0 +1,146 @@
+[
+  {
+    "category": "Правила крекинга (hashcat rules)",
+    "name": "best64.rule",
+    "purpose": "Базовый набор из 64 самых результативных мутаций (регистр, добавление цифр/года, leet, реверс). Лучшее соотношение «охват/скорость» — первый rule для любого крекинга.",
+    "whenToUse": "Первый прогон поверх rockyou: даёт максимум попаданий за минимум времени, прежде чем брать тяжёлые правила.",
+    "size": "64 правила",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/best64.rule"],
+    "github": "https://github.com/hashcat/hashcat/blob/master/rules/best64.rule",
+    "tags": ["rules", "hashcat", "kali", "starter", "classic"]
+  },
+  {
+    "category": "Правила крекинга (hashcat rules)",
+    "name": "rockyou-30000.rule",
+    "purpose": "~30 000 правил, выведенных из анализа утечки RockYou. Хороший средний набор: заметно шире best64, но ещё быстрый.",
+    "whenToUse": "Второй прогон после best64, когда нужно больше охвата без перехода к огромным правилам.",
+    "size": "~30 000 правил",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/rockyou-30000.rule"],
+    "github": "https://github.com/hashcat/hashcat/blob/master/rules/rockyou-30000.rule",
+    "tags": ["rules", "hashcat", "kali", "rockyou"]
+  },
+  {
+    "category": "Правила крекинга (hashcat rules)",
+    "name": "dive.rule",
+    "purpose": "Один из самых больших встроенных наборов (~99 000 правил) — очень глубокие мутации. Высокий охват ценой времени.",
+    "whenToUse": "Когда быстрые правила исчерпаны, есть время/GPU и хочется выжать максимум из имеющегося словаря.",
+    "size": "~99 000 правил",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/dive.rule"],
+    "github": "https://github.com/hashcat/hashcat/blob/master/rules/dive.rule",
+    "tags": ["rules", "hashcat", "kali", "heavy"]
+  },
+  {
+    "category": "Правила крекинга (hashcat rules)",
+    "name": "d3ad0ne.rule",
+    "purpose": "Популярный набор (~34 000 правил) от d3ad0ne — сбалансированные мутации, хорошо ловит «человеческие» вариации паролей.",
+    "whenToUse": "Альтернатива/дополнение к dive: запускают, когда best64 и rockyou-30000 не добили хэши.",
+    "size": "~34 000 правил",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/d3ad0ne.rule"],
+    "github": "https://github.com/hashcat/hashcat/blob/master/rules/d3ad0ne.rule",
+    "tags": ["rules", "hashcat", "kali"]
+  },
+  {
+    "category": "Правила крекинга (hashcat rules)",
+    "name": "T0XlC.rule / T0XlC-insert_*.rule",
+    "purpose": "Набор T0XlC (~11 000 правил) и его insert-варианты (вставка символов/цифр в разные позиции). Хорош против паролей со спецсимволами внутри.",
+    "whenToUse": "Когда подозреваешь вставки спецсимволов/цифр не только в конце, а внутри слова.",
+    "size": "~11 000 правил (базовый T0XlC)",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/T0XlC.rule", "/usr/share/hashcat/rules/T0XlC-insert_top_50_1_2_3.rule"],
+    "github": "https://github.com/hashcat/hashcat/tree/master/rules",
+    "tags": ["rules", "hashcat", "kali", "insert"]
+  },
+  {
+    "category": "Правила крекинга (hashcat rules)",
+    "name": "generated2.rule",
+    "purpose": "Машинно-сгенерированный набор (~65 000 правил) — широкое покрытие мутаций. Тяжёлый, но эффективный на больших списках хэшей.",
+    "whenToUse": "Глубокий прогон, когда нужен максимум вариаций и есть вычислительный ресурс.",
+    "size": "~65 000 правил",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/generated2.rule"],
+    "github": "https://github.com/hashcat/hashcat/blob/master/rules/generated2.rule",
+    "tags": ["rules", "hashcat", "kali", "heavy"]
+  },
+  {
+    "category": "Правила крекинга (hashcat rules)",
+    "name": "leetspeak.rule",
+    "purpose": "Маленький набор leet-замен (a->4, e->3, o->0, s->$ и т.п.). Точечно ловит «leet»-вариации словарных слов.",
+    "whenToUse": "Когда пароли — это слова с leet-заменами; дёшево добавить к любому словарю.",
+    "size": "~15 правил",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/leetspeak.rule"],
+    "github": "https://github.com/hashcat/hashcat/blob/master/rules/leetspeak.rule",
+    "tags": ["rules", "hashcat", "kali", "leet"]
+  },
+  {
+    "category": "Правила крекинга (hashcat rules)",
+    "name": "toggles1-5.rule",
+    "purpose": "Перебор регистра (toggle-case) в первых N позициях: toggles1 — 1 позиция, ... toggles5 — до 5. Для случаев Password vs pAssword vs PASSword.",
+    "whenToUse": "Когда хэши чувствительны к регистру, а кандидаты в нижнем регистре; добавляют поверх словаря.",
+    "size": "toggles1 ... toggles5 (растёт с числом позиций)",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/toggles1.rule", "/usr/share/hashcat/rules/toggles5.rule"],
+    "github": "https://github.com/hashcat/hashcat/tree/master/rules",
+    "tags": ["rules", "hashcat", "kali", "case"]
+  },
+  {
+    "category": "Правила крекинга (hashcat rules)",
+    "name": "InsidePro-PasswordsPro.rule / InsidePro-HashManager.rule",
+    "purpose": "Большие наборы из InsidePro (PasswordsPro / HashManager). Широкие мутации, хорошо себя показывают на реальных утечках.",
+    "whenToUse": "Как тяжёлая альтернатива dive/generated2 для глубокого прогона.",
+    "size": "несколько тысяч правил каждый",
+    "tool": "hashcat",
+    "paths": ["/usr/share/hashcat/rules/InsidePro-PasswordsPro.rule", "/usr/share/hashcat/rules/InsidePro-HashManager.rule"],
+    "github": "https://github.com/hashcat/hashcat/tree/master/rules",
+    "tags": ["rules", "hashcat", "kali", "insidepro"]
+  },
+  {
+    "category": "Правила крекинга (hashcat rules)",
+    "name": "OneRuleToRuleThemAll.rule",
+    "purpose": "Знаменитый набор (~52 000 правил) от NotSoSecure/stealthsploit: собран из лучших публичных правил. Один из самых результативных «универсальных» наборов.",
+    "whenToUse": "Когда нужен один сильный универсальный rule вместо перебора нескольких. НЕ входит в стандартную Kali — скачай с GitHub.",
+    "size": "~52 000 правил",
+    "tool": "hashcat",
+    "paths": ["~/rules/OneRuleToRuleThemAll.rule"],
+    "github": "https://github.com/stealthsploit/OneRuleToRuleThemAll",
+    "raw": "https://raw.githubusercontent.com/stealthsploit/OneRuleToRuleThemAll/master/OneRuleToRuleThemAll.rule",
+    "tags": ["rules", "hashcat", "external", "universal", "popular"]
+  },
+  {
+    "category": "Правила крекинга (hashcat rules)",
+    "name": "OneRuleToRuleThemStill.rule",
+    "purpose": "Обновлённый/оптимизированный преемник OneRuleToRuleThemAll: меньше правил при сопоставимом охвате — быстрее на медленных хэшах.",
+    "whenToUse": "Когда One Rule слишком тяжёл для медленного алгоритма (bcrypt и т.п.), но нужен его охват.",
+    "size": "~49 000 правил",
+    "tool": "hashcat",
+    "paths": ["~/rules/OneRuleToRuleThemStill.rule"],
+    "github": "https://github.com/stealthsploit/OneRuleToRuleThemStill",
+    "tags": ["rules", "hashcat", "external", "universal", "optimized"]
+  },
+  {
+    "category": "Правила крекинга (hashcat rules)",
+    "name": "Kaonashi.rule",
+    "purpose": "Набор правил из проекта Kaonashi (исследование реальных паролей): сильные «человеческие» мутации, хорошо дополняет One Rule.",
+    "whenToUse": "Для глубокого прогона на реальных утечках; качай с GitHub (нет в стоковой Kali).",
+    "size": "~13 000 правил",
+    "tool": "hashcat",
+    "paths": ["~/rules/Kaonashi.rule"],
+    "github": "https://github.com/kaonashi-passwords/Kaonashi",
+    "tags": ["rules", "hashcat", "external"]
+  },
+  {
+    "category": "Правила крекинга (hashcat rules)",
+    "name": "Как применять правила (синтаксис)",
+    "purpose": "Правила (-r) комбинируются со словарём в режиме атаки по словарю (-a 0). Можно подключать несколько -r — они применяются последовательно (декартово произведение мутаций).",
+    "whenToUse": "Шпаргалка по запуску любого правила выше.",
+    "size": "—",
+    "tool": "hashcat",
+    "paths": ["hashcat -m 0 -a 0 hash.txt /usr/share/wordlists/rockyou.txt -r /usr/share/hashcat/rules/best64.rule"],
+    "github": "https://hashcat.net/wiki/doku.php?id=rule_based_attack",
+    "tags": ["rules", "hashcat", "syntax", "howto"]
+  }
+]

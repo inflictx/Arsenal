@@ -1,0 +1,90 @@
+{
+  "category": "Subdomain Takeover",
+  "source": "PayloadsAllTheThings + EdOverflow/can-i-take-over-xyz",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое Subdomain Takeover",
+      "language": "text",
+      "tags": ["methodology", "subdomain-takeover", "dns"],
+      "body": "Subdomain takeover — захват чужого поддомена из-за «висячей» (dangling) DNS-записи. Поддомен (напр. blog.target.com) через CNAME указывает на внешний сервис (GitHub Pages, S3, Heroku и т.п.), но сам ресурс на сервисе УДАЛЁН или не зарегистрирован. Атакующий регистрирует этот ресурс у провайдера на своё имя — и теперь контролирует контент на blog.target.com.\n\nИмпакт: произвольный контент на доверенном домене → фишинг, кража cookie (если scope cookie на *.target.com), обход CSP/CORS, угон OAuth redirect_uri, XSS в контексте основного домена."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Как возникает висячая запись",
+      "language": "text",
+      "tags": ["methodology", "lifecycle"],
+      "body": "Типичный жизненный цикл:\n1. Команда создаёт поддомен и направляет его CNAME на сторонний сервис (app на Heroku, статика на GitHub Pages, файлы в S3).\n2. Позже сервис/ресурс удаляют (проект закрыт, bucket удалён), НО DNS-запись убрать забывают.\n3. CNAME продолжает указывать на освободившееся имя у провайдера.\n4. Атакующий заявляет это имя у провайдера и захватывает поддомен.\n\nОтдельный класс — dangling NS: делегация зоны на DNS-провайдера, где зона удалена."
+    },
+    {
+      "subcategory": "Детект",
+      "title": "Поиск кандидатов на захват",
+      "language": "bash",
+      "tags": ["detection", "recon", "cname"],
+      "body": "# 1) Собрать поддомены\nsubfinder -d target.com -all -silent -o subs.txt\namass enum -passive -d target.com >> subs.txt\n\n# 2) Резолвить CNAME — искать указатели на внешние сервисы\ndnsx -l subs.txt -cname -resp -silent\nfor s in $(cat subs.txt); do echo \"$s -> $(dig +short CNAME $s)\"; done\n\n# 3) Живые HTTP + заголовки/тело с признаками ошибок сервиса\nhttpx -l subs.txt -title -status-code -silent"
+    },
+    {
+      "subcategory": "Детект",
+      "title": "Fingerprint-строки сервисов",
+      "language": "text",
+      "tags": ["detection", "fingerprint"],
+      "body": "Признак takeover — CNAME на сервис + страница отдаёт «ничего не настроено»:\n• GitHub Pages: There isn't a GitHub Pages site here.\n• AWS S3: NoSuchBucket / The specified bucket does not exist\n• Heroku: No such app (herokucdn.com/error-pages/no-such-app.html)\n• Fastly: Fastly error: unknown domain\n• Shopify: Sorry, this shop is currently unavailable\n• Surge.sh: project not found\n• Tumblr: Whatever you were looking for doesn't currently exist at this address\n• Bitbucket: Repository not found\n• Read the Docs: unknown to Read the Docs\n• Azure: 404 Web Site not found (*.azurewebsites.net / *.cloudapp.net / *.trafficmanager.net)"
+    },
+    {
+      "subcategory": "Матрица сервисов",
+      "title": "can-i-take-over-xyz — справочник",
+      "language": "text",
+      "tags": ["matrix", "services", "reference"],
+      "body": "Проект EdOverflow/can-i-take-over-xyz — карта «какой сервис захватывается». Для каждого: fingerprint, статус (Vulnerable / Not vulnerable / Edge case) и инструкция.\n\nКлассически захватываемые: GitHub Pages, AWS S3, Heroku, Surge.sh, Tumblr, Webflow, Cargo, Tilda, Helpjuice, Helpscout, Pingdom, UserVoice. Часть со временем закрыта.\n\nВАЖНО: статус меняется — провайдеры вводят верификацию владения доменом. Всегда сверяйся с актуальной матрицей и проверяй вручную, а не только по сигнатуре."
+    },
+    {
+      "subcategory": "Эксплуатация",
+      "title": "GitHub Pages takeover",
+      "language": "bash",
+      "tags": ["exploit", "github-pages"],
+      "body": "Условие: CNAME поддомена → <user>.github.io, а Pages-сайт/репозиторий не существует.\n\n1. Создай репозиторий на своём GitHub-аккаунте.\n2. Включи GitHub Pages (Settings -> Pages).\n3. Положи в корень файл CNAME с захватываемым поддоменом:\n   echo 'blog.target.com' > CNAME\n   git add CNAME && git commit -m init && git push\n4. GitHub привяжет blog.target.com к твоему сайту — контент под твоим контролем.\n\nНюанс: иногда нужно подождать и повторить (GitHub проверяет, не привязан ли домен к другому аккаунту)."
+    },
+    {
+      "subcategory": "Эксплуатация",
+      "title": "AWS S3 bucket takeover",
+      "language": "bash",
+      "tags": ["exploit", "aws", "s3"],
+      "body": "Условие: поддомен указывает (CNAME) на <bucket>.s3.amazonaws.com или S3 website-endpoint, а bucket удалён -> NoSuchBucket.\n\n1. Узнай имя bucket из CNAME/URL.\n2. Создай bucket с ТЕМ ЖЕ именем (имена S3 глобально уникальны) в правильном регионе:\n   aws s3 mb s3://<bucket-name> --region <region>\n3. Включи static website hosting, залей свой index.html.\n4. Запросы на поддомен отдают твой контент.\n\nНюанс: регион должен совпасть с тем, что в endpoint; иначе будет редирект/ошибка."
+    },
+    {
+      "subcategory": "Эксплуатация",
+      "title": "Heroku и Azure",
+      "language": "text",
+      "tags": ["exploit", "heroku", "azure"],
+      "body": "Heroku: CNAME -> <app>.herokuapp.com, приложение удалено (No such app). Создай Heroku-приложение и добавь кастомный домен:\n   heroku domains:add blog.target.com\nЕсли домен не закреплён за другим аккаунтом — захватишь.\n\nAzure: CNAME на *.azurewebsites.net / *.cloudapp.net / *.trafficmanager.net / *.blob.core.windows.net, ресурс удалён. Создай ресурс с тем же именем в своей подписке. Azure ввёл защиту от dangling DNS — проверяй edge-cases."
+    },
+    {
+      "subcategory": "Эксплуатация",
+      "title": "Dangling NS (делегация зоны)",
+      "language": "dns",
+      "tags": ["exploit", "ns", "delegation"],
+      "body": "Опаснее CNAME-takeover: если NS-запись поддомена делегирована DNS-провайдеру, где зона удалена/не сконфигурирована, атакующий регистрирует зону у этого провайдера и контролирует ВЕСЬ поддомен (любые записи).\n\nДетект:\n  dig NS sub.target.com\n  # NS указывают на провайдера (напр. *.dnsmadeeasy.com, ns-XXXX.awsdns-XX.org),\n  # где зона не настроена -> SERVFAIL / REFUSED при резолве\n\nПроверь, можно ли создать зону sub.target.com у этого провайдера на свой аккаунт."
+    },
+    {
+      "subcategory": "Инструменты",
+      "title": "Автоматизация поиска",
+      "language": "bash",
+      "tags": ["tools", "automation"],
+      "body": "# subjack — классика\nsubjack -w subs.txt -t 100 -timeout 30 -ssl -c fingerprints.json -v\n\n# nuclei — шаблоны takeover\nnuclei -l subs.txt -t http/takeovers/ -silent\n\n# dnsReaper — современный, десятки сигнатур\npython3 dnsreaper.py file --filename subs.txt\n\n# subzy\nsubzy run --targets subs.txt\n\n# SubOver\nSubOver -l subs.txt\n\nВсегда подтверждай находку вручную: автосигнатуры дают false positives."
+    },
+    {
+      "subcategory": "PoC и репорт",
+      "title": "Подтверждение и отчёт",
+      "language": "text",
+      "tags": ["poc", "reporting"],
+      "body": "Безопасный PoC: размести на захваченном поддомене безобидную страницу с твоим маркером (напр. /poc.txt с ником и датой), сделай скриншот, зафиксируй CNAME и fingerprint.\n\nНЕ размещай вредоносный/фишинговый контент. В отчёте укажи: уязвимый поддомен, на какой сервис висел CNAME, fingerprint, шаги захвата, импакт (scope cookie, OAuth redirect, CSP-обход) и фикс.\n\nФикс: удалить висячую DNS-запись ИЛИ заново заявить ресурс у провайдера."
+    },
+    {
+      "subcategory": "Защита",
+      "title": "Профилактика",
+      "language": "text",
+      "tags": ["defense", "prevention"],
+      "body": "• Декомиссия по порядку: СНАЧАЛА удаляй DNS-запись, ПОТОМ ресурс у провайдера.\n• Регулярный аудит CNAME/NS на висячие записи (dnsReaper/nuclei в CI).\n• Предпочитай провайдеров с верификацией владения доменом (TXT-проверка).\n• Не используй wildcard-CNAME на внешние сервисы.\n• Мониторинг: алерт при появлении fingerprint-ошибок на своих поддоменах."
+    }
+  ]
+}

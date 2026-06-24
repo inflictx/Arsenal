@@ -7,7 +7,7 @@ export function BackupView(outlet: HTMLElement): () => void {
 
   const msg = h('div', { class: 'bk-msg' });
   const statsEl = h('div', { class: 'bk-stats' }, '…');
-  const setMsg = (t: string, cls = '') => { msg.textContent = t; msg.className = 'bk-msg' + (cls ? ' ' + cls : ''); };
+  const setMsg = (text: string, cls = '') => { msg.textContent = text; msg.className = 'bk-msg' + (cls ? ' ' + cls : ''); };
 
   const exportA = h('button', { class: 'btn bk-btn', type: 'button', onclick: async () => {
     try {
@@ -18,8 +18,11 @@ export function BackupView(outlet: HTMLElement): () => void {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) { setMsg(t('backup.exportFailed') + (e instanceof Error ? e.message : String(e)), 'err'); }
   } }, '⤓ ' + t('backup.exportBtn'));
+
   const fileInp = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' } }) as HTMLInputElement;
-  const importBtn = h('button', { class: 'btn bk-btn', type: 'button', onclick: () => fileInp.click() }, '⤒ ' + t('backup.importBtn'));
+  let pendingMode: 'replace' | 'merge' = 'replace';
+  const importBtn = h('button', { class: 'btn bk-btn', type: 'button', onclick: () => { pendingMode = 'replace'; fileInp.click(); } }, '⤒ ' + t('backup.importBtn'));
+  const mergeBtn = h('button', { class: 'btn bk-btn', type: 'button', onclick: () => { pendingMode = 'merge'; fileInp.click(); } }, '⤬ ' + t('backup.mergeBtn'));
 
   fileInp.addEventListener('change', async () => {
     const f = fileInp.files?.[0];
@@ -28,6 +31,19 @@ export function BackupView(outlet: HTMLElement): () => void {
     try { data = JSON.parse(await f.text()); } catch { setMsg(t('backup.readFailed'), 'err'); fileInp.value = ''; return; }
     const n = Array.isArray(data?.entries) ? data.entries!.length : -1;
     if (n < 0) { setMsg(t('backup.noEntries'), 'err'); fileInp.value = ''; return; }
+
+    if (pendingMode === 'merge') {
+      if (!window.confirm(t('backup.confirmMergeHead') + `\n\n` + t('backup.confirmMergeBody'))) { fileInp.value = ''; return; }
+      setMsg(t('backup.restoring'));
+      try {
+        const r = await api.merge(data);
+        setMsg(`${t('backup.doneMerged')} ${r.addedEntries} ${t('backup.mergedEntries')} + ${r.mergedState} ${t('backup.mergedMarks')}. ` + t('backup.reloadHint'), 'ok');
+        loadStats();
+      } catch (e) { setMsg(t('backup.restoreError') + (e instanceof Error ? e.message : String(e)), 'err'); }
+      fileInp.value = '';
+      return;
+    }
+
     if (!window.confirm(t('backup.confirmHead') + `\n\n` + t('backup.confirmBody1') + ` (${n} ` + t('backup.records') + `). ` + t('backup.confirmBody2'))) { fileInp.value = ''; return; }
     setMsg(t('backup.restoring'));
     try {
@@ -52,7 +68,7 @@ export function BackupView(outlet: HTMLElement): () => void {
   outlet.appendChild(h('div', { class: 'content bk-content' },
     h('div', { class: 'cards-head' }, h('h1', { class: 'cat-h' }, '💾 ' + t('backup.title'))),
     h('p', { class: 'bk-intro' }, t('backup.intro')),
-    h('div', { class: 'bk-row' }, exportA, importBtn),
+    h('div', { class: 'bk-row' }, exportA, importBtn, mergeBtn),
     fileInp,
     msg,
     h('div', { class: 'cards-head', style: { marginTop: '24px' } }, h('h2', { class: 'bk-h2' }, t('backup.nowInDb'))),

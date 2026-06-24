@@ -36,7 +36,7 @@ function splitFlagBullets(md: string): string {
     if (inFence) return [line];
     const m = /^(\s*[-*]\s+)(.*\S)\s*$/.exec(line);
     if (!m) return [line];
-    const [, indent, content] = m;
+    const [, indent = '', content = ''] = m;
     if (!content.includes('; ') || !content.includes('`')) return [line];
     const parts = splitTopLevel(content, '; ').map((p) => p.trim()).filter(Boolean);
     return parts.length < 2 ? [line] : parts.map((p) => indent + p);
@@ -47,12 +47,13 @@ function splitCodeBlocks(md: string): string {
   const lines = md.split('\n');
   const out: string[] = [];
   for (let i = 0; i < lines.length; ) {
-    const fence = /^(\s*)```(\w*)\s*$/.exec(lines[i]);
-    if (!fence) { out.push(lines[i]); i++; continue; }
-    const [, indent, lang] = fence;
+    const cur = lines[i] ?? '';
+    const fence = /^(\s*)```(\w*)\s*$/.exec(cur);
+    if (!fence) { out.push(cur); i++; continue; }
+    const [, indent = '', lang = ''] = fence;
     const body: string[] = [];
     i++;
-    while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) { body.push(lines[i]); i++; }
+    while (i < lines.length && !/^\s*```\s*$/.test(lines[i] ?? '')) { body.push(lines[i] ?? ''); i++; }
     i++;
     const open = indent + '```' + lang, close = indent + '```';
     const splittable = lang === '' || lang === 'bash' || lang === 'sh';
@@ -128,7 +129,7 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
     return [...map.entries()]
       .map(([name, pages]) => ({
         name,
-        order: (pages[0].meta?.catOrder ?? 99) as number,
+        order: (pages[0]?.meta?.catOrder ?? 99) as number,
         pages: pages.slice().sort((a, b) => ((a.meta?.toolOrder ?? 0) as number) - ((b.meta?.toolOrder ?? 0) as number)),
       }))
       .sort((a, b) => a.order - b.order);
@@ -313,7 +314,7 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
     if (modes.length) {
       modes.forEach((md) => modesRow.appendChild(
         h('button', { class: 'mode-btn' + (md.name === mode ? ' on' : ''), type: 'button', title: md.desc ?? '',
-          onclick: () => { mode = md.name; [...modesRow.children].forEach((c, i) => (c as HTMLElement).classList.toggle('on', modes[i].name === mode)); renderFlags(); assemble(); } }, md.name)));
+          onclick: () => { mode = md.name; [...modesRow.children].forEach((c, i) => (c as HTMLElement).classList.toggle('on', modes[i]?.name === mode)); renderFlags(); assemble(); } }, md.name)));
     }
     bodyEl.appendChild(h('div', { class: 'builder' },
       h('div', { class: 'builder-head' },
@@ -348,6 +349,7 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
       const arr = recipeCache.get(title);
       if (!arr || from < 0 || to < 0 || from === to) return;
       const [moved] = arr.splice(from, 1);
+      if (!moved) return;
       arr.splice(to, 0, moved);
       arr.forEach((en, i) => { en.meta = { ...(en.meta || {}), sort: i }; api.update(en.id, { meta: en.meta }).catch(() => {}); });
       renderRecipes();

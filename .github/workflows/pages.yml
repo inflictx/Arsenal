@@ -24,6 +24,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npm test              # unit tests — fast gate before building/deploying
+      - run: npx tsc --noEmit      # strict typecheck — fail the build on any type regression
       - run: npm run seed          # build data/arsenal.db from the in-repo seed sources
       - run: npm run pages         # export-static (DB -> JSON) + build:static (web/dist-static)
       - uses: actions/configure-pages@v5

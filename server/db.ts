@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS targets (
 
 CREATE TABLE IF NOT EXISTS findings (
   id         INTEGER PRIMARY KEY,
-  target_id  INTEGER,
+  target_id  INTEGER REFERENCES targets(id) ON DELETE CASCADE,
   title      TEXT NOT NULL,
   severity   TEXT NOT NULL DEFAULT 'medium',
   url        TEXT,

