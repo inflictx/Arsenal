@@ -127,8 +127,8 @@ crlfuzz -u 'http://t/?redirect=1'
 cat urls.txt | crlfuzz -s -o crlf.txt
 ```
 
-## Обход 403/40X (byp4xx · nomore403 · bypass-url-parser) — auto-fuzzing
-**Purpose:** automatically iterate over path mutations, HTTP methods, and headers to reach a 403/401-protected endpoint. Detailed techniques and payload lists are in the **Payloads → "Обход 403 / контроль доступа"** section.
+## 403/40X bypass (byp4xx · nomore403 · bypass-url-parser) — auto-fuzzing
+**Purpose:** automatically iterate over path mutations, HTTP methods, and headers to reach a 403/401-protected endpoint. Detailed techniques and payload lists are in the **Payloads → "403 Bypass"** section.
 **Install:** `go install github.com/devploit/nomore403@latest`; `git clone https://github.com/lobuhi/byp4xx`; `pipx install bypass-url-parser`. They are not on stock Kali (ffuf/dirsearch are).
 - **nomore403** (Go, all-in-one): `-u URL` target; `-H "h: v"` header; `-m method`; `-f folder` custom payloads; `-k` skip TLS check; `--rate-limit N`; `-d` dump responses.
 - **byp4xx** (bash): `./byp4xx.sh URL` - verbs + headers + path-mutations + Unicode in a single run.
