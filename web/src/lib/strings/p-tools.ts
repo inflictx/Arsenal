@@ -176,6 +176,7 @@ const p: { ru: Record<string, string>; en: Record<string, string> } = {
     'engage.lhostLabel': 'LHOST  →  {LHOST}',
     'engage.scope': 'Scope',
     'engage.scopePh': '*.target.com, in-scope hosts…',
+    'engage.findingsHead': 'Findings',
     'engage.addFinding': '＋ Finding',
     'engage.notesHead': '🗒 Notes',
     'engage.noFindings': 'no findings yet - add the first one',
