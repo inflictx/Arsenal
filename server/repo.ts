@@ -142,6 +142,18 @@ export function updateEntry(id: number, patch: Partial<EntryInput>): Entry | nul
     source: has('source') ? (patch.source ?? null) : cur.source,
     meta: has('meta') ? (patch.meta != null ? JSON.stringify(patch.meta) : null) : (cur.meta != null ? JSON.stringify(cur.meta) : null),
   };
+  // A no-op save (open the editor, hit Save without changing anything) must NOT flip the row to
+  // "yours" or bump it; only a real content change makes it custom + protected from re-seed.
+  const changed =
+    next.title !== cur.title ||
+    next.category !== cur.category ||
+    next.subcategory !== cur.subcategory ||
+    next.body !== cur.body ||
+    next.language !== cur.language ||
+    next.tags !== JSON.stringify(cur.tags) ||
+    next.source !== cur.source ||
+    next.meta !== (cur.meta != null ? JSON.stringify(cur.meta) : null);
+  if (!changed) return cur;
   // Editing a row makes it "yours" → protected from re-seed.
   db.prepare(
     `UPDATE entries SET title=@title, category=@category, subcategory=@subcategory, body=@body,
