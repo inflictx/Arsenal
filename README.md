@@ -4,9 +4,9 @@
 
 <p align="center">
   <b>A local, offline-first arsenal for pentesting &amp; bug bounty.</b><br>
-  Payloads, a click-to-build command generator, GTFOBins, wordlists, an embedded CyberChef,
-  reverse shells, a Burp reference, operational checklists and an engagement tracker —
-  one fast, searchable, editable app that runs entirely on your machine.
+  Payloads, a click-to-build command generator, GTFOBins, ready-to-run scripts, wordlists,
+  an embedded CyberChef, reverse shells, a Burp reference, operational checklists and an
+  engagement tracker. One fast, searchable, editable app that runs entirely on your machine.
 </p>
 
 <p align="center">
@@ -55,6 +55,13 @@ copy-ready payloads, diagrams and tables, with tips (RU/EN). Not a noisy auto-du
 
 ![Payloads](screenshots/payloads.gif)
 
+### 📜 Scripts — 110 ready-to-run scripts *(new in 1.0)*
+Full copy-paste-and-run scripts (Python / Bash / JS / HTML PoC) across 27 categories, not
+one-liners: boolean / time / error / UNION blind SQLi extractors, JWT forging, SSRF &amp; XXE
+out-of-band listeners, IDOR matrices, recon pipelines, cloud / k8s probes, CVE PoCs and more.
+Filter by group and language; each script lists its dependencies, parameters and safety
+badges (destructive / paid / root). All original code, RU / EN.
+
 ### 🧪 CyberChef — embedded &amp; offline
 The full official CyberChef build, embedded right in the app, re-themed to match and with
 its UI localized to Russian. Encode/decode/crypto without leaving ARS3NAL or going online.
@@ -96,7 +103,7 @@ and a reference for the Burp Suite desktop workflow (RU/EN).
 </p>
 
 Plus **Notes** (personal Markdown), **Favorites** (★ across every module) and **Backup**
-(export/import the whole DB as one JSON).
+(export/import your personal layer as one JSON; restoring never touches the bundled reference content).
 
 ---
 
