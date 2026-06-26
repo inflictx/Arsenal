@@ -2,44 +2,6 @@
 
 Тулзы, дополняющие основной веб-арсенал: сбор поддоменов, быстрый порт-скан в пайплайне ProjectDiscovery, фингерпринт технологий/WAF, краулинг, OOB-взаимодействия и нишевые классы (smuggling, CRLF, GraphQL).
 
-## subfinder (ProjectDiscovery) — пассивный сбор поддоменов
-**Назначение:** быстрый passive-enum поддоменов по десяткам источников (без шума по цели).
-**Установка:** `go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest`.
-- `-d domain` — цель; `-dL list.txt` — список доменов; `-all` — все источники (медленнее, полнее); `-recursive` — рекурсивно; `-o file`/`-oJ` — вывод; `-silent` — только результат (для пайпов); `-rl` — rate; `-nW` — только живые (по DNS); `-cs` — provider-config с API-ключами (`~/.config/subfinder/provider-config.yaml`).
-- Пайплайн: `subfinder → dnsx (резолв) → httpx (живые HTTP) → nuclei`.
-```bash
-subfinder -d target.htb -all -silent -o subs.txt
-subfinder -d target.htb -silent | dnsx -silent | httpx -silent -title -td
-```
-**Tip:** для HTB домены обычно локальные (`*.htb`) — пассивные источники не помогут, добавь `gobuster dns`/`ffuf` по словарю.
-
-## amass — enum поддоменов (OWASP)
-**Назначение:** глубокий сбор поверхности атаки (passive + active + bruteforce + перебор по графу).
-**Установка:** `sudo apt install amass` / `go install github.com/owasp-amass/amass/v4/...@master`.
-- `amass enum -d domain` — основной режим; `-passive` (без активных запросов) / `-active` (резолв, cert grab); `-brute` (+ `-w wordlist`); `-d domain`; `-df domains.txt`; `-o out.txt`; `-json`; `-ip`/`-src` (показать IP/источник); `-config config.ini` (API-ключи). `amass intel -d domain` — OSINT по организации (ASN/whois).
-```bash
-amass enum -passive -d target.htb -o amass.txt
-amass enum -active -brute -d target.htb -w subdomains-top1million-5000.txt
-```
-
-## naabu (ProjectDiscovery) — быстрый порт-скан (SYN/CONNECT)
-**Назначение:** молниеносный поиск открытых портов как первый шаг пайплайна (затем nmap точечно по найденным).
-**Установка:** `go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest` (для SYN нужен root/libpcap).
-- `-host`/`-list`; `-p 80,443` / `-p -` (все 65535) / `-top-ports 100|1000`; `-s s|c` (SYN/CONNECT); `-rate N` (pps); `-c` concurrency; `-nmap-cli 'nmap -sV -sC'` (прогнать nmap по найденным портам); `-silent`; `-o`; `-Pn` (skip host-discovery); `-ec` (exclude-cdn).
-```bash
-naabu -host 10.10.10.10 -p - -rate 5000 -silent
-naabu -host 10.10.10.10 -top-ports 1000 -nmap-cli 'nmap -sV -sC'
-```
-
-## dnsx (ProjectDiscovery) — DNS-резолвер/тулкит
-**Назначение:** массовый резолв, фильтрация живых, DNS-запросы и брут поддоменов через `FUZZ`.
-**Установка:** `go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest`.
-- `-l hosts.txt` / stdin; `-a`/`-aaaa`/`-cname`/`-mx`/`-ns`/`-txt`/`-ptr` (типы записей); `-resp`/`-resp-only` (показать ответ); `-silent`; `-d domain -w words.txt` (или `FUZZ` в `-d`) — DNS-брут; `-r resolvers.txt`; `-rl` rate; `-wd domain` (wildcard-фильтр).
-```bash
-subfinder -d target.htb -silent | dnsx -silent -a -resp
-dnsx -d 'FUZZ.target.htb' -w subdomains.txt -silent
-```
-
 ## nikto — сканер веб-сервера
 **Назначение:** быстрый чек типовых мисконфигов, опасных файлов, устаревших серверов (шумный, но даёт зацепки).
 **Установка:** `sudo apt install nikto`.

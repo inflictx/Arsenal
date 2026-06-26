@@ -1,0 +1,94 @@
+{
+  "category": "Recon · Discovery & Ports",
+  "group": "recon",
+  "catOrder": 35,
+  "entries": [
+    {
+      "title": "naabu -> nmap port/service pipeline",
+      "lang": "bash",
+      "tags": [
+        "recon",
+        "ports",
+        "naabu",
+        "nmap",
+        "scan"
+      ],
+      "rating": "must",
+      "deps": "go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest · sudo apt install -y libpcap-dev nmap",
+      "placeholders": "{{TARGET}} (host/cidr/file) · {{TOP_PORTS}}",
+      "badges": [
+        "root"
+      ],
+      "source": "https://github.com/projectdiscovery/naabu",
+      "license": "GPL-3.0 (original)",
+      "body": "A fast **ports -> services** pipeline: `naabu` finds open ports (its own libpcap-based SYN scanner), then immediately hands them to `nmap` for version and default-script detection. The key trick is the `naabu -nmap-cli 'nmap -sV -sC'` flag: naabu runs nmap itself over the list of live ports (it fills in the ports and the target itself, so you do NOT specify them in `-nmap-cli`). `-exclude-cdn` skips port scanning on CDN hosts (where it is pointless), `-top-ports 1000` limits the scope.\n\n> naabu uses raw sockets, so it needs **root** and an installed **libpcap** (`apt install libpcap-dev`). The SYN scan (`-s s`) requires root; without root naabu falls back to a CONNECT scan. In `-nmap-cli` pass only nmap flags, without `-p` and without a host.\n\n```bash\n#!/usr/bin/env bash\n# naabu_pipeline.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Fast port -> service pipeline: naabu finds ports, hands them to nmap -sV -sC.\nset -u\nTARGET=\"${1:?usage: sudo ./naabu_pipeline.sh <host|cidr|file> [top-ports]}\"\nTOP=\"${2:-1000}\"\nOUT=\"naabu_$(echo \"$TARGET\" | tr '/:' '__')\"\ncommand -v naabu >/dev/null || { echo \"[!] install: go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest (needs libpcap-dev)\"; exit 1; }\ncommand -v nmap  >/dev/null || { echo \"[!] install: apt install -y nmap\"; exit 1; }\n\n# -list if a file was given, otherwise -host\nif [ -f \"$TARGET\" ]; then SRC=\"-list $TARGET\"; else SRC=\"-host $TARGET\"; fi\n\necho \"[*] naabu scanning top-$TOP ports (CDN excluded) ...\"\n# -nmap-cli runs nmap automatically over the discovered ports;\n# do NOT put -p or the target inside -nmap-cli, naabu fills them in.\nnaabu $SRC -top-ports \"$TOP\" -exclude-cdn -silent \\\n      -nmap-cli \"nmap -sV -sC -oA ${OUT}_nmap\" \\\n      -o \"${OUT}_ports.txt\"\n\necho\necho \"[=] open ports -> ${OUT}_ports.txt\"\necho \"[=] nmap results -> ${OUT}_nmap.{nmap,gnmap,xml}\"\necho \"[i] parse the XML to CSV with: python3 parse_nmap.py ${OUT}_nmap.xml\"\n```\n\nRun:\n```bash\n# needs root + libpcap\nsudo apt install -y libpcap-dev nmap\ngo install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest\nsudo ./naabu_pipeline.sh target.example.com 1000\nsudo ./naabu_pipeline.sh scope.txt 100\n```"
+    },
+    {
+      "title": "nmap XML -> CSV parser",
+      "lang": "python",
+      "tags": [
+        "recon",
+        "nmap",
+        "parser",
+        "csv"
+      ],
+      "rating": "must",
+      "deps": "stdlib only (Python 3.6+)",
+      "placeholders": "{{NMAP_XML}} · {{OUT_CSV}}",
+      "source": "https://nmap.org/book/nmap-dtd.html",
+      "license": "GPL-3.0 (original)",
+      "body": "Parses **nmap XML** (`-oX`/`-oA`) into a flat **CSV** `ip,hostname,port,proto,state,service,product,version`. Handy when you have scanned many hosts and need to quickly grep/sort the findings in a table rather than page through `.nmap`. It takes only IPv4 addresses (`addrtype=\"ipv4\"`), and pulls the `product`/`version`/`extrainfo` fields via `.get()` with a default - they are optional and often missing, otherwise the parser would crash. It prints only open ports.\n\n> Pure stdlib (`xml.etree`), no dependencies. If a host has several addresses, the first IPv4 is taken. The hostname comes from the `<hostnames>` section, if nmap resolved it.\n\n```python\n#!/usr/bin/env python3\n# parse_nmap.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Flatten nmap XML (-oX) into CSV: ip,hostname,port,proto,state,service,product,version\nimport csv, sys, xml.etree.ElementTree as ET\n\ndef first_ipv4(host):\n    for a in host.findall(\"address\"):\n        if a.get(\"addrtype\") == \"ipv4\":\n            return a.get(\"addr\", \"\")\n    # fall back to whatever address exists (ipv6/mac)\n    a = host.find(\"address\")\n    return a.get(\"addr\", \"\") if a is not None else \"\"\n\ndef hostname(host):\n    hn = host.find(\"hostnames/hostname\")\n    return hn.get(\"name\", \"\") if hn is not None else \"\"\n\ndef main():\n    if len(sys.argv) < 2:\n        sys.exit(\"usage: parse_nmap.py <nmap.xml> [out.csv]\")\n    tree = ET.parse(sys.argv[1])\n    out = sys.argv[2] if len(sys.argv) > 2 else None\n    rows = []\n    for host in tree.getroot().findall(\"host\"):\n        st = host.find(\"status\")\n        if st is not None and st.get(\"state\") == \"down\":\n            continue\n        ip, hn = first_ipv4(host), hostname(host)\n        for port in host.findall(\"ports/port\"):\n            state = port.find(\"state\")\n            if state is None or state.get(\"state\") != \"open\":\n                continue\n            svc = port.find(\"service\")\n            g = (lambda k: svc.get(k, \"\")) if svc is not None else (lambda k: \"\")\n            rows.append([\n                ip, hn, port.get(\"portid\", \"\"), port.get(\"protocol\", \"\"),\n                state.get(\"state\", \"\"), g(\"name\"), g(\"product\"),\n                (g(\"version\") + \" \" + g(\"extrainfo\")).strip(),\n            ])\n    header = [\"ip\", \"hostname\", \"port\", \"proto\", \"state\", \"service\", \"product\", \"version\"]\n    w = csv.writer(open(out, \"w\", newline=\"\") if out else sys.stdout)\n    w.writerow(header); w.writerows(rows)\n    if out:\n        print(f\"[=] {len(rows)} open ports -> {out}\", file=sys.stderr)\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\nnmap -sV -sC -oX scan.xml target.example.com\npython3 parse_nmap.py scan.xml results.csv\npython3 parse_nmap.py scan.xml          # print to stdout\n```"
+    },
+    {
+      "title": "ffuf vhost discovery with wildcard calibration",
+      "lang": "bash",
+      "tags": [
+        "recon",
+        "discovery",
+        "ffuf",
+        "vhost",
+        "fuzzing"
+      ],
+      "rating": "must",
+      "deps": "go install github.com/ffuf/ffuf/v2@latest · apt install -y seclists",
+      "placeholders": "{{URL}} (IP or base host) · {{DOMAIN}} · {{WORDLIST}}",
+      "source": "https://github.com/ffuf/ffuf",
+      "license": "GPL-3.0 (original)",
+      "body": "Brute-forces **virtual hosts** (vhost) via ffuf: it injects `FUZZ` into the `Host: FUZZ.domain` header and looks for internal/hidden sites that respond only to a specific Host (a classic for admin panels and dev environments behind a single IP). The main difficulty is the wildcard response: the server returns the same default page for any Host. The script first makes a calibration request with a deliberately non-existent Host, learns the default response length and filters it out via `-fs`, leaving only the genuinely different vhosts.\n\n> The target is given by IP or base domain, while the name being brute-forced goes into the Host header. If the server has several different default-page sizes, add `-fs len1,len2` comma-separated or switch to the word filter `-fw`.\n\n```bash\n#!/usr/bin/env bash\n# ffuf_vhost.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Virtual-host discovery via Host: FUZZ.DOMAIN with wildcard size calibration.\nset -u\nURL=\"${1:?usage: ./ffuf_vhost.sh <https://target-or-ip> <domain> [wordlist]}\"\nDOMAIN=\"${2:?need base domain, e.g. example.com}\"\nWL=\"${3:-/usr/share/seclists/Discovery/DNS/subdomains-top1million-20000.txt}\"\ncommand -v ffuf >/dev/null || { echo \"[!] install: go install github.com/ffuf/ffuf/v2@latest\"; exit 1; }\n[ -f \"$WL\" ] || { echo \"[!] wordlist not found: $WL\"; exit 1; }\n\n# 1) calibrate: send a random Host, measure default response size\nRAND=\"zz$(date +%s)notexist\"\nCAL_LEN=\"$(ffuf -u \"$URL\" -w <(echo \"$RAND\") -H \"Host: ${RAND}.${DOMAIN}\" \\\n           -mc all -s -of json -o /dev/stdout 2>/dev/null \\\n           | grep -oE '\"length\":[0-9]+' | head -1 | cut -d: -f2)\"\nCAL_LEN=\"${CAL_LEN:-0}\"\necho \"[*] wildcard default length = $CAL_LEN -> filtering it out (-fs $CAL_LEN)\"\n\nOUT=\"ffuf_vhost_${DOMAIN}.json\"\nffuf -u \"$URL\" -w \"$WL\" \\\n     -H \"Host: FUZZ.${DOMAIN}\" \\\n     -fs \"$CAL_LEN\" \\\n     -mc 200,201,204,301,302,307,401,403 \\\n     -t 50 -rate 200 \\\n     -H \"User-Agent: ARS3NAL-vhost/1.0\" \\\n     -o \"$OUT\" -of json\necho \"[=] vhosts -> $OUT\"\n```\n\nRun:\n```bash\n./ffuf_vhost.sh https://10.10.10.10 example.com\n./ffuf_vhost.sh https://target.example.com example.com /usr/share/seclists/Discovery/DNS/subdomains-top1million-110000.txt\n```"
+    },
+    {
+      "title": "gobuster vhost discovery (--append-domain)",
+      "lang": "bash",
+      "tags": [
+        "recon",
+        "discovery",
+        "gobuster",
+        "vhost"
+      ],
+      "rating": "nice",
+      "deps": "apt install -y gobuster seclists",
+      "placeholders": "{{URL}} (IP or base host) · {{DOMAIN}} · {{WORDLIST}}",
+      "source": "https://github.com/OJ/gobuster",
+      "license": "GPL-3.0 (original)",
+      "body": "An alternative to vhost brute-forcing with **gobuster** (the `vhost` mode). Two flags are critical here: `--append-domain` - WITHOUT it, gobuster in newer versions does not form `word.domain` and the brute-force does not work (the old behavior was removed); `--exclude-length` - cuts off the wildcard response by length (the calibration equivalent). The script first measures the default length with a request using a non-existent Host, then runs gobuster with that `--exclude-length`. Use it when ffuf is unavailable or you want gobuster output.\n\n> In gobuster >= 3.2 `--append-domain` is mandatory for vhost mode. If you see it finding ALL words in a row, the wildcard kicked in - check `--exclude-length`. List several sizes comma-separated: `--exclude-length 0,1234`.\n\n```bash\n#!/usr/bin/env bash\n# gobuster_vhost.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Virtual-host discovery via gobuster vhost (--append-domain + --exclude-length).\nset -u\nURL=\"${1:?usage: ./gobuster_vhost.sh <https://target-or-ip> <domain> [wordlist]}\"\nDOMAIN=\"${2:?need base domain}\"\nWL=\"${3:-/usr/share/seclists/Discovery/DNS/subdomains-top1million-20000.txt}\"\ncommand -v gobuster >/dev/null || { echo \"[!] install: apt install -y gobuster\"; exit 1; }\n[ -f \"$WL\" ] || { echo \"[!] wordlist not found: $WL\"; exit 1; }\n\n# calibrate wildcard length with a bogus vhost\nRAND=\"zz$(date +%s)notexist\"\nCAL_LEN=\"$(curl -s -k -H \"Host: ${RAND}.${DOMAIN}\" \"$URL\" | wc -c | tr -d ' ')\"\necho \"[*] wildcard default length = $CAL_LEN -> --exclude-length $CAL_LEN\"\n\ngobuster vhost -u \"$URL\" -w \"$WL\" \\\n  --append-domain \\\n  --domain \"$DOMAIN\" \\\n  --exclude-length \"$CAL_LEN\" \\\n  -k -t 50 \\\n  -o \"gobuster_vhost_${DOMAIN}.txt\"\necho \"[=] vhosts -> gobuster_vhost_${DOMAIN}.txt\"\n```\n\nRun:\n```bash\napt install -y gobuster\n./gobuster_vhost.sh https://10.10.10.10 example.com\n```"
+    },
+    {
+      "title": "Parameter discovery sources (gau+katana -> unfurl -> arjun)",
+      "lang": "bash",
+      "tags": [
+        "recon",
+        "params",
+        "arjun",
+        "gau",
+        "katana",
+        "fuzzing"
+      ],
+      "rating": "must",
+      "deps": "go install github.com/lc/gau/v2/cmd/gau@latest · katana · unfurl · pipx install arjun",
+      "placeholders": "{{TARGET}} (domain or URL)",
+      "source": "https://github.com/s0md3v/Arjun",
+      "license": "GPL-3.0 (original)",
+      "body": "Collects **candidate parameters** for fuzzing from historical URLs and active crawling, then tops them up with a brute-force via arjun. The flow: `gau` + `katana` pull known URLs (archive + crawl), `unfurl keys` extracts the query-parameter names, dedup - and this wordlist is fed to `arjun` to confirm which parameters actually affect the response. Additionally you can run `x8` (more powerful on hidden parameters). The goal is to find undeclared parameters (debug, admin, redirect, id) that vulnerabilities sit on.\n\n> `gau` is `github.com/lc/gau/v2` (NOT tomnomnom). `unfurl` is from tomnomnom. If you want passive only without active crawling, drop katana. arjun confirms parameters by the change in response length/code; run x8 separately for deep POST-body mining.\n\n```bash\n#!/usr/bin/env bash\n# param_sources.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Build a parameter wordlist from gau+katana, then confirm with arjun (x8 optional).\nset -u\nTARGET=\"${1:?usage: ./param_sources.sh <domain-or-url>}\"\nHOST=\"$(echo \"$TARGET\" | sed -E 's,^https?://,,; s,/.*$,,')\"\nPARAMS=\".params_${HOST}.txt\"; URLS=\".urls_${HOST}.txt\"\n: > \"$URLS\"\n\nhave(){ command -v \"$1\" >/dev/null; }\n\necho \"[*] passive URLs via gau (lc/gau/v2)\"\nhave gau && gau --threads 5 \"$HOST\" >> \"$URLS\" 2>/dev/null \\\n        || echo \"    [skip] gau not installed (go install github.com/lc/gau/v2/cmd/gau@latest)\"\n\necho \"[*] active crawl via katana\"\nhave katana && katana -u \"https://${HOST}\" -d 2 -silent >> \"$URLS\" 2>/dev/null \\\n            || echo \"    [skip] katana not installed\"\n\necho \"[*] extracting parameter names with unfurl keys\"\nif have unfurl; then\n  sort -u \"$URLS\" | unfurl keys 2>/dev/null | sort -u > \"$PARAMS\"\nelse\n  # fallback: pull ?a=&b= keys with sed\n  grep -oE '[?&][a-zA-Z0-9_.-]+=' \"$URLS\" | tr -d '?&=' | sort -u > \"$PARAMS\"\nfi\necho \"[=] $(wc -l < \"$PARAMS\") candidate params -> $PARAMS\"\n\necho \"[*] confirming live params with arjun\"\nif have arjun; then\n  arjun -u \"https://${HOST}/\" -m GET -w \"$PARAMS\" -oT \"arjun_${HOST}.txt\" 2>/dev/null\n  echo \"[=] confirmed -> arjun_${HOST}.txt\"\nelse\n  echo \"    [skip] arjun not installed (pipx install arjun)\"\nfi\necho \"[i] for deep POST/body param mining run: x8 -u https://${HOST}/ -w $PARAMS\"\n```\n\nRun:\n```bash\ngo install github.com/lc/gau/v2/cmd/gau@latest\ngo install github.com/projectdiscovery/katana/cmd/katana@latest\ngo install github.com/tomnomnom/unfurl@latest\npipx install arjun\n./param_sources.sh target.example.com\n```"
+    }
+  ]
+}

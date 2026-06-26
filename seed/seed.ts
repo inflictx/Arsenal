@@ -7,6 +7,7 @@ import { parseChecklists } from './parsers/checklists';
 import { parseCommands } from './parsers/commands';
 import { parseStructuredCommands, cmdKey } from './parsers/commands-structured';
 import { parseGtfobins } from './parsers/gtfobins';
+import { parseScripts } from './parsers/scripts';
 import { parseWordlistsRef } from './parsers/wordlists-ref';
 import { replaceChecklists } from '../server/checklists';
 import { CURATED, CURATED_EN } from './curated/index';
@@ -97,6 +98,11 @@ function seedContent(locale: 'ru' | 'en'): number {
   // (no RU overlay). Wordlist refs are mostly English data (RU copy fallback for now).
   total += insertMany(withLocale(parseGtfobins(locale), locale));
   total += insertMany(withLocale(parseWordlistsRef(locale), locale));
+
+  // Scripts: full copy-paste-and-run scripts. EN prefers scripts-en/, falls back to the RU source.
+  const scriptsEnDir = join(here, 'scripts-en');
+  const scripts = en && existsSync(scriptsEnDir) ? parseScripts(scriptsEnDir) : parseScripts();
+  total += insertMany(withLocale(scripts, locale));
 
   return total;
 }

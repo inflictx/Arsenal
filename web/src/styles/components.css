@@ -62,6 +62,32 @@
 .gtfo-credit a { color: var(--muted); border-bottom: 1px solid var(--border-2); }
 .gtfo-credit a:hover { color: var(--cyan); }
 
+/* ===== Scripts ===== */
+.script-sec { margin-top: 10px; }
+.script-dot { margin-left: auto; color: var(--cyan); font-size: 10px; }
+.script-meta { display: flex; flex-direction: column; gap: 8px; margin: 2px 0 16px; }
+.script-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.script-badge { font-family: var(--mono); font-size: 10.5px; padding: 2px 9px; border-radius: 5px; border: 1px solid var(--border-2); color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.script-badge.must { color: var(--cyan); border-color: rgba(73, 109, 255, 0.4); background: rgba(73, 109, 255, 0.1); }
+.script-badge.lang { color: var(--muted); background: var(--panel-2); }
+.script-badge.danger { color: #ff6b6b; border-color: rgba(255, 90, 90, 0.45); background: rgba(255, 90, 90, 0.1); }
+.script-badge.warn { color: #f5a623; border-color: rgba(245, 166, 35, 0.45); background: rgba(245, 166, 35, 0.1); }
+.script-badge.info { color: var(--cyan); border-color: rgba(73, 109, 255, 0.35); }
+.script-badge.muted { color: var(--faint); }
+.script-dep { font-size: 13px; color: var(--muted); }
+.script-dep b { margin-right: 5px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--faint); }
+.script-dep code { font-family: var(--mono); font-size: 12.5px; color: var(--cyan); }
+.script-src { font-size: 12px; color: var(--faint); }
+.script-src a { color: var(--muted); border-bottom: 1px solid var(--border-2); }
+.script-src a:hover { color: var(--cyan); }
+.script-intro { font-size: 12.5px; color: var(--muted); padding: 9px 13px; margin-bottom: 14px; background: var(--panel); border: 1px solid var(--border-2); border-left: 2px solid var(--cyan); border-radius: var(--r); }
+.script-empty-list { padding: 18px 8px; color: var(--faint); font-size: 13px; }
+.script-reset { margin: 4px 8px; padding: 5px 12px; font-size: 12px; font-family: var(--mono); color: var(--cyan); background: var(--panel); border: 1px solid var(--border-2); border-radius: 6px; cursor: pointer; }
+.script-reset:hover { border-color: var(--cyan); }
+.script-empty { color: var(--faint); padding: 40px 10px; text-align: center; }
+.script-dep-copy { position: static; opacity: 0.6; margin-left: 6px; vertical-align: middle; }
+.script-dep-copy:hover { opacity: 1; }
+
 /* ===== ⌘K palette ===== */
 .palette-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(4, 4, 8, 0.6); backdrop-filter: blur(4px); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; }
 .palette { width: min(680px, 92vw); max-height: 70vh; display: flex; flex-direction: column; background: linear-gradient(180deg, var(--panel-2), var(--panel)); border: 1px solid var(--border-2); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
@@ -161,9 +187,10 @@
 
 /* inline payloads under an item */
 .chk-item-wrap { display: flex; flex-direction: column; }
-.chk-pl-chip { flex: none; align-self: flex-start; margin-top: 1px; font-family: var(--mono); font-size: 10.5px; padding: 2px 9px; border-radius: 20px; border: 1px solid rgba(73, 109, 255, 0.35); background: rgba(73, 109, 255, 0.08); color: var(--cyan); cursor: pointer; transition: 0.13s; white-space: nowrap; }
-.chk-pl-chip:hover { background: rgba(73, 109, 255, 0.16); box-shadow: 0 0 0 3px rgba(73, 109, 255, 0.08); }
-.chk-pl-chip.active { background: var(--grad-soft); color: #fff; border-color: rgba(73, 109, 255, 0.5); }
+/* Payloads toggle — compact button INLINE at the right end of the checklist item row (flex pushes it right). */
+.chk-pl-btn { flex: none; align-self: flex-start; margin-top: 1px; display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 7px; border: 1px solid rgba(73, 109, 255, 0.35); background: rgba(73, 109, 255, 0.08); color: var(--cyan); cursor: pointer; transition: 0.13s; white-space: nowrap; }
+.chk-pl-btn:hover { background: rgba(73, 109, 255, 0.16); border-color: rgba(73, 109, 255, 0.6); box-shadow: 0 0 0 3px rgba(73, 109, 255, 0.08); }
+.chk-pl-btn.open { background: var(--grad-soft); color: #fff; border-color: rgba(73, 109, 255, 0.5); }
 .chk-item-payloads { display: flex; flex-direction: column; gap: 12px; margin: 9px 0 4px 29px; padding: 13px 14px; border-left: 2px solid rgba(73, 109, 255, 0.28); background: rgba(73, 109, 255, 0.03); border-radius: 0 10px 10px 0; max-height: 72vh; overflow-y: auto; }
 .chk-pl-all { font-family: var(--mono); font-size: 11.5px; color: var(--cyan); text-decoration: none; border-bottom: 1px solid rgba(73, 109, 255, 0.3); align-self: flex-start; }
 .chk-pl-all:hover { border-bottom-color: var(--cyan); }
@@ -271,6 +298,10 @@ select.input { cursor: pointer; min-width: 160px; }
 .card-mine { flex: none; font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #22c55e; background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 5px; padding: 2px 6px; }
 .card-del:hover { color: #f87171; border-color: rgba(248, 113, 113, 0.5); }
 .cards-head-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+/* favorite ★ toggle in module reader headers (GTFOBins/Commands/Scripts/Burp) */
+.head-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.fav-toggle { font-size: 14px; line-height: 1; padding: 4px 10px; color: var(--muted); }
+.fav-toggle.on { color: #fbbf24; border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.10); }
 .pl-mine { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
 .pl-mine-cb { accent-color: var(--cyan); cursor: pointer; }
 .pl-new { white-space: nowrap; }
@@ -322,7 +353,8 @@ select.input { cursor: pointer; min-width: 160px; }
 .recipe-item { display: flex; align-items: center; gap: 8px; border: 1px solid transparent; border-radius: 9px; padding: 3px 4px; margin-bottom: 7px; transition: 0.12s; }
 .recipe-item.drop-target { border-color: rgba(73, 109, 255, 0.55); background: rgba(73, 109, 255, 0.06); }
 .recipe-item.dragging { opacity: 0.45; }
-.recipe-item pre { flex: 1; min-width: 0; margin: 0; }
+.recipe-item .code-wrap { flex: 1; min-width: 0; }
+.recipe-item .code-wrap pre { margin: 0; min-width: 0; }
 .recipe-grip { flex: none; cursor: grab; color: var(--faint); font-size: 17px; line-height: 1; user-select: none; padding: 0 3px; transition: 0.12s; }
 .recipe-grip:hover { color: var(--cyan); }
 .recipe-grip:active { cursor: grabbing; }
@@ -358,10 +390,14 @@ select.input { cursor: pointer; min-width: 160px; }
 .gtfo-chip.ctx:hover { border-color: rgba(130, 80, 223, 0.45); }
 .gtfo-chip.func.on { background: rgba(73, 109, 255, 0.16); color: var(--cyan); border-color: rgba(73, 109, 255, 0.5); }
 .gtfo-chip.ctx.on { background: rgba(130, 80, 223, 0.16); color: var(--violet); border-color: rgba(130, 80, 223, 0.5); }
-.md pre { position: relative; }
-.doc-copy { position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity 0.15s; }
-.md pre:hover .doc-copy { opacity: 1; }
-.md pre:hover code { padding-right: 64px; }
+/* Code blocks are wrapped in a non-scrolling .code-wrap (see lib/codeblock.ts); the Copy
+   button pins to the WRAP, not the <pre>, so it holds its corner while a long line scrolls
+   sideways, and an opaque background means the code never shows through it. */
+.md pre, .code-wrap { position: relative; }
+.code-wrap { margin: 7px 0; }
+.code-wrap > pre { margin: 0; }
+.doc-copy { position: absolute; top: 6px; right: 6px; z-index: 2; opacity: 0; background: #25282d; box-shadow: 0 2px 10px -3px rgba(0, 0, 0, 0.7); transition: opacity 0.14s; }
+.code-wrap:hover .doc-copy, .doc-copy.copied { opacity: 1; }
 
 /* ===== Wordlists reference ===== */
 .wl-intro { max-width: 820px; font-size: 12.5px; line-height: 1.6; color: var(--muted); margin: 2px 0 14px; }

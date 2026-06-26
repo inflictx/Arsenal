@@ -2,44 +2,6 @@
 
 Tools that complement the main web arsenal: subdomain collection, fast port-scan in the ProjectDiscovery pipeline, technology/WAF fingerprinting, crawling, OOB interactions, and niche classes (smuggling, CRLF, GraphQL).
 
-## subfinder (ProjectDiscovery) — passive subdomain collection
-**Purpose:** fast passive subdomain enumeration across dozens of sources (no noise against the target).
-**Install:** `go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest`.
-- `-d domain` - target; `-dL list.txt` - list of domains; `-all` - all sources (slower, more complete); `-recursive` - recursively; `-o file`/`-oJ` - output; `-silent` - results only (for pipes); `-rl` - rate; `-nW` - live only (by DNS); `-cs` - provider-config with API keys (`~/.config/subfinder/provider-config.yaml`).
-- Pipeline: `subfinder → dnsx (resolve) → httpx (live HTTP) → nuclei`.
-```bash
-subfinder -d target.htb -all -silent -o subs.txt
-subfinder -d target.htb -silent | dnsx -silent | httpx -silent -title -td
-```
-**Tip:** for HTB the domains are usually local (`*.htb`) - passive sources will not help, add `gobuster dns`/`ffuf` with a wordlist.
-
-## amass — subdomain enum (OWASP)
-**Purpose:** deep attack-surface collection (passive + active + bruteforce + graph traversal).
-**Install:** `sudo apt install amass` / `go install github.com/owasp-amass/amass/v4/...@master`.
-- `amass enum -d domain` - main mode; `-passive` (no active queries) / `-active` (resolve, cert grab); `-brute` (+ `-w wordlist`); `-d domain`; `-df domains.txt`; `-o out.txt`; `-json`; `-ip`/`-src` (show IP/source); `-config config.ini` (API keys). `amass intel -d domain` - OSINT on the organization (ASN/whois).
-```bash
-amass enum -passive -d target.htb -o amass.txt
-amass enum -active -brute -d target.htb -w subdomains-top1million-5000.txt
-```
-
-## naabu (ProjectDiscovery) — fast port-scan (SYN/CONNECT)
-**Purpose:** lightning-fast discovery of open ports as the first pipeline step (then nmap targeted on what is found).
-**Install:** `go install github.com/projectdiscovery/naabu/v2/cmd/naabu@latest` (SYN requires root/libpcap).
-- `-host`/`-list`; `-p 80,443` / `-p -` (all 65535) / `-top-ports 100|1000`; `-s s|c` (SYN/CONNECT); `-rate N` (pps); `-c` concurrency; `-nmap-cli 'nmap -sV -sC'` (run nmap over the found ports); `-silent`; `-o`; `-Pn` (skip host-discovery); `-ec` (exclude-cdn).
-```bash
-naabu -host 10.10.10.10 -p - -rate 5000 -silent
-naabu -host 10.10.10.10 -top-ports 1000 -nmap-cli 'nmap -sV -sC'
-```
-
-## dnsx (ProjectDiscovery) — DNS resolver/toolkit
-**Purpose:** mass resolution, filtering of live hosts, DNS queries, and subdomain brute-forcing via `FUZZ`.
-**Install:** `go install github.com/projectdiscovery/dnsx/cmd/dnsx@latest`.
-- `-l hosts.txt` / stdin; `-a`/`-aaaa`/`-cname`/`-mx`/`-ns`/`-txt`/`-ptr` (record types); `-resp`/`-resp-only` (show response); `-silent`; `-d domain -w words.txt` (or `FUZZ` in `-d`) - DNS brute; `-r resolvers.txt`; `-rl` rate; `-wd domain` (wildcard filter).
-```bash
-subfinder -d target.htb -silent | dnsx -silent -a -resp
-dnsx -d 'FUZZ.target.htb' -w subdomains.txt -silent
-```
-
 ## nikto — web server scanner
 **Purpose:** quick check of common misconfigs, dangerous files, outdated servers (noisy, but gives leads).
 **Install:** `sudo apt install nikto`.

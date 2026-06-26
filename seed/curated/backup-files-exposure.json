@@ -1,0 +1,72 @@
+{
+  "category": "Backup Files Exposure",
+  "source": "nuclei-templates (backup/disclosure) + SecLists",
+  "entries": [
+    {
+      "subcategory": "Методология",
+      "title": "Экспонированные бэкапы и исходники",
+      "language": "text",
+      "tags": ["methodology", "backup", "source-disclosure", "info-leak"],
+      "body": "Разработчики и серверы плодят побочные копии файлов: редакторские свопы (vim `.swp`), сохранёнки (`~`, `.orig`), ручные бэкапы перед правкой (`config.php.bak`), архивы релиза (`backup.zip`, `site.tar.gz`), дампы БД (`db.sql`). Если такой файл лежит в вебруте и сервер отдаёт его как ТЕКСТ (а не исполняет), утекает исходный код с секретами.\n\nИмпакт: креды БД и API-ключи из конфигов, логика приложения и скрытые эндпоинты, цепочка к RCE/доступу к БД. Часто это «лёгкая» находка high-severity.\n\nДве отдельные поверхности: (1) бэкап КОНКРЕТНОГО известного файла (`/config.php` -> `/config.php.bak`), (2) архив/дамп всего проекта в корне (`/backup.zip`, `/www.tar.gz`, `/dump.sql`). Смежно: экспонированные `.git`/`.svn` (см. Insecure Source Code Management) и `.env` (см. API Key Leaks)."
+    },
+    {
+      "subcategory": "Расширения и суффиксы",
+      "title": "Суффиксы бэкап-копий",
+      "language": "table",
+      "tags": ["backup", "extensions", "fuzzing"],
+      "body": "swp swo bak old orig save tmp dist backup zip tar gz sql",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Суффикс", "Откуда берётся"],
+          "rows": [
+            [".swp .swo .swn", "своп-файлы vim для открытого файла (часто `.index.php.swp`)"],
+            ["~  .save", "автосейв/бэкап редактора (gedit, nano)"],
+            [".bak .bk .bkp _bak _1.bak", "ручной бэкап перед правкой"],
+            [".old .orig .new .original", "версии при ручном апдейте"],
+            [".dist .sample .example", "шаблон конфига из поставки (часто с дефолтными кредами)"],
+            [".disabled .txt .src", "файл «выключили», переименовав, и он перестал исполняться"],
+            [".0 .1 .2 .3  .copy", "logrotate-подобные и ручные нумерованные копии"],
+            [".zip .tar.gz .tgz .rar .7z .gz .bz2", "архив релиза/всего сайта в корне"],
+            [".sql .sqlite .db .dump", "дамп базы данных"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Где искать",
+      "title": "Типичные имена и пути",
+      "language": "text",
+      "tags": ["backup", "paths", "wordlist"],
+      "body": "База = текущий файл + суффикс:\n  /config.php -> /config.php.bak, /config.php~, /config.php.old, /config.bak\n  /index.php  -> /index.php.swp, /.index.php.swp\n\nКонфиги по CMS (кандидаты под бэкап-суффикс):\n  WordPress: /wp-config.php\n  Drupal:    /sites/default/settings.php\n  Joomla:    /configuration.php\n  Magento:   /app/etc/env.php\n  Laravel:   /.env\n  общие:     /config.php /database.php /db.php /conn.php /settings.php\n\nАрхив/дамп всего проекта в корне (по имени домена и общим словам):\n  /backup.zip /backup.tar.gz /www.zip /site.tar.gz /web.zip\n  /example.com.zip /example.zip /public_html.tar.gz\n  /db.sql /dump.sql /database.sql /backup.sql\n\nГотовые словари: SecLists `Discovery/Web-Content/` (`backup-files.txt`, `BackupFiles.fuzz.txt`, `coldfusion`), тулкитные `juicy_files.txt` / `backup_files_only.txt`."
+    },
+    {
+      "subcategory": "Эксплуатация",
+      "title": "Фаззинг бэкап-файлов (ffuf / feroxbuster)",
+      "language": "bash",
+      "tags": ["backup", "ffuf", "feroxbuster", "fuzzing"],
+      "body": "# 1) Кластербомба: известные файлы x суффиксы (две точки фаззинга)\nffuf -w files.txt:FILE -w exts.txt:EXT -u 'http://target.htb/FILEEXT' -mc 200 -ac\n#   files.txt: config.php\\nindex.php\\ndatabase.php …\n#   exts.txt:  .bak\\n.old\\n.swp\\n~\\n.save\\n.zip …\n\n# 2) Архив/дамп всего проекта в корне\nffuf -w archive-names.txt -u 'http://target.htb/FUZZ' -e .zip,.tar.gz,.sql,.bak -mc 200 -ac\n\n# 3) feroxbuster с авто-добавлением расширений\nferoxbuster -u http://target.htb -x bak,old,swp,zip,sql,tar.gz -w common.txt\n\n# 4) точечно по найденному пути\ncurl -s -o /dev/null -w '%{http_code} %{size_download}\\n' http://target.htb/config.php.bak\n\n# -ac (auto-calibrate) отсекает «мягкие 200» (кастомные 404). Для .swp:\n#   vim -r .config.php.swp   # восстановить оригинал из свопа"
+    },
+    {
+      "subcategory": "Детект",
+      "title": "Понять, что отдан исходник, а не страница",
+      "language": "text",
+      "tags": ["backup", "detection", "source-leak"],
+      "body": "Цель не «200 OK», а «сервер вернул ИСХОДНИК вместо исполнения». Признаки:\n• Заголовок `Content-Type: text/plain` (или `application/octet-stream`) на том, что обычно отдаётся как html.\n• В теле виден код: `<?php`, `<?=`, `$_GET[`, `$_POST[`, `define('DB_`, `DB_PASSWORD`, `'password' =>`, строки подключения к БД.\n• Размер ответа заметно отличается от обычной страницы того же имени.\n\nДля архива/дампа: `Content-Type: application/zip` / `application/sql`, magic-байты в начале (`PK` для zip, `SQLite format` для sqlite). Скачай и грепни на `password`, `secret`, `api_key`, `BEGIN PRIVATE KEY`."
+    },
+    {
+      "subcategory": "Инструменты",
+      "title": "Wayback и nuclei для бэкапов",
+      "language": "bash",
+      "tags": ["backup", "wayback", "nuclei", "automation"],
+      "body": "# Исторические бэкапы из веб-архива (см. Commands -> Recon -> Wayback CDX)\ncurl -s 'https://web.archive.org/cdx/search/cdx?url=*.example.com/*&collapse=urlkey&output=text&fl=original&filter=original:.*\\.(zip|tar\\.gz|sql|bak|old|backup|swp|env)$' | sort -u\n\n# nuclei: готовые шаблоны на бэкап-файлы и дампы\nnuclei -u http://target.htb -tags backup,exposure -severity medium,high\n\n# gobuster pattern-mode: подставить домен в шаблоны имён архивов\ngobuster dir -u http://target.htb -w common.txt -x zip,tar.gz,sql,bak\n\n# Внимание: качать чужие БД-дампы целиком за рамками скоупа рискованно —\n# подтверждай минимально (заголовок/первые байты), полную выгрузку согласуй с правилами программы."
+    },
+    {
+      "subcategory": "Защита",
+      "title": "Профилактика",
+      "language": "text",
+      "tags": ["backup", "defense", "prevention"],
+      "body": "• Не держи бэкапы и дампы в вебруте; бэкапь вне DocumentRoot.\n• Запрети отдачу служебных расширений на уровне сервера (nginx/apache `location ~* \\.(bak|old|swp|save|orig|sql|zip|tar\\.gz)$ { deny all; }`).\n• Чисти своп-файлы редакторов на проде (`.*.swp`), не редактируй файлы прямо на боевом.\n• Не клади `.env`/`config.*.dist` с реальными секретами в публичную папку.\n• Мониторь 200-ответы на типовые бэкап-пути (нечастый, но точный сигнал утечки)."
+    }
+  ]
+}

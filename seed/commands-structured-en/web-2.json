@@ -102,7 +102,7 @@
       "install": "CGO_ENABLED=1 go install github.com/projectdiscovery/katana/cmd/katana@latest",
       "binary": "katana",
       "target": "-u {TARGET}",
-      "modes": ["standard", "headless"],
+      "modes": [],
       "groups": [
         {
           "name": "Input",
@@ -237,6 +237,8 @@
     },
     {
       "title": "subfinder",
+      "category": "Recon",
+      "catOrder": 1.5,
       "subcategory": "Passive subdomain discovery",
       "purpose": "Passive subdomain enumeration from ProjectDiscovery via many online sources (crt.sh, VirusTotal, etc.). Fast and quiet against the target.",
       "install": "go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest",
@@ -305,12 +307,14 @@
     },
     {
       "title": "amass",
+      "category": "Recon",
+      "catOrder": 1.5,
       "subcategory": "Deep DNS/subdomain recon",
       "purpose": "Powerful OWASP framework for DNS recon and attack surface mapping: passive sources, brute-forcing and active validation of subdomains with a graph database.",
       "install": "go install -v github.com/owasp-amass/amass/v4/...@master",
       "binary": "amass",
       "target": "enum -d {TARGET}",
-      "modes": ["passive", "normal", "active"],
+      "modes": [],
       "groups": [
         {
           "name": "Input and mode",
@@ -377,12 +381,14 @@
     },
     {
       "title": "naabu",
+      "category": "Recon",
+      "catOrder": 1.5,
       "subcategory": "Fast port scanner",
       "purpose": "Fast Go port scanner from ProjectDiscovery: SYN/CONNECT scans, host discovery, convenient pairing with httpx and nmap for verification.",
       "install": "go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest",
       "binary": "naabu",
       "target": "-host {TARGET}",
-      "modes": ["SYN", "CONNECT"],
+      "modes": [],
       "groups": [
         {
           "name": "Input",
@@ -455,6 +461,8 @@
     },
     {
       "title": "dnsx",
+      "category": "Recon",
+      "catOrder": 1.5,
       "subcategory": "Fast DNS resolver and toolkit",
       "purpose": "Fast multipurpose DNS tool from ProjectDiscovery: bulk resolution, querying any record type, DNS brute-forcing and wildcard filtering.",
       "install": "go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest",

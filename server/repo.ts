@@ -178,11 +178,14 @@ export function search(q: string, type?: string, limit = 50, locale?: string): E
   return (db.prepare(sql).all(...params) as any[]).map(toEntry);
 }
 
-// ── Backup / restore: full snapshot of content + checklist progress ──────────
+// ── Backup / restore: PERSONAL layer + checklist progress ────────────────────
+// Export only what the user created/marked — custom entries plus favorite/note overrides on
+// seeded rows. The seeded reference content is reproduced by `npm run seed`, so bundling it
+// (7+ MB) is pointless and would make restore destructive. Matches the static localApi shape.
 export function exportData() {
   return {
     v: 1,
-    entries: db.prepare('SELECT * FROM entries ORDER BY id').all(),
+    entries: db.prepare("SELECT * FROM entries WHERE is_custom=1 OR is_favorite=1 OR IFNULL(notes,'')<>''").all(),
     checklist_state: db.prepare('SELECT * FROM checklist_state').all(),
     targets: db.prepare('SELECT * FROM targets ORDER BY id').all(),
     findings: db.prepare('SELECT * FROM findings ORDER BY id').all(),
@@ -193,21 +196,33 @@ const restoreTx = db.transaction((data: any) => {
   const entries: any[] = Array.isArray(data?.entries) ? data.entries : [];
   const cs: any[] = Array.isArray(data?.checklist_state) ? data.checklist_state : [];
   const now = new Date().toISOString();
-  db.prepare('DELETE FROM entries').run();
-  const ins = db.prepare(`INSERT INTO entries
-    (id, type, category, subcategory, title, body, language, locale, tags, source, meta, is_custom, is_favorite, notes, created_at, updated_at)
-    VALUES (@id, @type, @category, @subcategory, @title, @body, @language, @locale, @tags, @source, @meta, @is_custom, @is_favorite, @notes, @created_at, @updated_at)`);
+  // Restore the PERSONAL layer only — never wipe seeded reference content (it comes from seed).
+  // Clear current personal layer: drop custom rows, strip favorite/note overrides off seeded rows.
+  db.prepare('DELETE FROM entries WHERE is_custom=1').run();
+  db.prepare("UPDATE entries SET is_favorite=0, notes=NULL WHERE is_custom=0 AND (is_favorite=1 OR IFNULL(notes,'')<>'')").run();
+  const insCustom = db.prepare(`INSERT INTO entries
+    (type, category, subcategory, title, body, language, locale, tags, source, meta, is_custom, is_favorite, notes, created_at, updated_at)
+    VALUES (@type, @category, @subcategory, @title, @body, @language, @locale, @tags, @source, @meta, 1, @is_favorite, @notes, @created_at, @updated_at)`);
+  // seeded rows shift ids across reseed, so re-apply favorite/note overrides by content + locale.
+  const findSeed = db.prepare("SELECT id FROM entries WHERE is_custom=0 AND type=? AND locale=? AND IFNULL(category,'')=IFNULL(?,'') AND title=? AND IFNULL(body,'')=IFNULL(?,'') LIMIT 1");
+  const applyOverride = db.prepare('UPDATE entries SET is_favorite=@is_favorite, notes=@notes WHERE id=@id');
+  let custom = 0, overrides = 0;
   for (const e of entries) {
-    ins.run({
-      id: e.id ?? null, type: e.type, category: e.category ?? null, subcategory: e.subcategory ?? null,
-      title: e.title, body: e.body ?? null, language: e.language ?? null, locale: e.locale ?? 'ru',
-      // accept both string (server backup) and array/object (static/IndexedDB backup) shapes
-      tags: typeof e.tags === 'string' ? e.tags : (e.tags != null ? JSON.stringify(e.tags) : null),
-      source: e.source ?? null,
-      meta: typeof e.meta === 'string' ? e.meta : (e.meta != null ? JSON.stringify(e.meta) : null),
-      is_custom: e.is_custom ? 1 : 0, is_favorite: e.is_favorite ? 1 : 0, notes: e.notes ?? null,
-      created_at: e.created_at ?? now, updated_at: e.updated_at ?? now,
-    });
+    // accept both string (server backup) and array/object (static/IndexedDB backup) tag/meta shapes
+    const tags = typeof e.tags === 'string' ? e.tags : (e.tags != null ? JSON.stringify(e.tags) : null);
+    const meta = typeof e.meta === 'string' ? e.meta : (e.meta != null ? JSON.stringify(e.meta) : null);
+    if (e.is_custom) {
+      insCustom.run({
+        type: e.type, category: e.category ?? null, subcategory: e.subcategory ?? null,
+        title: e.title, body: e.body ?? null, language: e.language ?? null, locale: e.locale ?? 'ru',
+        tags, source: e.source ?? null, meta, is_favorite: e.is_favorite ? 1 : 0, notes: e.notes ?? null,
+        created_at: e.created_at ?? now, updated_at: e.updated_at ?? now,
+      });
+      custom++;
+    } else {
+      const row = findSeed.get(e.type, e.locale ?? 'ru', e.category ?? null, e.title, e.body ?? null) as { id: number } | undefined;
+      if (row) { applyOverride.run({ id: row.id, is_favorite: e.is_favorite ? 1 : 0, notes: e.notes ?? null }); overrides++; }
+    }
   }
   db.prepare('DELETE FROM checklist_state').run();
   const insCs = db.prepare('INSERT INTO checklist_state (key, checked, note, updated_at) VALUES (@key, @checked, @note, @updated_at)');
@@ -224,7 +239,7 @@ const restoreTx = db.transaction((data: any) => {
     const insF = db.prepare('INSERT INTO findings (id,target_id,title,severity,url,status,body,sort,created_at,updated_at) VALUES (@id,@target_id,@title,@severity,@url,@status,@body,@sort,@created_at,@updated_at)');
     for (const f of data.findings) insF.run({ id: f.id ?? null, target_id: f.target_id ?? null, title: f.title, severity: f.severity ?? 'medium', url: f.url ?? null, status: f.status ?? 'open', body: f.body ?? null, sort: f.sort ?? 0, created_at: f.created_at ?? now, updated_at: f.updated_at ?? now });
   }
-  return { entries: entries.length, checklist_state: cs.length, targets: Array.isArray(data?.targets) ? data.targets.length : 0, findings: Array.isArray(data?.findings) ? data.findings.length : 0 };
+  return { entries: custom + overrides, custom, overrides, checklist_state: cs.length, targets: Array.isArray(data?.targets) ? data.targets.length : 0, findings: Array.isArray(data?.findings) ? data.findings.length : 0 };
 });
 
 export function importData(data: unknown) {

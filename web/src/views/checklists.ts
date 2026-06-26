@@ -16,6 +16,10 @@ const STOP = new Set([
   'for', 'with', 'not', 'any', 'use',
 ]);
 
+const TOKEN_RE = /[a-zа-яё0-9_]{3,}/gi;
+const tokenize = (s: string): string[] => s.toLowerCase().match(TOKEN_RE) || [];
+const termSet = (s: string): Set<string> => new Set(tokenize(s).filter((w) => !STOP.has(w)));
+
 export function ChecklistsView(outlet: HTMLElement, params: Record<string, string>): () => void {
   clear(outlet);
 
@@ -32,8 +36,9 @@ export function ChecklistsView(outlet: HTMLElement, params: Record<string, strin
   let uncovered: string[] = [];
   let active = params.sub || '';
   let current: Checklist | null = null;
-  // Пейлоады текущей категории, проиндексированные для быстрого подбора под пункт.
-  let catIndex: { p: Entry; hay: string }[] = [];
+  // Пейлоады текущей категории, проиндексированные для подбора под пункт (idf-взвешенно).
+  let catIndex: { p: Entry; terms: Set<string>; strong: Set<string> }[] = [];
+  let idf = new Map<string, number>(); // вес термина = log(1 + N/df): редкие слова важнее частых
 
   // ── left list ───────────────────────────────────────────────────────────
   function renderList() {
@@ -70,23 +75,25 @@ export function ChecklistsView(outlet: HTMLElement, params: Record<string, strin
     renderList();
   }
 
-  // Подобрать релевантные пейлоады под конкретный пункт (по code-токенам в `..` + ключевым словам).
+  // Подобрать релевантные пейлоады под пункт: idf-взвешенный матч термов пункта против термов
+  // пейлоадов категории. Редкие (отличительные) слова весят больше частых — поэтому generic-пункты
+  // не тянут один и тот же набор, а специфичные получают именно свои пейлоады. Совпадение в
+  // title/subcategory/tags (strong) весит сильнее, чем в теле; токен из `code` — сильнее обычного слова.
   function matchPayloads(text: string): Entry[] {
     if (!catIndex.length) return [];
-    const codeNeedles = new Set<string>();
-    for (const m of text.matchAll(/`([^`]+)`/g)) {
-      for (const s of (m[1] ?? '').toLowerCase().match(/[a-zа-яё0-9_]{3,}/gi) || []) codeNeedles.add(s);
-    }
-    const plain = text.toLowerCase().replace(/`[^`]+`/g, ' ');
-    const words = new Set((plain.match(/[a-zа-яё0-9_]{3,}/gi) || []).filter((w) => !STOP.has(w)));
-    if (!codeNeedles.size && !words.size) return [];
-    const scored = catIndex.map(({ p, hay }) => {
+    const needles = new Set<string>();
+    for (const m of text.matchAll(/`([^`]+)`/g)) for (const tk of tokenize(m[1] ?? '')) needles.add(tk);
+    const words = termSet(text.replace(/`[^`]+`/g, ' '));
+    if (!needles.size && !words.size) return [];
+    const scored = catIndex.map(({ p, terms, strong }) => {
       let score = 0;
-      for (const s of codeNeedles) if (hay.includes(s)) score += 3;
-      for (const w of words) if (hay.includes(w)) score += 1;
+      for (const n of needles) if (terms.has(n)) score += (idf.get(n) ?? 1) * (strong.has(n) ? 4 : 2.2);
+      for (const w of words) if (terms.has(w)) score += (idf.get(w) ?? 1) * (strong.has(w) ? 2 : 1);
       return { p, score };
-    }).filter((x) => x.score >= 3).sort((a, b) => b.score - a.score);
-    return scored.slice(0, 8).map((x) => x.p);
+    }).filter((x) => x.score > 0).sort((a, b) => b.score - a.score);
+    if (!scored.length) return [];
+    const top = scored[0]!.score;
+    return scored.filter((x) => x.score >= Math.max(top * 0.4, 1.2)).slice(0, 6).map((x) => x.p);
   }
 
   // Пейлоады, вписанные прямо в `code`-спаны пункта (полиглоты, {{7*7}}, ' UNION SELECT…,
@@ -185,21 +192,22 @@ export function ChecklistsView(outlet: HTMLElement, params: Record<string, strin
         });
       });
 
+      // Подобранные пейлоады: компактная кнопка В СТРОКЕ пункта (уходит вправо), разворачивает карточки под ним.
       const matches = matchPayloads(it.text);
-      const chip = matches.length
-        ? (h('button', { class: 'chk-pl-chip', title: t('checklists.matchedPayloads'), type: 'button' }, `⚡ ${matches.length}`) as HTMLButtonElement)
-        : null;
-
-      const row = h('label', { class: 'chk-item' + (it.checked ? ' checked' : '') }, box, txt, chip);
       const panel = h('div', { class: 'chk-item-payloads' });
       panel.style.display = 'none';
+      let plBtn: HTMLButtonElement | null = null;
+      if (matches.length) {
+        plBtn = h('button', { class: 'chk-pl-btn', type: 'button' },
+          `⚡ ${t('checklists.showPayloads')} · ${matches.length}`) as HTMLButtonElement;
+      }
 
+      const row = h('label', { class: 'chk-item' + (it.checked ? ' checked' : '') }, box, txt, plBtn);
       row.addEventListener('click', (ev) => { ev.preventDefault(); toggleDone(); });
 
-      let built = false;
-      let open = false;
-      if (chip) {
-        chip.addEventListener('click', (ev) => {
+      if (plBtn) {
+        let built = false, open = false;
+        plBtn.addEventListener('click', (ev) => {
           ev.preventDefault();
           ev.stopPropagation();
           open = !open;
@@ -214,7 +222,7 @@ export function ChecklistsView(outlet: HTMLElement, params: Record<string, strin
             }
           }
           panel.style.display = open ? 'block' : 'none';
-          chip.classList.toggle('active', open);
+          plBtn!.classList.toggle('open', open);
         });
       }
 
@@ -246,14 +254,19 @@ export function ChecklistsView(outlet: HTMLElement, params: Record<string, strin
       current = null;
     }
     catIndex = [];
+    idf = new Map();
     if (current?.category) {
       try {
         const pl = await api.entries({ type: 'payload', category: current.category, limit: 1000 });
-        catIndex = pl.map((p) => ({
-          p,
-          hay: (p.title + ' ' + (p.body || '') + ' ' + (p.subcategory || '') + ' ' + (p.tags || []).join(' ')).toLowerCase(),
-        }));
-      } catch { catIndex = []; }
+        catIndex = pl.map((p) => {
+          const strongText = p.title + ' ' + (p.subcategory || '') + ' ' + (p.tags || []).join(' ');
+          return { p, terms: termSet(strongText + ' ' + (p.body || '')), strong: termSet(strongText) };
+        });
+        const N = catIndex.length || 1;
+        const df = new Map<string, number>();
+        for (const x of catIndex) for (const term of x.terms) df.set(term, (df.get(term) ?? 0) + 1);
+        for (const [term, d] of df) idf.set(term, Math.log(1 + N / d));
+      } catch { catIndex = []; idf = new Map(); }
     }
     renderDetail();
   }

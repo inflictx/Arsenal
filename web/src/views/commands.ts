@@ -3,6 +3,8 @@ import { api, type Entry } from '../api';
 import { SearchField } from '../components/searchfield';
 import { ScrollTop } from '../components/scrolltop';
 import { copyButton } from '../lib/copy';
+import { decorateCodeBlocks, codeWrap } from '../lib/codeblock';
+import { favoriteButton } from '../lib/favorite';
 import { renderMarkdown } from '../lib/markdown';
 import { t } from '../lib/i18n';
 
@@ -93,9 +95,10 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
   const left = h('aside', { class: 'catlist' }, filter.el, treeScroll);
 
   const titleEl = h('h1', { class: 'cat-h' }, t('commands.title'));
+  const headActions = h('div', { class: 'head-actions' });
   const subEl = h('div', { class: 'cmd-purpose' });
   const bodyEl = h('article', { class: 'md cmd-md' });
-  const right = h('div', { style: { minWidth: '0' } }, h('div', { class: 'cards-head' }, titleEl), subEl, bodyEl);
+  const right = h('div', { style: { minWidth: '0' } }, h('div', { class: 'cards-head' }, titleEl, headActions), subEl, bodyEl);
 
   outlet.appendChild(h('div', { class: 'content' }, bar, h('div', { class: 'browser' }, left, right)));
   const scrollTop = ScrollTop();
@@ -209,7 +212,7 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
       out = out.replace(/(https?:\/\/)t\b/g, (_m, p1) => p1 + t).replace(/\b10\.10\.10\.10\b/g, () => t);
       if (/[a-z]/i.test(t)) out = out.replace(/\btarget\.htb\b/g, () => t);
     }
-    if (l) out = out.replace(/\b10\.10\.14\.1\b/g, () => l).replace(/\b1\.1\.1\.1\b/g, () => l).replace(/\bATTACKER\b/g, () => l);
+    if (l) out = out.replace(/\b10\.10\.14\.1\b/g, () => l).replace(/\bATTACKER\b/g, () => l);
     return out;
   }
   function highlight(root: HTMLElement) {
@@ -244,10 +247,7 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
     const code = h('code', {}, subst ? substTokens(text) : text);
     const pre = h('pre', { class: 'cmd-box' }, code);
     if (subst) highlight(pre);
-    const b = copyButton(() => code.textContent ?? '', t('commands.copy'));
-    b.classList.add('doc-copy');
-    pre.appendChild(b);
-    return pre;
+    return codeWrap(pre, t('commands.copy'), () => code.textContent ?? '');
   }
 
   // ── markdown render (domains not yet structured) ──
@@ -255,13 +255,9 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
     liveResub = null;
     if (!active) return;
     bodyEl.innerHTML = renderMarkdown(splitCodeBlocks(splitFlagBullets(applyTargets(active.body ?? ''))));
-    bodyEl.querySelectorAll('pre').forEach((pre) => {
-      const code = pre.querySelector('code');
-      const raw = (code?.textContent ?? pre.textContent ?? '').replace(/\n+$/, '');
-      const clean = raw.split('\n').map((l) => l.replace(/\s{2,}#.*$/, '').replace(/\s+$/, '')).join('\n').trim();
-      const btn = copyButton(() => clean || raw, t('commands.copy'));
-      btn.classList.add('doc-copy');
-      pre.appendChild(btn);
+    decorateCodeBlocks(bodyEl, t('commands.copy'), (_pre, code) => {
+      const raw = (code?.textContent ?? '').replace(/\n+$/, '');
+      return raw.split('\n').map((l) => l.replace(/\s{2,}#.*$/, '').replace(/\s+$/, '')).join('\n').trim() || raw;
     });
     highlight(bodyEl);
   }
@@ -278,7 +274,9 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
     }
 
     const groups: SGroup[] = m.groups ?? [];
-    const modes: SMode[] = m.modes ?? [];
+    // Tolerate modes authored as bare strings (["url","file"]) — normalize to {name} so they
+    // never render as empty buttons; an object mode passes through unchanged.
+    const modes: SMode[] = (m.modes ?? []).map((x: any) => (typeof x === 'string' ? { name: x } : x));
     const selected = new Set<string>();
     const values = new Map<string, string>();
     let mode = modes[0]?.name ?? '';
@@ -436,6 +434,7 @@ export function CommandsView(outlet: HTMLElement, params: Record<string, string>
     active = p;
     for (const [id, el] of rowById) el.classList.toggle('active', id === p.id);
     titleEl.textContent = p.title;
+    headActions.replaceChildren(favoriteButton(p));
     subEl.textContent = p.subcategory ?? '';
     subEl.style.display = p.subcategory ? '' : 'none';
     if (p.meta?.structured) renderBuilder(p); else renderBody();

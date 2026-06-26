@@ -15,19 +15,15 @@ function firstCodeBlock(body: string): string | null {
 }
 // The clean value the ⧉ button copies — or null when there's nothing useful to copy
 // (e.g. Burp docs are prose). When null the copy button is hidden, so you never copy junk.
-function copyValueFor(e: Entry): string | null {
+export function copyValueFor(e: Entry): string | null {
   const meta = (e.meta ?? {}) as Record<string, any>;
   if (e.type === 'wordlist_ref') return (meta.paths && meta.paths[0]) || meta.raw || meta.github || null;
-  if (e.type === 'command' || e.type === 'gtfobin') return firstCodeBlock(e.body ?? ''); // first command block, else null
+  if (e.type === 'command' || e.type === 'gtfobin' || e.type === 'script') return firstCodeBlock(e.body ?? ''); // first command/script block, else null
   if (e.type === 'doc') return null; // Burp docs are prose — nothing clean to copy; just open it
   return (e.body ?? '').trim() || null; // payload / cmd_recipe / note → the payload/command itself
 }
 function preview(e: Entry): string {
   const meta = (e.meta ?? {}) as Record<string, any>;
-  if (e.type === 'wordlist') {
-    const n = typeof meta.lineCount === 'number' ? meta.lineCount : null;
-    return n != null ? `${n.toLocaleString()} lines` : 'wordlist file';
-  }
   if (e.type === 'wordlist_ref') return (meta.paths && meta.paths[0]) || meta.purpose || 'wordlist';
   return (e.body ?? '').replace(/\s+/g, ' ').trim().slice(0, 180);
 }
@@ -94,6 +90,7 @@ export function openPalette() {
       case 'gtfobin': return { route: 'gtfobins', sub: e.title };
       case 'doc': return { route: 'burp', sub: e.title };
       case 'note': return { route: 'notes', sub: e.title };
+      case 'script': return { route: 'scripts', sub: e.title };
       default: return { route: 'payloads', sub: e.category ?? '' };
     }
   }

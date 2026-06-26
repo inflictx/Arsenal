@@ -102,7 +102,7 @@
       "install": "CGO_ENABLED=1 go install github.com/projectdiscovery/katana/cmd/katana@latest",
       "binary": "katana",
       "target": "-u {TARGET}",
-      "modes": ["standard", "headless"],
+      "modes": [],
       "groups": [
         {
           "name": "Ввод",
@@ -237,6 +237,8 @@
     },
     {
       "title": "subfinder",
+      "category": "Recon",
+      "catOrder": 1.5,
       "subcategory": "Пассивный поиск сабдоменов",
       "purpose": "Пассивный перебор сабдоменов от ProjectDiscovery через множество онлайн-источников (crt.sh, VirusTotal, и др.). Быстрый и не шумит по цели.",
       "install": "go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest",
@@ -305,12 +307,14 @@
     },
     {
       "title": "amass",
+      "category": "Recon",
+      "catOrder": 1.5,
       "subcategory": "Глубокая разведка DNS/сабдоменов",
       "purpose": "Мощный фреймворк OWASP для DNS-разведки и картирования атак: пассивные источники, брутфорс и активная проверка сабдоменов с графовой БД.",
       "install": "go install -v github.com/owasp-amass/amass/v4/...@master",
       "binary": "amass",
       "target": "enum -d {TARGET}",
-      "modes": ["passive", "normal", "active"],
+      "modes": [],
       "groups": [
         {
           "name": "Ввод и режим",
@@ -377,12 +381,14 @@
     },
     {
       "title": "naabu",
+      "category": "Recon",
+      "catOrder": 1.5,
       "subcategory": "Быстрый сканер портов",
       "purpose": "Быстрый сканер портов от ProjectDiscovery на Go: SYN/CONNECT-сканы, обнаружение хостов, удобная связка с httpx и nmap для верификации.",
       "install": "go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest",
       "binary": "naabu",
       "target": "-host {TARGET}",
-      "modes": ["SYN", "CONNECT"],
+      "modes": [],
       "groups": [
         {
           "name": "Ввод",
@@ -455,6 +461,8 @@
     },
     {
       "title": "dnsx",
+      "category": "Recon",
+      "catOrder": 1.5,
       "subcategory": "Быстрый DNS-резолвер и тулкит",
       "purpose": "Быстрый многоцелевой DNS-инструмент от ProjectDiscovery: массовый резолв, запрос любых типов записей, DNS-брутфорс и фильтрация wildcard.",
       "install": "go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest",

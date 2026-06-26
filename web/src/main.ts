@@ -18,6 +18,7 @@ import { RevShellView } from './views/revshell';
 import { BurpView } from './views/burp';
 import { CommandsView } from './views/commands';
 import { GtfobinsView } from './views/gtfobins';
+import { ScriptsView } from './views/scripts';
 import { WordlistsView } from './views/wordlists';
 import { NotesView } from './views/notes';
 import { FavoritesView } from './views/favorites';
@@ -43,6 +44,7 @@ const routes: Record<string, RenderFn> = {
   burp: BurpView,
   commands: CommandsView,
   gtfobins: GtfobinsView,
+  scripts: ScriptsView,
   wordlists: WordlistsView,
   cyberchef: CyberChefView,
   notes: NotesView,

@@ -1,0 +1,57 @@
+{
+  "category": "Recon · Subdomains",
+  "group": "recon",
+  "catOrder": 30,
+  "entries": [
+    {
+      "title": "crt.sh certificate transparency enum (retry/backoff)",
+      "lang": "bash",
+      "tags": [
+        "subdomains",
+        "crtsh",
+        "ct-logs",
+        "passive"
+      ],
+      "rating": "must",
+      "deps": "curl, jq (apt install jq) - no keys",
+      "placeholders": "{{DOMAIN}}",
+      "source": "https://crt.sh/",
+      "license": "GPL-3.0 (original)",
+      "body": "Pulls subdomains from **Certificate Transparency logs** via crt.sh. Fully passive and keyless: not a single packet to the target itself. crt.sh sometimes returns 502/timeout under load, so a retry with exponential backoff is built in. The `name_value` field can be multi-line (SAN list) and carry a wildcard `*.` prefix - all of that gets cleaned up. The output is a sorted unique list.\n\n> Free and no registration. This is the first source in any passive pipeline: CT logs contain subdomains that often show up nowhere else.\n\n```bash\n#!/usr/bin/env bash\n# crtsh_enum.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -euo pipefail\nDOMAIN=\"${1:?usage: crtsh_enum.sh <domain>}\"\nUA=\"ARS3NAL-recon/1.0\"\n\nfetch() {\n  local tries=0 max=4 wait=2\n  while [ \"$tries\" -lt \"$max\" ]; do\n    if curl -fsS -A \"$UA\" \"https://crt.sh/?q=%25.${DOMAIN}&output=json\"; then\n      return 0\n    fi\n    tries=$((tries+1)); echo \"[!] crt.sh retry $tries/$max in ${wait}s\" >&2\n    sleep \"$wait\"; wait=$((wait*2))\n  done\n  return 1\n}\n\nfetch \\\n  | jq -r '.[].name_value' \\\n  | tr '[:upper:]' '[:lower:]' \\\n  | sed 's/^\\*\\.//' \\\n  | grep -E \"\\\\.${DOMAIN//./\\\\.}$\" \\\n  | sort -u\n```\n\nRun:\n```bash\nchmod +x crtsh_enum.sh\n./crtsh_enum.sh target.com > subs_crtsh.txt\n```"
+    },
+    {
+      "title": "Passive subdomain enum (subfinder + amass + assetfinder + github-subdomains + crt.sh)",
+      "lang": "bash",
+      "tags": [
+        "subdomains",
+        "passive",
+        "subfinder",
+        "amass",
+        "assetfinder"
+      ],
+      "rating": "must",
+      "deps": "go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest · go install github.com/owasp-amass/amass/v5/...@latest · go install github.com/tomnomnom/assetfinder@latest · go install github.com/gwen001/github-subdomains@latest",
+      "placeholders": "{{DOMAIN}}",
+      "source": "https://github.com/projectdiscovery/subfinder",
+      "license": "GPL-3.0 (original)",
+      "body": "Runs all the major **passive** subdomain sources in parallel and merges them into a single sorted unique list. Purely passive (no requests to the target itself): subfinder, amass passive, assetfinder, github-subdomains and our crt.sh. Missing tools are silently skipped so the pipeline never breaks.\n\n> Environment keys: `GITHUB_TOKEN` is needed for github-subdomains (a free personal token with public_repo scope). `PDCP_API_KEY` (a free ProjectDiscovery Cloud key) enables the chaos source inside subfinder. Without keys, those sources simply stay quiet.\n> IMPORTANT (amass v5): passive mode is now `amass enum -passive` (the `intel` subcommand was REMOVED in v5). The repo is `owasp-amass/amass/v5`. If you install it via apt (`apt install amass`), check the version - older packages use a different syntax.\n\n```bash\n#!/usr/bin/env bash\n# passive_subs.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -uo pipefail\nDOMAIN=\"${1:?usage: passive_subs.sh <domain>}\"\nOUT=\"subs_${DOMAIN}.txt\"\nTMP=\"$(mktemp -d)\"\ntrap 'rm -rf \"$TMP\"' EXIT\nhave() { command -v \"$1\" >/dev/null 2>&1; }\n\nif have subfinder; then\n  echo \"[*] subfinder\" >&2\n  subfinder -silent -all -d \"$DOMAIN\" > \"$TMP/subfinder\" 2>/dev/null || true\nfi\nif have amass; then\n  echo \"[*] amass enum -passive\" >&2\n  amass enum -passive -d \"$DOMAIN\" -silent > \"$TMP/amass\" 2>/dev/null || true\nfi\nif have assetfinder; then\n  echo \"[*] assetfinder\" >&2\n  assetfinder --subs-only \"$DOMAIN\" > \"$TMP/assetfinder\" 2>/dev/null || true\nfi\nif have github-subdomains && [ -n \"${GITHUB_TOKEN:-}\" ]; then\n  echo \"[*] github-subdomains\" >&2\n  github-subdomains -d \"$DOMAIN\" -t \"$GITHUB_TOKEN\" -o \"$TMP/github\" 2>/dev/null || true\nfi\n# crt.sh (always, keyless)\necho \"[*] crt.sh\" >&2\ncurl -fsS -A ARS3NAL \"https://crt.sh/?q=%25.${DOMAIN}&output=json\" 2>/dev/null \\\n  | jq -r '.[].name_value' 2>/dev/null \\\n  | sed 's/^\\*\\.//' > \"$TMP/crtsh\" || true\n\ncat \"$TMP\"/* 2>/dev/null \\\n  | tr '[:upper:]' '[:lower:]' \\\n  | grep -E \"\\\\.${DOMAIN//./\\\\.}$\" \\\n  | sort -u > \"$OUT\"\necho \"[+] $(wc -l < \"$OUT\") unique -> $OUT\" >&2\n```\n\nRun:\n```bash\nexport GITHUB_TOKEN=ghp_xxx        # free personal token\nexport PDCP_API_KEY=xxxx           # opt., free chaos\n./passive_subs.sh target.com\n```"
+    },
+    {
+      "title": "Recon master pipeline (passive -> merge -> dnsx -> httpx)",
+      "lang": "bash",
+      "tags": [
+        "recon",
+        "pipeline",
+        "master",
+        "subdomains",
+        "live"
+      ],
+      "rating": "must",
+      "deps": "subfinder, amass(v5), assetfinder, github-subdomains, dnsx, httpx(-toolkit), jq, curl",
+      "placeholders": "{{DOMAIN}}",
+      "source": "https://github.com/projectdiscovery",
+      "license": "GPL-3.0 (original)",
+      "body": "Chains the whole passive recon into one command: collects subdomains from all sources (like `passive_subs.sh`), merges them, resolves with dnsx, then httpx finds live hosts with status/tech-stack/IP. The result is split into files under a `recon_<domain>/` directory. This is the starting point - next come wayback, JS analysis, content discovery, port scanning.\n\n> Needs the same environment keys: `GITHUB_TOKEN` (free), `PDCP_API_KEY` (free chaos). amass v5: `enum -passive`. On Kali httpx = `httpx-toolkit`.\n\n```bash\n#!/usr/bin/env bash\n# recon_master.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -uo pipefail\nDOMAIN=\"${1:?usage: recon_master.sh <domain>}\"\nDIR=\"recon_${DOMAIN}\"; mkdir -p \"$DIR\"\nhave() { command -v \"$1\" >/dev/null 2>&1; }\nif have httpx-toolkit; then HTTPX=httpx-toolkit; else HTTPX=httpx; fi\nTMP=\"$(mktemp -d)\"; trap 'rm -rf \"$TMP\"' EXIT\n\necho \"[1/4] passive collect\" >&2\nhave subfinder      && subfinder -silent -all -d \"$DOMAIN\" >> \"$TMP/all\" 2>/dev/null\nhave amass          && amass enum -passive -d \"$DOMAIN\" -silent >> \"$TMP/all\" 2>/dev/null\nhave assetfinder    && assetfinder --subs-only \"$DOMAIN\" >> \"$TMP/all\" 2>/dev/null\nif have github-subdomains && [ -n \"${GITHUB_TOKEN:-}\" ]; then\n  github-subdomains -d \"$DOMAIN\" -t \"$GITHUB_TOKEN\" 2>/dev/null >> \"$TMP/all\"\nfi\ncurl -fsS -A ARS3NAL \"https://crt.sh/?q=%25.${DOMAIN}&output=json\" 2>/dev/null \\\n  | jq -r '.[].name_value' 2>/dev/null | sed 's/^\\*\\.//' >> \"$TMP/all\" || true\n\necho \"[2/4] merge\" >&2\ntr '[:upper:]' '[:lower:]' < \"$TMP/all\" \\\n  | grep -E \"\\\\.${DOMAIN//./\\\\.}$\" | sort -u > \"$DIR/subdomains.txt\"\necho \"    $(wc -l < \"$DIR/subdomains.txt\") subdomains\" >&2\n\necho \"[3/4] dnsx resolve\" >&2\ndnsx -silent -l \"$DIR/subdomains.txt\" 2>/dev/null | sort -u > \"$DIR/resolved.txt\"\necho \"    $(wc -l < \"$DIR/resolved.txt\") resolved\" >&2\n\necho \"[4/4] httpx live probe\" >&2\n\"$HTTPX\" -silent -sc -title -td -cdn -ip -l \"$DIR/resolved.txt\" \\\n  -o \"$DIR/live.txt\" 2>/dev/null\necho \"[+] done -> $DIR/ (subdomains.txt, resolved.txt, live.txt)\" >&2\n```\n\nRun:\n```bash\nexport GITHUB_TOKEN=ghp_xxx\n./recon_master.sh target.com\n```"
+    }
+  ]
+}

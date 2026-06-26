@@ -1,0 +1,99 @@
+{
+  "category": "Recon · Origin & Buckets",
+  "group": "recon",
+  "catOrder": 34,
+  "entries": [
+    {
+      "title": "Favicon hash calculator (Shodan-compatible)",
+      "lang": "python",
+      "tags": [
+        "recon",
+        "origin",
+        "favicon",
+        "shodan",
+        "waf-bypass"
+      ],
+      "rating": "must",
+      "deps": "pip install mmh3",
+      "placeholders": "{{TARGET}} (host/URL или путь к .ico)",
+      "badges": [
+        "paid"
+      ],
+      "source": "https://book.hacktricks.xyz/network-services-pentesting/pentesting-web#favicon",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "Считает **favicon-хэш** так же, как Shodan: качает `/favicon.ico` цели, кодирует тело в base64 **с переносами строк** (это важно: `base64.encodebytes`, а не `b64encode`!), берёт `mmh3.hash` и приводит к **знаковому** 32-битному int. Затем печатает готовый дорк `http.favicon.hash:<int>` для Shodan/ZoomEye/FOFA. Идея: WAF/CDN скрывают origin-IP, но favicon у origin-сервера часто тот же, что и у фронтенда. Найдя хосты с тем же хэшем в Shodan, ты находишь IP, который отвечает в обход CDN.\n\n> Сам поиск по фасету `http.favicon.hash:` на Shodan **платный** (нужны query-credits, free-аккаунт их не даёт). Скрипт лишь СЧИТАЕТ хэш офлайн; запрос в Shodan/FOFA делаешь сам через UI/платный API. ZoomEye/FOFA принимают тот же хэш.\n\n```python\n#!/usr/bin/env python3\n# favicon_hash.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Compute Shodan-compatible favicon hash (mmh3 over base64-with-newlines, signed int32).\nimport argparse, base64, struct, sys, urllib.request, urllib.parse, ssl\ntry:\n    import mmh3\nexcept ImportError:\n    sys.exit(\"[!] need: pip install mmh3\")\n\ndef fetch(url, timeout):\n    ctx = ssl.create_default_context()\n    ctx.check_hostname = False\n    ctx.verify_mode = ssl.CERT_NONE\n    req = urllib.request.Request(url, headers={\"User-Agent\": \"ARS3NAL-favicon/1.0\"})\n    with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:\n        return r.read()\n\ndef fav_hash(raw):\n    # Shodan encodes the icon with base64.encodebytes (keeps the 76-col newlines + trailing \\n)\n    b64 = base64.encodebytes(raw)\n    u = mmh3.hash(b64)            # mmh3.hash already returns a signed int32 on most builds\n    # normalize to signed int32 explicitly so the result matches Shodan regardless of build\n    s = struct.unpack(\">i\", struct.pack(\">I\", u & 0xFFFFFFFF))[0]\n    return s\n\ndef target_to_favurl(t):\n    if t.startswith(\"http://\") or t.startswith(\"https://\"):\n        p = urllib.parse.urlparse(t)\n        if p.path in (\"\", \"/\"):\n            return f\"{p.scheme}://{p.netloc}/favicon.ico\"\n        return t\n    return f\"https://{t}/favicon.ico\"\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL Shodan favicon-hash calculator\")\n    ap.add_argument(\"target\", help=\"host, URL, or path to a local .ico file\")\n    ap.add_argument(\"-f\", \"--file\", action=\"store_true\", help=\"treat target as a local icon file\")\n    ap.add_argument(\"-t\", \"--timeout\", type=int, default=15)\n    a = ap.parse_args()\n    try:\n        raw = open(a.target, \"rb\").read() if a.file else fetch(target_to_favurl(a.target), a.timeout)\n    except Exception as e:\n        sys.exit(f\"[!] fetch failed: {e}\")\n    h = fav_hash(raw)\n    print(f\"[*] bytes={len(raw)}  favicon.hash={h}\")\n    print(f\"[=] shodan : http.favicon.hash:{h}\")\n    print(f\"[=] fofa   : icon_hash=\\\"{h}\\\"\")\n    print(f\"[=] zoomeye: iconhash:\\\"{h}\\\"\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nЗапуск:\n```bash\npip install mmh3\npython3 favicon_hash.py https://target.example.com\npython3 favicon_hash.py -f /path/to/favicon.ico\n# затем вставь напечатанный дорк в Shodan/FOFA (Shodan-фасет платный)\n```"
+    },
+    {
+      "title": "Origin-IP recon behind CDN (crt.sh + DNS history + SPF/MX leak)",
+      "lang": "bash",
+      "tags": [
+        "recon",
+        "origin",
+        "cdn",
+        "waf-bypass",
+        "dns"
+      ],
+      "rating": "must",
+      "deps": "sudo apt install -y dnsutils whois curl",
+      "placeholders": "{{DOMAIN}}",
+      "source": "https://book.hacktricks.xyz/network-services-pentesting/pentesting-web#bypass-cloudflare",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "Собирает **кандидаты на origin-IP** для домена за CDN из нескольких бесплатных источников и резолвит исторические/просочившиеся имена, помечая IP, которые **не принадлежат CDN**. Логика: (1) сертификаты `crt.sh` дают связанные хосты, которые часто указывают прямо на origin; (2) почтовые записи (`MX`, `SPF` в TXT) утекают реальные IP, т.к. почта обычно идёт мимо CDN; (3) типовые поддомены `direct.`/`origin.`/`mail.`/`cpanel.` нередко A-записью смотрят на origin. Каждый найденный IP резолвится и сверяется со списком CDN-диапазонов: всё, что НЕ в CDN, выводится как `[!] CANDIDATE ORIGIN`.\n\n> Это эвристика, не гарантия. Кандидата обязательно проверяй скриптом `verify_origin.sh` (Host-заголовок через `--resolve`). CDN-диапазоны тут заданы по ASN-описанию через `whois`; если нет сети, замени проверку на свой статический список префиксов.\n\n```bash\n#!/usr/bin/env bash\n# origin_recon.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Harvest origin-IP candidates behind a CDN: crt.sh + DNS history names + SPF/MX leaks.\nset -u\nDOMAIN=\"${1:?usage: origin_recon.sh <domain>}\"\nCDN_RE='cloudflare|cloudfront|akamai|fastly|incapsula|imperva|sucuri|stackpath|edgecast|google|azure|amazon'\n\nnote(){ printf '%s\\n' \"[*] $*\" >&2; }\nresolve(){ dig +short \"$1\" A 2>/dev/null | grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$'; }\n\n# is this IP part of a known CDN? (whois org/netname match) -> returns 0 if CDN\nis_cdn(){\n  whois \"$1\" 2>/dev/null | grep -iqE \"$CDN_RE\"\n}\n\nnames_file=\"$(mktemp)\"; ips_file=\"$(mktemp)\"\ntrap 'rm -f \"$names_file\" \"$ips_file\"' EXIT\n\nnote \"crt.sh certificate names for $DOMAIN\"\ncurl -s --max-time 30 \"https://crt.sh/?q=%25.${DOMAIN}&output=json\" \\\n  | tr ',' '\\n' | grep -oiE \"[a-z0-9._-]+\\.${DOMAIN}\" | tr 'A-Z' 'a-z' | sort -u >> \"$names_file\"\n\nnote \"common direct/origin subdomain guesses\"\nfor p in direct origin origin-www mail smtp mx cpanel webmail ftp dev staging server host vpn; do\n  echo \"${p}.${DOMAIN}\" >> \"$names_file\"\ndone\necho \"$DOMAIN\" >> \"$names_file\"\n\nnote \"SPF / MX leak (mail usually bypasses the CDN)\"\ndig +short \"$DOMAIN\" MX 2>/dev/null | awk '{print $2}' | sed 's/\\.$//' >> \"$names_file\"\ndig +short \"$DOMAIN\" TXT 2>/dev/null | tr ' ' '\\n' \\\n  | grep -oiE 'ip4:[0-9.]+' | cut -d: -f2 >> \"$ips_file\"\n\nnote \"resolving names\"\nsort -u \"$names_file\" | while read -r n; do\n  [ -z \"$n\" ] && continue\n  resolve \"$n\" | while read -r ip; do echo \"$ip\" >> \"$ips_file\"; done\ndone\n\necho\necho \"[=] origin candidates (non-CDN IPs):\"\nsort -u \"$ips_file\" | while read -r ip; do\n  [ -z \"$ip\" ] && continue\n  if is_cdn \"$ip\"; then\n    echo \"    [cdn]  $ip\"\n  else\n    echo \"    [!] CANDIDATE ORIGIN  $ip\"\n  fi\ndone\n```\n\nЗапуск:\n```bash\n# нужны dig (dnsutils), whois, curl\nsudo apt install -y dnsutils whois curl\n./origin_recon.sh target.example.com\n# каждого кандидата прогони через verify_origin.sh\n```"
+    },
+    {
+      "title": "Verify origin IP via curl --resolve diff",
+      "lang": "bash",
+      "tags": [
+        "recon",
+        "origin",
+        "cdn",
+        "waf-bypass",
+        "verify"
+      ],
+      "rating": "must",
+      "deps": "curl (предустановлен в Kali)",
+      "placeholders": "{{HOST}} · {{CANDIDATE_IP}} · {{PATH}}",
+      "source": "https://book.hacktricks.xyz/network-services-pentesting/pentesting-web#bypass-cloudflare",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "Подтверждает, что найденный IP - действительно **origin** за CDN, а не случайный сервер. Делает один и тот же HTTPS-запрос дважды: один раз через CDN (как обычно), второй раз - насильно на IP-кандидата через `curl --resolve HOST:443:IP`, подставляя реальный Host-заголовок. Затем сравнивает: HTTP-статус, длину тела, заголовок `Server`, наличие CDN-заголовков (`cf-ray`, `x-amz-cf-id` и т.п.) и хэш тела. Если кандидат отдаёт тот же контент, но **без** CDN-заголовков - это origin, к которому можно обращаться напрямую (полезно, чтобы обойти WAF на уровне CDN).\n\n> Многие origin-серверы отвечают `403/421` на неверный Host или вообще на прямой IP. Если совпал хэш тела при правильном Host - это сильный сигнал. Сравнивай именно с тем же путём (`-p /`), а не с дефолтной страницей IP.\n\n```bash\n#!/usr/bin/env bash\n# verify_origin.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Confirm a candidate origin IP behind a CDN via curl --resolve diff.\nset -u\nusage(){ echo \"usage: verify_origin.sh <hostname> <candidate-ip> [path] [port]\"; exit 1; }\nHOST=\"${1:-}\"; IP=\"${2:-}\"; PATHQ=\"${3:-/}\"; PORT=\"${4:-443}\"\n[ -z \"$HOST\" ] || [ -z \"$IP\" ] && usage\nSCHEME=\"https\"; [ \"$PORT\" = \"80\" ] && SCHEME=\"http\"\n\nprobe(){ # $1 = curl extra args; prints \"status|len|server|cdnhdr|bodyhash\"\n  local extra=\"$1\" hdr body\n  hdr=\"$(curl -s -k -D - -o /tmp/.vo_body $extra --max-time 20 \\\n        -H \"User-Agent: ARS3NAL-verify/1.0\" \"${SCHEME}://${HOST}${PATHQ}\" 2>/dev/null)\"\n  local status len server cdn bh\n  status=\"$(printf '%s' \"$hdr\" | awk 'NR==1{print $2}')\"\n  len=\"$(wc -c < /tmp/.vo_body | tr -d ' ')\"\n  server=\"$(printf '%s' \"$hdr\" | grep -i '^server:' | head -1 | cut -d' ' -f2- | tr -d '\\r')\"\n  cdn=\"$(printf '%s' \"$hdr\" | grep -iE '^(cf-ray|x-amz-cf-id|x-cache|x-served-by|x-fastly|x-sucuri-id|x-iinfo):' | cut -d: -f1 | paste -sd, -)\"\n  bh=\"$(sha256sum /tmp/.vo_body | cut -c1-12)\"\n  echo \"${status:-?}|${len:-0}|${server:--}|${cdn:--}|${bh}\"\n}\n\necho \"[*] via CDN   (normal DNS):\"\nCDN_R=\"$(probe '')\"; echo \"    $CDN_R\"\necho \"[*] via origin (--resolve ${HOST}:${PORT}:${IP}):\"\nORI_R=\"$(probe \"--resolve ${HOST}:${PORT}:${IP}\")\"; echo \"    $ORI_R\"\n\nIFS='|' read -r cs cl _ ccdn cbh <<<\"$CDN_R\"\nIFS='|' read -r os ol _ ocdn obh <<<\"$ORI_R\"\necho\nif [ \"$cbh\" = \"$obh\" ] && [ \"$obh\" != \"$(sha256sum < /dev/null | cut -c1-12)\" ]; then\n  echo \"[=] BODY MATCH -> $IP very likely the ORIGIN for $HOST\"\nelif [ \"$cs\" = \"$os\" ] && [ \"$ocdn\" = \"-\" ] && [ \"$ccdn\" != \"-\" ]; then\n  echo \"[=] same status, candidate has NO CDN headers -> likely origin\"\nelse\n  echo \"[~] inconclusive: compare status/len/body above manually\"\nfi\n```\n\nЗапуск:\n```bash\n./verify_origin.sh target.example.com 203.0.113.45 /\n./verify_origin.sh target.example.com 203.0.113.45 /login 443\n```"
+    },
+    {
+      "title": "Cloud bucket permutation brute (S3 / GCS / Azure)",
+      "lang": "python",
+      "tags": [
+        "recon",
+        "buckets",
+        "s3",
+        "gcs",
+        "azure",
+        "cloud"
+      ],
+      "rating": "must",
+      "deps": "stdlib only (Python 3.7+)",
+      "placeholders": "{{KEYWORDS}} (бренд/домен/проект)",
+      "source": "https://book.hacktricks.xyz/network-services-pentesting/pentesting-web/buckets",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "Брутит **облачные бакеты** (AWS S3 + Google Cloud Storage + Azure Blob) по пермутациям имени из ключевого слова (обычно бренда/домена компании). Генерит варианты вида `brand`, `brand-dev`, `brand-prod`, `brand-backup`, `brand-assets`, `dev-brand` и т.п., затем дёргает публичные REST-эндпоинты каждого провайдера БЕЗ авторизации и читает оракул по HTTP-коду: `404` = бакета нет, `403` = бакет есть, но приватный, `200` = публичный и листится. Полезно для поиска забытых/мисконфигнутых хранилищ с данными.\n\n> Никакие ключи не нужны: проверки полностью анонимны (анонимный GET к `s3.amazonaws.com`, `storage.googleapis.com`, `*.blob.core.windows.net`). Найденный `[PUBLIC]`/`[PRIVATE-EXISTS]` бакет дальше изучай скриптом `bucket_access.sh`.\n\n```python\n#!/usr/bin/env python3\n# bucket_brute.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Permutation brute of S3 / GCS / Azure buckets, anonymous 404/403/200 oracle.\nimport argparse, concurrent.futures as cf, sys, urllib.request, urllib.error\n\nAFFIX = [\"\", \"dev\", \"prod\", \"stage\", \"staging\", \"test\", \"qa\", \"backup\", \"backups\",\n         \"assets\", \"static\", \"media\", \"uploads\", \"files\", \"data\", \"db\", \"logs\",\n         \"public\", \"private\", \"internal\", \"cdn\", \"images\", \"img\", \"web\", \"app\",\n         \"bucket\", \"s3\", \"storage\", \"archive\", \"old\", \"new\", \"tmp\", \"temp\"]\nSEP = [\"\", \"-\", \".\", \"_\"]\n\ndef permutations(words):\n    seen, out = set(), []\n    for w in words:\n        w = w.strip().lower()\n        if not w:\n            continue\n        for a in AFFIX:\n            for s in SEP:\n                for name in ((w if a == \"\" else w + s + a), (w if a == \"\" else a + s + w)):\n                    if name and name not in seen and 3 <= len(name) <= 63:\n                        seen.add(name); out.append(name)\n    return out\n\ndef http_code(url):\n    req = urllib.request.Request(url, method=\"GET\",\n                                 headers={\"User-Agent\": \"ARS3NAL-bucket/1.0\"})\n    try:\n        with urllib.request.urlopen(req, timeout=10) as r:\n            return r.status, r.read(512)\n    except urllib.error.HTTPError as e:\n        return e.code, b\"\"\n    except Exception:\n        return None, b\"\"\n\ndef classify(code):\n    if code == 200:\n        return \"PUBLIC\"\n    if code in (403, 401):\n        return \"PRIVATE-EXISTS\"\n    return None  # 404 / error -> skip\n\nPROVIDERS = {\n    \"s3\":    lambda n: f\"https://{n}.s3.amazonaws.com/\",\n    \"gcs\":   lambda n: f\"https://storage.googleapis.com/{n}/\",\n    \"azure\": lambda n: f\"https://{n}.blob.core.windows.net/?comp=list\",\n}\n\ndef check(provider, name):\n    url = PROVIDERS[provider](name)\n    code, _ = http_code(url)\n    verdict = classify(code)\n    return (provider, name, code, verdict, url) if verdict else None\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL S3/GCS/Azure bucket permutation brute\")\n    ap.add_argument(\"keywords\", nargs=\"+\", help=\"base words (brand, domain stem, project)\")\n    ap.add_argument(\"-p\", \"--providers\", default=\"s3,gcs,azure\", help=\"comma list: s3,gcs,azure\")\n    ap.add_argument(\"-w\", \"--workers\", type=int, default=20)\n    a = ap.parse_args()\n    provs = [p for p in a.providers.split(\",\") if p in PROVIDERS]\n    names = permutations(a.keywords)\n    print(f\"[*] {len(names)} names x {len(provs)} providers = {len(names)*len(provs)} checks\", file=sys.stderr)\n    jobs = [(p, n) for p in provs for n in names]\n    with cf.ThreadPoolExecutor(max_workers=a.workers) as ex:\n        for res in ex.map(lambda j: check(*j), jobs):\n            if res:\n                pr, nm, code, vd, url = res\n                tag = \"[PUBLIC]\" if vd == \"PUBLIC\" else \"[PRIVATE-EXISTS]\"\n                print(f\"{tag:18} {pr:5} {code}  {url}\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nЗапуск:\n```bash\npython3 bucket_brute.py acme acmecorp acme-inc -p s3,gcs,azure\n# публичные/приватные находки изучи через bucket_access.sh\n```"
+    },
+    {
+      "title": "S3 bucket anonymous access probe (list/read/write)",
+      "lang": "bash",
+      "tags": [
+        "recon",
+        "buckets",
+        "s3",
+        "cloud",
+        "access"
+      ],
+      "rating": "must",
+      "deps": "pip install awscli",
+      "placeholders": "{{BUCKET_NAME}}",
+      "badges": [
+        "destructive"
+      ],
+      "source": "https://book.hacktricks.xyz/network-services-pentesting/pentesting-web/buckets",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "Проверяет **уровень доступа** к найденному S3-бакету анонимно (без ключей AWS), используя `aws s3 ls s3://NAME --no-sign-request`. Делает три проверки: (1) **list** - листинг объектов; (2) **read** - скачивание первого объекта; (3) **write** - попытку залить пробный файл (опасно, делается только с флагом). Обрабатывает редирект региона (`AuthorizationHeaderMalformed`/301): достаёт правильный регион и повторяет запрос с `--region`. Это следующий шаг после `bucket_brute.py`: понять, что именно открыто.\n\n> Нужен установленный `awscli`, но **ключи не требуются** благодаря `--no-sign-request`. Тест записи `[w]` помечен как destructive: он создаёт объект в чужом бакете, делай это только в рамках разрешённого скоупа и с явным флагом `--write`.\n\n```bash\n#!/usr/bin/env bash\n# bucket_access.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Probe anonymous access level of an S3 bucket (list / read / optional write).\nset -u\nNAME=\"${1:?usage: bucket_access.sh <bucket-name> [--write]}\"\nDO_WRITE=0; [ \"${2:-}\" = \"--write\" ] && DO_WRITE=1\ncommand -v aws >/dev/null || { echo \"[!] need awscli: pip install awscli\"; exit 1; }\n\nREGION_ARG=\"\"\nls_try(){ aws s3 ls \"s3://${NAME}\" --no-sign-request $REGION_ARG 2>&1; }\n\necho \"[*] bucket: $NAME\"\nOUT=\"$(ls_try)\"\n# handle region redirect\nif printf '%s' \"$OUT\" | grep -qiE 'AuthorizationHeaderMalformed|PermanentRedirect|301'; then\n  REG=\"$(printf '%s' \"$OUT\" | grep -oiE \"expecting '[a-z0-9-]+'\" | grep -oE \"[a-z0-9-]+'\" | tr -d \\\"'\\\" | head -1)\"\n  [ -z \"$REG\" ] && REG=\"$(printf '%s' \"$OUT\" | grep -oE 'us-[a-z]+-[0-9]|eu-[a-z]+-[0-9]|ap-[a-z]+-[0-9]' | head -1)\"\n  if [ -n \"$REG\" ]; then echo \"    [i] region redirect -> $REG\"; REGION_ARG=\"--region $REG\"; OUT=\"$(ls_try)\"; fi\nfi\n\n# [l] LIST\nif printf '%s' \"$OUT\" | grep -qiE 'AccessDenied'; then\n  echo \"    [l] LIST   : DENIED (bucket exists, listing blocked)\"\nelif printf '%s' \"$OUT\" | grep -qiE 'NoSuchBucket'; then\n  echo \"    [l] LIST   : bucket does not exist\"; exit 0\nelse\n  echo \"    [l] LIST   : ALLOWED\"\n  printf '%s\\n' \"$OUT\" | sed 's/^/        /' | head -10\nfi\n\n# [r] READ first object\nFIRST=\"$(printf '%s' \"$OUT\" | awk '/[0-9]+ /{print $NF}' | grep -v '/$' | head -1)\"\nif [ -n \"$FIRST\" ]; then\n  if aws s3 cp \"s3://${NAME}/${FIRST}\" /tmp/.ba_obj --no-sign-request $REGION_ARG >/dev/null 2>&1; then\n    echo \"    [r] READ   : ALLOWED ($FIRST -> /tmp/.ba_obj, $(wc -c </tmp/.ba_obj) bytes)\"\n  else\n    echo \"    [r] READ   : denied for $FIRST\"\n  fi\nfi\n\n# [w] WRITE (destructive, opt-in)\nif [ \"$DO_WRITE\" = \"1\" ]; then\n  TF=\"/tmp/.ars3nal_write_test\"; echo \"ars3nal-write-test\" > \"$TF\"\n  if aws s3 cp \"$TF\" \"s3://${NAME}/ars3nal_write_test.txt\" --no-sign-request $REGION_ARG >/dev/null 2>&1; then\n    echo \"    [w] WRITE  : ALLOWED !! (uploaded ars3nal_write_test.txt - clean it up)\"\n  else\n    echo \"    [w] WRITE  : denied\"\n  fi\nfi\n```\n\nЗапуск:\n```bash\npip install awscli\n./bucket_access.sh acme-backups\n# тест записи (destructive, только в скоупе):\n./bucket_access.sh acme-backups --write\n```"
+    }
+  ]
+}

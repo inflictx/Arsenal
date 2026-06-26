@@ -165,5 +165,16 @@
     "github": "https://github.com/danielmiessler/SecLists/blob/master/Fuzzing/User-Agents/UserAgents.fuzz.txt",
     "raw": "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Fuzzing/User-Agents/UserAgents.fuzz.txt",
     "tags": ["seclists", "fuzzing", "user-agents", "payloads"]
+  },
+  {
+    "category": "Фаззинг и payload-листы",
+    "name": "coffinxp/payloads (сборка bug-bounty payload'ов)",
+    "purpose": "Сборка payload'ов и фаззинг-листов одного баг-хантера (coffinxp): XSS-полиглоты и WAF-обходы, WordPress-фаззинг, github-дорки, LFI/SQLi, юзан-пути. ВНИМАНИЕ: у репозитория нет лицензии, многое пересекается с SecLists / PayloadsAllTheThings.",
+    "whenToUse": "Когда нужен быстрый набор готовых payload-файлов в одном месте. Самое ценное (XSS WAF-обходы, полиглоты, backup-файлы, recon) уже разобрано своими словами в модулях Payloads и Commands, тут только указатель на источник.",
+    "size": "десятки файлов; крупные fuzz-листы по 8-17 МБ (everything / onelistforall / api)",
+    "tool": "ffuf / Burp Intruder / dirsearch",
+    "paths": [],
+    "github": "https://github.com/coffinxp/payloads",
+    "tags": ["coffinxp", "fuzzing", "payloads", "collection", "no-license"]
   }
 ]

@@ -1,0 +1,108 @@
+{
+  "category": "Automation & Meta",
+  "group": "modern",
+  "catOrder": 65,
+  "entries": [
+    {
+      "title": "Recon chain (subfinder -> httpx -> nuclei -> notify)",
+      "lang": "bash",
+      "tags": [
+        "automation",
+        "recon",
+        "subfinder",
+        "httpx",
+        "nuclei"
+      ],
+      "rating": "must",
+      "deps": "subfinder, httpx, nuclei (ProjectDiscovery)",
+      "placeholders": "{{DOMAIN}} · {{WEBHOOK}}",
+      "source": "https://github.com/six2dez/reconftw",
+      "license": "GPL-3.0 (wrapper) · reconftw MIT",
+      "body": "A passive/active recon chain in one command: **subfinder -> httpx -> nuclei -> notify**. Subdomains, a live-host filter, a run of nuclei templates, a notification to a messenger. Artifacts are stored in a folder per domain. The tools are from ProjectDiscovery (MIT); reconftw (MIT) is the pipeline idea.\n\n> It does not run what is not there: each step is checked with `command -v`. The run is active (httpx/nuclei send requests) - only against your own/authorized targets. notify.sh (see the neighboring script) sends the final alert.\n\ndeps: subfinder, httpx, nuclei (ProjectDiscovery). placeholders: `{{DOMAIN}}`, `{{WEBHOOK}}` (for notify).\n\n```bash\n#!/usr/bin/env bash\n# recon_chain.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -u\nDOMAIN=\"${1:?usage: recon_chain.sh <domain> [webhook]}\"\nHOOK=\"${2:-}\"\nOUT=\"recon_$DOMAIN\"; mkdir -p \"$OUT\"\nneed() { command -v \"$1\" >/dev/null || { echo \"[!] missing: $1\"; return 1; }; }\n\necho \"[*] target=$DOMAIN out=$OUT/\"\n\nif need subfinder; then\n  subfinder -d \"$DOMAIN\" -silent > \"$OUT/subs.txt\"\n  echo \"[+] subdomains: $(wc -l < \"$OUT/subs.txt\")\"\nfi\n\nif need httpx; then\n  httpx -silent -l \"$OUT/subs.txt\" -title -tech-detect -status-code \\\n        -o \"$OUT/live.txt\"\n  # only URLs for nuclei\n  httpx -silent -l \"$OUT/subs.txt\" > \"$OUT/live_urls.txt\"\n  echo \"[+] live hosts: $(wc -l < \"$OUT/live_urls.txt\")\"\nfi\n\nif need nuclei; then\n  nuclei -silent -l \"$OUT/live_urls.txt\" -severity low,medium,high,critical \\\n         -o \"$OUT/nuclei.txt\"\n  FOUND=$(wc -l < \"$OUT/nuclei.txt\" 2>/dev/null || echo 0)\n  echo \"[+] nuclei findings: $FOUND\"\nfi\n\n# notification (if there is a webhook and notify.sh nearby)\nif [ -n \"$HOOK\" ] && [ -x ./notify.sh ]; then\n  MSG=\"recon $DOMAIN: $(wc -l < \"$OUT/live_urls.txt\") live, $(wc -l < \"$OUT/nuclei.txt\" 2>/dev/null || echo 0) findings\"\n  ./notify.sh \"$HOOK\" \"$MSG\"\nfi\necho \"[=] done -> $OUT/\"\n```\n\nRun:\n```bash\nbash recon_chain.sh target.com \"https://hooks.slack.com/services/XXX\"\n```"
+    },
+    {
+      "title": "Webhook notifier (Slack / Telegram / Discord)",
+      "lang": "bash",
+      "tags": [
+        "automation",
+        "notify",
+        "webhook",
+        "slack",
+        "telegram",
+        "discord"
+      ],
+      "rating": "must",
+      "deps": "curl",
+      "placeholders": "{{WEBHOOK}} · {{MESSAGE}}",
+      "source": "https://api.slack.com/messaging/webhooks",
+      "license": "GPL-3.0 (original)",
+      "body": "A universal **webhook notifier**: one script sends a message to Slack, Telegram or Discord - the type is determined from the URL. Called from any pipeline (recon_chain, monitoring) for alerts.\n\n> The channel type is detected from the webhook domain: hooks.slack.com -> Slack JSON, api.telegram.org -> Telegram, discord.com/api/webhooks -> Discord. For Telegram, pass a URL of the form `https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<ID>`.\n\ndeps: `curl`. placeholders: `{{WEBHOOK}}`, `{{MESSAGE}}`.\n\n```bash\n#!/usr/bin/env bash\n# notify.sh - ARS3NAL (GPL-3.0). Sends to Slack/Telegram/Discord.\nset -u\nHOOK=\"${1:?usage: notify.sh <webhook-url> <message>}\"\nMSG=\"${2:?need message}\"\n# escape quotes for JSON\nESC=$(printf '%s' \"$MSG\" | sed 's/\\\\/\\\\\\\\/g; s/\"/\\\\\"/g')\n\ncase \"$HOOK\" in\n  *hooks.slack.com*)\n    curl -s -X POST \"$HOOK\" -H \"Content-Type: application/json\" \\\n      -d \"{\\\"text\\\":\\\"$ESC\\\"}\" >/dev/null && echo \"[+] slack sent\" ;;\n  *api.telegram.org*)\n    # HOOK already contains bot<token>/sendMessage?chat_id=...\n    curl -s \"$HOOK\" --data-urlencode \"text=$MSG\" >/dev/null && echo \"[+] telegram sent\" ;;\n  *discord.com/api/webhooks*|*discordapp.com/api/webhooks*)\n    curl -s -X POST \"$HOOK\" -H \"Content-Type: application/json\" \\\n      -d \"{\\\"content\\\":\\\"$ESC\\\"}\" >/dev/null && echo \"[+] discord sent\" ;;\n  *)\n    # generic: POST as text\n    curl -s -X POST \"$HOOK\" -H \"Content-Type: application/json\" \\\n      -d \"{\\\"text\\\":\\\"$ESC\\\"}\" >/dev/null && echo \"[+] generic POST sent\" ;;\nesac\n```\n\nRun:\n```bash\nbash notify.sh \"https://hooks.slack.com/services/XXX\" \"new finding on target.com\"\nbash notify.sh \"https://api.telegram.org/bot123:ABC/sendMessage?chat_id=42\" \"ping\"\n```"
+    },
+    {
+      "title": "JS endpoint snapshot + diff + alert",
+      "lang": "bash",
+      "tags": [
+        "automation",
+        "js",
+        "endpoints",
+        "monitoring",
+        "diff"
+      ],
+      "rating": "must",
+      "deps": "curl, grep; optional notify.sh",
+      "placeholders": "{{JS_URL}} · {{WEBHOOK}}",
+      "source": "https://github.com/GerbenJavado/LinkFinder",
+      "license": "GPL-3.0 (original)",
+      "body": "Monitoring of **new endpoints in JS**: it fetches the target's JS files, pulls out paths/URLs with regexes, saves a snapshot and on the next run shows a **diff** - new endpoints often = a new feature = fresh attack surface. When a new one appears, it sends an alert via notify.sh.\n\n> The LinkFinder/Endpoints-Monitor idea: a new path shows up in JS earlier than the feature in the UI. Run it on cron and you will see `/api/v2/internal/...` on deploy day.\n\ndeps: `curl`, `grep`, optional notify.sh. placeholders: `{{JS_URL}}` (or a file with a list of JS URLs), `{{WEBHOOK}}`.\n\n```bash\n#!/usr/bin/env bash\n# js_endpoint_diff.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -u\nSRC=\"${1:?usage: js_endpoint_diff.sh <js-url|file-of-urls> [webhook]}\"\nHOOK=\"${2:-}\"\nSTORE=\".js_endpoints\"; mkdir -p \"$STORE\"\n\n# build the list of JS URLs\nif [ -f \"$SRC\" ]; then URLS=$(cat \"$SRC\"); else URLS=\"$SRC\"; fi\nKEY=$(printf '%s' \"$URLS\" | md5sum 2>/dev/null | cut -c1-10 || echo snap)\nSNAP=\"$STORE/$KEY.txt\"; NEW=\"$STORE/$KEY.new\"\n\n# extract paths and absolute URLs from the JS bodies\n: > \"$NEW\"\nfor u in $URLS; do\n  curl -s -k --max-time 15 \"$u\" \\\n  | grep -oaE '(\"|'\"'\"')(/[a-zA-Z0-9_./?=&%-]{2,}|https?://[a-zA-Z0-9_./?=&%-]+)(\"|'\"'\"')' \\\n  | tr -d \"\\\"'\" \\\n  | grep -aE '^(/|https?://)' >> \"$NEW\"\ndone\nsort -u \"$NEW\" -o \"$NEW\"\n\nif [ -f \"$SNAP\" ]; then\n  ADDED=$(comm -13 \"$SNAP\" \"$NEW\")\n  if [ -n \"$ADDED\" ]; then\n    echo \"[!] NEW endpoints:\"; echo \"$ADDED\" | sed 's/^/    /'\n    if [ -n \"$HOOK\" ] && [ -x ./notify.sh ]; then\n      ./notify.sh \"$HOOK\" \"new JS endpoints: $(echo \"$ADDED\" | head -5 | tr '\\n' ' ')\"\n    fi\n  else\n    echo \"[i] no new endpoints\"\n  fi\nelse\n  echo \"[*] baseline saved: $(wc -l < \"$NEW\") endpoints\"\nfi\ncp \"$NEW\" \"$SNAP\"\necho \"[=] snapshot -> $SNAP\"\n```\n\nRun:\n```bash\nbash js_endpoint_diff.sh https://target/app.js \"https://hooks.slack.com/services/XXX\"\nbash js_endpoint_diff.sh js_urls.txt\n```"
+    },
+    {
+      "title": "curl -> Python requests converter",
+      "lang": "python",
+      "tags": [
+        "meta",
+        "curl",
+        "requests",
+        "converter"
+      ],
+      "rating": "must",
+      "deps": "stdlib",
+      "placeholders": "{{CURL}}",
+      "source": "https://curl.se/docs/manpage.html",
+      "license": "GPL-3.0 (original)",
+      "body": "A converter from a **curl command to Python `requests`**: you paste \"Copy as cURL\" from DevTools/Burp and get a ready script with the method, headers, cookies and body. Then you tweak it for fuzzing/automation.\n\ndeps: stdlib. placeholders: `{{CURL}}` (the command as a string or via stdin).\n\n```python\n#!/usr/bin/env python3\n# curl_to_python.py - ARS3NAL (GPL-3.0).\nimport argparse, shlex, sys, json\n\ndef parse(tokens):\n    method, url, headers, data, cookies = \"GET\", \"\", {}, None, {}\n    it = iter(range(len(tokens)))\n    i = 0\n    while i < len(tokens):\n        t = tokens[i]\n        if t in (\"curl\",):\n            i += 1; continue\n        if t in (\"-X\", \"--request\"):\n            method = tokens[i+1]; i += 2; continue\n        if t in (\"-H\", \"--header\"):\n            k, _, v = tokens[i+1].partition(\":\")\n            if k.lower() == \"cookie\":\n                for c in v.split(\";\"):\n                    ck, _, cv = c.strip().partition(\"=\")\n                    if ck: cookies[ck] = cv\n            else:\n                headers[k.strip()] = v.strip()\n            i += 2; continue\n        if t in (\"-b\", \"--cookie\"):\n            for c in tokens[i+1].split(\";\"):\n                ck, _, cv = c.strip().partition(\"=\")\n                if ck: cookies[ck] = cv\n            i += 2; continue\n        if t in (\"-d\", \"--data\", \"--data-raw\", \"--data-binary\", \"--data-urlencode\"):\n            data = tokens[i+1]; method = \"POST\" if method == \"GET\" else method; i += 2; continue\n        if t in (\"-u\", \"--user\", \"-A\", \"--user-agent\", \"-e\", \"--referer\"):\n            if t in (\"-A\", \"--user-agent\"): headers[\"User-Agent\"] = tokens[i+1]\n            if t in (\"-e\", \"--referer\"): headers[\"Referer\"] = tokens[i+1]\n            i += 2; continue\n        if t in (\"--compressed\", \"-k\", \"--insecure\", \"-s\", \"--silent\", \"-i\", \"-L\", \"--location\"):\n            i += 1; continue\n        if t.startswith(\"http\"):\n            url = t\n        i += 1\n    return method, url, headers, data, cookies\n\ndef emit(method, url, headers, data, cookies):\n    lines = [\"import requests\", \"\"]\n    lines.append(f\"url = {url!r}\")\n    lines.append(f\"headers = {json.dumps(headers, indent=4)}\")\n    if cookies:\n        lines.append(f\"cookies = {json.dumps(cookies, indent=4)}\")\n    if data is not None:\n        lines.append(f\"data = {data!r}\")\n    call = f\"r = requests.request({method!r}, url, headers=headers\"\n    if cookies: call += \", cookies=cookies\"\n    if data is not None: call += \", data=data\"\n    call += \", verify=False)\"\n    lines += [\"\", call, \"print(r.status_code)\", \"print(r.text[:500])\"]\n    return \"\\n\".join(lines)\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL curl -> requests\")\n    ap.add_argument(\"curl\", nargs=\"*\", help=\"curl command (or pipe via stdin)\")\n    a = ap.parse_args()\n    raw = \" \".join(a.curl) if a.curl else sys.stdin.read()\n    tokens = shlex.split(raw.replace(\"\\\\\\n\", \" \"))\n    print(emit(*parse(tokens)))\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\npython3 curl_to_python.py \"curl -X POST https://t/api -H 'Cookie: s=1' -d 'a=b'\"\npbpaste | python3 curl_to_python.py      # from the clipboard (Copy as cURL)\n```"
+    },
+    {
+      "title": "HAR -> Python requests series",
+      "lang": "python",
+      "tags": [
+        "meta",
+        "har",
+        "requests",
+        "replay"
+      ],
+      "rating": "must",
+      "deps": "stdlib",
+      "placeholders": "{{HAR}} · {{FILTER}}",
+      "source": "http://www.softwareishard.com/blog/har-12-spec/",
+      "license": "GPL-3.0 (original)",
+      "body": "A converter from a **HAR file to a series of Python `requests`**: you export the HAR from the browser (Network -> Save all as HAR), and the script turns each request into reproducible code. Handy for replaying a chain of requests, hunting IDOR/race across the series.\n\ndeps: stdlib. placeholders: `{{HAR}}` (the path to .har), `{{FILTER}}` (optional URL substring for filtering).\n\n```python\n#!/usr/bin/env python3\n# har_to_requests.py - ARS3NAL (GPL-3.0).\nimport argparse, json, sys\n\nSKIP_EXT = (\".png\", \".jpg\", \".gif\", \".css\", \".woff\", \".woff2\", \".svg\", \".ico\")\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL HAR -> requests\")\n    ap.add_argument(\"har\", help=\"path to .har file\")\n    ap.add_argument(\"-f\", \"--filter\", default=\"\", help=\"only URLs containing this\")\n    ap.add_argument(\"--keep-static\", action=\"store_true\")\n    a = ap.parse_args()\n    har = json.load(open(a.har, encoding=\"utf-8\"))\n    entries = har[\"log\"][\"entries\"]\n    print(\"import requests\\n\\ns = requests.Session()\\n\")\n    n = 0\n    for e in entries:\n        req = e[\"request\"]\n        url = req[\"url\"]\n        if a.filter and a.filter not in url:\n            continue\n        if not a.keep_static and url.lower().split(\"?\")[0].endswith(SKIP_EXT):\n            continue\n        method = req[\"method\"]\n        headers = {h[\"name\"]: h[\"value\"] for h in req.get(\"headers\", [])\n                   if not h[\"name\"].startswith(\":\")}\n        # cookies are already in the Cookie header; remove the noisy ones\n        for noisy in (\"Content-Length\", \"Host\"):\n            headers.pop(noisy, None)\n        body = None\n        pd = req.get(\"postData\")\n        if pd and \"text\" in pd:\n            body = pd[\"text\"]\n        n += 1\n        print(f\"# [{n}] {method} {url}\")\n        print(f\"r{n} = s.request({method!r}, {url!r},\")\n        print(f\"    headers={json.dumps(headers)},\")\n        if body is not None:\n            print(f\"    data={body!r},\")\n        print(f\"    verify=False)\")\n        print(f\"print({n}, r{n}.status_code, len(r{n}.content))\\n\")\n    if n == 0:\n        sys.exit(\"[!] no matching requests (try without --filter or --keep-static)\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\npython3 har_to_requests.py session.har -f \"/api/\" > replay.py\npython3 replay.py\n```"
+    },
+    {
+      "title": "Baseline vs payload differ (status/len/time/similarity)",
+      "lang": "python",
+      "tags": [
+        "meta",
+        "baseline",
+        "diff",
+        "blind",
+        "difflib"
+      ],
+      "rating": "must",
+      "deps": "pip install requests",
+      "placeholders": "{{URL}} · {{PAYLOAD}}",
+      "source": "https://docs.python.org/3/library/difflib.html",
+      "license": "GPL-3.0 (original)",
+      "body": "A core for blind detection: **it compares a baseline response with the response to a payload** by status, length, time and **text similarity** (difflib). It returns the deltas - so you can automatically decide \"the response changed\" in boolean/time-based tasks, without guessing the threshold by hand.\n\n> It takes N baseline requests (the median time, a reference body), then the payload request. It prints: status change, length delta, time delta, similarity ratio (1.0 = identical). Similarity < ~0.98 at the same length is a common sign of a blind difference.\n\ndeps: `pip install requests`. placeholders: `{{URL}}` (with `*` at the payload point), `{{PAYLOAD}}`.\n\n```python\n#!/usr/bin/env python3\n# baseline_diff.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nimport argparse, statistics, time, difflib, requests\n\ndef fetch(url, payload, timeout):\n    full = url.replace(\"*\", payload) if \"*\" in url else url\n    t0 = time.time()\n    r = requests.get(full, timeout=timeout, verify=False, allow_redirects=False)\n    return r, time.time() - t0\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL baseline vs payload differ\")\n    ap.add_argument(\"-u\", \"--url\", required=True, help=\"URL with * at injection point\")\n    ap.add_argument(\"-p\", \"--payload\", required=True, help=\"payload to substitute at *\")\n    ap.add_argument(\"--baseline\", default=\"\", help=\"benign value for * (default: empty)\")\n    ap.add_argument(\"-n\", \"--samples\", type=int, default=3)\n    ap.add_argument(\"--timeout\", type=int, default=30)\n    a = ap.parse_args()\n    requests.packages.urllib3.disable_warnings()\n\n    # baseline: N runs, reference = first response, median time\n    times, ref = [], None\n    base_status = base_len = 0\n    for _ in range(a.samples):\n        r, dt = fetch(a.url, a.baseline, a.timeout)\n        times.append(dt)\n        if ref is None:\n            ref, base_status, base_len = r.text, r.status_code, len(r.content)\n    base_time = statistics.median(times)\n    print(f\"[*] baseline: status={base_status} len={base_len} time={base_time:.2f}s\\n\")\n\n    # payload\n    pr, pdt = fetch(a.url, a.payload, a.timeout)\n    sim = difflib.SequenceMatcher(None, ref, pr.text).ratio()\n    d_status = \"SAME\" if pr.status_code == base_status else f\"{base_status}->{pr.status_code}\"\n    d_len = len(pr.content) - base_len\n    d_time = pdt - base_time\n    print(f\"[=] payload {a.payload!r}\")\n    print(f\"    status : {d_status}\")\n    print(f\"    length : {d_len:+d} bytes\")\n    print(f\"    time   : {d_time:+.2f}s\")\n    print(f\"    similar: {sim:.4f}  (1.0 = identical)\")\n    changed = (pr.status_code != base_status) or abs(d_len) > 0 or sim < 0.98 or d_time > 1.0\n    print(f\"\\n[=] {'DIFFERENT (signal)' if changed else 'no meaningful difference'}\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\npython3 baseline_diff.py -u \"https://t/item?id=1*\" -p \"1 AND 1=2\" --baseline \"1\"\n```"
+    }
+  ]
+}

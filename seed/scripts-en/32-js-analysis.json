@@ -1,0 +1,74 @@
+{
+  "category": "Recon · JS Analysis",
+  "group": "recon",
+  "catOrder": 32,
+  "entries": [
+    {
+      "title": "Collect JS files (katana -jc + gau + subjs + getJS)",
+      "lang": "bash",
+      "tags": [
+        "js",
+        "javascript",
+        "collect",
+        "katana",
+        "subjs"
+      ],
+      "rating": "must",
+      "deps": "go install github.com/projectdiscovery/katana/cmd/katana@latest · go install github.com/lc/gau/v2/cmd/gau@latest · go install github.com/lc/subjs@latest · go install github.com/003random/getJS/v2@latest",
+      "placeholders": "{{DOMAIN}} or {{URLS_FILE}}",
+      "source": "https://github.com/projectdiscovery/katana",
+      "license": "GPL-3.0 (original)",
+      "body": "Collects **all .js file links** of the target from several sources and merges them into a single list. katana with the `-jc` flag (JS crawl) parses linked scripts while crawling, gau pulls .js from archives, subjs and getJS extract `<script src>` from pages. The output is a unique list of JS bundle URLs for further endpoint and secret analysis.\n\n> katana and getJS make ACTIVE requests to the target (crawling) - only within scope. gau is passive (archives). Accepts either a domain or a file with a list of URLs/hosts.\n\n```bash\n#!/usr/bin/env bash\n# collect_js.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -uo pipefail\nTARGET=\"${1:?usage: collect_js.sh <domain|urls.txt>}\"\nOUT=\"js_urls.txt\"\nhave() { command -v \"$1\" >/dev/null 2>&1; }\nTMP=\"$(mktemp -d)\"; trap 'rm -rf \"$TMP\"' EXIT\n\nif [ -f \"$TARGET\" ]; then SEED=\"$TARGET\"; else printf '%s\\n' \"https://$TARGET\" > \"$TMP/seed\"; SEED=\"$TMP/seed\"; fi\n\necho \"[*] katana -jc\" >&2\nhave katana && katana -silent -jc -d 2 -list \"$SEED\" 2>/dev/null \\\n  | grep -iE '\\.js(\\?|$)' >> \"$TMP/js\" || true\n\necho \"[*] gau (.js)\" >&2\nif have gau; then\n  if [ -f \"$TARGET\" ]; then DOM=\"$(head -1 \"$TARGET\" | sed -E 's#https?://##; s#/.*##')\"; else DOM=\"$TARGET\"; fi\n  gau --subs \"$DOM\" 2>/dev/null | grep -iE '\\.js(\\?|$)' >> \"$TMP/js\" || true\nfi\n\necho \"[*] subjs\" >&2\nhave subjs && subjs -i \"$SEED\" 2>/dev/null >> \"$TMP/js\" || true\n\necho \"[*] getJS\" >&2\nhave getJS && getJS --input \"$SEED\" --complete 2>/dev/null >> \"$TMP/js\" || true\n\nsort -u \"$TMP/js\" | grep -iE '\\.js(\\?|$)' > \"$OUT\" || true\necho \"[+] $(wc -l < \"$OUT\") JS URLs -> $OUT\" >&2\n```\n\nRun:\n```bash\n./collect_js.sh target.com\n# or for a list of live hosts:\n./collect_js.sh live_subs.txt\n```"
+    },
+    {
+      "title": "JS endpoint extractor (LinkFinder-style regex, stdlib)",
+      "lang": "python",
+      "tags": [
+        "js",
+        "endpoints",
+        "linkfinder",
+        "regex"
+      ],
+      "rating": "must",
+      "deps": "stdlib (re, sys) - no dependencies",
+      "placeholders": "{{JS_FILE}} or {{JS_URL}}",
+      "source": "https://github.com/GerbenJavado/LinkFinder",
+      "license": "GPL-3.0 (original)",
+      "body": "Extracts **hidden paths and endpoints** from a JS file (`/api/v2/users`, `/admin/...`, relative and absolute URLs) with a set of LinkFinder-style regexes, but this is an original pure-stdlib implementation (no dependencies). Frontend bundles often hold undocumented APIs, debug routes and admin panels that are not in the public navigation.\n\n> This is original ARS3NAL code (not vendored LinkFinder, to avoid pulling in an MIT dependency). Reads a file from disk or a url from the argument (via urllib). Then feed the endpoints into httpx/ffuf to check whether they are alive.\n\n```python\n#!/usr/bin/env python3\n# jsendpoints.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nimport re, sys, urllib.request, ssl\n\n# regex catches string literals resembling paths/URLs\nENDPOINT = re.compile(r'''\n  (?:\"|')                       # quote\n  (\n    (?:https?:)?//[^\"'\\s]{3,}    # //host/... or http(s)://\n    |\n    /[A-Za-z0-9_./?&=#%~+-]{2,}  # /relative/path\n    |\n    [A-Za-z0-9_./-]+?\\.(?:php|asp|aspx|jsp|json|js|xml|do|action)\\b[^\"'\\s]*\n  )\n  (?:\"|')\n''', re.VERBOSE)\n\nNOISE = re.compile(r'\\.(png|jpe?g|gif|svg|css|woff2?|ttf|ico|mp4)(\\?|$)', re.I)\n\ndef load(src):\n    if src.startswith(\"http\"):\n        ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE\n        req = urllib.request.Request(src, headers={\"User-Agent\": \"ARS3NAL/1.0\"})\n        return urllib.request.urlopen(req, timeout=20, context=ctx).read().decode(\"utf-8\", \"replace\")\n    with open(src, encoding=\"utf-8\", errors=\"replace\") as f:\n        return f.read()\n\ndef extract(text):\n    out = set()\n    for m in ENDPOINT.finditer(text):\n        ep = m.group(1).strip()\n        if len(ep) < 3 or NOISE.search(ep):\n            continue\n        out.add(ep)\n    return sorted(out)\n\ndef main():\n    if len(sys.argv) < 2:\n        print(\"usage: jsendpoints.py <file.js|url> [...]\"); sys.exit(1)\n    for src in sys.argv[1:]:\n        try:\n            eps = extract(load(src))\n        except Exception as e:\n            print(f\"[err] {src}: {e}\", file=sys.stderr); continue\n        print(f\"\\n# {src}  ({len(eps)})\")\n        for e in eps:\n            print(e)\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\npython3 jsendpoints.py app.bundle.js\npython3 jsendpoints.py \"https://target/static/main.js\"\n```"
+    },
+    {
+      "title": "JS secret scanner (API keys / tokens / private keys)",
+      "lang": "python",
+      "tags": [
+        "js",
+        "secrets",
+        "api-keys",
+        "tokens",
+        "jwt"
+      ],
+      "rating": "must",
+      "deps": "stdlib (re, sys) - no dependencies",
+      "placeholders": "{{JS_FILE}} or {{JS_URL}}",
+      "source": "https://github.com/m4ll0k/SecretFinder",
+      "license": "GPL-3.0 (original)",
+      "body": "Scans JS (or any text) for **hardcoded secrets**: GitHub tokens (`ghp_`, `github_pat_`), AWS Access Key (`AKIA...`), Slack tokens (`xox[baprs]-...`), Google API key (`AIza...`), Stripe (`sk_live_`), JWT, private keys (`-----BEGIN ... PRIVATE KEY-----`) and a generic `api_key=...`. An original stdlib implementation. Every match is printed with its rule name and context.\n\n> This is an original set of regexes (not vendored SecretFinder). Additionally/for verification use trufflehog: it checks for itself whether a key is live. trufflehog is licensed under **AGPL-3.0** - it CANNOT be statically bundled into a GPL-3.0 project, so install it as an external binary and run it separately: `trufflehog filesystem ./js --results=verified` (the flag is exactly `--results=verified`; the old `--only-verified` is deprecated).\n\n```python\n#!/usr/bin/env python3\n# jssecrets.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nimport re, sys, urllib.request, ssl\n\nRULES = {\n    \"github-pat-classic\": r\"ghp_[A-Za-z0-9]{36}\",\n    \"github-pat-fine\":    r\"github_pat_[A-Za-z0-9_]{60,}\",\n    \"github-oauth\":       r\"gho_[A-Za-z0-9]{36}\",\n    \"aws-akia\":           r\"AKIA[0-9A-Z]{16}\",\n    \"aws-asia\":           r\"ASIA[0-9A-Z]{16}\",\n    \"slack-token\":        r\"xox[baprs]-[0-9A-Za-z-]{10,48}\",\n    \"slack-webhook\":      r\"https://hooks\\.slack\\.com/services/T[0-9A-Za-z_/]+\",\n    \"google-api\":         r\"AIza[0-9A-Za-z_-]{35}\",\n    \"stripe-live\":        r\"sk_live_[0-9A-Za-z]{20,}\",\n    \"stripe-pub\":         r\"pk_live_[0-9A-Za-z]{20,}\",\n    \"jwt\":                r\"eyJ[A-Za-z0-9_-]{8,}\\.eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\",\n    \"private-key\":        r\"-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----\",\n    \"generic-api-key\":    r\"(?i)(?:api[_-]?key|secret|token)['\\\"]?\\s*[:=]\\s*['\\\"][A-Za-z0-9_\\-]{16,}['\\\"]\",\n    \"firebase\":           r\"[a-z0-9-]+\\.firebaseio\\.com\",\n}\nCOMPILED = {k: re.compile(v) for k, v in RULES.items()}\n\ndef load(src):\n    if src.startswith(\"http\"):\n        ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE\n        req = urllib.request.Request(src, headers={\"User-Agent\": \"ARS3NAL/1.0\"})\n        return urllib.request.urlopen(req, timeout=20, context=ctx).read().decode(\"utf-8\", \"replace\")\n    with open(src, encoding=\"utf-8\", errors=\"replace\") as f:\n        return f.read()\n\ndef scan(text):\n    hits = []\n    for name, rx in COMPILED.items():\n        for m in rx.finditer(text):\n            val = m.group(0)\n            hits.append((name, val[:80]))\n    return hits\n\ndef main():\n    if len(sys.argv) < 2:\n        print(\"usage: jssecrets.py <file.js|url> [...]\"); sys.exit(1)\n    total = 0\n    for src in sys.argv[1:]:\n        try:\n            hits = scan(load(src))\n        except Exception as e:\n            print(f\"[err] {src}: {e}\", file=sys.stderr); continue\n        for name, val in hits:\n            total += 1\n            print(f\"[{name}] {src}\\n    {val}\")\n    print(f\"\\n[=] {total} potential secrets\", file=sys.stderr)\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\npython3 jssecrets.py main.js\npython3 jssecrets.py \"https://target/static/app.js\"\n```"
+    },
+    {
+      "title": "JS mass scan (fetch -> endpoints + secrets -> dedup)",
+      "lang": "python",
+      "tags": [
+        "js",
+        "mass",
+        "endpoints",
+        "secrets",
+        "pipeline"
+      ],
+      "rating": "must",
+      "deps": "pip install requests",
+      "placeholders": "{{JS_URLS_FILE}} (list of .js URLs, e.g. from collect_js.sh)",
+      "source": "https://github.com/GerbenJavado/LinkFinder",
+      "license": "GPL-3.0 (original)",
+      "body": "Takes a **list of JS file URLs** (for example, the output of `collect_js.sh`), downloads them in parallel and runs them through both original checks: endpoint extraction (LinkFinder style) and secret hunting. Results are deduplicated and split into two files: `endpoints.txt` and `secrets.txt`. This is the `collect_js.sh -> jsendpoints.py + jssecrets.py` chain in a single multi-threaded pass.\n\n> Downloads real files from the target (active). Threads are controlled with `-w`. To confirm live secrets, eyeball `secrets.txt` and verify with trufflehog (AGPL, external binary, `--results=verified`).\n\n```python\n#!/usr/bin/env python3\n# js_mass_scan.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nimport argparse, re, requests\nfrom concurrent.futures import ThreadPoolExecutor\nrequests.packages.urllib3.disable_warnings()\n\nENDPOINT = re.compile(r'''(?:\"|')((?:https?:)?//[^\"'\\s]{3,}|/[A-Za-z0-9_./?&=#%~+-]{2,}|[A-Za-z0-9_./-]+?\\.(?:php|asp|aspx|jsp|json|do|action)\\b[^\"'\\s]*)(?:\"|')''')\nNOISE = re.compile(r'\\.(png|jpe?g|gif|svg|css|woff2?|ttf|ico|mp4)(\\?|$)', re.I)\nSECRETS = {\n    \"github-pat\": re.compile(r\"ghp_[A-Za-z0-9]{36}\"),\n    \"aws-akia\":   re.compile(r\"AKIA[0-9A-Z]{16}\"),\n    \"slack\":      re.compile(r\"xox[baprs]-[0-9A-Za-z-]{10,48}\"),\n    \"google-api\": re.compile(r\"AIza[0-9A-Za-z_-]{35}\"),\n    \"stripe\":     re.compile(r\"sk_live_[0-9A-Za-z]{20,}\"),\n    \"jwt\":        re.compile(r\"eyJ[A-Za-z0-9_-]{8,}\\.eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\"),\n    \"priv-key\":   re.compile(r\"-----BEGIN (?:RSA |EC )?PRIVATE KEY-----\"),\n}\n\ndef fetch(url):\n    try:\n        r = requests.get(url, verify=False, timeout=20, headers={\"User-Agent\": \"ARS3NAL/1.0\"})\n        return url, r.text\n    except requests.RequestException:\n        return url, \"\"\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL JS mass scan\")\n    ap.add_argument(\"-l\", \"--list\", required=True, help=\"file with a list of .js URLs\")\n    ap.add_argument(\"-w\", \"--workers\", type=int, default=10)\n    a = ap.parse_args()\n    urls = [u.strip() for u in open(a.list) if u.strip()]\n    eps, secrets = set(), set()\n    with ThreadPoolExecutor(max_workers=a.workers) as ex:\n        for url, body in ex.map(fetch, urls):\n            if not body:\n                continue\n            for m in ENDPOINT.finditer(body):\n                ep = m.group(1).strip()\n                if len(ep) >= 3 and not NOISE.search(ep):\n                    eps.add(ep)\n            for name, rx in SECRETS.items():\n                for s in rx.findall(body):\n                    secrets.add(f\"[{name}] {url} :: {s[:80]}\")\n    with open(\"endpoints.txt\", \"w\", encoding=\"utf-8\") as f:\n        f.write(\"\\n\".join(sorted(eps)))\n    with open(\"secrets.txt\", \"w\", encoding=\"utf-8\") as f:\n        f.write(\"\\n\".join(sorted(secrets)))\n    print(f\"[+] {len(eps)} endpoints -> endpoints.txt\")\n    print(f\"[+] {len(secrets)} secrets   -> secrets.txt\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\n./collect_js.sh target.com          # -> js_urls.txt\npython3 js_mass_scan.py -l js_urls.txt -w 15\n```"
+    }
+  ]
+}

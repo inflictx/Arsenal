@@ -106,6 +106,18 @@
     "tags": ["online", "passwords", "weakpass", "cracking"]
   },
   {
+    "category": "Пароли",
+    "name": "jwt.secrets.list (wallarm) / jwt-secrets",
+    "purpose": "Словарь типовых и утёкших секретов подписи HS256-токенов JWT: дефолты фреймворков, 'secret', 'your-256-bit-secret' и подобные. Для офлайн-брутфорса слабого ключа подписи.",
+    "whenToUse": "Когда поймал JWT на алгоритме HS256 и проверяешь слабость секрета: `hashcat -m 16500 jwt.txt jwt.secrets.list` либо jwt_tool / jwt-cracker.",
+    "size": "~3500 строк (~70 КБ)",
+    "tool": "hashcat -m 16500 / jwt_tool / jwt-cracker",
+    "paths": [],
+    "github": "https://github.com/wallarm/jwt-secrets/blob/master/jwt.secrets.list",
+    "raw": "https://raw.githubusercontent.com/wallarm/jwt-secrets/master/jwt.secrets.list",
+    "tags": ["jwt", "hs256", "secrets", "cracking", "passwords"]
+  },
+  {
     "category": "Имена пользователей",
     "name": "top-usernames-shortlist.txt",
     "purpose": "Короткий список самых типовых имён учёток (admin, root, administrator, user, test и т.п.). Базовый набор для быстрого перебора логинов.",

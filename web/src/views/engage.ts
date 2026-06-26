@@ -22,8 +22,10 @@ export function EngageView(outlet: HTMLElement): () => void {
   // Push the active target's host/lhost into the global keys Commands reads, and notify it.
   const pushGlobalTarget = (tg: Target | null) => {
     try {
-      if (tg?.host) localStorage.setItem('cmd.target', tg.host);
-      if (tg?.lhost) localStorage.setItem('cmd.lhost', tg.lhost);
+      // Set both unconditionally so activating a target WITHOUT a host/lhost clears the
+      // previous target's stale value instead of leaving it in the global Target/LHOST bar.
+      localStorage.setItem('cmd.target', tg?.host || '');
+      localStorage.setItem('cmd.lhost', tg?.lhost || '');
     } catch { /* ignore */ }
     window.dispatchEvent(new CustomEvent('ars:target'));
   };

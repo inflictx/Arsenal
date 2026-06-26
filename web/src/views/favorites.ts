@@ -3,14 +3,16 @@ import { api, type Entry } from '../api';
 import { SearchField } from '../components/searchfield';
 import { ScrollTop } from '../components/scrolltop';
 import { copyButton } from '../lib/copy';
+import { decorateCodeBlocks } from '../lib/codeblock';
+import { copyValueFor } from '../lib/palette';
 import { renderMarkdown } from '../lib/markdown';
 import { t } from '../lib/i18n';
 
 const TYPE_LABEL: Record<string, string> = {
   note: t('favorites.typeNote'), cmd_recipe: t('favorites.typeRecipe'), command: 'Command', payload: 'Payload',
-  gtfobin: 'GTFOBins', wordlist_ref: 'Wordlist', wordlist: 'Wordlist', doc: 'Burp Docs',
+  gtfobin: 'GTFOBins', script: 'Scripts', wordlist_ref: 'Wordlist', wordlist: 'Wordlist', doc: 'Burp Docs',
 };
-const TYPE_ORDER = ['note', 'cmd_recipe', 'command', 'payload', 'gtfobin', 'wordlist_ref', 'wordlist', 'doc'];
+const TYPE_ORDER = ['note', 'cmd_recipe', 'command', 'payload', 'gtfobin', 'script', 'wordlist_ref', 'wordlist', 'doc'];
 
 export function FavoritesView(outlet: HTMLElement): () => void {
   clear(outlet);
@@ -38,19 +40,15 @@ export function FavoritesView(outlet: HTMLElement): () => void {
     const head = h('div', { class: 'fav-card-head' },
       h('span', { class: 'fav-title' }, e.title || t('favorites.untitled')),
       h('span', { class: 'fav-type' }, TYPE_LABEL[e.type] ?? e.type));
-    const copyBtn = copyButton(() => e.body ?? '', 'Copy');
-    copyBtn.classList.add('fav-copy');
+    const cv = copyValueFor(e); // copy the useful value per type (payload/command/script…), not prose docs
+    const copyBtn = cv ? copyButton(() => cv, 'Copy') : null;
+    copyBtn?.classList.add('fav-copy');
     const star = h('button', { class: 'btn fav-x', type: 'button', title: t('favorites.remove'), onclick: () => unfav(e) }, '★');
-    head.append(copyBtn, star);
+    head.append(...(copyBtn ? [copyBtn, star] : [star]));
 
     const md = h('article', { class: 'md cmd-md' });
     md.innerHTML = renderMarkdown(e.body ?? '');
-    md.querySelectorAll('pre').forEach((pre) => {
-      const code = pre.querySelector('code');
-      const b = copyButton(() => code?.textContent ?? pre.textContent ?? '', 'Copy');
-      b.classList.add('doc-copy');
-      pre.appendChild(b);
-    });
+    decorateCodeBlocks(md, 'Copy');
 
     const kids: HTMLElement[] = [head];
     if (e.category) kids.push(h('div', { class: 'fav-cat' }, e.category));

@@ -18,7 +18,10 @@ const OVERVIEW: Cat = { category: 'Обзор', order: 1 };
 
 // `# DOMAIN` headers → ARS3NAL category + sort order. First match wins.
 const DOMAINS: { match: RegExp; cat: Cat }[] = [
+  // WEB must precede Recon: the web-extra heading mentions "(recon, …)" and should stay WEB;
+  // only a heading whose domain is recon (no "web") falls through to the Recon category.
   { match: /\bweb\b/i, cat: { category: 'WEB', order: 2 } },
+  { match: /\brecon\b|разведк/i, cat: { category: 'Recon', order: 1.5 } },
   { match: /active directory|network|services/i, cat: { category: 'Network / AD', order: 3 } },
   { match: /privilege escalation/i, cat: { category: 'Privilege Escalation', order: 4 } },
   { match: /крекинг|cracking/i, cat: { category: 'Крекинг паролей', order: 5 } },
@@ -66,13 +69,15 @@ export function parseCommands(dir: string = DIR, locale: 'ru' | 'en' = 'ru'): En
     const text = readFileSync(join(dir, file), 'utf8');
     let cur: Cat = OVERVIEW;
     let entry: Draft | null = null;
+    let inFence = false; // inside a ``` fenced code block — `#`/`##` lines there are comments, not headings
     const flush = () => {
       if (entry && entry.lines.join('\n').trim()) drafts.push(entry);
       entry = null;
     };
     for (const raw of text.split(/\r?\n/)) {
-      const h1 = /^#\s+(.+?)\s*$/.exec(raw);
-      const h2 = /^##\s+(.+?)\s*$/.exec(raw);
+      if (/^\s*```/.test(raw)) { inFence = !inFence; if (entry) entry.lines.push(raw); continue; }
+      const h1 = inFence ? null : /^#\s+(.+?)\s*$/.exec(raw);
+      const h2 = inFence ? null : /^##\s+(.+?)\s*$/.exec(raw);
       if (h1) {
         const cls = classifyH1(h1[1] ?? '');
         flush();

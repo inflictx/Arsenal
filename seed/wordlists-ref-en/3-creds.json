@@ -106,6 +106,18 @@
     "tags": ["online", "passwords", "weakpass", "cracking"]
   },
   {
+    "category": "Passwords",
+    "name": "jwt.secrets.list (wallarm) / jwt-secrets",
+    "purpose": "A wordlist of common and leaked HS256 signing secrets for JWTs: framework defaults, 'secret', 'your-256-bit-secret' and the like. For offline brute-forcing of a weak signing key.",
+    "whenToUse": "When you catch a JWT on the HS256 algorithm and test the secret strength: `hashcat -m 16500 jwt.txt jwt.secrets.list` or jwt_tool / jwt-cracker.",
+    "size": "~3500 lines (~70 KB)",
+    "tool": "hashcat -m 16500 / jwt_tool / jwt-cracker",
+    "paths": [],
+    "github": "https://github.com/wallarm/jwt-secrets/blob/master/jwt.secrets.list",
+    "raw": "https://raw.githubusercontent.com/wallarm/jwt-secrets/master/jwt.secrets.list",
+    "tags": ["jwt", "hs256", "secrets", "cracking", "passwords"]
+  },
+  {
     "category": "Usernames",
     "name": "top-usernames-shortlist.txt",
     "purpose": "A short list of the most typical account names (admin, root, administrator, user, test, etc.). A baseline set for fast login enumeration.",

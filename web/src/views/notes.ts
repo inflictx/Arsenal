@@ -2,13 +2,13 @@ import { h, clear } from '../lib/dom';
 import { api, type Entry } from '../api';
 import { SearchField } from '../components/searchfield';
 import { ScrollTop } from '../components/scrolltop';
-import { copyButton } from '../lib/copy';
+import { decorateCodeBlocks } from '../lib/codeblock';
 import { renderMarkdown } from '../lib/markdown';
 import { t } from '../lib/i18n';
 
 const NEW: Entry = { id: 0, type: 'note', category: null, subcategory: null, title: '', body: '', language: 'md', tags: [], source: null, meta: null, is_custom: true, is_favorite: false, notes: null, created_at: '', updated_at: '' };
 
-export function NotesView(outlet: HTMLElement): () => void {
+export function NotesView(outlet: HTMLElement, params: Record<string, string>): () => void {
   clear(outlet);
 
   let notes: Entry[] = [];
@@ -124,12 +124,7 @@ export function NotesView(outlet: HTMLElement): () => void {
     const meta = h('div', { class: 'note-meta' }, (active.category ? active.category + ' · ' : '') + t('notes.updated') + ' ' + fmtDate(active.updated_at));
     const md = h('article', { class: 'md cmd-md' });
     md.innerHTML = renderMarkdown(active.body ?? '');
-    md.querySelectorAll('pre').forEach((pre) => {
-      const code = pre.querySelector('code');
-      const btn = copyButton(() => code?.textContent ?? pre.textContent ?? '', 'Copy');
-      btn.classList.add('doc-copy');
-      pre.appendChild(btn);
-    });
+    decorateCodeBlocks(md, 'Copy');
     bodyEl.append(meta, md);
   }
 
@@ -167,7 +162,10 @@ export function NotesView(outlet: HTMLElement): () => void {
 
   (async () => {
     await reload();
-    active = notes[0] ?? null;
+    // ⌘K deep-link: prefer the requested note (by id, then title), else the first one.
+    active = (params.id ? notes.find((n) => String(n.id) === params.id) : null)
+      ?? (params.sub ? notes.find((n) => n.title === params.sub) : null)
+      ?? notes[0] ?? null;
     renderList();
     renderRight();
   })();

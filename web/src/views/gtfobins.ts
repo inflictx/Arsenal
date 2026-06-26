@@ -2,7 +2,8 @@ import { h, clear } from '../lib/dom';
 import { api, type Entry } from '../api';
 import { SearchField } from '../components/searchfield';
 import { ScrollTop } from '../components/scrolltop';
-import { copyButton } from '../lib/copy';
+import { decorateCodeBlocks } from '../lib/codeblock';
+import { favoriteButton } from '../lib/favorite';
 import { renderMarkdown } from '../lib/markdown';
 import { t } from '../lib/i18n';
 
@@ -31,8 +32,9 @@ export function GtfobinsView(outlet: HTMLElement, params: Record<string, string>
   const left = h('aside', { class: 'catlist' }, filter.el, countEl, listScroll, credit);
 
   const titleEl = h('h1', { class: 'cat-h' }, 'GTFOBins');
+  const headActions = h('div', { class: 'head-actions' });
   const bodyEl = h('article', { class: 'md cmd-md' });
-  const right = h('div', { style: { minWidth: '0' } }, h('div', { class: 'cards-head' }, titleEl), bodyEl);
+  const right = h('div', { style: { minWidth: '0' } }, h('div', { class: 'cards-head' }, titleEl, headActions), bodyEl);
 
   const chipBar = h('div', { class: 'gtfo-filters' });
   const addChips = (label: string, list: [string, string][], cls: string) => {
@@ -87,13 +89,9 @@ export function GtfobinsView(outlet: HTMLElement, params: Record<string, string>
     active = b;
     for (const [id, el] of rowById) el.classList.toggle('active', id === b.id);
     titleEl.textContent = b.title;
+    headActions.replaceChildren(favoriteButton(b));
     bodyEl.innerHTML = renderMarkdown(b.body ?? '');
-    bodyEl.querySelectorAll('pre').forEach((pre) => {
-      const code = pre.querySelector('code');
-      const btn = copyButton(() => (code?.textContent ?? pre.textContent ?? ''), t('gtfobins.copy'));
-      btn.classList.add('doc-copy');
-      pre.appendChild(btn);
-    });
+    decorateCodeBlocks(bodyEl, t('gtfobins.copy'));
   }
 
   (async () => {

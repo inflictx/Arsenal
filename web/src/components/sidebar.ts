@@ -8,6 +8,7 @@ export interface NavItem { id: string; label: string; icon: string; }
 export const NAV_REFERENCE: NavItem[] = [
   { id: 'payloads', label: 'Payloads', icon: '⚡' },
   { id: 'commands', label: 'Commands', icon: '⌘' },
+  { id: 'scripts', label: 'Scripts', icon: '📜' },
   { id: 'gtfobins', label: 'GTFOBins', icon: '🐧' },
   { id: 'wordlists', label: 'Wordlists', icon: '📚' },
   { id: 'cyberchef', label: 'CyberChef', icon: '🧪' },

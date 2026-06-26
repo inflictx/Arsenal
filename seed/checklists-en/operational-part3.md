@@ -295,6 +295,7 @@
 **Screenshots and nuclei**
 - [ ] Triage: `gowitness scan file -f live.txt --screenshot-path ./shots`
 - [ ] Templates: `nuclei -l live.txt -severity critical,high,medium -es info -rl 150 -o nuclei.txt`; takeover `nuclei -l live.txt -t http/takeovers/`
+- [ ] DAST on historical parameters: `cat urls_gau.txt urls_wb.txt | grep -E '\?[^=]+=' | uro | httpx -silent | nuclei -dast -silent` (reflected XSS/SSRF/redirect on URLs with GET parameters)
 
 **Pipeline and monitoring**
 - [ ] Full pipe: `subfinder -d target.com -all -silent | dnsx -silent | httpx -silent | nuclei -severity critical,high -silent`

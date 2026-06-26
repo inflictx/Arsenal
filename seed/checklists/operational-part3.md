@@ -295,6 +295,7 @@
 **Скриншоты и nuclei**
 - [ ] Триаж: `gowitness scan file -f live.txt --screenshot-path ./shots`
 - [ ] Шаблоны: `nuclei -l live.txt -severity critical,high,medium -es info -rl 150 -o nuclei.txt`; takeover `nuclei -l live.txt -t http/takeovers/`
+- [ ] DAST по историческим параметрам: `cat urls_gau.txt urls_wb.txt | grep -E '\?[^=]+=' | uro | httpx -silent | nuclei -dast -silent` (отражённые XSS/SSRF/redirect на URL с GET-параметрами)
 
 **Связка и мониторинг**
 - [ ] Полный пайп: `subfinder -d target.com -all -silent | dnsx -silent | httpx -silent | nuclei -severity critical,high -silent`

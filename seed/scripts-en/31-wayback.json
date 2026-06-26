@@ -1,0 +1,76 @@
+{
+  "category": "Recon · Wayback / Archive",
+  "group": "recon",
+  "catOrder": 31,
+  "entries": [
+    {
+      "title": "Wayback CDX URL harvest (matchType=domain)",
+      "lang": "bash",
+      "tags": [
+        "wayback",
+        "cdx",
+        "archive",
+        "urls",
+        "passive"
+      ],
+      "rating": "must",
+      "deps": "curl, sort (coreutils) - no keys",
+      "placeholders": "{{DOMAIN}}",
+      "source": "https://github.com/internetarchive/wayback/tree/master/wayback-cdx-server",
+      "license": "GPL-3.0 (original)",
+      "body": "Downloads **every URL of the domain (and its subdomains)** that the Internet Archive has ever seen, via the CDX API. Fully passive: not a single request to the target itself. `matchType=domain` grabs both the domain and all subdomains; `fl=original` returns only the URLs themselves; `collapse=urlkey` collapses duplicates. This is a goldmine: old endpoints, forgotten parameters, deleted pages.\n\n> Correct query form: `url=DOMAIN&matchType=domain` (NOT `url=*.DOMAIN/*`). The CDX status field is called `statuscode`. `fl=original` - output only the URL column.\n\n```bash\n#!/usr/bin/env bash\n# cdx_harvest.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -euo pipefail\nDOMAIN=\"${1:?usage: cdx_harvest.sh <domain>}\"\nOUT=\"cdx_${DOMAIN}.txt\"\nUA=\"ARS3NAL-recon/1.0\"\n\ncurl -fsS -A \"$UA\" -G \"https://web.archive.org/cdx/search/cdx\" \\\n  --data-urlencode \"url=${DOMAIN}\" \\\n  --data-urlencode \"matchType=domain\" \\\n  --data-urlencode \"collapse=urlkey\" \\\n  --data-urlencode \"fl=original\" \\\n  --data-urlencode \"output=text\" \\\n  | sort -u > \"$OUT\"\n\necho \"[+] $(wc -l < \"$OUT\") URLs -> $OUT\"\n```\n\nRun:\n```bash\nchmod +x cdx_harvest.sh\n./cdx_harvest.sh target.com\n```"
+    },
+    {
+      "title": "Wayback CDX sensitive files (server-side filter)",
+      "lang": "bash",
+      "tags": [
+        "wayback",
+        "cdx",
+        "sensitive",
+        "secrets",
+        "env"
+      ],
+      "rating": "must",
+      "deps": "curl, sort - no keys",
+      "placeholders": "{{DOMAIN}}",
+      "source": "https://github.com/internetarchive/wayback/tree/master/wayback-cdx-server",
+      "license": "GPL-3.0 (original)",
+      "body": "Searches the archive for **sensitive files** (`.env`, `.git`, `.sql`, `.bak`, `config`, `.json` with keys, etc.), filtering right on the CDX server side - faster and less traffic than pulling everything and grepping locally. Uses the server-side `filter=statuscode:200` (only the ones that actually existed, not 404s) and `filter=original:<regex>` by extension.\n\n> CDX applies a Java regex and **anchors it to the whole field**, so the pattern needs a trailing `.*`: the correct form is `filter=original:.*\\.env.*`, otherwise there will be no matches. Each extension is a separate request (CDX handles one filter on the original field at a time more reliably than an alternation).\n\n```bash\n#!/usr/bin/env bash\n# cdx_sensitive.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -uo pipefail\nDOMAIN=\"${1:?usage: cdx_sensitive.sh <domain>}\"\nOUT=\"cdx_sensitive_${DOMAIN}.txt\"\nUA=\"ARS3NAL-recon/1.0\"\n: > \"$OUT\"\n\n# regex anchors to the whole original field -> trailing .* is MANDATORY\nPATTERNS=(\n  '.*\\.env.*' '.*\\.git.*' '.*\\.sql.*' '.*\\.bak.*' '.*\\.old.*'\n  '.*\\.zip.*' '.*\\.tar\\.gz.*' '.*\\.json.*' '.*\\.yml.*' '.*\\.yaml.*'\n  '.*\\.config.*' '.*\\.ini.*' '.*\\.log.*' '.*backup.*' '.*\\.swp.*'\n)\n\nfor pat in \"${PATTERNS[@]}\"; do\n  echo \"[*] $pat\" >&2\n  curl -fsS -A \"$UA\" -G \"https://web.archive.org/cdx/search/cdx\" \\\n    --data-urlencode \"url=${DOMAIN}\" \\\n    --data-urlencode \"matchType=domain\" \\\n    --data-urlencode \"collapse=urlkey\" \\\n    --data-urlencode \"fl=original\" \\\n    --data-urlencode \"filter=statuscode:200\" \\\n    --data-urlencode \"filter=original:${pat}\" \\\n    --data-urlencode \"output=text\" 2>/dev/null >> \"$OUT\" || true\ndone\n\nsort -u -o \"$OUT\" \"$OUT\"\necho \"[+] $(wc -l < \"$OUT\") sensitive URLs -> $OUT\" >&2\n```\n\nRun:\n```bash\n./cdx_sensitive.sh target.com\n```"
+    },
+    {
+      "title": "URL harvest pipeline (gau + waybackurls + katana -> uro -> gf -> qsreplace)",
+      "lang": "bash",
+      "tags": [
+        "urls",
+        "gau",
+        "waybackurls",
+        "katana",
+        "gf",
+        "qsreplace"
+      ],
+      "rating": "must",
+      "deps": "go install github.com/lc/gau/v2/cmd/gau@latest · go install github.com/tomnomnom/waybackurls@latest · go install github.com/projectdiscovery/katana/cmd/katana@latest · pipx install uro · go install github.com/tomnomnom/gf@latest · go install github.com/tomnomnom/qsreplace@latest",
+      "placeholders": "{{DOMAIN}}",
+      "source": "https://github.com/lc/gau",
+      "license": "GPL-3.0 (original)",
+      "body": "A full URL pipeline for bug bounty: collects URLs from all sources (gau - archives/CommonCrawl/OTX, waybackurls - Wayback, katana - active crawling), cleans and deduplicates with **uro** (collapses similar parameterized URLs), classifies by vulnerability class with **gf** (sqli/xss/ssrf/redirect/lfi/ssti/idor) and prepares for fuzzing with **qsreplace FUZZ** (all parameter values get replaced with the `FUZZ` marker).\n\n> gau is installed from the **lc/gau/v2** repo (`go install github.com/lc/gau/v2/cmd/gau@latest`), not tomnomnom. gf needs patterns: `git clone https://github.com/1ndianl33t/Gf-Patterns ~/.gf`. katana makes ACTIVE requests to the target - run it only within scope.\n\n```bash\n#!/usr/bin/env bash\n# url_harvest.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -uo pipefail\nDOMAIN=\"${1:?usage: url_harvest.sh <domain>}\"\nDIR=\"urls_${DOMAIN}\"; mkdir -p \"$DIR\"\nhave() { command -v \"$1\" >/dev/null 2>&1; }\nTMP=\"$(mktemp -d)\"; trap 'rm -rf \"$TMP\"' EXIT\n\necho \"[1/4] collect\" >&2\nhave gau         && gau --subs \"$DOMAIN\"            >> \"$TMP/raw\" 2>/dev/null\nhave waybackurls && echo \"$DOMAIN\" | waybackurls   >> \"$TMP/raw\" 2>/dev/null\nhave katana      && katana -silent -d 2 -u \"https://$DOMAIN\" >> \"$TMP/raw\" 2>/dev/null\n\necho \"[2/4] dedup (uro)\" >&2\nif have uro; then uro < \"$TMP/raw\" | sort -u > \"$DIR/all_urls.txt\"\nelse sort -u \"$TMP/raw\" > \"$DIR/all_urls.txt\"; fi\necho \"    $(wc -l < \"$DIR/all_urls.txt\") urls\" >&2\n\necho \"[3/4] gf classify\" >&2\nif have gf; then\n  for p in sqli xss ssrf redirect lfi ssti idor rce; do\n    gf \"$p\" < \"$DIR/all_urls.txt\" 2>/dev/null | sort -u > \"$DIR/gf_${p}.txt\" || true\n  done\nfi\n\necho \"[4/4] qsreplace FUZZ\" >&2\nif have qsreplace; then\n  grep '?' \"$DIR/all_urls.txt\" | qsreplace FUZZ 2>/dev/null | sort -u > \"$DIR/fuzz_urls.txt\"\nfi\necho \"[+] done -> $DIR/\" >&2\n```\n\nRun:\n```bash\ngit clone https://github.com/1ndianl33t/Gf-Patterns ~/.gf   # once\n./url_harvest.sh target.com\n```"
+    },
+    {
+      "title": "Recover deleted pages from Wayback (raw id_ snapshots)",
+      "lang": "bash",
+      "tags": [
+        "wayback",
+        "recover",
+        "deleted",
+        "archive",
+        "raw"
+      ],
+      "rating": "must",
+      "deps": "curl, jq, sort - no keys",
+      "placeholders": "{{DOMAIN}}",
+      "source": "https://github.com/internetarchive/wayback/tree/master/wayback-cdx-server",
+      "license": "GPL-3.0 (original)",
+      "body": "Pulls **currently deleted/unavailable** pages straight from the archive in raw form. First it fetches every snapshot with `statuscode:200` from CDX, takes the freshest timestamp for each URL, then downloads the **raw** content using the special `id_` modifier in the archive URL (`web.archive.org/web/<ts>id_/<url>`) - this returns the original response without the Wayback toolbar wrapper. Handy for recovering old JS, a config, or an endpoint that has already been stripped from the live site.\n\n> The `id_` (identity) modifier is the key bit: without it the archive injects its own JS/banner and corrupts the files. Only snapshots with `statuscode:200` are taken, so archived 404s are not pulled.\n\n```bash\n#!/usr/bin/env bash\n# recover_deleted.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -uo pipefail\nDOMAIN=\"${1:?usage: recover_deleted.sh <domain> [maxfetch]}\"\nMAX=\"${2:-25}\"\nDIR=\"recovered_${DOMAIN}\"; mkdir -p \"$DIR\"\nUA=\"ARS3NAL-recon/1.0\"\n\n# timestamp + original, successful snapshots only\ncurl -fsS -A \"$UA\" -G \"https://web.archive.org/cdx/search/cdx\" \\\n  --data-urlencode \"url=${DOMAIN}\" \\\n  --data-urlencode \"matchType=domain\" \\\n  --data-urlencode \"collapse=urlkey\" \\\n  --data-urlencode \"filter=statuscode:200\" \\\n  --data-urlencode \"fl=timestamp,original\" \\\n  --data-urlencode \"output=text\" 2>/dev/null > \"$DIR/_index.txt\" || true\n\necho \"[*] $(wc -l < \"$DIR/_index.txt\") snapshots, fetching up to $MAX raw\" >&2\nn=0\nwhile read -r ts url; do\n  [ -z \"${url:-}\" ] && continue\n  n=$((n+1)); [ \"$n\" -gt \"$MAX\" ] && break\n  fname=\"$DIR/$(echo \"$url\" | sed 's#https\\?://##; s#[^A-Za-z0-9._-]#_#g' | cut -c1-120)\"\n  # id_ = raw original response without the Wayback toolbar\n  curl -fsSL -A \"$UA\" \"https://web.archive.org/web/${ts}id_/${url}\" -o \"$fname\" 2>/dev/null || true\n  echo \"    [$n] $url\" >&2\ndone < \"$DIR/_index.txt\"\necho \"[+] raw files -> $DIR/\" >&2\n```\n\nRun:\n```bash\n./recover_deleted.sh target.com 50\n```"
+    }
+  ]
+}

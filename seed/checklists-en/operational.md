@@ -328,6 +328,7 @@
 - [ ] JWT forge (see §11)
 - [ ] 2FA bypass: response manipulation (`{"success":false}`->`true`), step skip, OTP brute (+ race, see §15)
 - [ ] Session is not invalidated after a password change
+- [ ] Username/email collision: leading/trailing spaces (`"admin "`), Unicode normalization (NFKC) and IDN homoglyphs (Cyrillic `а`, `demⓞ@x.com`) collapse your account into the victim's on reset/merge
 
 **Tools:** Burp, Autorize
 **Defense (for the report):** invalidate all sessions on password/email change; re-auth on sensitive actions; secure reset tokens

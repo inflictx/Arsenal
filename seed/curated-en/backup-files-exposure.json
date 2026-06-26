@@ -1,0 +1,72 @@
+{
+  "category": "Backup Files Exposure",
+  "source": "nuclei-templates (backup/disclosure) + SecLists",
+  "entries": [
+    {
+      "subcategory": "Methodology",
+      "title": "Exposed backups and source files",
+      "language": "text",
+      "tags": ["methodology", "backup", "source-disclosure", "info-leak"],
+      "body": "Developers and servers spawn side copies of files: editor swaps (vim `.swp`), saves (`~`, `.orig`), manual backups before an edit (`config.php.bak`), release archives (`backup.zip`, `site.tar.gz`), DB dumps (`db.sql`). If such a file sits in the webroot and the server serves it as TEXT (instead of executing it), the source code leaks together with its secrets.\n\nImpact: DB creds and API keys from configs, app logic and hidden endpoints, a chain to RCE or DB access. Often an easy high-severity finding.\n\nTwo separate surfaces: (1) a backup of a KNOWN file (`/config.php` -> `/config.php.bak`), (2) an archive/dump of the whole project in the root (`/backup.zip`, `/www.tar.gz`, `/dump.sql`). Related: exposed `.git`/`.svn` (see Insecure Source Code Management) and `.env` (see API Key Leaks)."
+    },
+    {
+      "subcategory": "Extensions and suffixes",
+      "title": "Backup copy suffixes",
+      "language": "table",
+      "tags": ["backup", "extensions", "fuzzing"],
+      "body": "swp swo bak old orig save tmp dist backup zip tar gz sql",
+      "meta": {
+        "kind": "table",
+        "table": {
+          "headers": ["Suffix", "Where it comes from"],
+          "rows": [
+            [".swp .swo .swn", "vim swap files for an open file (often `.index.php.swp`)"],
+            ["~  .save", "editor autosave/backup (gedit, nano)"],
+            [".bak .bk .bkp _bak _1.bak", "manual backup before an edit"],
+            [".old .orig .new .original", "versions left during a manual update"],
+            [".dist .sample .example", "shipped config template (often with default creds)"],
+            [".disabled .txt .src", "file 'turned off' by renaming, so it stopped executing"],
+            [".0 .1 .2 .3  .copy", "logrotate-like and manual numbered copies"],
+            [".zip .tar.gz .tgz .rar .7z .gz .bz2", "release/whole-site archive in the root"],
+            [".sql .sqlite .db .dump", "database dump"]
+          ]
+        }
+      }
+    },
+    {
+      "subcategory": "Where to look",
+      "title": "Common names and paths",
+      "language": "text",
+      "tags": ["backup", "paths", "wordlist"],
+      "body": "Base = current file + suffix:\n  /config.php -> /config.php.bak, /config.php~, /config.php.old, /config.bak\n  /index.php  -> /index.php.swp, /.index.php.swp\n\nCMS configs (candidates for a backup suffix):\n  WordPress: /wp-config.php\n  Drupal:    /sites/default/settings.php\n  Joomla:    /configuration.php\n  Magento:   /app/etc/env.php\n  Laravel:   /.env\n  generic:   /config.php /database.php /db.php /conn.php /settings.php\n\nWhole-project archive/dump in the root (by domain name and common words):\n  /backup.zip /backup.tar.gz /www.zip /site.tar.gz /web.zip\n  /example.com.zip /example.zip /public_html.tar.gz\n  /db.sql /dump.sql /database.sql /backup.sql\n\nReady wordlists: SecLists `Discovery/Web-Content/` (`backup-files.txt`, `BackupFiles.fuzz.txt`, `coldfusion`), toolkit `juicy_files.txt` / `backup_files_only.txt`."
+    },
+    {
+      "subcategory": "Exploitation",
+      "title": "Fuzzing backup files (ffuf / feroxbuster)",
+      "language": "bash",
+      "tags": ["backup", "ffuf", "feroxbuster", "fuzzing"],
+      "body": "# 1) Clusterbomb: known files x suffixes (two fuzz points)\nffuf -w files.txt:FILE -w exts.txt:EXT -u 'http://target.htb/FILEEXT' -mc 200 -ac\n#   files.txt: config.php\\nindex.php\\ndatabase.php …\n#   exts.txt:  .bak\\n.old\\n.swp\\n~\\n.save\\n.zip …\n\n# 2) Archive/dump of the whole project in the root\nffuf -w archive-names.txt -u 'http://target.htb/FUZZ' -e .zip,.tar.gz,.sql,.bak -mc 200 -ac\n\n# 3) feroxbuster with auto-appended extensions\nferoxbuster -u http://target.htb -x bak,old,swp,zip,sql,tar.gz -w common.txt\n\n# 4) point check on a found path\ncurl -s -o /dev/null -w '%{http_code} %{size_download}\\n' http://target.htb/config.php.bak\n\n# -ac (auto-calibrate) filters 'soft 200s' (custom 404s). For .swp:\n#   vim -r .config.php.swp   # recover the original from the swap"
+    },
+    {
+      "subcategory": "Detection",
+      "title": "Tell source disclosure from a normal page",
+      "language": "text",
+      "tags": ["backup", "detection", "source-leak"],
+      "body": "The goal is not '200 OK', it is 'the server returned SOURCE instead of executing it'. Signs:\n• `Content-Type: text/plain` (or `application/octet-stream`) on something normally served as html.\n• Code visible in the body: `<?php`, `<?=`, `$_GET[`, `$_POST[`, `define('DB_`, `DB_PASSWORD`, `'password' =>`, DB connection strings.\n• Response size clearly differs from the normal page of the same name.\n\nFor an archive/dump: `Content-Type: application/zip` / `application/sql`, magic bytes at the start (`PK` for zip, `SQLite format` for sqlite). Download and grep for `password`, `secret`, `api_key`, `BEGIN PRIVATE KEY`."
+    },
+    {
+      "subcategory": "Tools",
+      "title": "Wayback and nuclei for backups",
+      "language": "bash",
+      "tags": ["backup", "wayback", "nuclei", "automation"],
+      "body": "# Historical backups from the web archive (see Commands -> Recon -> Wayback CDX)\ncurl -s 'https://web.archive.org/cdx/search/cdx?url=*.example.com/*&collapse=urlkey&output=text&fl=original&filter=original:.*\\.(zip|tar\\.gz|sql|bak|old|backup|swp|env)$' | sort -u\n\n# nuclei: ready templates for backup files and dumps\nnuclei -u http://target.htb -tags backup,exposure -severity medium,high\n\n# gobuster pattern-mode: substitute the domain into archive name templates\ngobuster dir -u http://target.htb -w common.txt -x zip,tar.gz,sql,bak\n\n# Note: downloading someone's full DB dump out of scope is risky -\n# confirm minimally (header/first bytes), clear a full pull against program rules."
+    },
+    {
+      "subcategory": "Defense",
+      "title": "Prevention",
+      "language": "text",
+      "tags": ["backup", "defense", "prevention"],
+      "body": "• Do not keep backups and dumps in the webroot; back up outside DocumentRoot.\n• Deny serving service extensions at the server level (nginx/apache `location ~* \\.(bak|old|swp|save|orig|sql|zip|tar\\.gz)$ { deny all; }`).\n• Clean editor swap files on prod (`.*.swp`); do not edit files directly on production.\n• Do not ship `.env`/`config.*.dist` with real secrets into a public folder.\n• Monitor 200 responses on typical backup paths (a rare but precise leak signal)."
+    }
+  ]
+}

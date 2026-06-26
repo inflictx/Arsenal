@@ -2,7 +2,8 @@ import { h, clear } from '../lib/dom';
 import { api, type Entry } from '../api';
 import { SearchField } from '../components/searchfield';
 import { ScrollTop } from '../components/scrolltop';
-import { copyButton } from '../lib/copy';
+import { decorateCodeBlocks } from '../lib/codeblock';
+import { favoriteButton } from '../lib/favorite';
 import { renderMarkdown } from '../lib/markdown';
 import { t } from '../lib/i18n';
 
@@ -16,9 +17,10 @@ export function BurpView(outlet: HTMLElement, params: Record<string, string>): (
   const left = h('aside', { class: 'catlist' }, filter.el, treeScroll, credit);
 
   const titleEl = h('h1', { class: 'cat-h' }, 'Burp Suite');
+  const headActions = h('div', { class: 'head-actions' });
   const bodyEl = h('article', { class: 'md burp-md' });
   const right = h('div', { style: { minWidth: '0' } },
-    h('div', { class: 'cards-head' }, titleEl),
+    h('div', { class: 'cards-head' }, titleEl, headActions),
     bodyEl,
   );
 
@@ -133,13 +135,9 @@ export function BurpView(outlet: HTMLElement, params: Record<string, string>): (
     active = p;
     for (const [id, el] of rowById) el.classList.toggle('active', id === p.id);
     titleEl.textContent = p.title;
+    headActions.replaceChildren(favoriteButton(p));
     bodyEl.innerHTML = renderMarkdown(p.body ?? '');
-    bodyEl.querySelectorAll('pre').forEach((pre) => {
-      const code = pre.querySelector('code');
-      const btn = copyButton(() => (code?.textContent ?? pre.textContent ?? ''), t('burp.copy'));
-      btn.classList.add('doc-copy');
-      pre.appendChild(btn);
-    });
+    decorateCodeBlocks(bodyEl, t('burp.copy'));
   }
 
   (async () => {

