@@ -5,7 +5,7 @@
 //     progress) lives in the browser's IndexedDB — per visitor, never shared.
 //   - search runs in-memory over a lightweight index (same payload/gtfobin bias).
 // The local (server) build never imports this — it keeps using httpApi.
-import type { Entry, Stats, Category, ChecklistSummary, Checklist, ChecklistSection } from '../api';
+import type { Entry, Stats, Category, ChecklistSummary, Checklist, ChecklistSection, Api } from '../api';
 import { getLang } from './i18n';
 
 const DATA_ROOT = import.meta.env.BASE_URL + 'data/';
@@ -249,8 +249,6 @@ export const localApi = {
     return (await resolve(id))!;
   },
 
-  config(_name: string): Promise<any> { return Promise.resolve(null); },
-
   // ── Backup / restore ──
   async restore(data: any): Promise<{ entries: number; checklist_state: number }> {
     await Promise.all(STORES.map((s) => dbClear(s)));
@@ -425,4 +423,4 @@ export const localApi = {
     for (const s of all) if (s.key.startsWith(slug + '#') && s.checked) { s.checked = false; await dbPut('checklistState', s); cleared++; }
     return { slug, cleared };
   },
-};
+} satisfies Api;

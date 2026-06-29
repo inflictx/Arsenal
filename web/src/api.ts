@@ -61,7 +61,6 @@ const httpApi = {
   remove: (id: number): Promise<{ ok: boolean }> => req('/entries/' + id, { method: 'DELETE' }),
   favorite: (id: number): Promise<Entry> => req('/entries/' + id + '/favorite', { method: 'PATCH' }),
   setNotes: (id: number, notes: string): Promise<Entry> => req('/entries/' + id + '/notes', { method: 'PATCH', ...json({ notes }) }),
-  config: (name: string): Promise<any> => req('/config/' + name),
   restore: (data: unknown): Promise<{ entries: number; checklist_state: number }> => req('/restore', { method: 'POST', ...json(data) }),
   merge: (data: unknown): Promise<{ addedEntries: number; mergedState: number; addedTargets: number; addedFindings: number }> => req('/merge', { method: 'POST', ...json(data) }),
   exportBackup: (): Promise<any> => req('/backup'),
@@ -88,6 +87,11 @@ const httpApi = {
     req('/checklists/' + encodeURIComponent(slug) + '/reset', { method: 'POST' }),
 };
 
+// The shared surface both backends must implement. localApi `satisfies Api` in local-api.ts, so a
+// method added or re-typed in one backend but not the other now fails to compile instead of silently
+// diverging behind a cast.
+export type Api = typeof httpApi;
+
 // Static (GitHub Pages) build uses the client-only localApi (IndexedDB + bundled
 // JSON); the normal build keeps the server-backed httpApi. Selected at build time.
-export const api = (import.meta.env.VITE_STATIC ? localApi : httpApi) as unknown as typeof httpApi;
+export const api: Api = import.meta.env.VITE_STATIC ? localApi : httpApi;

@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify';
 import * as repo from './repo';
 import * as checklists from './checklists';
 import * as engage from './engage';
-import { getSetting } from './db';
 
 // `:id` params are validated as positive integers. Fastify coerces "5" -> 5 and rejects junk
 // with a clean 400 instead of letting NaN reach better-sqlite3 and 500 the request.
@@ -32,6 +31,14 @@ const newEntrySchema = {
   },
 };
 
+// Parse a query number, returning undefined for missing/empty/non-finite input so that
+// `?limit=abc` becomes "no limit" instead of NaN reaching the SQL LIMIT bind and 500-ing.
+const numParam = (v: string | undefined): number | undefined => {
+  if (v == null || v === '') return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+};
+
 export async function registerRoutes(app: FastifyInstance) {
   app.get('/health', async () => ({ ok: true, name: 'ARS3NAL' }));
 
@@ -50,8 +57,8 @@ export async function registerRoutes(app: FastifyInstance) {
       tag: q.tag,
       favorite: q.favorite === '1' || q.favorite === 'true',
       locale: q.locale,
-      limit: q.limit ? Number(q.limit) : undefined,
-      offset: q.offset ? Number(q.offset) : undefined,
+      limit: numParam(q.limit),
+      offset: numParam(q.offset),
     });
   });
 
@@ -97,7 +104,7 @@ export async function registerRoutes(app: FastifyInstance) {
   app.get('/search', async (req) => {
     const { q, type, limit, locale } = req.query as { q?: string; type?: string; limit?: string; locale?: string };
     if (!q) return [];
-    return repo.search(q, type, limit ? Number(limit) : undefined, locale);
+    return repo.search(q, type, numParam(limit), locale);
   });
 
   // ── Checklists ──────────────────────────────────────────────────────────
@@ -139,15 +146,6 @@ export async function registerRoutes(app: FastifyInstance) {
   app.post('/checklists/:slug/reset', async (req) => {
     const { slug } = req.params as { slug: string };
     return checklists.resetChecklist(slug);
-  });
-
-  // Generator datasets (reverse shells / commands), seeded into settings as JSON.
-  app.get('/config/:name', async (req, reply) => {
-    const { name } = req.params as { name: string };
-    const raw = getSetting(`config:${name}`);
-    if (!raw) return reply.code(404).send({ error: 'config not found' });
-    reply.header('content-type', 'application/json');
-    return raw;
   });
 
   // ── Engagements (targets) + findings ──────────────────────────────────────

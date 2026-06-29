@@ -53,6 +53,7 @@ export function deleteTarget(id: number): boolean {
   return db.prepare('DELETE FROM targets WHERE id=?').run(id).changes > 0;
 }
 export function activateTarget(id: number): Target | null {
+  if (!getTarget(id)) return null; // unknown id: don't deactivate the current target then 404
   db.prepare('UPDATE targets SET is_active=0 WHERE is_active=1').run();
   db.prepare("UPDATE targets SET is_active=1, updated_at=datetime('now') WHERE id=?").run(id);
   return getTarget(id);
