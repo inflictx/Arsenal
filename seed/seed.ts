@@ -122,10 +122,13 @@ function seedContent(locale: 'ru' | 'en'): number {
 function main() {
   console.log('[ARS3NAL] seeding database…');
 
-  // Preserve ★/notes the user set on SEEDED (is_custom=0) rows — re-applied after reseed (matched by type|category|title).
+  // Preserve ★/notes the user set on SEEDED (is_custom=0) rows — re-applied after reseed.
+  // Match by type|locale|category|title|body (mirrors repo.ts findSeed): every reference row is
+  // seeded once per locale with the same title, so WITHOUT locale+body a per-locale note bleeds
+  // onto the other locale and a second note in the loop clobbers the first (silent data loss).
   const preserved = db.prepare(
-    "SELECT type, category, title, is_favorite, notes FROM entries WHERE is_custom=0 AND (is_favorite=1 OR (notes IS NOT NULL AND notes<>''))",
-  ).all() as { type: string; category: string | null; title: string; is_favorite: number; notes: string | null }[];
+    "SELECT type, category, title, locale, body, is_favorite, notes FROM entries WHERE is_custom=0 AND (is_favorite=1 OR (notes IS NOT NULL AND notes<>''))",
+  ).all() as { type: string; category: string | null; title: string; locale: string; body: string | null; is_favorite: number; notes: string | null }[];
 
   // Idempotent: drop previously-seeded rows but NEVER touch the user's own (is_custom=1).
   const cleared = db.prepare('DELETE FROM entries WHERE is_custom=0').run().changes;
@@ -178,7 +181,7 @@ function main() {
   // Re-apply the preserved ★/notes onto the freshly-seeded rows.
   if (preserved.length) {
     const upd = db.prepare(
-      "UPDATE entries SET is_favorite=@is_favorite, notes=COALESCE(@notes, notes) WHERE is_custom=0 AND type=@type AND category IS @category AND title=@title",
+      "UPDATE entries SET is_favorite=@is_favorite, notes=COALESCE(@notes, notes) WHERE is_custom=0 AND type=@type AND locale=@locale AND IFNULL(category,'')=IFNULL(@category,'') AND title=@title AND IFNULL(body,'')=IFNULL(@body,'')",
     );
     let restored = 0;
     for (const r of preserved) restored += upd.run(r).changes;
