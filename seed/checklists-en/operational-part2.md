@@ -14,7 +14,7 @@
 - [ ] Frontend source, sourcemaps (`.js.map`)
 - [ ] Git history (`.git` exposed, public GitHub/GitLab repos, dorks `org:target filename:.env`)
 - [ ] Mobile APK/IPA (decompile -> strings)
-- [ ] Wayback Machine, public S3 buckets, Postman/Swagger collections
+- [ ] Wayback archive, public S3 buckets, Postman/Swagger collections
 - [ ] HTTP responses, headers, error pages
 
 **Detection / validation (mandatory before the report)**

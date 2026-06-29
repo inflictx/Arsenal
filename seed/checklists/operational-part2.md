@@ -14,7 +14,7 @@
 - [ ] Исходники фронта, sourcemaps (`.js.map`)
 - [ ] Git-история (`.git` экспонирован, GitHub/GitLab публичные репо, dorks `org:target filename:.env`)
 - [ ] Мобильные APK/IPA (декомпиляция → strings)
-- [ ] Wayback Machine, public S3-бакеты, Postman/Swagger коллекции
+- [ ] Wayback-архив, public S3-бакеты, Postman/Swagger коллекции
 - [ ] HTTP-ответы, заголовки, error-страницы
 
 **Детект / валидация (обязательно перед репортом)**
