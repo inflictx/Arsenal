@@ -161,8 +161,7 @@ export async function registerRoutes(app: FastifyInstance) {
     return t ?? reply.code(404).send({ error: 'not found' });
   });
   app.get('/findings', async (req) => {
-    const t = (req.query as { target?: string }).target;
-    return engage.listFindings(t != null && t !== '' ? Number(t) : undefined);
+    return engage.listFindings(numParam((req.query as { target?: string }).target));
   });
   app.post('/findings', async (req) => engage.createFinding(req.body as Partial<engage.Finding>));
   app.put('/findings/:id', idSchema, async (req, reply) => {
@@ -181,13 +180,15 @@ export async function registerRoutes(app: FastifyInstance) {
   app.post('/restore', async (req, reply) => {
     const body = req.body as { entries?: unknown };
     if (!body || !Array.isArray(body.entries)) return reply.code(400).send({ error: 'invalid backup file' });
-    return repo.importData(body);
+    try { return repo.importData(body); }
+    catch { return reply.code(400).send({ error: 'invalid backup file' }); } // malformed entry shape -> 400, not 500 (tx auto-rolls back)
   });
 
   // Merge: add a backup's personal data without wiping the current DB.
   app.post('/merge', async (req, reply) => {
     const body = req.body as { entries?: unknown };
     if (!body || !Array.isArray(body.entries)) return reply.code(400).send({ error: 'invalid backup file' });
-    return repo.mergeData(body);
+    try { return repo.mergeData(body); }
+    catch { return reply.code(400).send({ error: 'invalid backup file' }); }
   });
 }
