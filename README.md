@@ -34,7 +34,7 @@
 ## ✨ Highlights
 
 ### 🔗 Attack Chains: from a finding to impact, step by step *(new)*
-92 curated, clickable kill-chains across 11 domains (IDOR / access control, recon, injection,
+92 curated, clickable kill-chains across 11 categories (IDOR / access control, recon, injection,
 OAuth / SSO, SSRF, client-side XSS / CSRF, auth / 2FA / logic, file upload / LFI, API / GraphQL,
 modern web, AI / LLM). Each chain is tagged by level (Newbie / Intermediate / Advanced) so a
 newcomer can start easy and climb. Every step is a goal plus a concrete payload or command, with a
@@ -46,7 +46,7 @@ context tokens and the steps fill themselves in.
 Interactive crafters that assemble, never fire. The OAuth / SSO Lab builds a malicious `/authorize`
 URL (redirect_uri bypass, PKCE downgrade, state/CSRF, token leak, nOAuth) you paste into Burp. The
 JWT Workshop decodes a token and forges it in the browser: alg:none, RS256 to HS256 key confusion,
-kid path-traversal / SQLi, re-sign with a weak secret. All client-side, nothing leaves the box.
+kid path-traversal / SQLi, re-sign with a weak secret.
 
 ### 📝 Report Templates *(new)*
 Per-class report skeletons (IDOR, OAuth ATO, SSRF, XSS, SQLi, RCE, auth, LLM and more) with a CWE
@@ -84,7 +84,7 @@ badges (destructive / paid / root). All original code, RU / EN.
 
 ### 🧪 CyberChef — embedded &amp; offline
 The full official CyberChef build, embedded right in the app, re-themed to match and with
-its UI localized to Russian. Encode/decode/crypto without leaving ARS3NAL or going online.
+its UI localized to Russian. Encode, decode and crypto right inside ARS3NAL, offline.
 
 ![Embedded CyberChef](screenshots/cyberchef.png)
 
