@@ -262,7 +262,14 @@ export function ChainsView(outlet: HTMLElement, params: Record<string, string>):
     // step's own card under sibling techniques of the same chain (a Twig step drowned in Jinja2 cards,
     // an IP-encoding SSRF step drowned in cloud-metadata cards). A relevance gate then drops the long
     // tail of low-scoring siblings so a narrow step doesn't dump its whole broad category.
-    const stepToks = new Set((`${s.title} ${s.detail}`.match(/[a-zа-яё0-9_]{3,}/gi) || []).map((x) => x.toLowerCase()));
+    const detailToks = new Set((`${s.title} ${s.detail}`.match(/[a-zа-яё0-9_]{3,}/gi) || []).map((x) => x.toLowerCase()));
+    // A punctuation-only detail (a SQLi probe `' OR '1'='1'`, a cmdi `8.8.8.8; id`, a null-byte
+    // `%00.png`) yields almost no word-tokens, so chain-theme/generic cards win and the step dumps its
+    // category. For those token-POOR steps only, fold in s.success — its evidence words ("error in your
+    // SQL syntax", "uid=") give the on-topic card something to match. Token-rich steps stay untouched
+    // (folding success there only adds noise and reshuffles already-good results).
+    const stepToks = detailToks.size >= 5 ? detailToks
+      : new Set([...detailToks, ...((s.success.match(/[a-zа-яё0-9_]{3,}/gi) || []).map((x) => x.toLowerCase()))]);
     const chainToks = new Set(((active?.tags ?? []).slice(2).join(' ').match(/[a-zа-яё0-9_]{3,}/gi) || []).map((x) => x.toLowerCase()));
     for (const t of stepToks) chainToks.delete(t); // a step token already counts at full weight
     const needle = s.detail.toLowerCase().replace(/\s+/g, ' ').slice(0, 24);
