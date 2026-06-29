@@ -153,8 +153,8 @@
         },
         {
           "title": "Skip the confirmation step",
-          "kind": "payload",
-          "q": "Account Takeover",
+          "kind": "note",
+          "q": "",
           "detail": "replay the final success request / POST /account/email/confirm directly without completing email confirmation"
         },
         {
@@ -421,8 +421,8 @@
         },
         {
           "title": "Obtain a known ID",
-          "kind": "payload",
-          "q": "Account Takeover",
+          "kind": "note",
+          "q": "",
           "detail": "grab an anonymous session, or set one via an accepted param/cookie (?sessionid=ATTACKER)"
         },
         {
@@ -465,8 +465,8 @@
         },
         {
           "title": "Skip verification",
-          "kind": "payload",
-          "q": "Account Takeover",
+          "kind": "note",
+          "q": "",
           "detail": "log in right after POST /register; if GET /dashboard loads unverified, the gate is client-side only",
           "success": "GET /dashboard opens without verification"
         },

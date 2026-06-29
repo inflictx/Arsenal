@@ -156,7 +156,7 @@
         "kid-injection",
         "bfla"
       ],
-      "realWorld": "PortSwigger 'Algorithm confusion attacks'; Auth0 jsonwebtoken alg:none (CVE-2015-9235); HackTricks JWT.",
+      "realWorld": "PortSwigger 'Algorithm confusion attacks'; Auth0 jsonwebtoken RS256/HS256 confusion (CVE-2015-9235); HackTricks JWT.",
       "defense": "Hard-pin a single server-side algorithm, reject alg:none, separate keys by purpose, validate kid against an allow-list.",
       "steps": [
         {
@@ -215,8 +215,8 @@
         },
         {
           "title": "Swap the tenant selector while keeping your own session",
-          "kind": "payload",
-          "q": "Insecure Direct Object References",
+          "kind": "note",
+          "q": "",
           "detail": "Change X-Tenant-ID, org_id=, /api/orgs/{otherOrg}/..., or Host: tenantB.app.com",
           "success": "the response holds another tenant's data (leads/invoices)"
         },
@@ -308,8 +308,8 @@
         },
         {
           "title": "Plant the victim's object ID in the write field",
-          "kind": "payload",
-          "q": "Insecure Direct Object References",
+          "kind": "note",
+          "q": "",
           "detail": "POST /reports {\"data_source_id\":<victimId>}  (write-side only checks you own the report)"
         },
         {

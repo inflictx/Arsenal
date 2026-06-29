@@ -143,7 +143,7 @@
         {
           "title": "Поднимаем ребиндер",
           "kind": "note",
-          "detail": "Singularity of Origin (NCC Group), или <pubIP>.<metaIP>.rbndr.us с TTL 0"
+          "detail": "Singularity of Origin (NCC Group), или <hexPubIP>.<hexMetaIP>.rbndr.us (hex-кодирование IP, напр. 7f000001.a9fea9fe; TTL 0)"
         },
         {
           "title": "Проходим проверку IP",
@@ -372,8 +372,8 @@
         },
         {
           "title": "Переключаемся на аудиторию Graph",
-          "kind": "payload",
-          "q": "Server Side Request Forgery",
+          "kind": "note",
+          "q": "",
           "detail": "resource=https://graph.microsoft.com  ->  enumerate/escalate в Entra ID, если у MI есть directory roles"
         },
         {

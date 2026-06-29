@@ -51,8 +51,8 @@
         },
         {
           "title": "Поднять чтение до записи",
-          "kind": "payload",
-          "q": "Insecure Direct Object References",
+          "kind": "note",
+          "q": "",
           "detail": "PUT /api/users/1006 {\"email\":\"{EMAIL}\"}",
           "success": "200 и email жертвы изменён"
         },
@@ -111,8 +111,8 @@
         },
         {
           "title": "Проверить запись (write-side BOLA)",
-          "kind": "payload",
-          "q": "Insecure Direct Object References",
+          "kind": "note",
+          "q": "",
           "detail": "PATCH /api/orders/9001 {\"shipping_address\":\"...\"} as another user; 200 = tamper others' objects"
         },
         {
@@ -159,8 +159,8 @@
         },
         {
           "title": "Попробовать подмену HTTP-метода",
-          "kind": "payload",
-          "q": "Обход 403 / контроль доступа",
+          "kind": "note",
+          "q": "",
           "detail": "flip GET /api/users/9001 to DELETE/PUT, or add header X-HTTP-Method-Override: PUT"
         },
         {
@@ -172,7 +172,7 @@
         {
           "title": "Доказать privesc: повысить пользователя до admin",
           "kind": "payload",
-          "q": "Insecure Direct Object References",
+          "q": "Mass Assignment",
           "detail": "PUT /api/users/9001/role {\"role\":\"admin\"} as low-priv -> re-login, confirm elevation"
         },
         {

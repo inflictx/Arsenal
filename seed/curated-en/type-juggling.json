@@ -82,10 +82,10 @@
     },
     {
       "subcategory": "Loose comparison",
-      "title": "PHP 8 - type juggling when comparing strings with numbers is almost dead",
+      "title": "PHP 8 - what changed (magic hashes are still alive)",
       "language": "text",
       "tags": ["loose-comparison", "php8", "mitigation"],
-      "body": "In PHP 8 a string is no longer coerced to a number automatically (RFC \"Saner string to number comparisons\") - collisions with hashes starting with 0e and similar are finally a thing of the past.\n\nThe RFC \"Consistent type errors for internal functions\" removes bypasses of the form 0 == strcmp($_GET['username'], $password): strcmp no longer returns null with a warning, but throws a proper exception.\n\nBottom line: magic hashes and strcmp tricks work on PHP <= 7, but not on PHP 8."
+      "body": "PHP 8 (RFC \"Saner string to number comparisons\") changed ONLY non-numeric-string vs number comparisons: `abc == 0` and ` == 0` are now false. But a `0e...` hash is a NUMERIC string, so magic hashes are STILL ALIVE on PHP 8: `md5($a) == md5($b)` (both of the form `0e[digits]`) and even `md5($x) == 0` are still true - see the php:8.3 brute-force entry below, it proves exactly this.\n\nWhat actually died on PHP 8: the `0 == strcmp($a, $b)` trick (strcmp throws a TypeError on non-strings instead of null+warning) and non-numeric-string vs int comparisons.\n\nBottom line: 0e hash collisions work on ALL PHP versions; PHP 8 only killed the strcmp-null and non-numeric-string-vs-int tricks."
     },
     {
       "subcategory": "Magic Hashes",

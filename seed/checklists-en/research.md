@@ -1,10 +1,10 @@
 # Web/API Security: research reference (2025-2026)
 
-> Companion document to `checklists.md`. This is the "why and where from": impact, current 2025-2026 techniques, recent CVEs, links to primary sources. The "go and check off" checklists are in `checklists.md`.
+> Companion document to `operational.md`. This is the "why and where from": impact, current 2025-2026 techniques, recent CVEs, links to primary sources. The "go and check off" checklists are in `operational.md`.
 > Explanations in English; payloads, commands, tool names, headers and parameters are kept technical as-is.
 
 ## TL;DR
-- **The highest ROI in 2025-2026 is API logic and desync, not classic reflected XSS.** Largest payouts: HTTP Request Smuggling ($5K-$30K+; Kettle earned >$350K for "HTTP/1.1 Must Die"), Account Takeover ($1K-$20K), cloud SSRF ($1K-$15K), BOLA/IDOR + Mass Assignment chains in APIs.
+- **The highest ROI in 2025-2026 is API logic and desync, not classic reflected XSS.** Largest payouts: HTTP Request Smuggling ($5K-$30K+; the "HTTP/1.1 Must Die" research drew >$350K in total payouts), Account Takeover ($1K-$20K), cloud SSRF ($1K-$15K), BOLA/IDOR + Mass Assignment chains in APIs.
 - **"Old" classes have been revived with new tooling:** the single-packet attack made race conditions massively exploitable; PHP filter chains and cnext turn any LFI into RCE; GadgetBuilder (NordSec 2025) brought back 17 ysoserial chains on Java 16+; algorithm confusion in JWT yields a cluster of fresh CVEs.
 - **Defensive mechanisms are bypassed systematically:** DOMPurify (mXSS), SameSite cookies (Lax+POST 120 s window, client-side redirect gadgets), WAF (JSON-based SQLi, Ghost Bits Unicode), IMDSv2 (DNS rebinding / TOCTOU).
 
@@ -220,7 +220,7 @@ Exploitation is two-stage: (1) pollute the prototype; (2) trigger a gadget (a pr
 
 ## 23. Mass Assignment
 
-Occurs with auto-binding of input JSON/form directly to a backend model: at registration you send `username`/`password`, but the model contains `role`/`is_admin`/`balance`, and if the developer didn't restrict the fields - the extra ones are accepted and written to the DB. Often silent (no visible error). #3-7 in OWASP API Security.
+Occurs with auto-binding of input JSON/form directly to a backend model: at registration you send `username`/`password`, but the model contains `role`/`is_admin`/`balance`, and if the developer didn't restrict the fields - the extra ones are accepted and written to the DB. Often silent (no visible error). API3:2023 (BOPLA) in the OWASP API Security Top 10.
 
 The main value is **chaining with IDOR** for ATO (set `password`/`email` on someone else's object) or instant privilege escalation (`"role":"admin"`). When testing, first add a fake field - if the response doesn't change, there is probably a filter; then try real fields and variations.
 
@@ -241,7 +241,7 @@ The idea: if a delimiter (e.g. `$`) is treated differently by the origin and the
 - **The 120 s window (Lax+POST)** applies only to cookies without an explicit `SameSite` (Chrome default) and is a temporary Chrome measure that may be removed/shortened.
 - **Numeric payouts** (>$350K, $221K for Akamai) are cited from the primary source (PortSwigger whitepaper) and illustrate impact, not a guarantee of payouts in a specific program.
 - Some payloads and techniques (PHP filter chains RCE, cnext, ysoserial/GadgetBuilder, single-packet race) are **destructive/load-heavy** - only within an authorized scope; many programs prohibit DoS and mass account creation.
-- This is the **first pass** over the 24 priority categories. The remaining ones of the 64 PayloadsAllTheThings (CRLF, SSI/ESI, XSLT, LDAP, XPath, SAML Injection, Web Sockets/CSWSH, Clickjacking, CSPT, Dependency Confusion, Prompt Injection/LLM, ReDoS, Type Juggling, Upload Insecure Files, Virtual Hosts, XS-Leaks, Zip Slip, etc.) are in subsequent passes.
+- These 24 are the priority categories; the remaining ones of the 64 PayloadsAllTheThings (CRLF, SSI/ESI, XSLT, LDAP, XPath, SAML Injection, Web Sockets/CSWSH, Clickjacking, CSPT, Dependency Confusion, Prompt Injection/LLM, ReDoS, Type Juggling, Upload Insecure Files, Virtual Hosts, XS-Leaks, Zip Slip, etc.) are covered in part 2.
 
 ---
 

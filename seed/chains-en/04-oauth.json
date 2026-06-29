@@ -210,8 +210,8 @@
         },
         {
           "title": "Pass the token across clients",
-          "kind": "payload",
-          "q": "OAuth Misconfiguration",
+          "kind": "note",
+          "q": "",
           "detail": "mint an access_token via your own OAuth app, then substitute it (or swap code->access_token) into the victim RP's verify call"
         },
         {
@@ -269,8 +269,8 @@
         },
         {
           "title": "Trojan Identifier (TID)",
-          "kind": "payload",
-          "q": "Account Takeover",
+          "kind": "note",
+          "q": "",
           "detail": "attach an attacker-controlled federated id or recovery (phone / 2nd email) that survives the victim's password reset"
         },
         {

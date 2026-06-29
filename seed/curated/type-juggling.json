@@ -82,10 +82,10 @@
     },
     {
       "subcategory": "Слабое сравнение",
-      "title": "PHP 8 — type juggling при сравнении строк с числами почти умер",
+      "title": "PHP 8 — что изменилось (магические хэши всё ещё живы)",
       "language": "text",
       "tags": ["loose-comparison", "php8", "mitigation"],
-      "body": "В PHP 8 строка больше не приводится к числу автоматически (RFC «Saner string to number comparisons») — коллизии с хэшами, начинающимися на 0e и подобными, наконец в прошлом.\n\nRFC «Consistent type errors for internal functions» убирает обходы вида 0 == strcmp($_GET['username'], $password): strcmp больше не возвращает null с warning, а бросает нормальное исключение.\n\nИтог: магические хэши и strcmp-трюки работают на PHP <= 7, на PHP 8 — нет."
+      "body": "PHP 8 (RFC «Saner string to number comparisons») изменил ТОЛЬКО сравнение НЕчисловой строки с числом: `abc == 0` и ` == 0` теперь false. Но `0e...`-хэш это ЧИСЛОВАЯ строка, поэтому магические хэши ЖИВЫ и на PHP 8: `md5($a) == md5($b)` (оба вида `0e[цифры]`) и даже `md5($x) == 0` по-прежнему true — см. брутфорс на php:8.3 ниже, он это и доказывает.\n\nЧто реально умерло на PHP 8: трюк `0 == strcmp($a, $b)` (strcmp бросает TypeError на не-строках вместо null+warning) и сравнения нечисловых строк с int.\n\nИтог: 0e-коллизии хэшей работают на ВСЕХ версиях PHP; PHP 8 убил только strcmp-null и «нечисловая строка == int»."
     },
     {
       "subcategory": "Magic Hashes",

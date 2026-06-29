@@ -7,7 +7,7 @@
       "title": "Что это и где искать",
       "language": "text",
       "tags": ["php", "extract", "methodology"],
-      "body": "PHP-функции extract($_GET/$_POST), import_request_variables(), parse_str() и register_globals импортируют пользовательский ввод в текущие переменные.\nextract() по умолчанию EXTR_OVERWRITE → ПЕРЕЗАПИСЫВАЕТ существующие переменные с тем же именем.\nИмпакт: обход логики/аутентификации, гаджет для LFI и RCE. Ищи в исходниках extract($_GET) и подобное."
+      "body": "PHP-функции extract($_GET/$_POST), import_request_variables(), parse_str() и register_globals импортируют пользовательский ввод в текущие переменные.\nextract() по умолчанию EXTR_OVERWRITE → ПЕРЕЗАПИСЫВАЕТ существующие переменные с тем же именем.\nИмпакт: обход логики/аутентификации, гаджет для LFI и RCE. Ищи в исходниках extract($_GET) и подобное. Прим.: register_globals и import_request_variables() удалены в PHP 5.4 — на PHP 7/8 актуальны только extract()/parse_str()."
     },
     {
       "subcategory": "Перезапись переменных",

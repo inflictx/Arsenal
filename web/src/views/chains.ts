@@ -250,17 +250,41 @@ export function ChainsView(outlet: HTMLElement, params: Record<string, string>):
     catCache.set(cat, cards);
     return cards;
   }
-  // Rank a category's payloads by relevance to the step (its concrete detail + title), like checklists.
+  // Rank a category's payloads by relevance to the step. Tokens come from the step's concrete
+  // detail + title AND the chain's curated topical tags (drop the leading domain/level slugs).
+  // Those tags bridge the language gap on prose-only steps: an English-authored step detail and a
+  // Russian card corpus still meet at the cards' English tags ("exfil"/"markdown-image"/"ssrf"…).
+  // A hit in the card's title/subcategory or its tags weighs more than a stray mention buried in
+  // the body, so the on-topic card outranks a generic one that merely name-drops the keyword.
   function rankPayloads(cards: Entry[], s: Step): Entry[] {
-    const toks = new Set((`${s.title} ${s.detail}`.match(/[a-zа-яё0-9_]{3,}/gi) || []).map((x) => x.toLowerCase()));
+    // The STEP's own words decide relevance at full weight (title/subcat +3, tags +2, body +1).
+    // The chain's topical tags are only a gentle +1 nudge — at full weight they used to BURY the
+    // step's own card under sibling techniques of the same chain (a Twig step drowned in Jinja2 cards,
+    // an IP-encoding SSRF step drowned in cloud-metadata cards). A relevance gate then drops the long
+    // tail of low-scoring siblings so a narrow step doesn't dump its whole broad category.
+    const stepToks = new Set((`${s.title} ${s.detail}`.match(/[a-zа-яё0-9_]{3,}/gi) || []).map((x) => x.toLowerCase()));
+    const chainToks = new Set(((active?.tags ?? []).slice(2).join(' ').match(/[a-zа-яё0-9_]{3,}/gi) || []).map((x) => x.toLowerCase()));
+    for (const t of stepToks) chainToks.delete(t); // a step token already counts at full weight
     const needle = s.detail.toLowerCase().replace(/\s+/g, ' ').slice(0, 24);
-    return cards.map((c) => {
-      const hay = `${c.title} ${c.subcategory ?? ''} ${c.body ?? ''} ${(c.tags ?? []).join(' ')}`.toLowerCase();
+    const scored = cards.map((c) => {
+      const head = `${c.title} ${c.subcategory ?? ''}`.toLowerCase();
+      const tags = (c.tags ?? []).join(' ').toLowerCase();
+      const body = (c.body ?? '').toLowerCase();
       let score = 0;
-      for (const tk of toks) if (hay.includes(tk)) score++;
-      if (needle.length > 6 && hay.includes(needle)) score += 6;
+      for (const tk of stepToks) {
+        if (head.includes(tk)) score += 3;
+        else if (tags.includes(tk)) score += 2;
+        else if (body.includes(tk)) score += 1;
+      }
+      for (const tk of chainToks) {
+        if (head.includes(tk) || tags.includes(tk)) score += 1; // chain theme — gentle nudge, never outvotes the step
+      }
+      if (needle.length > 6 && body.replace(/\s+/g, ' ').includes(needle)) score += 6; // literal payload phrase verbatim
       return { c, score };
-    }).filter((x) => x.score > 0).sort((a, b) => b.score - a.score).map((x) => x.c);
+    }).filter((x) => x.score > 0).sort((a, b) => b.score - a.score);
+    if (!scored.length) return [];
+    const gate = Math.max(2, scored[0]!.score * 0.4); // relevance gate: hide the tail of siblings far below the best card
+    return scored.filter((x) => x.score >= gate).map((x) => x.c);
   }
 
   // Scripts: loaded once, ranked against the step like the payloads, rendered inline.

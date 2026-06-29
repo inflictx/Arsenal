@@ -50,8 +50,8 @@
         },
         {
           "title": "Escalate read to write",
-          "kind": "payload",
-          "q": "Insecure Direct Object References",
+          "kind": "note",
+          "q": "",
           "detail": "PUT /api/users/1006 {\"email\":\"{EMAIL}\"}",
           "success": "200 and the victim's email is changed"
         },
@@ -109,8 +109,8 @@
         },
         {
           "title": "Test writes (write-side BOLA)",
-          "kind": "payload",
-          "q": "Insecure Direct Object References",
+          "kind": "note",
+          "q": "",
           "detail": "PATCH /api/orders/9001 {\"shipping_address\":\"...\"} as another user; 200 = tamper others' objects"
         },
         {
@@ -168,7 +168,7 @@
         {
           "title": "Prove privesc: elevate a user to admin",
           "kind": "payload",
-          "q": "Insecure Direct Object References",
+          "q": "Mass Assignment",
           "detail": "PUT /api/users/9001/role {\"role\":\"admin\"} as low-priv -> re-login, confirm elevation"
         },
         {

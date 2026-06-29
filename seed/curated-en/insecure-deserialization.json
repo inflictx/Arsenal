@@ -334,7 +334,7 @@
       "title": "Phar Deserialization - the concept",
       "language": "text",
       "tags": ["php", "phar", "deserialization"],
-      "body": "Through the phar:// wrapper you can trigger deserialization of the archive's metadata when accessing a file, e.g. file_get_contents(\"phar://./archives/app.phar\"). Deserialization happens even without an explicit unserialize() - a file operation on the phar is enough.\nA valid PHAR consists of 4 parts:\n1. Stub - a piece of PHP code, executed on access in an executable context; at minimum it must end with __HALT_COMPILER();. There are no other restrictions on the stub's content.\n2. Manifest - metadata about the archive and its contents.\n3. File Contents - the archive's files themselves.\n4. Signature (optional) - for integrity verification."
+      "body": "Through the phar:// wrapper you can trigger deserialization of the archive's metadata when accessing a file, e.g. file_get_contents(\"phar://./archives/app.phar\"). Deserialization happens even without an explicit unserialize() - a file operation on the phar is enough.\nA valid PHAR consists of 4 parts:\n1. Stub - a piece of PHP code, executed on access in an executable context; at minimum it must end with __HALT_COMPILER();. There are no other restrictions on the stub's content.\n2. Manifest - metadata about the archive and its contents.\n3. File Contents - the archive's files themselves.\n4. Signature (optional) - for integrity verification.\n\nImportant (PHP 8+): auto-unserialize of phar metadata on file ops (file_exists, file_get_contents, etc.) was REMOVED in PHP 8.0 - now only an explicit Phar::getMetadata() triggers it. On PHP 8 the target is usually not vulnerable to auto-phar."
     },
     {
       "subcategory": "PHP",

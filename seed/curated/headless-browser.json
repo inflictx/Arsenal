@@ -21,7 +21,7 @@
       "title": "Небезопасные флаги (--allow-file-access)",
       "language": "bash",
       "tags": ["headless", "file-read", "flags"],
-      "body": "google-chrome-stable --disable-gpu --headless=new --no-sandbox --no-first-run --disable-web-security -–allow-file-access-from-files --allow-file-access --allow-cross-origin-auth-prompt --user-data-dir"
+      "body": "google-chrome-stable --disable-gpu --headless=new --no-sandbox --no-first-run --disable-web-security --allow-file-access-from-files --allow-file-access --allow-cross-origin-auth-prompt --user-data-dir"
     },
     {
       "subcategory": "Чтение файлов",
@@ -91,7 +91,7 @@
       "title": "Эксплуатация через CVE браузера",
       "language": "text",
       "tags": ["headless", "cve", "rce"],
-      "body": "Определи браузер по User-Agent → выбери эксплойт под компонент (V8, Blink, WebKit).\nChrome: CVE-2024-9122 (WASM type confusion), CVE-2025-5419 (OOB read/write в V8).\nFirefox: CVE-2024-9680 (use-after-free).\nФлаг --no-sandbox отключает песочницу рендерера (puppeteer.launch({args:['--no-sandbox']})) — резко упрощает RCE."
+      "body": "Определи браузер по User-Agent → выбери эксплойт под компонент (V8, Blink, WebKit).\nChrome: CVE-2024-9122 (V8 type confusion), CVE-2025-5419 (OOB read/write в V8).\nFirefox: CVE-2024-9680 (use-after-free).\nФлаг --no-sandbox отключает песочницу рендерера (puppeteer.launch({args:['--no-sandbox']})) — резко упрощает RCE."
     }
   ]
 }

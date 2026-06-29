@@ -1,6 +1,6 @@
 # Web/API Security: research reference - part 2 (2025-2026)
 
-> Continuation of `research.md`. The remaining 39 categories of the 64. Companion document to `checklists-part2.md`. The "why and where from": impact, current 2025-2026 techniques, recent CVEs, sources.
+> Continuation of `research.md`. The remaining 39 categories of the 64. Companion document to `operational-part2.md`. The "why and where from": impact, current 2025-2026 techniques, recent CVEs, sources.
 
 ## TL;DR part 2
 - **The hottest fresh stuff:** SAML signature-wrapping returned as a cluster of criticals via parser-differential (PortSwigger "The Fragile Lock", Dec 2025; ruby-saml/samlify CVE), CSPT took shape as a standalone class (CSPT2CSRF/CSPT2XSS, Doyensec), ORM Leak - a new class from elttam (Black Hat EU "ORMageddon") + Django CVE-2025-64459 (SQLi via ORM, 9.1), reverse-proxy path confusion gave an unauth auth-bypass in PAN-OS (CVE-2025-0108), prompt injection - #1 in the OWASP Top 10 for LLM 2025.

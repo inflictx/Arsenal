@@ -7,7 +7,7 @@
       "title": "What it is and where to look",
       "language": "text",
       "tags": ["php", "extract", "methodology"],
-      "body": "The PHP functions extract($_GET/$_POST), import_request_variables(), parse_str() and register_globals import user input into the current variables.\nextract() defaults to EXTR_OVERWRITE -> it OVERWRITES existing variables with the same name.\nImpact: bypassing logic/authentication, a gadget for LFI and RCE. Look in the source for extract($_GET) and the like."
+      "body": "The PHP functions extract($_GET/$_POST), import_request_variables(), parse_str() and register_globals import user input into the current variables.\nextract() defaults to EXTR_OVERWRITE -> it OVERWRITES existing variables with the same name.\nImpact: bypassing logic/authentication, a gadget for LFI and RCE. Look in the source for extract($_GET) and the like. Note: register_globals and import_request_variables() were removed in PHP 5.4 - only extract()/parse_str() apply on PHP 7/8."
     },
     {
       "subcategory": "Variable overwrite",

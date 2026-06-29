@@ -21,7 +21,7 @@
       "title": "Unsafe flags (--allow-file-access)",
       "language": "bash",
       "tags": ["headless", "file-read", "flags"],
-      "body": "google-chrome-stable --disable-gpu --headless=new --no-sandbox --no-first-run --disable-web-security -–allow-file-access-from-files --allow-file-access --allow-cross-origin-auth-prompt --user-data-dir"
+      "body": "google-chrome-stable --disable-gpu --headless=new --no-sandbox --no-first-run --disable-web-security --allow-file-access-from-files --allow-file-access --allow-cross-origin-auth-prompt --user-data-dir"
     },
     {
       "subcategory": "File read",
@@ -91,7 +91,7 @@
       "title": "Exploitation via a browser CVE",
       "language": "text",
       "tags": ["headless", "cve", "rce"],
-      "body": "Identify the browser by its User-Agent -> pick an exploit for the component (V8, Blink, WebKit).\nChrome: CVE-2024-9122 (WASM type confusion), CVE-2025-5419 (OOB read/write in V8).\nFirefox: CVE-2024-9680 (use-after-free).\nThe --no-sandbox flag disables the renderer sandbox (puppeteer.launch({args:['--no-sandbox']})) - it dramatically simplifies RCE."
+      "body": "Identify the browser by its User-Agent -> pick an exploit for the component (V8, Blink, WebKit).\nChrome: CVE-2024-9122 (V8 type confusion), CVE-2025-5419 (OOB read/write in V8).\nFirefox: CVE-2024-9680 (use-after-free).\nThe --no-sandbox flag disables the renderer sandbox (puppeteer.launch({args:['--no-sandbox']})) - it dramatically simplifies RCE."
     }
   ]
 }

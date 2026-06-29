@@ -42,21 +42,21 @@
       "title": "Manually recovering a file by commit hash",
       "language": "bash",
       "tags": ["git", "recovery", "manual"],
-      "body": "# create an empty .git repository\ngit init test\ncd test/.git\n\n# download the file\nwget http://web.site/.git/objects/26/e35470d38c4d6815bc4426a862d5399f04865c\n\n# first byte for subdirectory, remaining bytes for filename\nmkdir .git/object/26\nmv e35470d38c4d6815bc4426a862d5399f04865c .git/objects/26/\n\n# display the file\ngit cat-file -p 26e35470d38c4d6815bc4426a862d5399f04865c\n    tree 323240a3983045cdc0dec2e88c1358e7998f2e39\n    parent 15ca375e54f056a576905b41a417b413c57df6eb\n    author Michael <michael@easyctf.com> 1489390329 +0000\n    committer Michael <michael@easyctf.com> 1489390329 +0000\n    Initial."
+      "body": "# create an empty .git repository\ngit init test\ncd test/.git\n\n# download the file\nwget http://web.site/.git/objects/26/e35470d38c4d6815bc4426a862d5399f04865c\n\n# first byte for subdirectory, remaining bytes for filename\nmkdir .git/objects/26\nmv e35470d38c4d6815bc4426a862d5399f04865c .git/objects/26/\n\n# display the file\ngit cat-file -p 26e35470d38c4d6815bc4426a862d5399f04865c\n    tree 323240a3983045cdc0dec2e88c1358e7998f2e39\n    parent 15ca375e54f056a576905b41a417b413c57df6eb\n    author Michael <michael@easyctf.com> 1489390329 +0000\n    committer Michael <michael@easyctf.com> 1489390329 +0000\n    Initial."
     },
     {
       "subcategory": "Git",
       "title": "Reading a tree object",
       "language": "bash",
       "tags": ["git", "recovery", "tree"],
-      "body": "wget http://web.site/.git/objects/32/3240a3983045cdc0dec2e88c1358e7998f2e39\nmkdir .git/object/32\nmv 3240a3983045cdc0dec2e88c1358e7998f2e39 .git/objects/32/\n\ngit cat-file -p 323240a3983045cdc0dec2e88c1358e7998f2e39\n    040000 tree bd083286051cd869ee6485a3046b9935fbd127c0        css\n    100644 blob cb6139863967a752f3402b3975e97a84d152fd8f        flag.txt\n    040000 tree 14032aabd85b43a058cfc7025dd4fa9dd325ea97        fonts\n    100644 blob a7f8a24096d81887483b5f0fa21251a7eefd0db1        index.html\n    040000 tree 5df8b56e2ffd07b050d6b6913c72aec44c8f39d8        js"
+      "body": "wget http://web.site/.git/objects/32/3240a3983045cdc0dec2e88c1358e7998f2e39\nmkdir .git/objects/32\nmv 3240a3983045cdc0dec2e88c1358e7998f2e39 .git/objects/32/\n\ngit cat-file -p 323240a3983045cdc0dec2e88c1358e7998f2e39\n    040000 tree bd083286051cd869ee6485a3046b9935fbd127c0        css\n    100644 blob cb6139863967a752f3402b3975e97a84d152fd8f        flag.txt\n    040000 tree 14032aabd85b43a058cfc7025dd4fa9dd325ea97        fonts\n    100644 blob a7f8a24096d81887483b5f0fa21251a7eefd0db1        index.html\n    040000 tree 5df8b56e2ffd07b050d6b6913c72aec44c8f39d8        js"
     },
     {
       "subcategory": "Git",
       "title": "Reading file contents (blob)",
       "language": "bash",
       "tags": ["git", "recovery", "blob"],
-      "body": "wget http://web.site/.git/objects/cb/6139863967a752f3402b3975e97a84d152fd8f\nmkdir .git/object/cb\nmv 6139863967a752f3402b3975e97a84d152fd8f .git/objects/32/\ngit cat-file -p cb6139863967a752f3402b3975e97a84d152fd8f"
+      "body": "wget http://web.site/.git/objects/cb/6139863967a752f3402b3975e97a84d152fd8f\nmkdir .git/objects/cb\nmv 6139863967a752f3402b3975e97a84d152fd8f .git/objects/cb/\ngit cat-file -p cb6139863967a752f3402b3975e97a84d152fd8f"
     },
     {
       "subcategory": "Git",

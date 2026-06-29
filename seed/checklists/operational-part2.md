@@ -1,6 +1,6 @@
 # Чек-листы по уязвимостям — часть 2 (operational, 2025-2026)
 
-> Продолжение `checklists.md`. Оставшиеся 39 категорий из 64 (PayloadsAllTheThings). Формат тот же: пункт = действие, идёшь сверху вниз, отмечаешь `[x]`.
+> Продолжение `operational.md`. Оставшиеся 39 категорий из 64 (PayloadsAllTheThings). Формат тот же: пункт = действие, идёшь сверху вниз, отмечаешь `[x]`.
 > Развёрнутое исследование (impact, CVE, источники) — в `research-part2.md`.
 
 **Содержание:** [API Key Leaks](#1-api-key-leaks) · [Brute Force & Rate Limit](#2-brute-force--rate-limit) · [Clickjacking](#3-clickjacking) · [CSPT](#4-client-side-path-traversal-cspt) · [CRLF](#5-crlf-injection) · [CSS Injection](#6-css-injection) · [CSV Injection](#7-csv-injection-formula-injection) · [CVE Exploits](#8-cve-exploits) · [DNS Rebinding](#9-dns-rebinding) · [DOM Clobbering](#10-dom-clobbering) · [DoS](#11-denial-of-service) · [Dependency Confusion](#12-dependency-confusion) · [Encoding Transformations](#13-encoding-transformations) · [External Variable Modification](#14-external-variable-modification) · [GWT](#15-google-web-toolkit-gwt) · [HPP](#16-http-parameter-pollution-hpp) · [Headless Browser](#17-headless-browser) · [Hidden Parameters](#18-hidden-parameters) · [Insecure Management Interface](#19-insecure-management-interface) · [Insecure Randomness](#20-insecure-randomness) · [SCM Leaks (.git/.svn)](#21-insecure-source-code-management-gitsvn-leaks) · [Java RMI](#22-java-rmi) · [LDAP Injection](#23-ldap-injection) · [LaTeX Injection](#24-latex-injection) · [ORM Leak](#25-orm-leak) · [Prompt Injection (LLM)](#26-prompt-injection-llm) · [ReDoS](#27-regular-expression-redos) · [Reverse Proxy Misconfig](#28-reverse-proxy-misconfigurations) · [SAML Injection](#29-saml-injection) · [SSI/ESI](#30-ssi--esi-injection) · [Tabnabbing](#31-tabnabbing-reverse-tabnabbing) · [Type Juggling](#32-type-juggling) · [Upload Insecure Files](#33-upload-insecure-files) · [Virtual Hosts](#34-virtual-hosts-vhost-enumeration) · [WebSockets (CSWSH)](#35-web-sockets-cswsh) · [XPATH](#36-xpath-injection) · [XS-Leaks](#37-xs-leaks) · [XSLT](#38-xslt-injection) · [Zip Slip](#39-zip-slip)
@@ -37,7 +37,7 @@
 - [ ] Лимит вообще есть? Прогнать 50+ попыток
 - [ ] IP-rotation: заголовки `X-Forwarded-For`, `X-Real-IP`, `X-Originating-IP`, `True-Client-IP` (менять каждый запрос)
 - [ ] Сброс счётчика: смена регистра логина, добавление точки/`%00`, разные форматы (`user`, `User`, `user `)
-- [ ] Числовой OTP/PIN: single-packet race (см. §15 ч.1) для обхода лимита попыток
+- [ ] Числовой OTP/PIN: single-packet race для обхода лимита попыток
 - [ ] Reset-токен короткий/числовой → перебор
 - [ ] Distributed brute force (если лимит per-IP)
 
@@ -193,9 +193,9 @@
 - [ ] Точки с неограниченной обработкой: загрузка файлов, парсинг JSON/XML, regex по вводу, поиск, генерация отчётов/изображений, GraphQL
 
 **Детект (без полного обрушения)**
-- [ ] Алгоритмическая сложность: ReDoS-паттерн (см. §27), hash-collision
+- [ ] Алгоритмическая сложность: ReDoS-паттерн, hash-collision
 - [ ] Декомпрессия: zip/gzip bomb, XML billion laughs (entity expansion)
-- [ ] Глубоко вложенный JSON/XML; GraphQL depth/alias (см. §19 ч.1)
+- [ ] Глубоко вложенный JSON/XML; GraphQL depth/alias
 - [ ] Большие payloads без лимита размера; масштабирование времени ответа с ростом ввода (на graduated-нагрузке, не до отказа)
 
 **Инструменты:** ручной, `regexploit`
@@ -297,7 +297,7 @@
 - [ ] SSRF: `<img src="http://169.254.169.254/...">`, `<iframe src="http://internal/">`
 - [ ] Утечка через рендер в итоговый PDF/скриншот
 
-**Инструменты:** ручной, Burp Collaborator, см. §3/§4 ч.1 (SSRF/SSTI)
+**Инструменты:** ручной, Burp Collaborator (SSRF/SSTI)
 **Защита (для репорта):** `--no-sandbox` НЕ использовать; изоляция рендерера; блок `file://`/internal; таймауты; запрет внешних ресурсов
 
 ---
@@ -311,7 +311,7 @@
 **Детект / эксплуатация**
 - [ ] Брутфорс параметров: `Arjun`, `param-miner`, `x8`
 - [ ] Проверить эффект: `debug=true`, `admin=1`, `test=1`, `source=true`, `is_admin`
-- [ ] Chain → Mass Assignment (§22 ч.1), privilege escalation, debug-раскрытие, ORM Leak (§25)
+- [ ] Chain → Mass Assignment, privilege escalation, debug-раскрытие, ORM Leak
 
 **Инструменты:** `Arjun`, Burp **Param Miner**, `x8`
 **Защита (для репорта):** allowlist принимаемых параметров; отключить debug в проде; серверная авторизация
@@ -483,7 +483,7 @@
 - [ ] CRLF в небезопасных nginx-переменных (`$uri`/`$arg_`)
 - [ ] `merge_slashes off` нюансы; `proxy_pass` без слеша → traversal к бэку (`/api../`)
 
-**Инструменты:** **bypass-url-parser** (laluka), **Kyubi** (alias traversal), `ffuf`, см. §19 ч.1 (smuggling)
+**Инструменты:** **bypass-url-parser** (laluka), **Kyubi** (alias traversal), `ffuf` (smuggling)
 **Защита (для репорта):** trailing slash в `location`/`alias`; единая нормализация фронт↔бэк; очистка hop-by-hop и `X-*` заголовков; whitelisting IP для management
 
 ---
@@ -499,7 +499,7 @@
 - [ ] **Parser differential** (ruby-saml ReXML vs Nokogiri): payload, который check видит иначе, чем app-логика (CVE-2025-25291/25292/66567/66568; samlify CVE-2025-47949)
 - [ ] **Comment injection** в NameID: `admin<!---->@evil.com` → текст после комментария теряется при канонизации (старый, но проверить)
 - [ ] **Golden SAML / empty-string signature reuse** (PortSwigger «Fragile Lock», libxml2 canonicalization): подпись пустой строки → валид на произвольный Response
-- [ ] `alg`/certificate confusion; отсутствие проверки `Recipient`/`Audience`/`NotOnOrAfter`; XXE в SAML (см. §9 ч.1)
+- [ ] `alg`/certificate confusion; отсутствие проверки `Recipient`/`Audience`/`NotOnOrAfter`; XXE в SAML
 - [ ] Подменить NameID/атрибуты на `admin`
 
 **Инструменты:** Burp **SAML Raider**, `samling`, ручной XML
@@ -572,7 +572,7 @@
 - [ ] **.htaccess override** (Apache): загрузить `.htaccess` с `AddType application/x-httpd-php .jpg`
 - [ ] Полиглот / **PHP в IDAT-чанке PNG** (переживает resize через `imagecopyresized`)
 - [ ] ImageMagick (если обработка): `push graphic-context ... fill 'url(...|cmd)'` (CVE-семейство ImageTragick)
-- [ ] Path traversal в имени файла → запись вне директории (см. Zip Slip §39)
+- [ ] Path traversal в имени файла → запись вне директории (см. Zip Slip)
 - [ ] Проверить выполнение: `uploads/shell.php?cmd=id`
 
 **Инструменты:** Burp, `nuclei` (upload-bypass templates), exiftool (внедрение в метаданные)

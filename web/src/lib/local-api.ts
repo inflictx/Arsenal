@@ -60,7 +60,13 @@ async function manifest() {
 async function loadType(type: string): Promise<Entry[]> {
   if (typeCache.has(type)) return typeCache.get(type)!;
   let arr: Entry[] = [];
-  try { const r = await fetch(DATA + `entries-${type}.json`); if (r.ok) arr = await r.json(); } catch { /* empty */ }
+  // Only fetch a shard for types that were actually exported. User-only types (e.g. cmd_recipe,
+  // saved command recipes that live solely in IndexedDB) have no shard — fetching one would 404
+  // and spam the console on the static build. Their data is added from userEntries by callers.
+  const m = await manifest();
+  if (m.types[type]) {
+    try { const r = await fetch(DATA + `entries-${type}.json`); if (r.ok) arr = await r.json(); } catch { /* empty */ }
+  }
   typeCache.set(type, arr);
   return arr;
 }

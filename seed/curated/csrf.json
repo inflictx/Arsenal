@@ -162,6 +162,13 @@
       "language": "text",
       "tags": ["bypass", "referer"],
       "body": "Если сервер проверяет лишь подстроку (домен присутствует где-то в Referer), обойди наивную проверку. Помести ожидаемый домен в свой URL — как поддомен или как параметр:\n\nhttp://attacker.com/?vulnerable-website.com\nhttp://vulnerable-website.com.attacker.com/\n\nЧтобы полный путь/query попал в Referer, ослабь политику страницы:\n<meta name=\"referrer\" content=\"unsafe-url\">\nLab: PortSwigger — CSRF with broken Referer validation."
+    },
+    {
+      "subcategory": "Обход защит (токены / SameSite / Referer)",
+      "title": "Обход SameSite=Lax (дефолт Chrome)",
+      "language": "text",
+      "tags": ["samesite", "lax", "bypass"],
+      "body": "SameSite=Lax (дефолт в Chrome) пропускает кросс-сайт запрос при top-level навигации GET. Векторы:\n\nGET-действие   опасное действие принимает GET или метод-оверрайд (_method=POST) -> <a> / <form method=GET> / window.open проходят.\n2-мин окно     свежая cookie без явного SameSite ~2 минуты трактуется как None для top-level POST (Chrome Lax+POST grace, окно постепенно убирают) — успеть, пока живо.\nsibling-домен  XSS/redirect на поддомене цели делает запрос same-site (SameSite смотрит на eTLD+1, не на origin).\nПримечание     SameSite не замена CSRF-токену: при любом из векторов всё равно нужен токен."
     }
   ]
 }

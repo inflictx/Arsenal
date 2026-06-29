@@ -162,6 +162,13 @@
       "language": "text",
       "tags": ["bypass", "referer"],
       "body": "If the server checks only a substring (the domain appears somewhere in the Referer), bypass the naive check. Place the expected domain in your own URL - as a subdomain or as a parameter:\n\nhttp://attacker.com/?vulnerable-website.com\nhttp://vulnerable-website.com.attacker.com/\n\nTo get the full path/query into the Referer, relax the page policy:\n<meta name=\"referrer\" content=\"unsafe-url\">\nLab: PortSwigger - CSRF with broken Referer validation."
+    },
+    {
+      "subcategory": "Bypassing defenses (tokens / SameSite / Referer)",
+      "title": "Bypassing SameSite=Lax (Chrome default)",
+      "language": "text",
+      "tags": ["samesite", "lax", "bypass"],
+      "body": "SameSite=Lax (Chrome's default) still allows a cross-site request on a top-level GET navigation. Vectors:\n\nGET action     the dangerous action accepts GET or a method override (_method=POST) -> <a> / <form method=GET> / window.open go through.\n2-min window   a freshly set cookie with no explicit SameSite is treated as None for top-level POST for ~2 minutes (Chrome Lax+POST grace, being phased out) — race that window.\nsibling domain an XSS/redirect on a subdomain of the target makes the request same-site (SameSite keys on eTLD+1, not the origin).\nNote           SameSite is not a substitute for a CSRF token: with any of these vectors you still need the token."
     }
   ]
 }

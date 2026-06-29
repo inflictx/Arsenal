@@ -96,7 +96,7 @@
       "title": "Parsing an ObjectId into timestamp/process/counter",
       "language": "python",
       "tags": ["mongodb", "objectid", "python"],
-      "body": "def MongoDB_ObjectID(timestamp, process, counter):\n    return \"%08x%10x%06x\" % (\n        timestamp,\n        process,\n        counter,\n    )\n\ndef reverse_MongoDB_ObjectID(token):\n    timestamp = int(token[0:8], 16)\n    process = int(token[8:18], 16)\n    counter = int(token[18:24], 16)\n    return timestamp, process, counter\n\n\ndef check(token):\n    (timestamp, process, counter) = reverse_MongoDB_ObjectID(token)\n    return token == MongoDB_ObjectID(timestamp, process, counter)\n\ntokens = [\"5ae9b90a2c144b9def01ec37\", \"5ae9bac82c144b9def01ec39\"]\nfor token in tokens:\n    (timestamp, process, counter) = reverse_MongoDB_ObjectID(token)\n    print(f\"{token}: {timestamp} - {process} - {counter}\")"
+      "body": "def MongoDB_ObjectID(timestamp, process, counter):\n    return \"%08x%010x%06x\" % (\n        timestamp,\n        process,\n        counter,\n    )\n\ndef reverse_MongoDB_ObjectID(token):\n    timestamp = int(token[0:8], 16)\n    process = int(token[8:18], 16)\n    counter = int(token[18:24], 16)\n    return timestamp, process, counter\n\n\ndef check(token):\n    (timestamp, process, counter) = reverse_MongoDB_ObjectID(token)\n    return token == MongoDB_ObjectID(timestamp, process, counter)\n\ntokens = [\"5ae9b90a2c144b9def01ec37\", \"5ae9bac82c144b9def01ec39\"]\nfor token in tokens:\n    (timestamp, process, counter) = reverse_MongoDB_ObjectID(token)\n    print(f\"{token}: {timestamp} - {process} - {counter}\")"
     },
     {
       "subcategory": "Uniqid",

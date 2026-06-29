@@ -100,8 +100,8 @@
         },
         {
           "title": "Replay the stolen code/token into the victim's session",
-          "kind": "payload",
-          "q": "Account Takeover",
+          "kind": "note",
+          "q": "",
           "detail": "exchange the stolen code at /oauth/token (Dirty Dancing response_type/response_mode confusion leaks fragment tokens cross-origin)"
         }
       ]
@@ -203,8 +203,8 @@
         },
         {
           "title": "RCE C: H2 CREATE ALIAS via an accessible datasource",
-          "kind": "payload",
-          "q": "Insecure Management Interface",
+          "kind": "note",
+          "q": "",
           "detail": "set spring.datasource.url to an H2 mem DB and inject a Java stored procedure via CREATE ALIAS"
         }
       ]
@@ -346,14 +346,14 @@
         },
         {
           "title": "Self-provision an account via Identity Toolkit",
-          "kind": "payload",
-          "q": "Account Takeover",
+          "kind": "note",
+          "q": "",
           "detail": "signupNewUser via identitytoolkit.googleapis.com?key=<apiKey>  when email/password auth is open"
         },
         {
           "title": "Flip a privilege field on a record",
           "kind": "payload",
-          "q": "Account Takeover",
+          "q": "Mass Assignment",
           "detail": "PATCH /users/<uid>.json setting \"role\":\"admin\" / \"isPremium\":true"
         },
         {

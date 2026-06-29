@@ -162,7 +162,7 @@
         "kid-injection",
         "bfla"
       ],
-      "realWorld": "PortSwigger 'Algorithm confusion attacks'; Auth0 jsonwebtoken alg:none (CVE-2015-9235); HackTricks JWT.",
+      "realWorld": "PortSwigger 'Algorithm confusion attacks'; Auth0 jsonwebtoken RS256/HS256 confusion (CVE-2015-9235); HackTricks JWT.",
       "defense": "Жёстко фиксировать один серверный алгоритм, отклонять alg:none, разделять ключи по назначению, валидировать kid по allow-list.",
       "steps": [
         {
@@ -222,8 +222,8 @@
         },
         {
           "title": "Подменяем селектор арендатора, сохраняя свою сессию",
-          "kind": "payload",
-          "q": "Insecure Direct Object References",
+          "kind": "note",
+          "q": "",
           "detail": "Change X-Tenant-ID, org_id=, /api/orgs/{otherOrg}/..., or Host: tenantB.app.com",
           "success": "в ответе чужие данные арендатора (лиды/счета)"
         },
@@ -271,21 +271,21 @@
         },
         {
           "title": "Меняем HTTP-метод",
-          "kind": "payload",
-          "q": "Обход 403 / контроль доступа",
+          "kind": "note",
+          "q": "",
           "detail": "Same path as GET /api/admin/users/promote?role=admin, or PUT/PATCH/HEAD",
           "success": "ответ 200 и действие выполнено вместо 403"
         },
         {
           "title": "Подсовываем method-override заголовки",
-          "kind": "payload",
-          "q": "Обход 403 / контроль доступа",
+          "kind": "note",
+          "q": "",
           "detail": "POST + header X-HTTP-Method-Override: GET / X-Method-Override / body _method=PUT"
         },
         {
           "title": "Меняем Content-Type против фильтров по формату",
-          "kind": "payload",
-          "q": "Обход 403 / контроль доступа",
+          "kind": "note",
+          "q": "",
           "detail": "Content-Type application/json  ->  application/x-www-form-urlencoded or text/plain, same params"
         },
         {
@@ -320,8 +320,8 @@
         },
         {
           "title": "Подкладываем ID объекта жертвы в поле записи",
-          "kind": "payload",
-          "q": "Insecure Direct Object References",
+          "kind": "note",
+          "q": "",
           "detail": "POST /reports {\"data_source_id\":<victimId>}  (write-side only checks you own the report)"
         },
         {

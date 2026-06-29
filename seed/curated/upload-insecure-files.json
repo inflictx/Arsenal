@@ -319,7 +319,7 @@
       "title": "CVE-2016-3714 — суть и триггер",
       "language": "text",
       "tags": ["imagemagick", "imagetragick", "cve", "rce"],
-      "body": "Если бэкенд использует ImageMagick для ресайза/конвертации картинок, можно эксплуатировать ImageTragick (ImageMagick 7.0.1-1). Загружаем пейлоад с расширением картинки.\nТриггерится командой: convert shellexec.jpeg whatever.gif"
+      "body": "Если бэкенд использует ImageMagick для ресайза/конвертации картинок, можно эксплуатировать ImageTragick (ImageMagick до 7.0.1-1 / 6.9.3-10). Загружаем пейлоад с расширением картинки.\nТриггерится командой: convert shellexec.jpeg whatever.gif"
     },
     {
       "subcategory": "ImageMagick (ImageTragick)",

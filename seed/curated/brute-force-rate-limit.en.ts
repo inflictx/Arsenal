@@ -63,5 +63,17 @@ TLS / JA3  the server fingerprints the TLS handshake even if you swap the User-A
 IPv6 /64   providers (e.g. Vultr) hand out a /64 (~1.8e19 addresses) for mass rotation.
 Tools      OmniProx (multi-cloud IP rotation), ffuf, curl-impersonate.`,
     },
+    {
+      subcategory: 'Rate limit',
+      title: 'Rate-limit bypass: path, case and header mutations',
+      language: 'text',
+      tags: ['rate-limit', 'bypass', 'path', 'case', 'method', 'header', '403'],
+      body: `Limiters often key the bucket on the exact path/method — a tiny mutation looks like a "new" endpoint:
+Path      trailing / or //, /./, %2e, %00, ;x=1, ?cb=1, add .json — dodges a path-keyed limit.
+Case      /Login instead of /login, mixed-case method (PoST) — if the key is case-sensitive.
+Method    switch to another allowed verb (PUT/PATCH) or add an X-HTTP-Method-Override header.
+Headers   flip Content-Type (form <-> json), add junk headers/cookies if the key includes them.
+Version   HTTP/2 vs HTTP/1.1, a different host alias (www / api / raw IP) — often a separate limit.`,
+    },
   ],
 };
