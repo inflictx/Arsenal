@@ -4,9 +4,9 @@
 
 <p align="center">
   <b>A local, offline-first arsenal for pentesting &amp; bug bounty.</b><br>
-  Payloads, a click-to-build command generator, GTFOBins, ready-to-run scripts, wordlists,
-  an embedded CyberChef, reverse shells, a Burp reference, operational checklists and an
-  engagement tracker. One fast, searchable, editable app that runs entirely on your machine.
+  Clickable attack chains, payloads, a click-to-build command generator, GTFOBins, ready-to-run
+  scripts, wordlists, an embedded CyberChef, reverse shells, a Burp reference, operational
+  checklists and an engagement tracker. One fast, searchable, editable app that runs on your machine.
 </p>
 
 <p align="center">
@@ -32,6 +32,26 @@
 ---
 
 ## ✨ Highlights
+
+### 🔗 Attack Chains: from a finding to impact, step by step *(new)*
+92 curated, clickable kill-chains across 11 domains (IDOR / access control, recon, injection,
+OAuth / SSO, SSRF, client-side XSS / CSRF, auth / 2FA / logic, file upload / LFI, API / GraphQL,
+modern web, AI / LLM). Each chain is tagged by level (Newbie / Intermediate / Advanced) so a
+newcomer can start easy and climb. Every step is a goal plus a concrete payload or command, with a
+one-click jump straight into the matching Payloads / Scripts / Commands entry, and they are grounded
+in real CVEs and disclosed reports. Paste your two accounts, client_id or redirect_uri into the
+context tokens and the steps fill themselves in.
+
+### 🧰 Offline attack labs: OAuth/SSO + JWT *(new)*
+Interactive crafters that assemble, never fire. The OAuth / SSO Lab builds a malicious `/authorize`
+URL (redirect_uri bypass, PKCE downgrade, state/CSRF, token leak, nOAuth) you paste into Burp. The
+JWT Workshop decodes a token and forges it in the browser: alg:none, RS256 to HS256 key confusion,
+kid path-traversal / SQLi, re-sign with a weak secret. All client-side, nothing leaves the box.
+
+### 📝 Report Templates *(new)*
+Per-class report skeletons (IDOR, OAuth ATO, SSRF, XSS, SQLi, RCE, auth, LLM and more) with a CWE
+and a pre-filled CVSS:3.1 vector. The active engagement target and your context tokens substitute
+into the text; copy the whole report or export it to `.md`.
 
 ### 🛠️ Command builder — assemble commands by clicking flags
 The headline feature. Pick a tool, toggle the flags you want, and the command assembles

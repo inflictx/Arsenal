@@ -17,6 +17,16 @@ export const getLhost = (): string => read(LS_LHOST);
 export function setTarget(v: string): void { write(LS_TARGET, v); notify(); }
 export function setLhost(v: string): void { write(LS_LHOST, v); notify(); }
 
+// Extra context tokens for IDOR / OAuth / OOB chains: paste two accounts, a client_id, a
+// redirect_uri or your collaborator once and every payload/chain/command that uses {USER_A},
+// {CLIENT_ID}, {REDIRECT_URI}, {COLLAB}, {EMAIL} fills in. Stored per-key, fed through the same
+// `ars:target` event so every view re-substitutes live.
+export const EXTRA_TOKENS = ['USER_A', 'USER_B', 'CLIENT_ID', 'REDIRECT_URI', 'COLLAB', 'EMAIL'] as const;
+export type ExtraToken = (typeof EXTRA_TOKENS)[number];
+const LS_TOKEN = (k: string): string => 'cmd.tok.' + k;
+export const getToken = (k: string): string => read(LS_TOKEN(k));
+export function setToken(k: string, v: string): void { write(LS_TOKEN(k), v); notify(); }
+
 function notify(): void { window.dispatchEvent(new CustomEvent('ars:target')); }
 
 /** Subscribe to target/LHOST changes raised from any view. Returns an unsubscribe fn. */
@@ -55,6 +65,12 @@ export function substTarget(text: string): { out: string; changed: boolean } {
   if (lh) {
     out = out.replace(CURLY_L, () => { changed = true; return lh; });
     out = out.replace(LHOST_RE, () => { changed = true; return lh; });
+  }
+  // Extra {USER_A}/{CLIENT_ID}/{REDIRECT_URI}/{COLLAB}/... tokens — only those the user filled in.
+  for (const k of EXTRA_TOKENS) {
+    const v = getToken(k).trim();
+    if (!v) continue;
+    out = out.replace(new RegExp('\\{' + k + '\\}', 'g'), () => { changed = true; return v; });
   }
   return { out, changed };
 }

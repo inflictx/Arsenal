@@ -16,7 +16,7 @@ const shellRu: Dict = {
   'nav.reference': 'Справочник',
   'nav.workspace': 'Рабочее',
   'sidebar.brandSub': '// личный набор для пентеста',
-  'sidebar.offline': 'офлайн · v1.0',
+  'sidebar.offline': 'офлайн · v1.1',
   'topbar.searchPlaceholder': "Поиск по payload'ам, командам, техникам…",
   'topbar.entries': 'записей',
 };
@@ -25,7 +25,7 @@ const shellEn: Dict = {
   'nav.reference': 'Reference',
   'nav.workspace': 'Workspace',
   'sidebar.brandSub': '// personal payload toolkit',
-  'sidebar.offline': 'offline · v1.0',
+  'sidebar.offline': 'offline · v1.1',
   'topbar.searchPlaceholder': 'Search payloads, commands, techniques…',
   'topbar.entries': 'entries',
 };

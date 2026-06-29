@@ -10,9 +10,10 @@ import { t } from '../lib/i18n';
 
 const TYPE_LABEL: Record<string, string> = {
   note: t('favorites.typeNote'), cmd_recipe: t('favorites.typeRecipe'), command: 'Command', payload: 'Payload',
-  gtfobin: 'GTFOBins', script: 'Scripts', wordlist_ref: 'Wordlist', wordlist: 'Wordlist', doc: 'Burp Docs',
+  gtfobin: 'GTFOBins', script: 'Scripts', chain: 'Attack Chain', report_tmpl: 'Report',
+  wordlist_ref: 'Wordlist', wordlist: 'Wordlist', doc: 'Burp Docs',
 };
-const TYPE_ORDER = ['note', 'cmd_recipe', 'command', 'payload', 'gtfobin', 'script', 'wordlist_ref', 'wordlist', 'doc'];
+const TYPE_ORDER = ['note', 'cmd_recipe', 'command', 'payload', 'gtfobin', 'script', 'chain', 'report_tmpl', 'wordlist_ref', 'wordlist', 'doc'];
 
 export function FavoritesView(outlet: HTMLElement): () => void {
   clear(outlet);
@@ -47,7 +48,8 @@ export function FavoritesView(outlet: HTMLElement): () => void {
     head.append(...(copyBtn ? [copyBtn, star] : [star]));
 
     const md = h('article', { class: 'md cmd-md' });
-    md.innerHTML = renderMarkdown(e.body ?? '');
+    // a chain's "body" is search text, not prose — show its impact line instead of the raw blob.
+    md.innerHTML = renderMarkdown(e.type === 'chain' ? String((e.meta as any)?.impact ?? e.title) : (e.body ?? ''));
     decorateCodeBlocks(md, 'Copy');
 
     const kids: HTMLElement[] = [head];

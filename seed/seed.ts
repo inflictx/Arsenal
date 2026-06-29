@@ -8,6 +8,8 @@ import { parseCommands } from './parsers/commands';
 import { parseStructuredCommands, cmdKey } from './parsers/commands-structured';
 import { parseGtfobins } from './parsers/gtfobins';
 import { parseScripts } from './parsers/scripts';
+import { parseChains } from './parsers/chains';
+import { parseReports } from './parsers/reports';
 import { parseWordlistsRef } from './parsers/wordlists-ref';
 import { replaceChecklists } from '../server/checklists';
 import { CURATED, CURATED_EN } from './curated/index';
@@ -103,6 +105,16 @@ function seedContent(locale: 'ru' | 'en'): number {
   const scriptsEnDir = join(here, 'scripts-en');
   const scripts = en && existsSync(scriptsEnDir) ? parseScripts(scriptsEnDir) : parseScripts();
   total += insertMany(withLocale(scripts, locale));
+
+  // Attack Chains: curated leveled kill-chains. EN prefers chains-en/, falls back to the RU source.
+  const chainsEnDir = join(here, 'chains-en');
+  const chains = en && existsSync(chainsEnDir) ? parseChains(chainsEnDir) : parseChains();
+  total += insertMany(withLocale(chains, locale));
+
+  // Report templates (RU; EN prefers reports-en/, falls back to the RU source).
+  const reportsEnDir = join(here, 'reports-en');
+  const reports = en && existsSync(reportsEnDir) ? parseReports(reportsEnDir) : parseReports();
+  total += insertMany(withLocale(reports, locale));
 
   return total;
 }

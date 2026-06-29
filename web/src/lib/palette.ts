@@ -19,7 +19,7 @@ export function copyValueFor(e: Entry): string | null {
   const meta = (e.meta ?? {}) as Record<string, any>;
   if (e.type === 'wordlist_ref') return (meta.paths && meta.paths[0]) || meta.raw || meta.github || null;
   if (e.type === 'command' || e.type === 'gtfobin' || e.type === 'script') return firstCodeBlock(e.body ?? ''); // first command/script block, else null
-  if (e.type === 'doc') return null; // Burp docs are prose — nothing clean to copy; just open it
+  if (e.type === 'doc' || e.type === 'chain' || e.type === 'report_tmpl') return null; // prose / chain / report skeleton — open it; copy the filled version from its view
   return (e.body ?? '').trim() || null; // payload / cmd_recipe / note → the payload/command itself
 }
 function preview(e: Entry): string {
@@ -91,6 +91,8 @@ export function openPalette() {
       case 'doc': return { route: 'burp', sub: e.title };
       case 'note': return { route: 'notes', sub: e.title };
       case 'script': return { route: 'scripts', sub: e.title };
+      case 'chain': return { route: 'chains', sub: e.title };
+      case 'report_tmpl': return { route: 'reports', sub: e.title };
       default: return { route: 'payloads', sub: e.category ?? '' };
     }
   }

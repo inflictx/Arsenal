@@ -7,17 +7,21 @@ export interface NavItem { id: string; label: string; icon: string; }
 // Two groups: reference material you look things up in, and the per-engagement workspace.
 export const NAV_REFERENCE: NavItem[] = [
   { id: 'payloads', label: 'Payloads', icon: '⚡' },
+  { id: 'chains', label: 'Attack Chains', icon: '🔗' },
   { id: 'commands', label: 'Commands', icon: '⌘' },
   { id: 'scripts', label: 'Scripts', icon: '📜' },
   { id: 'gtfobins', label: 'GTFOBins', icon: '🐧' },
   { id: 'wordlists', label: 'Wordlists', icon: '📚' },
   { id: 'cyberchef', label: 'CyberChef', icon: '🧪' },
   { id: 'revshell', label: 'Reverse Shell', icon: '🐚' },
+  { id: 'oauthlab', label: 'OAuth / SSO Lab', icon: '🔓' },
+  { id: 'jwtlab', label: 'JWT Workshop', icon: '🔑' },
   { id: 'burp', label: 'Burp Docs', icon: '🟠' },
 ];
 export const NAV_WORKSPACE: NavItem[] = [
   { id: 'checklists', label: 'Checklists', icon: '☑' },
   { id: 'engage', label: 'Engagements', icon: '🎯' },
+  { id: 'reports', label: 'Report Templates', icon: '📝' },
   { id: 'notes', label: 'Notes', icon: '🗒' },
   { id: 'favorites', label: 'Favorites', icon: '★' },
   { id: 'backup', label: 'Backup', icon: '💾' },

