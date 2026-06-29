@@ -9,6 +9,12 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
     node.setAttribute('target', '_blank');
     node.setAttribute('rel', 'noopener noreferrer');
   }
+  // Root-absolute /img/* paths must respect the Vite base ('/Arsenal/' on GitHub Pages); otherwise
+  // the image 404s on the subpath deploy while still working on the base-'/' local/server build.
+  if (node.tagName === 'IMG') {
+    const src = node.getAttribute('src');
+    if (src && src.startsWith('/img/')) node.setAttribute('src', import.meta.env.BASE_URL + src.slice(1));
+  }
 });
 
 /** Render a full markdown document to safe HTML (headings, lists, tables, code…). */
