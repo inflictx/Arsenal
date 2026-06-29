@@ -121,7 +121,7 @@
     },
     {
       "subcategory": "alg: none",
-      "title": "None Algorithm (CVE-2015-9235)",
+      "title": "None Algorithm",
       "language": "text",
       "tags": ["alg-none", "cve-2015-9235", "bypass"],
       "body": "JWT supports a None algorithm for signing (probably introduced for debugging). This can critically reduce the application's security.\n\nSpelling variants of alg:\nnone\nNone\nNONE\nnOnE\n\nTo exploit it: decode the JWT, change the signing algorithm. This will NOT work until you REMOVE the signature itself. Alternatively, you can modify an existing JWT (be careful with the exp expiration)."
