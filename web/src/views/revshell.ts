@@ -2,13 +2,20 @@ import { h, clear } from '../lib/dom';
 import { codeBlock } from '../lib/highlight';
 import { copyButton } from '../lib/copy';
 import { SearchField } from '../components/searchfield';
-import { fmt, applyEncoding, ENCODINGS, type Encoding } from '../data/revshells';
+import { fmt, fmtAssembled, psB64, applyEncoding, ENCODINGS, type Encoding } from '../data/revshells';
 import { rsgData, CommandType } from '../data/rsg-data';
 import { t } from '../lib/i18n';
 
 interface Cmd { name: string; command: string; meta: string[]; }
-const DATA = rsgData as { reverseShellCommands: Cmd[]; listenerCommands: [string, string][]; shells: string[] };
+const DATA = rsgData as { reverseShellCommands: Cmd[]; listenerCommands: [string, string][]; shells: string[]; specialCommands: Record<string, string> };
 const CT = CommandType;
+
+// The PowerShell "(Base64)" rows ship as name-only placeholders; their real payload lives in
+// specialCommands and must be UTF-16LE-base64'd at gen() time (after {ip}/{port} substitution).
+const PS_B64_SPECIAL: Record<string, string> = {
+  'PowerShell #3 (Base64)': 'PowerShell payload',
+  'PowerShell #5 (stderr support) (Base64)': 'PowerShell +stderr payload',
+};
 
 const TABS: { id: string; label: string }[] = [
   { id: CT.ReverseShell, label: t('revshell.tabReverse') },
@@ -62,6 +69,17 @@ export function RevShellView(outlet: HTMLElement): () => void {
   let selectedName: string | null = null;
 
   const gen = (c: Cmd, withEnc: boolean) => {
+    // PowerShell "(Base64)" placeholders -> build the real `powershell -e <b64>` from specialCommands
+    // (already encoded, so the enc dropdown does not apply).
+    const special = PS_B64_SPECIAL[c.name];
+    if (special && DATA.specialCommands[special]) {
+      return `powershell -e ${psB64(fmt(DATA.specialCommands[special], { ip, port, shell }))}`;
+    }
+    // Assembled shellcode embeds {ip}/{port} inside the \xNN byte run -> substitute as network bytes.
+    if (c.meta.includes(CT.Assembled)) {
+      const raw = fmtAssembled(c.command, ip, port);
+      return withEnc ? applyEncoding(raw, enc, false) : raw;
+    }
     const raw = fmt(c.command, { ip, port, shell });
     return withEnc ? applyEncoding(raw, enc, isPwsh(c)) : raw;
   };
