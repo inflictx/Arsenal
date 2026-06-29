@@ -12,6 +12,21 @@ const HOST = '127.0.0.1';
 
 const app = Fastify({ logger: false, bodyLimit: 64 * 1024 * 1024 }); // 64MB — restore uploads the full backup JSON
 
+// DNS-rebinding guard. The server binds 127.0.0.1, but a malicious page can rebind its own domain
+// to 127.0.0.1 and reach this local server from the victim's browser (where the Host header is the
+// attacker's domain, not localhost). Reject any request whose Host is not one of our local origins,
+// so /api/backup can't be read nor /api/restore abused that way. Documented access is localhost:PORT.
+const ALLOWED_HOSTS = new Set([
+  `localhost:${PORT}`, `127.0.0.1:${PORT}`, `[::1]:${PORT}`,
+  'localhost', '127.0.0.1', '[::1]', // port-less forms (e.g. PORT 80/443)
+]);
+app.addHook('onRequest', async (req, reply) => {
+  const host = (req.headers.host ?? '').toLowerCase();
+  if (!ALLOWED_HOSTS.has(host)) {
+    return reply.code(403).send({ error: 'host not allowed' });
+  }
+});
+
 await app.register(registerRoutes, { prefix: '/api' });
 
 // Local personal tool — never let the browser persist ANY response to its on-disk cache.
