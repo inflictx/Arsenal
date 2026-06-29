@@ -45,8 +45,11 @@ export function PayloadCard(e: Entry, opts?: { onEdit?: (e: Entry) => void; onDe
   let targeted = titleR.changed;
 
   if (kind === 'image') {
+    // root-absolute /img/* must respect the Vite base ('/Arsenal/' on Pages) or it 404s on the subpath
+    const imgSrc = typeof meta.src === 'string' && meta.src.startsWith('/img/')
+      ? import.meta.env.BASE_URL + meta.src.slice(1) : meta.src;
     content = h('figure', { class: 'card-figure' },
-      h('img', { class: 'card-img', src: meta.src, alt: e.title, loading: 'lazy' }),
+      h('img', { class: 'card-img', src: imgSrc, alt: e.title, loading: 'lazy' }),
       meta.caption ? h('figcaption', {}, meta.caption) : null,
     );
     actions = [star];
