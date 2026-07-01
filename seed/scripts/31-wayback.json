@@ -71,6 +71,23 @@
       "source": "https://github.com/internetarchive/wayback/tree/master/wayback-cdx-server",
       "license": "GPL-3.0 (оригинал)",
       "body": "Достаёт **удалённые/недоступные сейчас** страницы прямо из архива в сыром виде. Сначала тянет из CDX все снимки со `statuscode:200`, берёт самый свежий timestamp для каждого URL, потом скачивает **сырой** контент через специальный модификатор `id_` в URL архива (`web.archive.org/web/<ts>id_/<url>`) - это отдаёт оригинальный ответ без обёртки тулбара Wayback. Удобно, чтобы восстановить старый JS, конфиг, или endpoint, который уже выпилили с боевого сайта.\n\n> Модификатор `id_` (identity) - ключевой: без него архив подмешивает свой JS/баннер и портит файлы. Берётся снимок только с `statuscode:200`, чтобы не тащить архивные 404.\n\n```bash\n#!/usr/bin/env bash\n# recover_deleted.sh - ARS3NAL (GPL-3.0). Only for AUTHORIZED testing.\nset -uo pipefail\nDOMAIN=\"${1:?usage: recover_deleted.sh <domain> [maxfetch]}\"\nMAX=\"${2:-25}\"\nDIR=\"recovered_${DOMAIN}\"; mkdir -p \"$DIR\"\nUA=\"ARS3NAL-recon/1.0\"\n\n# timestamp + original, только успешные снимки\ncurl -fsS -A \"$UA\" -G \"https://web.archive.org/cdx/search/cdx\" \\\n  --data-urlencode \"url=${DOMAIN}\" \\\n  --data-urlencode \"matchType=domain\" \\\n  --data-urlencode \"collapse=urlkey\" \\\n  --data-urlencode \"filter=statuscode:200\" \\\n  --data-urlencode \"fl=timestamp,original\" \\\n  --data-urlencode \"output=text\" 2>/dev/null > \"$DIR/_index.txt\" || true\n\necho \"[*] $(wc -l < \"$DIR/_index.txt\") snapshots, fetching up to $MAX raw\" >&2\nn=0\nwhile read -r ts url; do\n  [ -z \"${url:-}\" ] && continue\n  n=$((n+1)); [ \"$n\" -gt \"$MAX\" ] && break\n  fname=\"$DIR/$(echo \"$url\" | sed 's#https\\?://##; s#[^A-Za-z0-9._-]#_#g' | cut -c1-120)\"\n  # id_ = сырой оригинальный ответ без тулбара Wayback\n  curl -fsSL -A \"$UA\" \"https://web.archive.org/web/${ts}id_/${url}\" -o \"$fname\" 2>/dev/null || true\n  echo \"    [$n] $url\" >&2\ndone < \"$DIR/_index.txt\"\necho \"[+] raw files -> $DIR/\" >&2\n```\n\nЗапуск:\n```bash\n./recover_deleted.sh target.com 50\n```"
+    },
+    {
+      "title": "waymore harvest (gau/waybackurls суперсет + тела ответов)",
+      "lang": "bash",
+      "tags": [
+        "waymore",
+        "wayback",
+        "recon",
+        "urls",
+        "secrets"
+      ],
+      "rating": "must",
+      "deps": "pipx install waymore",
+      "placeholders": "{{DOMAIN}} · {{OUTDIR}}",
+      "source": "https://github.com/xnl-h4ck3r/waymore",
+      "license": "GPL-3.0 (оригинал)",
+      "body": "Пайплайн **waymore** (xnl-h4ck3r) - суперсет gau/waybackurls. Тянет URL из 7 источников (Wayback, Common Crawl, OTX, URLScan, VirusTotal, GhostArchive, Intelligence X) И, в отличие от gau, СКАЧИВАЕТ архивные тела ответов - старый JS, комменты разработчиков, забытые секреты. Скрипт: собирает URL, прогоняет через uro/gf, качает тела и грепает секреты.\n\n> Ключевое преимущество - `-mode R` (скачать ответы), а не только список URL. API-ключи (urlscan/virustotal/intelx) в `~/.config/waymore/config.yml`. `-mode` по умолчанию: B для голого домена, R для домена с путём.\n\ndeps: `pipx install waymore`; опц. `uro`, `gf`. placeholders: `{{DOMAIN}}`, `{{OUTDIR}}`.\n\n```bash\n#!/usr/bin/env bash\n# waymore_harvest.sh - ARS3NAL (GPL-3.0). Wraps waymore (xnl-h4ck3r). AUTHORIZED testing only.\nset -euo pipefail\nDOMAIN=\"${1:?usage: waymore_harvest.sh <domain> [outdir]}\"\nOUT=\"${2:-waymore_$DOMAIN}\"\nmkdir -p \"$OUT\"\ncommand -v waymore >/dev/null || { echo \"[!] pipx install waymore  (github.com/xnl-h4ck3r/waymore)\"; exit 1; }\n\n# 1) URLs only (7 sources)\nwaymore -i \"$DOMAIN\" -mode U -oU \"$OUT/urls.txt\"\necho \"[=] $(wc -l < \"$OUT/urls.txt\") urls\"\n\n# 2) dedup + classify into gf buckets\nif command -v uro >/dev/null; then uro -i \"$OUT/urls.txt\" > \"$OUT/urls.uro.txt\"; fi\nif [ -f \"$OUT/urls.uro.txt\" ] && command -v gf >/dev/null; then\n  for p in xss ssrf lfi redirect sqli; do gf \"$p\" < \"$OUT/urls.uro.txt\" > \"$OUT/gf-$p.txt\" 2>/dev/null || true; done\nfi\n\n# 3) waymore's edge: DOWNLOAD archived response bodies, then hunt secrets in them\nwaymore -i \"$DOMAIN\" -mode R -l 1000 -oR \"$OUT/responses\"\ngrep -rEi 'api[_-]?key|secret|authorization|aws_access_key_id|AIza[0-9A-Za-z_-]{35}|-----BEGIN' \\\n  \"$OUT/responses\" > \"$OUT/secrets.txt\" 2>/dev/null || true\necho \"[=] responses -> $OUT/responses ; secret hits -> $OUT/secrets.txt\"\n```\n\nЗапуск:\n```bash\nbash waymore_harvest.sh target.com\nbash waymore_harvest.sh target.com ~/recon/target\n```"
     }
   ]
 }

