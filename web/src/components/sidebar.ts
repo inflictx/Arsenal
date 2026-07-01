@@ -16,6 +16,7 @@ export const NAV_REFERENCE: NavItem[] = [
   { id: 'revshell', label: 'Reverse Shell', icon: '🐚' },
   { id: 'oauthlab', label: 'OAuth / SSO Lab', icon: '🔓' },
   { id: 'jwtlab', label: 'JWT Workshop', icon: '🔑' },
+  { id: 'recon', label: 'Recon Tools', icon: '📡' },
   { id: 'burp', label: 'Burp Docs', icon: '🟠' },
 ];
 export const NAV_WORKSPACE: NavItem[] = [

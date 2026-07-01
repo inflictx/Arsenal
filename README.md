@@ -42,6 +42,20 @@ one-click jump straight into the matching Payloads / Scripts / Commands entry, a
 in real CVEs and disclosed reports. Paste your two accounts, client_id or redirect_uri into the
 context tokens and the steps fill themselves in.
 
+### 🛰️ Recon Tools: Wayback CDX, IDN homograph email-ATO, dorks *(new)*
+Three offline recon crafters that only assemble what *you* run. A **Wayback CDX query builder**
+(match types, extension filters, presets) with copy-paste post-processing recipes (gau/waybackurls
+harvest, `uro` dedup, `gf` classification, `id_` deleted-file recovery, PDF secret scan). An **IDN
+homograph generator** for 0-click account takeover via punycode email: it crafts the domain-part and
+username-part look-alikes plus their on-the-wire form and the full attack workflow, with a defensive
+analyzer that decodes `xn--` and flags confusables. And a **dork builder** with 20 Google categories
+plus GitHub code-search and Shodan pivots.
+
+<p>
+  <img src="screenshots/recon.png" width="49%" alt="Wayback CDX query builder">
+  <img src="screenshots/recon-homograph.png" width="49%" alt="IDN homograph email-ATO generator">
+</p>
+
 ### 🧰 Offline attack labs: OAuth/SSO + JWT *(new)*
 Interactive crafters that assemble, never fire. The OAuth / SSO Lab builds a malicious `/authorize`
 URL (redirect_uri bypass, PKCE downgrade, state/CSRF, token leak, nOAuth) you paste into Burp. The

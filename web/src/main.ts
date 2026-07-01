@@ -20,6 +20,7 @@ import { CommandsView } from './views/commands';
 import { GtfobinsView } from './views/gtfobins';
 import { ScriptsView } from './views/scripts';
 import { ChainsView } from './views/chains';
+import { ReconView } from './views/recon';
 import { OAuthLabView } from './views/oauthlab';
 import { JwtLabView } from './views/jwtlab';
 import { ReportsView } from './views/reports';
@@ -44,6 +45,7 @@ appRoot.append(sidebar.el, main);
 const routes: Record<string, RenderFn> = {
   payloads: PayloadsView,
   chains: ChainsView,
+  recon: ReconView,
   oauthlab: OAuthLabView,
   jwtlab: JwtLabView,
   reports: ReportsView,
