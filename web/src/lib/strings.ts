@@ -19,6 +19,8 @@ const shellRu: Dict = {
   'sidebar.offline': 'офлайн · v1.1',
   'topbar.searchPlaceholder': "Поиск по payload'ам, командам, техникам…",
   'topbar.entries': 'записей',
+  'common.copy': 'Copy',
+  'common.copied': 'Скопировано',
 };
 
 const shellEn: Dict = {
@@ -28,6 +30,8 @@ const shellEn: Dict = {
   'sidebar.offline': 'offline · v1.1',
   'topbar.searchPlaceholder': 'Search payloads, commands, techniques…',
   'topbar.entries': 'entries',
+  'common.copy': 'Copy',
+  'common.copied': 'Copied',
 };
 
 const ru: Dict = { ...shellRu, ...pReference.ru, ...pTools.ru, ...pMisc.ru };
